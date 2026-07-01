@@ -1,14 +1,20 @@
 # ztmux parity suite
 
 ztmux is a from-source port of tmux, so the definition of "correct" is **tmux
-itself**. The parity suite runs the same inputs through the system `tmux` (the
-reference) and `ztmux` (the port) and compares their output byte-for-byte —
-mirroring the sibling ports (zshrs vs system `zsh`, strykelang vs system `perl`).
+itself** — specifically the exact tmux under `vendor/tmux` (currently `next-3.7`)
+that `src/` is ported from. The suite runs the same inputs through that **vendored
+tmux** (built from `vendor/tmux`, not the system's) and `ztmux`, and compares
+byte-for-byte — mirroring the sibling ports (zshrs vs `zsh`, strykelang vs `perl`).
+
+Version matters: layout rounding, div-by-zero formatting, and other format
+details change between tmux releases, so comparing against a system tmux of a
+different version (e.g. Ubuntu's 3.4) produces false diffs. The runner builds and
+uses `vendor/tmux/tmux` by default; set `TMUX_REF=/path/to/tmux` to override.
 
 ## Running
 
 ```sh
-# builds release ztmux if missing; needs `tmux` on PATH
+# builds the vendored tmux reference + release ztmux if missing
 bash parity/run_parity.sh                 # per-case OK/FAIL + totals
 bash parity/run_parity.sh --summary       # totals only (CI)
 bash parity/run_parity.sh --json parity/parity_summary.json
@@ -63,27 +69,31 @@ The port is seeded from a transpile, so — unlike a from-scratch rewrite — a 
 part of the format engine already works. The suite's job is (a) to guard that
 from regressing and (b) to grow coverage so the remaining gaps surface.
 
-The suite has already paid off. It flagged that `#{l:…}` (the literal operator)
-**crashed ztmux's server** — pinned to one case, root-caused to a dropped pointer
-increment in `format_unescape`, and fixed by a faithful re-port of the C loop.
+The suite has already paid off:
 
-As coverage grew past the easy format cases, real divergences surfaced (this is
-the point — a green suite of only-easy cases is a false 100%). Currently known,
-each pinned to a single case:
+- `#{l:…}` (the literal operator) **crashed ztmux's server** — root-caused to a
+  dropped pointer increment in `format_unescape`, fixed by a faithful re-port.
+- **`405_select_layout`** — even-horizontal layout rounding was off by one column
+  (`39|40` vs tmux's `40|39`). The port carried an *older* tmux algorithm that
+  dumped the remainder on the last pane; ported the current C's leading-pane
+  `remainder` distribution. Fixed. (This one was ALSO why comparing against a
+  stale system tmux misled us — see the version note at the top.)
 
-- **`405_select_layout.sh`** — even-horizontal layout rounding: for an 80-col,
-  2-pane split tmux gives the extra column to the left pane (`40|39`), ztmux to
-  the right (`39|40`).
+Currently known, on Linux the suite is green; the one remaining failure is
+platform-specific:
+
 - **`294_pane_cmd.fmt`** — `#{pane_current_command}` reports the server binary
-  (`ztmux`) rather than the pane's actual process (`sleep`); ztmux isn't yet
-  tracking the running command per pane.
+  (`ztmux`) instead of the pane's process (`sleep`) **on macOS only**. Traced to
+  pane spawn: the forked child enters the child branch but never reaches `execvp`
+  (so the pane process stays as ztmux). Linux spawns/exec's correctly, so this
+  case passes there. A macOS forkpty/child-exec bug, tracked here until fixed.
 
-These stay in the suite as failing cases (the CI job is advisory) until the
-underlying code is ported correctly.
+Failing cases stay in the suite (the CI job is advisory) until the underlying
+code is ported correctly — removing them would fake a green suite.
 
 ## CI
 
-The `Parity vs system tmux` job runs the suite advisory (`continue-on-error`,
+The `Parity vs vendored tmux` job runs the suite advisory (`continue-on-error`,
 not in the release-build gate) while the port's server surface is still coming
 up — it surfaces the pass rate and uploads the failure log without failing the
 pipeline, matching how `fmt`/`clippy` are handled here. Once the suite is

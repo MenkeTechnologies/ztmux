@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Parity: compare system tmux(1) (the reference) vs ztmux (the port) on the same
-# inputs, byte-for-byte (stdout+stderr). ztmux is a from-source port of tmux, so
-# the truth we measure against is tmux itself.
+# Parity: compare the VENDORED tmux (the reference) vs ztmux (the port) on the
+# same inputs, byte-for-byte (stdout+stderr). ztmux is a from-source port of the
+# tmux under vendor/tmux (next-3.7), so the truth we measure against is THAT exact
+# tmux — built from vendor/tmux, not whatever version the system has. Override
+# with TMUX_REF=/path/to/tmux if you really want a different reference.
 #
 # Usage: from repo root —  bash parity/run_parity.sh [--summary] [--json OUT] [--fail-log PATH]
 # Env:   TMUX_REF=tmux            reference binary (the real tmux)
@@ -54,7 +56,31 @@ export LC_ALL=C LANG=C
 # Keep the reference tmux from reading a user config or environment session.
 unset TMUX TMUX_TMPDIR 2>/dev/null || true
 
-TMUX_REF="${TMUX_REF:-tmux}"
+# The reference is the VENDORED tmux — the exact source ztmux ports (next-3.7),
+# NOT whatever tmux the system happens to have. Version matters: layout rounding,
+# div-by-zero formatting, and other format details change between releases, so a
+# system tmux of a different version produces false diffs. Build vendor/tmux once
+# (gitignored artifacts) and use it; fall back to system tmux only if that build
+# is impossible, with a loud warning.
+VENDOR_TMUX="$ROOT/vendor/tmux/tmux"
+if [[ -z "${TMUX_REF:-}" ]]; then
+  if [[ ! -x "$VENDOR_TMUX" && -f "$ROOT/vendor/tmux/configure.ac" ]]; then
+    echo "parity: building vendored tmux reference (vendor/tmux, next-3.7)…" >&2
+    (
+      builtin cd "$ROOT/vendor/tmux"
+      [[ -x ./configure ]] || sh autogen.sh
+      [[ -f Makefile ]] || ./configure --disable-utf8proc
+      make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)"
+    ) >"${TMPDIR:-/tmp}/ztmux-vendor-tmux-build.log" 2>&1 ||
+      echo "parity: vendored tmux build failed (see ${TMPDIR:-/tmp}/ztmux-vendor-tmux-build.log)" >&2
+  fi
+  if [[ -x "$VENDOR_TMUX" ]]; then
+    TMUX_REF="$VENDOR_TMUX"
+  else
+    TMUX_REF="tmux"
+    echo "parity: WARNING falling back to system tmux ($(tmux -V 2>/dev/null || echo '?')); version drift vs the vendored next-3.7 may cause false diffs" >&2
+  fi
+fi
 ZTMUX="${ZTMUX:-$ROOT/target/release/ztmux}"
 
 if ! command -v "$TMUX_REF" >/dev/null 2>&1; then

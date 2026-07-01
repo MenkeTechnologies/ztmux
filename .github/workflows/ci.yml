@@ -96,23 +96,27 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --locked
 
-  # Parity vs system tmux: run the same inputs through the real tmux and ztmux
-  # and diff byte-for-byte. Advisory (continue-on-error, not in release-build
-  # `needs:`) while the port's server surface is still coming up — it surfaces
-  # the pass rate and uploads the failure log without failing the pipeline.
-  # Flip to blocking once the suite is reliably green (see parity/PARITY_ROADMAP.md).
+  # Parity vs the VENDORED tmux: run the same inputs through the exact tmux
+  # source ztmux ports (vendor/tmux, next-3.7) and diff byte-for-byte. The
+  # reference is BUILT from vendor/tmux — not apt's tmux, whose version differs
+  # and produces false diffs (layout rounding, div-by-zero formatting, etc.).
+  # Advisory (continue-on-error, not in release-build `needs:`) while the port's
+  # server surface is still coming up — it surfaces the pass rate and uploads the
+  # failure log without failing the pipeline. Flip to blocking once the suite is
+  # reliably green (see parity/PARITY_ROADMAP.md).
   parity:
-    name: Parity vs system tmux
+    name: Parity vs vendored tmux
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
-      - run: sudo apt-get update && sudo apt-get install -y libevent-dev tmux
+      # Build deps for the vendored tmux reference (run_parity.sh builds it).
+      - run: sudo apt-get update && sudo apt-get install -y libevent-dev libncurses-dev automake autoconf pkg-config bison build-essential
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked
-      - name: Compare ztmux output to tmux on parity/cases
+      - name: Compare ztmux output to the vendored tmux on parity/cases
         run: bash parity/run_parity.sh --summary --json parity/parity_summary.json
         env:
           ZTMUX: ${{ github.workspace }}/target/release/ztmux
