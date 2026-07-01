@@ -923,13 +923,31 @@ mod tests {
         unsafe { utf8_stravis_(c.as_ptr(), flags) }
     }
 
+    // Decode a vis(3)-escaped string back to raw bytes via the ported strunvis.
+    unsafe fn unvis(escaped: &[u8]) -> Vec<u8> {
+        let mut src = escaped.to_vec();
+        src.push(0);
+        let mut dst = vec![0u8; src.len()];
+        let n = unsafe { crate::compat::strunvis(dst.as_mut_ptr(), src.as_ptr()) };
+        assert!(n >= 0, "strunvis failed on {escaped:02x?}");
+        dst.truncate(n as usize);
+        dst
+    }
+
     // Regression for the utf8_strvis inner-loop bug: it advanced `src` once
     // before the append loop but not inside it (C uses `while (++src < end ...)`),
     // so every continuation byte after the first was re-read. A valid multibyte
     // char like € (E2 82 AC) came out as `E2 82 82 \202 \254` — raw garbage plus
     // octal escapes — which is what showed up as `\202\202\202` in the status bar.
+    //
+    // The assertion is round-trip (vis then unvis == identity) rather than raw
+    // passthrough, because passthrough is locale-dependent: in a UTF-8 locale a
+    // valid char is emitted raw, but under the C locale glibc can't compute its
+    // width so it's octal-escaped instead (macOS libc is permissive, so a plain
+    // passthrough check is green on macOS but red on Linux CI). Round-trip holds
+    // in BOTH cases — and it's exactly the invariant the buggy duplication broke.
     #[test]
-    fn valid_utf8_is_preserved_not_octal_escaped() {
+    fn utf8_strvis_roundtrips_through_unvis() {
         let cases: &[&[u8]] = &[
             b"plain ascii",
             &[0xc3, 0xa9],                   // é         U+00E9  (2 bytes)
@@ -939,11 +957,12 @@ mod tests {
             b"A\xe2\x82\xacB\xee\x82\xb0C",  // mixed ascii + multibyte
         ];
         for c in cases {
-            let out = unsafe { stravis(c) };
+            let escaped = unsafe { stravis(c) };
+            let decoded = unsafe { unvis(&escaped) };
             assert_eq!(
-                out.as_slice(),
+                decoded.as_slice(),
                 *c,
-                "expected byte-identical passthrough for {c:02x?}, got {out:02x?}"
+                "vis/unvis must round-trip for {c:02x?}; escaped={escaped:02x?}"
             );
         }
     }
