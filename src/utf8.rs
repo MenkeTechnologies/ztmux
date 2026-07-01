@@ -506,8 +506,14 @@ pub unsafe fn utf8_strvis(
         while src < end {
             more = utf8_open(&raw mut ud, *src);
             if more == utf8_state::UTF8_MORE {
-                src = src.add(1);
-                while src < end && more == utf8_state::UTF8_MORE {
+                // C: while (++src < end && more == UTF8_MORE) — src must advance
+                // BEFORE each append, else the same continuation byte is read
+                // repeatedly and a valid multibyte char is mangled into octal.
+                loop {
+                    src = src.add(1);
+                    if !(src < end && more == utf8_state::UTF8_MORE) {
+                        break;
+                    }
                     more = utf8_append(&raw mut ud, *src);
                 }
                 if more == utf8_state::UTF8_DONE {
@@ -550,8 +556,14 @@ pub unsafe fn utf8_strvis_(dst: &mut Vec<u8>, mut src: *const u8, len: usize, fl
         while src < end {
             more = utf8_open(&raw mut ud, *src);
             if more == utf8_state::UTF8_MORE {
-                src = src.add(1);
-                while src < end && more == utf8_state::UTF8_MORE {
+                // C: while (++src < end && more == UTF8_MORE) — src must advance
+                // BEFORE each append, else the same continuation byte is read
+                // repeatedly and a valid multibyte char is mangled into octal.
+                loop {
+                    src = src.add(1);
+                    if !(src < end && more == utf8_state::UTF8_MORE) {
+                        break;
+                    }
                     more = utf8_append(&raw mut ud, *src);
                 }
                 if more == utf8_state::UTF8_DONE {
@@ -892,5 +904,54 @@ pub unsafe fn utf8_cstrhas(s: *const u8, ud: *const utf8_data) -> bool {
         free_(copy);
 
         found
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Run a byte string (NUL-terminated internally) through utf8_stravis_ with
+    // the same flags args_escape uses.
+    unsafe fn stravis(bytes: &[u8]) -> Vec<u8> {
+        let mut c = bytes.to_vec();
+        c.push(0);
+        let flags = vis_flags::VIS_OCTAL
+            | vis_flags::VIS_CSTYLE
+            | vis_flags::VIS_TAB
+            | vis_flags::VIS_NL;
+        unsafe { utf8_stravis_(c.as_ptr(), flags) }
+    }
+
+    // Regression for the utf8_strvis inner-loop bug: it advanced `src` once
+    // before the append loop but not inside it (C uses `while (++src < end ...)`),
+    // so every continuation byte after the first was re-read. A valid multibyte
+    // char like € (E2 82 AC) came out as `E2 82 82 \202 \254` — raw garbage plus
+    // octal escapes — which is what showed up as `\202\202\202` in the status bar.
+    #[test]
+    fn valid_utf8_is_preserved_not_octal_escaped() {
+        let cases: &[&[u8]] = &[
+            b"plain ascii",
+            &[0xc3, 0xa9],                   // é         U+00E9  (2 bytes)
+            &[0xe2, 0x82, 0xac],             // €         U+20AC  (3 bytes)
+            &[0xee, 0x82, 0xb0],             // powerline U+E0B0  (3 bytes)
+            &[0xf0, 0x9f, 0x98, 0x80],       // 😀        U+1F600 (4 bytes)
+            b"A\xe2\x82\xacB\xee\x82\xb0C",  // mixed ascii + multibyte
+        ];
+        for c in cases {
+            let out = unsafe { stravis(c) };
+            assert_eq!(
+                out.as_slice(),
+                *c,
+                "expected byte-identical passthrough for {c:02x?}, got {out:02x?}"
+            );
+        }
+    }
+
+    // A lone continuation byte is not valid UTF-8 and must still be octal-escaped.
+    #[test]
+    fn invalid_byte_is_octal_escaped() {
+        let out = unsafe { stravis(&[0x82]) };
+        assert_eq!(out.as_slice(), b"\\202");
     }
 }
