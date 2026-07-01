@@ -307,10 +307,10 @@ RE_C_TAG = re.compile(r"//\s*[Cc]:\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 # that read e.g. "Port of the dispatcher behind `selectinword` /
 # `selectaword`" — RE_PORT_COMMENT alone would only capture "the" there.
 RE_BACKTICK_IDENT = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(\))?`")
-# Cited C source paths like `Src/Zle/textobjects.c:41` or
-# `Src/builtin.c`. Used to credit Rust files that cite a C file as a
+# Cited C source paths like `vendor/tmux/cmd-kill-pane.c:41` or
+# `tmux/window.c`. Used to credit Rust files that cite a C file as a
 # whole (independent of which fn names the citation mentions).
-RE_C_PATH_CITATION = re.compile(r"Src/[A-Za-z0-9_./-]+\.c(?::\d+)?")
+RE_C_PATH_CITATION = re.compile(r"(?:vendor/tmux/|tmux/)[A-Za-z0-9_./-]+\.c(?::\d+)?")
 # Verbs that mark a doc-comment line as a port citation. We only mine
 # RE_BACKTICK_IDENT / RE_C_PATH_CITATION on lines that contain one of
 # these — keeps body comments from polluting the index.
@@ -357,7 +357,8 @@ def walk_rs() -> tuple[dict[str, list[tuple[str,int]]], dict[str, set[str]], dic
                 # backticked names on the same line too.
                 if is_doc:
                     for path_match in RE_C_PATH_CITATION.findall(line):
-                        c_rel = "src/zsh/" + path_match.split(":", 1)[0]
+                        raw = path_match.split(":", 1)[0]
+                        c_rel = raw if raw.startswith("vendor/") else "vendor/" + raw
                         cfile_cites[c_rel].add(rel)
                         for nm in RE_BACKTICK_IDENT.findall(line):
                             port_mentions[nm].add(rel)
@@ -392,7 +393,7 @@ def _call_re(name: str) -> re.Pattern:
 # inner per-name loop is O(N) instead of O(N * file-read).
 def _slurp_c_files() -> list[tuple[str, list[str]]]:
     out: list[tuple[str, list[str]]] = []
-    for c in sorted(ZSH_SRC.rglob("*.c")):
+    for c in c_source_paths():
         if c.stem in C_EXCLUDE_STEMS:
             continue
         rel = c.relative_to(ROOT).as_posix()
@@ -566,28 +567,27 @@ def count_rust_calls(name: str, rust_def_locs: list[tuple[str, int]],
 
 # ── Expected destination map ─────────────────────────────────────────────────
 def expected_for(c_path: str) -> list[str]:
-    """zsh/Src/foo.c -> the Rust path. Strict 1:1, byte-for-byte stem.
+    """vendor/tmux/cmd-kill-pane.c -> the Rust port file(s).
 
-    No prefix or suffix stripping of any kind — Rust file stems are
-    identical to C file stems.
+    tmux C filenames use dashes; the port uses underscores, with an
+    optional trailing `_` to avoid a module/keyword clash. Normalise the
+    stem (`-` -> `_`) and look it up in RS_FILE_INDEX, which indexes each
+    Rust file under both its exact stem and its trailing-`_`-stripped form
+    (so `client` resolves to `client_.rs`). Returns the ACTUAL Rust paths
+    where the port lives (recursively located under src/), or [] when the
+    C file has no Rust counterpart yet.
     """
     base = os.path.basename(c_path)
     stem = base[:-2] if base.endswith(".c") else base
-    if "/Modules/" in c_path:
-        return [f"src/ported/modules/{stem}.rs"]
-    if "/Builtins/" in c_path:
-        return [f"src/ported/builtins/{stem}.rs"]
-    if "/Zle/" in c_path:
-        return [f"src/ported/zle/{stem}.rs"]
-    # Lexer + parser live in the main runtime crate under src/ported/.
-    if stem in ("lex", "parse"):
-        return [f"src/ported/{stem}.rs"]
-    return [f"src/ported/{stem}.rs"]
+    norm = stem.replace("-", "_")
+    return sorted(set(RS_FILE_INDEX.get(norm, [])))
 
 # ── Build report ─────────────────────────────────────────────────────────────
 GENERIC_NAME_THRESHOLD = 4
 
 def main() -> int:
+    build_rs_file_index()
+    print(f"  {len(RS_FILE_INDEX)} indexed Rust file stems", file=sys.stderr)
     print("indexing C sources...", file=sys.stderr)
     c_idx = walk_c()
     print(f"  {len(c_idx)} unique C names", file=sys.stderr)
@@ -623,9 +623,9 @@ def main() -> int:
 
     for name in sorted(c_idx.keys()):
         c_locs = sorted(c_idx[name])
-        primary_c = c_locs[0][0]  # full rel path src/zsh/Src/...
-        # short form for filter / display: drop "src/zsh/Src/"
-        cf_short = primary_c.replace("src/zsh/Src/", "")
+        primary_c = c_locs[0][0]  # full rel path vendor/tmux/...
+        # short form for filter / display: drop "vendor/tmux/"
+        cf_short = primary_c.replace("vendor/tmux/", "")
         expected_for_row = expected_for(primary_c)
         rust_locs: list[tuple[str,int]] = []
         if name in generic:
@@ -758,7 +758,7 @@ def main() -> int:
             "total": 0, "ported": 0, "unported": 0,
             "rust_files": set(),
             "expected": [],
-            "c_full": "src/zsh/Src/" + cf,
+            "c_full": "vendor/tmux/" + cf,
         })
         rec["total"] += 1
         if r["status"] == "ported":
@@ -775,7 +775,7 @@ def main() -> int:
     # in any doc comment) so per-cfile rows reflect every Rust file that
     # ports any part of this C file, not just per-symbol matches.
     for c_rel, rust_set in cfile_cites.items():
-        cf_short = c_rel.replace("src/zsh/Src/", "")
+        cf_short = c_rel.replace("vendor/tmux/", "")
         rec = by_cfile.get(cf_short)
         if rec is not None:
             rec["rust_files"].update(rust_set)
@@ -790,7 +790,7 @@ def main() -> int:
     # ── HTML ────────────────────────────────────────────────────────────────
     def cell_c(locs: list[tuple[str,int]]) -> str:
         if not locs: return ""
-        parts = [f'<a href="../{html.escape(p)}#L{ln}">{html.escape(p.replace("src/zsh/Src/","Src/"))}:{ln}</a>'
+        parts = [f'<a href="../{html.escape(p)}#L{ln}">{html.escape(p.replace("vendor/tmux/","tmux/"))}:{ln}</a>'
                  for p, ln in locs]
         return "<br>".join(parts)
     def cell_rs(locs: list[tuple[str,int]], pointers: list[str]) -> str:
@@ -913,12 +913,9 @@ def main() -> int:
     # "which C fns have a big Rust body?" or "which short C fns are
     # bloated in Rust?" or "show me everything in glob.c sorted by C
     # body desc". Includes rust-only rows too (cfile = "(rust-only)").
-    # Three tables: lc_rows = real C↔Rust pairs, ro_rows = rust-only fns,
-    # ex_rows = exec.c (tree-walker; replaced by fusevm bytecode, NOT a
-    # 1:1 port target — segregate so it doesn't drag the lc gradient).
+    # Two tables: lc_rows = real C↔Rust pairs, ro_rows = rust-only fns.
     lc_rows: list[str] = []
     ro_rows: list[str] = []
-    ex_rows: list[str] = []
     # Sort by ratio ascending so the worst porting gaps surface at the top.
     # Rust-only rows have no ratio — push them to the bottom (sort key
     # below pins them to +inf). Within the same ratio, fall back to
@@ -938,7 +935,7 @@ def main() -> int:
     for r in sorted(rows, key=_row_sort_key):
         c_first = r["c_locs"][0] if r["c_locs"] else ("", 0)
         rs_first = r["rust_locs"][0] if r["rust_locs"] else ("", 0)
-        c_file_short = c_first[0].replace("src/zsh/Src/", "") if c_first[0] else ""
+        c_file_short = c_first[0].replace("vendor/tmux/", "") if c_first[0] else ""
         c_line = c_first[1]
         rs_file = rs_first[0]
         rs_line = rs_first[1]
@@ -1011,12 +1008,8 @@ def main() -> int:
                 cp_cls = "cp-ok"
             call_pct_cell = f'<span class="{cp_cls}">{call_pct}%</span>'
             call_pct_attr = f'data-callpct="{call_pct}" '
-        # exec.c rows go to their own table — the C tree-walker is
-        # replaced by fusevm bytecode, so per-fn ratios there are
-        # noise (a `walk_*` fn with 200 lines of C and no Rust hit
-        # is intentional, not a stub).
-        row_cls = "ex-row" if r["cfile"] == "exec.c" else "lc-row"
-        target_rows = ex_rows if r["cfile"] == "exec.c" else lc_rows
+        row_cls = "lc-row"
+        target_rows = lc_rows
         target_rows.append(
             f'<tr class="{row_cls}" '
             f'style="{row_style}" '
@@ -1044,7 +1037,8 @@ def main() -> int:
     # ── Bot-friendly JSON dataset + schema comment ────────────────────────
     schema_doc = """\
 <!--PORT-REPORT-SCHEMA
-This file is the definitive C->Rust port mapping for zshrs.
+This file is the definitive C->Rust port mapping for ztmux (tmux ported
+to Rust). C reference: vendor/tmux/*.c (+ compat/). Rust port: src/**/*.rs.
 
 Machine-readable surfaces (use these, not the rendered HTML):
 
@@ -1055,32 +1049,31 @@ Machine-readable surfaces (use these, not the rendered HTML):
        "stats": { total, ported, unported, rust_only, correct,
                   split, misplaced, unmapped },
        "files": [                             # one entry per C file
-         { "cfile":   "Builtins/rlimits.c",
-           "c_full":  "src/zsh/Src/Builtins/rlimits.c",
-           "c_lines": 924,
-           "total":   19,
-           "ported":  15,
-           "unported": 4,
-           "coverage_pct": 79,
-           "expected_rust": ["src/ported/builtins/rlimits.rs"],
-           "rust_files":   ["src/ported/builtins/rlimits.rs", ...] }
+         { "cfile":   "cmd-kill-pane.c",
+           "c_full":  "vendor/tmux/cmd-kill-pane.c",
+           "c_lines": 84,
+           "total":   3,
+           "ported":  3,
+           "unported": 0,
+           "coverage_pct": 100,
+           "expected_rust": ["src/cmd_/cmd_kill_pane.rs"],
+           "rust_files":   ["src/cmd_/cmd_kill_pane.rs", ...] }
        ],
        "symbols": [                           # one entry per C function
-         { "name":      "bin_limit",
+         { "name":      "cmd_kill_pane_exec",
            "status":    "ported"|"unported"|"rust-only",
            "placement": "correct"|"split"|"misplaced"|"unmapped"|"-",
-           "cfile":     "Builtins/rlimits.c",  # "(rust-only)" when no C
-           "c_locs":    [["src/zsh/Src/Builtins/rlimits.c", 519], ...],
-           "rust_locs": [["src/ported/builtins/rlimits.rs", 454], ...],
+           "cfile":     "cmd-kill-pane.c",     # "(rust-only)" when no C
+           "c_locs":    [["vendor/tmux/cmd-kill-pane.c", 40], ...],
+           "rust_locs": [["src/cmd_/cmd_kill_pane.rs", 44], ...],
            "rust_pointer_files": ["..."],   # rust files that cite via doc-comment but don't define
-           "expected":  ["src/ported/builtins/rlimits.rs"] }
+           "expected":  ["src/cmd_/cmd_kill_pane.rs"] }
        ]
      }
 
-Excluded from this report by design:
-* src/extensions/ — features zsh C does NOT have
-* src/recorder/  — feature-gated recorder
-* src/zsh/Src/main.c, Src/Modules/zshrs_dump.c — non-port files
+C→Rust file mapping: tmux C uses dashes (cmd-kill-pane.c), the port uses
+underscores (cmd_kill_pane.rs) with an optional trailing `_` to dodge a
+module/keyword clash (client.c -> client_.rs, grid.c -> grid_.rs).
 -->
 """
     import datetime
@@ -1147,7 +1140,7 @@ Excluded from this report by design:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
-<title>zshrs — Port Report (per-function)</title>
+<title>ztmux — Port Report (per-function)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -1274,20 +1267,19 @@ Excluded from this report by design:
   <header class="tutorial-header">
     <div class="tutorial-header-inner">
       <div>
-        <h1 class="tutorial-brand">// ZSHRS &mdash; PER-FUNCTION PORT REPORT</h1>
+        <h1 class="tutorial-brand">// ZTMUX &mdash; PER-FUNCTION PORT REPORT</h1>
         <nav class="tutorial-crumbs" aria-label="Breadcrumb">
           <span class="current">Port Report</span>
           <span class="sep">/</span>
-          <a href="index.html">zshrs Docs</a>
+          <a href="index.html">ztmux Docs</a>
           <span class="sep">/</span>
-          <a href="report.html">Coverage Report</a>
+          <a href="report.html">Engineering Report</a>
           <span class="sep">/</span>
-          <a href="https://github.com/MenkeTechnologies/zshrs" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/MenkeTechnologies/ztmux" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
         <p style="margin:0.35rem 0 0;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:0.03em;opacity:0.8;">
-          Per-symbol map of every C function in <code>src/zsh/Src/**/*.c</code> against its Rust counterpart in
-          <code>src/ported/**/*.rs</code>. Detects missing ports, misplaced ports, and rust-only helpers.
-          Non-port code under <code>src/extensions/</code> and <code>src/recorder/</code> is intentionally excluded.
+          Per-symbol map of every C function in <code>vendor/tmux/*.c</code> against its Rust counterpart in
+          <code>src/**/*.rs</code>. Detects missing ports, stubs, misplaced ports, and rust-only helpers.
         </p>
       </div>
     </div>
@@ -1307,7 +1299,7 @@ Excluded from this report by design:
       <div class="stat-card"><div class="stat-val yellow">{n_split:,}</div><div class="stat-label">Placement: Split</div></div>
       <div class="stat-card"><div class="stat-val red">{n_misplaced:,}</div><div class="stat-label">Placement: Misplaced</div></div>
       <div class="stat-card"><div class="stat-val gray">{n_unmapped:,}</div><div class="stat-label">Placement: Unmapped</div></div>
-      <div class="stat-card" title="Rust port exists but is called at <30% of the C call sites (doshfunc fakery detector). 0 is the goal."><div class="stat-val {('red' if n_under_wired > 0 else 'green')}">{n_under_wired:,}</div><div class="stat-label">Under-wired (call &lt;30%)</div></div>
+      <div class="stat-card" title="Rust port exists but is called at <30% of the C call sites — the port is defined but not actually wired into its callers. 0 is the goal."><div class="stat-val {('red' if n_under_wired > 0 else 'green')}">{n_under_wired:,}</div><div class="stat-label">Under-wired (call &lt;30%)</div></div>
     </div>
 
     <p class="legend">
@@ -1324,7 +1316,7 @@ Excluded from this report by design:
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>FILE MAP &mdash; C &harr; RUST</h2>
     <p class="legend">
-      Each upstream <code>zsh/Src/**/*.c</code> file paired with its expected destination
+      Each upstream <code>vendor/tmux/*.c</code> file paired with its expected destination
       and the set of Rust files where its symbols actually ended up. Coverage % = ported /
       total fns defined in that C file.
     </p>
@@ -1351,7 +1343,7 @@ Excluded from this report by design:
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>LINE COUNTS &mdash; PER FN</h2>
     <p class="legend">
-      Every C function in <code>src/zsh/Src/**/*.c</code> with its primary
+      Every C function in <code>vendor/tmux/*.c</code> with its primary
       Rust counterpart. Line counts are non-blank/non-comment body lines
       between the matching <code>&#123;</code>/<code>&#125;</code>.
       Click any column header to sort &middot; filter by name / file /
@@ -1384,43 +1376,12 @@ Excluded from this report by design:
         <th data-sort="rbody"     onclick="lcs('rbody')">Rust lines</th>
         <th data-sort="ratio"     class="sort-asc" onclick="lcs('ratio')">ratio</th>
         <th data-sort="ccalls"    onclick="lcs('ccalls')" title="C call sites (excludes def line)">C calls</th>
-        <th data-sort="rcalls"    onclick="lcs('rcalls')" title="Rust call sites in src/ported/ (excludes def line + comments)">Rust calls</th>
-        <th data-sort="callpct"   onclick="lcs('callpct')" title="Rust calls / C calls; red = under-wired (Rust port exists but isn't being called at the C-equivalent sites; the doshfunc fakery signal).">call %</th>
+        <th data-sort="rcalls"    onclick="lcs('rcalls')" title="Rust call sites in src/ (excludes def line + comments)">Rust calls</th>
+        <th data-sort="callpct"   onclick="lcs('callpct')" title="Rust calls / C calls; red = under-wired (Rust port exists but isn't being called at the C-equivalent sites).">call %</th>
         <th data-sort="status"    onclick="lcs('status')">status</th>
       </tr></thead>
       <tbody id="lc-tbody">
 {chr(10).join(lc_rows)}
-      </tbody>
-    </table>
-
-    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXEC.C (TREE-WALKER &mdash; SEGREGATED)</h2>
-    <p class="legend">
-      <code>exec.c</code> implements the C tree-walker interpreter
-      (<code>execlist</code>/<code>execpline</code>/<code>execcmd</code>
-      etc.). zshrs replaces the entire walker with <code>fusevm</code>
-      bytecode compilation, so per-fn ratios here are noise — a 200-line
-      <code>walk_*</code> with no Rust counterpart is intentional, not a
-      stub. Listed for visibility only.
-    </p>
-    <div class="filter-bar">
-      <label for="exq">filter:</label><input id="exq" placeholder="fn name…" oninput="exf()" size="22">
-      <span id="exct" class="legend" style="margin-left:auto;font-size:10px;"></span>
-    </div>
-    <table class="fn-table lc-table">
-      <thead><tr>
-        <th data-sort="name"   onclick="exs('name')">fn name</th>
-        <th data-sort="cline"  onclick="exs('cline')">C file:line</th>
-        <th data-sort="cbody"  onclick="exs('cbody')">C lines</th>
-        <th data-sort="rline"  onclick="exs('rline')">Rust file:line</th>
-        <th data-sort="rbody"  onclick="exs('rbody')">Rust lines</th>
-        <th data-sort="ratio"  onclick="exs('ratio')">ratio</th>
-        <th data-sort="ccalls" onclick="exs('ccalls')">C calls</th>
-        <th data-sort="rcalls" onclick="exs('rcalls')">Rust calls</th>
-        <th data-sort="callpct" onclick="exs('callpct')">call %</th>
-        <th data-sort="status" onclick="exs('status')">status</th>
-      </tr></thead>
-      <tbody id="ex-tbody">
-{chr(10).join(ex_rows)}
       </tbody>
     </table>
 
@@ -1599,56 +1560,7 @@ function lcs(key){{
 window.addEventListener('DOMContentLoaded', () => {{
   if (document.getElementById('lcct')) lcf();
   if (document.getElementById('roct')) rof();
-  if (document.getElementById('exct')) exf();
 }});
-// ── EXEC.C (tree-walker, segregated) table: filter + sort ──────────────
-function exf(){{
-  const q = document.getElementById('exq').value.toLowerCase();
-  let shown = 0;
-  document.querySelectorAll('#ex-tbody tr.ex-row').forEach(tr => {{
-    const ok = !q || tr.dataset.name.toLowerCase().includes(q);
-    tr.style.display = ok ? '' : 'none';
-    if (ok) shown++;
-  }});
-  const ct = document.getElementById('exct');
-  if (ct) ct.textContent = shown + ' / ' + document.querySelectorAll('#ex-tbody tr.ex-row').length + ' rows';
-}}
-let exSortKey = null, exSortDir = 1;
-function exs(key){{
-  if (exSortKey === key) exSortDir = -exSortDir;
-  else {{ exSortKey = key; exSortDir = 1; }}
-  const tbody = document.getElementById('ex-tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr.ex-row'));
-  const num = ['cbody','rbody','cline','rline','ratio','ccalls','rcalls','callpct'].includes(key);
-  rows.sort((a, b) => {{
-    let va, vb;
-    if (key === 'name')        {{ va = a.dataset.name;     vb = b.dataset.name; }}
-    else if (key === 'status') {{ va = a.dataset.status;   vb = b.dataset.status; }}
-    else if (key === 'cbody')  {{ va = +a.dataset.cbody;   vb = +b.dataset.cbody; }}
-    else if (key === 'rbody')  {{ va = +a.dataset.rbody;   vb = +b.dataset.rbody; }}
-    else if (key === 'cline')  {{ va = +a.dataset.cline;   vb = +b.dataset.cline; }}
-    else if (key === 'rline')  {{ va = +a.dataset.rline;   vb = +b.dataset.rline; }}
-    else if (key === 'ratio')  {{ va = +a.dataset.ratio;   vb = +b.dataset.ratio; }}
-    else if (key === 'ccalls') {{ va = +a.dataset.ccalls;  vb = +b.dataset.ccalls; }}
-    else if (key === 'rcalls') {{ va = +a.dataset.rcalls;  vb = +b.dataset.rcalls; }}
-    else if (key === 'callpct'){{ va = a.dataset.callpct ? +a.dataset.callpct : -1;
-                                  vb = b.dataset.callpct ? +b.dataset.callpct : -1; }}
-    if (num) return (va - vb) * exSortDir;
-    return va.localeCompare(vb) * exSortDir;
-  }});
-  rows.forEach(r => tbody.appendChild(r));
-  // The exec.c table reuses .lc-table class but tags headers by data-sort;
-  // pick the right one via closest tbody match.
-  const tableHead = tbody.parentElement.querySelector('thead');
-  if (tableHead) {{
-    tableHead.querySelectorAll('th').forEach(th => {{
-      th.classList.remove('sort-asc', 'sort-desc');
-      if (th.dataset.sort === key) {{
-        th.classList.add(exSortDir > 0 ? 'sort-asc' : 'sort-desc');
-      }}
-    }});
-  }}
-}}
 // ── RUST-ONLY table: filter + sort ──────────────────────────────────────
 function rof(){{
   const q = document.getElementById('roq').value.toLowerCase();
@@ -1687,169 +1599,12 @@ function ros(key){{
 </script>
 </body></html>
 """
+    OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(html_doc)
     print(f"wrote {OUT} ({len(html_doc):,} bytes)", file=sys.stderr)
-    cov_path = ROOT / "docs" / "report.html"
-    if cov_path.exists():
-        patch_coverage_report_html(
-            cov_path,
-            by_cfile,
-            rows,
-            summary={
-                "total_rows": total,
-                "n_unported": n_unported,
-                "n_misplaced": n_misplaced,
-                "n_ported": n_ported,
-            },
-        )
+    # NOTE: ztmux's port_report.html is standalone — we do NOT patch
+    # docs/report.html (that coupling was zsh-specific).
     return 0
-
-
-# Core `Src/*.c` files surfaced on docs/report.html (dashboard only).
-CORE_COVERAGE_FILES: list[tuple[str, str, str]] = [
-    ("lex.c", "ported/lex.rs", "src/ported/lex.rs"),
-    ("parse.c", "ported/parse.rs", "src/ported/parse.rs"),
-    ("subst.c", "src/ported/subst.rs", "src/ported/subst.rs"),
-    ("math.c", "src/ported/math.rs", "src/ported/math.rs"),
-    (
-        "exec.c",
-        'src/exec.rs <span style="opacity:.6;">(re-exported as <code>crate::ported::exec</code>)</span>',
-        "src/exec.rs",
-    ),
-    ("params.c", "src/ported/params.rs", "src/ported/params.rs"),
-    ("pattern.c", "src/ported/pattern.rs", "src/ported/pattern.rs"),
-    ("glob.c", "src/ported/glob.rs", "src/ported/glob.rs"),
-    ("jobs.c", "src/ported/jobs.rs", "src/ported/jobs.rs"),
-    ("hist.c", "src/ported/hist.rs", "src/ported/hist.rs"),
-    ("utils.c", "src/ported/utils.rs", "src/ported/utils.rs"),
-    ("prompt.c", "src/ported/prompt.rs", "src/ported/prompt.rs"),
-    ("init.c", "src/ported/init.rs", "src/ported/init.rs"),
-    ("signals.c", "src/ported/signals.rs", "src/ported/signals.rs"),
-]
-
-
-def _line_count(path: Path) -> int:
-    try:
-        return sum(1 for _ in path.open("rb"))
-    except Exception:
-        return 0
-
-
-def patch_coverage_report_html(
-    report_path: Path,
-    by_cfile: dict,
-    rows: list[dict],
-    summary: dict[str, int] | None = None,
-) -> None:
-    """Rewrite the auto-generated slice of docs/report.html (core file table).
-
-    Keeps styling/marketing prose outside the PORT_REPORT markers untouched,
-    but replaces hard-coded per-file stats with numbers derived from the same
-    C/Rust index as port_report.html (regex C fn defs + Rust fn defs + port
-    doc mining — heuristic, not proof of behavioral parity).
-    """
-    body_parts: list[str] = []
-    sum_c = sum_r = sum_total = sum_sn = sum_rn = sum_ported = 0
-    for cf, rust_disp, rust_rel in CORE_COVERAGE_FILES:
-        rec = by_cfile.get(cf, {})
-        c_lines = int(rec.get("c_lines") or 0)
-        rust_lines = _line_count(ROOT / rust_rel)
-        file_rows = [r for r in rows if r["cfile"] == cf]
-        total = len(file_rows)
-        same_name = sum(1 for r in file_rows if r.get("rust_locs"))
-        ported = sum(1 for r in file_rows if r["status"] == "ported")
-        renamed = max(0, total - same_name)
-        ratio = (100.0 * rust_lines / c_lines) if c_lines else 0.0
-        cov_pct = (100.0 * ported / total) if total else 0.0
-        sum_c += c_lines
-        sum_r += rust_lines
-        sum_total += total
-        sum_sn += same_name
-        sum_rn += renamed
-        sum_ported += ported
-        if cov_pct >= 95:
-            bar_cls = "green"
-        elif cov_pct >= 50:
-            bar_cls = "yellow"
-        elif cov_pct > 0:
-            bar_cls = "magenta"
-        else:
-            bar_cls = "magenta"
-        st = "&#x2705;" if ported == total and total else "&#x26A0;&#xFE0F;"
-        body_parts.append(
-            '        <tr><td>'
-            f'{html.escape(cf)}</td><td>{rust_disp}</td>'
-            f'<td class="num">{c_lines:,}</td>'
-            f'<td class="num">{rust_lines:,}</td>'
-            f'<td class="num">{ratio:.1f}%</td>'
-            f'<td class="num">{total}</td>'
-            f'<td class="num">{same_name}</td>'
-            f'<td class="num">{renamed}</td>'
-            f'<td><div class="bar-wrap"><div class="bar-fill {bar_cls}" style="width:{min(100.0, cov_pct):.1f}%"></div>'
-            f'<span class="bar-pct">{cov_pct:.1f}%</span></div></td>'
-            f'<td class="status">{st}</td></tr>'
-        )
-    total_ratio = (100.0 * sum_r / sum_c) if sum_c else 0.0
-    total_cov = (100.0 * sum_ported / sum_total) if sum_total else 0.0
-    tfoot = (
-        '<tfoot><tr class="total-row">'
-        '<td colspan="2" style="font-family:\'Orbitron\',sans-serif;font-size:10px;letter-spacing:1px;">'
-        "TOTAL (core)</td>"
-        f'<td class="num">{sum_c:,}</td>'
-        f'<td class="num">{sum_r:,}</td>'
-        f'<td class="num">{total_ratio:.1f}%</td>'
-        f'<td class="num">{sum_total}</td>'
-        f'<td class="num">{sum_sn}</td>'
-        f'<td class="num">{sum_rn}</td>'
-        f'<td><div class="bar-wrap"><div class="bar-fill cyan" style="width:{min(100.0, total_cov):.1f}%"></div>'
-        f'<span class="bar-pct">{total_cov:.1f}%</span></div></td>'
-        '<td class="status" style="font-size:18px;">&#x2139;&#xFE0F;</td>'
-        "</tr></tfoot>"
-    )
-    block = (
-        "<!-- PORT_REPORT:BEGIN:CORETABLE -->\n        <tbody>\n"
-        + "\n".join(body_parts)
-        + "\n        </tbody>\n        "
-        + tfoot
-        + "\n        <!-- PORT_REPORT:END:CORETABLE -->"
-    )
-    text = report_path.read_text(encoding="utf-8", errors="replace")
-    begin = "<!-- PORT_REPORT:BEGIN:CORETABLE -->"
-    end = "<!-- PORT_REPORT:END:CORETABLE -->"
-    if begin not in text or end not in text:
-        print(f"warning: {report_path} missing PORT_REPORT markers; skipping dashboard patch", file=sys.stderr)
-        return
-    pre, rest = text.split(begin, 1)
-    _, post = rest.split(end, 1)
-    text = pre + block + post
-    if summary:
-        desc = (
-            "zshrs port/coverage dashboard. "
-            f"Indexer: {summary['total_rows']:,} unique C symbols; "
-            f"{summary['n_unported']:,} C-only, {summary['n_misplaced']:,} misplaced, "
-            f"{summary['n_ported']:,} with a Rust counterpart. "
-            f"{sum_total} symbols in the 14-file core slice (table below). "
-            "Regenerate: python3 scripts/gen_port_report.py. "
-            f"Updated {date.today().isoformat()}."
-        )
-        text, n_meta = re.subn(
-            r'(<meta\s+name="description"\s+content=")[^"]*("\s*>)',
-            lambda m: m.group(1) + html.escape(desc) + m.group(2),
-            text,
-            count=1,
-        )
-        if n_meta != 1:
-            print(f"warning: description meta replace matched {n_meta} times", file=sys.stderr)
-        text, n_card = re.subn(
-            r'(<div class="stat-card"><div class="stat-val yellow">)[^<]*(</div>\s*<div class="stat-label">C-only symbols \(index\)</div></div>)',
-            lambda m: m.group(1) + f"{summary['n_unported']:,}" + m.group(2),
-            text,
-            count=1,
-        )
-        if n_card != 1:
-            print(f"warning: C-only stat-card replace matched {n_card} times", file=sys.stderr)
-    report_path.write_text(text, encoding="utf-8")
-    print(f"patched {report_path} core table ({sum_total} C symbols indexed in core files)", file=sys.stderr)
 
 if __name__ == "__main__":
     raise SystemExit(main())
