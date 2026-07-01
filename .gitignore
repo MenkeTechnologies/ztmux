@@ -18,5 +18,9 @@ vendor/tmux/config.status
 vendor/tmux/autom4te.cache
 vendor/tmux/Makefile
 
+# Parity suite runtime failure log (regenerated each run; the committed
+# parity_summary.json is the durable snapshot).
+parity/parity_failures.log
+
 # macOS
 .DS_Store
