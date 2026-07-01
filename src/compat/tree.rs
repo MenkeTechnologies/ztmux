@@ -932,7 +932,7 @@ mod tests {
                     drop(Box::from_raw(node));
                     check(&raw mut head);
                 }
-                assert!((*(&raw mut head)).rbh_root.is_null(), "tree should be empty");
+                assert!(head.rbh_root.is_null(), "tree should be empty");
             }
         }
     }
