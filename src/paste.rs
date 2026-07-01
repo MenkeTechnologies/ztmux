@@ -1,0 +1,343 @@
+// Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
+//
+// Permission to use, copy, modify, and distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+// ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF MIND, USE, DATA OR PROFITS, WHETHER
+// IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
+// OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+use crate::*;
+use crate::options_::*;
+
+#[repr(C)]
+pub struct paste_buffer {
+    pub data: *mut u8,
+    pub size: usize,
+
+    pub name: Cow<'static, str>,
+    pub created: time_t,
+    pub automatic: i32,
+    pub order: u32,
+
+    pub name_entry: rb_entry<paste_buffer>,
+    pub time_entry: rb_entry<paste_buffer>,
+}
+
+static mut PASTE_NEXT_INDEX: u32 = 0;
+static mut PASTE_NEXT_ORDER: u32 = 0;
+static mut PASTE_NUM_AUTOMATIC: u32 = 0;
+
+type paste_name_tree = rb_head<paste_buffer>;
+type paste_time_tree = rb_head<paste_buffer>;
+
+static mut PASTE_BY_NAME: paste_name_tree = rb_initializer();
+static mut PASTE_BY_TIME: paste_time_tree = rb_initializer();
+
+RB_GENERATE!(
+    paste_name_tree,
+    paste_buffer,
+    name_entry,
+    discr_name_entry,
+    paste_cmp_names
+);
+fn paste_cmp_names(a: *const paste_buffer, b: *const paste_buffer) -> cmp::Ordering {
+    unsafe { (*a).name.cmp(&(*b).name) }
+}
+
+RB_GENERATE!(
+    paste_time_tree,
+    paste_buffer,
+    time_entry,
+    discr_time_entry,
+    paste_cmp_times
+);
+fn paste_cmp_times(a: *const paste_buffer, b: *const paste_buffer) -> cmp::Ordering {
+    unsafe {
+        let x = (*a).order;
+        let y = (*b).order;
+
+        u32::cmp(&x, &y)
+    }
+}
+
+pub unsafe fn paste_buffer_name<'a>(pb: NonNull<paste_buffer>) -> &'a str {
+    unsafe { &(*pb.as_ptr()).name }
+}
+
+pub unsafe fn paste_buffer_order(pb: NonNull<paste_buffer>) -> u32 {
+    unsafe { (*pb.as_ptr()).order }
+}
+
+pub unsafe fn paste_buffer_created(pb: NonNull<paste_buffer>) -> time_t {
+    unsafe { (*pb.as_ptr()).created }
+}
+
+pub unsafe fn paste_buffer_data(pb: *mut paste_buffer, size: *mut usize) -> *const u8 {
+    unsafe {
+        if !size.is_null() {
+            *size = (*pb).size;
+        }
+        (*pb).data
+    }
+}
+// all usages seen pass in a param and don't use null, so we can remove the check
+pub unsafe fn paste_buffer_data_(pb: NonNull<paste_buffer>, size: &mut usize) -> *const u8 {
+    unsafe {
+        *size = (*pb.as_ptr()).size;
+        (*pb.as_ptr()).data
+    }
+}
+
+pub unsafe fn paste_walk(pb: *mut paste_buffer) -> *mut paste_buffer {
+    unsafe {
+        if pb.is_null() {
+            return rb_min::<_, discr_time_entry>(&raw mut PASTE_BY_TIME);
+        }
+        rb_next::<_, discr_time_entry>(pb)
+    }
+}
+
+pub unsafe fn paste_is_empty() -> bool {
+    unsafe { PASTE_BY_TIME.rbh_root.is_null() }
+}
+
+pub unsafe fn paste_get_top(name: *mut Option<&str>) -> *mut paste_buffer {
+    unsafe {
+        let mut pb = rb_min::<_, discr_time_entry>(&raw mut PASTE_BY_TIME);
+        while !pb.is_null() && (*pb).automatic == 0 {
+            pb = rb_next::<_, discr_time_entry>(pb);
+        }
+        if pb.is_null() {
+            return null_mut();
+        }
+        if !name.is_null() {
+            *name = Some(&(*pb).name);
+        }
+
+        pb
+    }
+}
+
+pub unsafe fn paste_get_name(name: Option<&str>) -> *mut paste_buffer {
+    unsafe {
+        let mut pbfind = MaybeUninit::<paste_buffer>::uninit();
+
+        let Some(name) = name else {
+            return null_mut();
+        };
+        if name.is_empty() {
+            return null_mut();
+        }
+
+        (*pbfind.as_mut_ptr()).name =
+            Cow::Borrowed(std::mem::transmute::<&str, &'static str>(name));
+        rb_find::<_, discr_name_entry>(&raw mut PASTE_BY_NAME, pbfind.as_ptr())
+    }
+}
+
+pub unsafe fn paste_free(pb: NonNull<paste_buffer>) {
+    unsafe {
+        let pb = pb.as_ptr();
+        notify_paste_buffer(&(*pb).name, true);
+
+        rb_remove::<_, discr_name_entry>(&raw mut PASTE_BY_NAME, pb);
+        rb_remove::<_, discr_time_entry>(&raw mut PASTE_BY_TIME, pb);
+        if (*pb).automatic != 0 {
+            PASTE_NUM_AUTOMATIC -= 1;
+        }
+
+        free_((*pb).data);
+        (*pb).name = Cow::Borrowed("");
+        free_(pb);
+    }
+}
+
+pub unsafe fn paste_add(mut prefix: *const u8, data: *mut u8, size: usize) {
+    unsafe {
+        if prefix.is_null() {
+            prefix = c!("buffer");
+        }
+
+        if size == 0 {
+            free_(data);
+            return;
+        }
+
+        let limit = options_get_number_(GLOBAL_OPTIONS, "buffer-limit");
+        for pb in rb_foreach_reverse::<_, discr_time_entry>(&raw mut PASTE_BY_TIME) {
+            if (PASTE_NUM_AUTOMATIC as i64) < limit {
+                break;
+            }
+            if (*pb.as_ptr()).automatic != 0 {
+                paste_free(pb);
+            }
+        }
+
+        let pb = Box::leak(Box::new(paste_buffer {
+            data,
+            size,
+            name: Cow::Borrowed(""),
+            created: libc::time(null_mut()),
+            automatic: 1,
+            order: PASTE_NEXT_ORDER,
+            name_entry: zeroed(),
+            time_entry: zeroed(),
+        })) as *mut paste_buffer;
+        PASTE_NUM_AUTOMATIC += 1;
+        PASTE_NEXT_ORDER += 1;
+
+        loop {
+            let tmp = PASTE_NEXT_INDEX;
+            (*pb).name = Cow::Owned(format!("{}{}", _s(prefix), tmp));
+            PASTE_NEXT_INDEX += 1;
+            if paste_get_name(Some(&(*pb).name)).is_null() {
+                break;
+            }
+        }
+        rb_insert::<_, discr_name_entry>(&raw mut PASTE_BY_NAME, pb);
+        rb_insert::<_, discr_time_entry>(&raw mut PASTE_BY_TIME, pb);
+
+        notify_paste_buffer(&(*pb).name, false);
+    }
+}
+
+pub unsafe fn paste_rename(
+    oldname: Option<&str>,
+    newname: Option<&str>,
+    cause: *mut *mut u8,
+) -> i32 {
+    unsafe {
+        if !cause.is_null() {
+            *cause = null_mut();
+        }
+
+        if oldname.is_none_or(str::is_empty) {
+            if !cause.is_null() {
+                *cause = xstrdup_(c"no buffer").as_ptr();
+            }
+            return -1;
+        }
+        if newname.is_none_or(str::is_empty) {
+            if !cause.is_null() {
+                *cause = xstrdup_(c"new name is empty").as_ptr();
+            }
+            return -1;
+        }
+
+        let pb = paste_get_name(oldname);
+        if pb.is_null() {
+            if !cause.is_null() {
+                *cause = format_nul!("no buffer {}", oldname.unwrap());
+            }
+            return -1;
+        }
+
+        if let Some(pb_new) = NonNull::new(paste_get_name(newname)) {
+            paste_free(pb_new);
+        }
+
+        rb_remove::<_, discr_name_entry>(&raw mut PASTE_BY_NAME, pb);
+
+        (*pb).name = Cow::Owned(newname.unwrap().to_string());
+
+        if (*pb).automatic != 0 {
+            PASTE_NUM_AUTOMATIC -= 1;
+        }
+        (*pb).automatic = 0;
+
+        rb_insert::<_, discr_name_entry>(&raw mut PASTE_BY_NAME, pb);
+
+        notify_paste_buffer(oldname.unwrap(), true);
+        notify_paste_buffer(newname.unwrap(), false);
+    }
+    0
+}
+
+pub unsafe fn paste_set(
+    data: *mut u8,
+    size: usize,
+    name: Option<&str>,
+    cause: *mut *mut u8,
+) -> i32 {
+    unsafe {
+        if !cause.is_null() {
+            *cause = null_mut();
+        }
+
+        if size == 0 {
+            free_(data);
+            return 0;
+        }
+        let Some(name) = name else {
+            paste_add(null_mut(), data, size);
+            return 0;
+        };
+
+        if name.is_empty() {
+            if !cause.is_null() {
+                *cause = xstrdup_(c"empty buffer name").as_ptr();
+            }
+            return -1;
+        }
+
+        let pb = Box::leak(Box::new(paste_buffer {
+            data,
+            size,
+            name: Cow::Owned(name.to_string()),
+            created: libc::time(null_mut()),
+            automatic: 0,
+            order: PASTE_NEXT_ORDER,
+            name_entry: rb_entry::default(),
+            time_entry: rb_entry::default(),
+        }));
+        PASTE_NEXT_ORDER += 1;
+
+        if let Some(old) = NonNull::new(paste_get_name(Some(name))) {
+            paste_free(old);
+        }
+
+        rb_insert::<_, discr_name_entry>(&raw mut PASTE_BY_NAME, pb);
+        rb_insert::<_, discr_time_entry>(&raw mut PASTE_BY_TIME, pb);
+
+        notify_paste_buffer(name, false);
+    }
+    0
+}
+
+pub unsafe fn paste_replace(pb: NonNull<paste_buffer>, data: *mut u8, size: usize) {
+    unsafe {
+        free_((*pb.as_ptr()).data);
+        (*pb.as_ptr()).data = data;
+        (*pb.as_ptr()).size = size;
+
+        notify_paste_buffer(&(*pb.as_ptr()).name, false);
+    }
+}
+
+pub unsafe fn paste_make_sample(pb: *mut paste_buffer) -> String {
+    unsafe {
+        let width = 200;
+
+        let mut len = (*pb).size;
+        if len > width {
+            len = width;
+        }
+        let mut buf: Vec<u8> = Vec::with_capacity(len * (4 + 4));
+
+        utf8_strvis_(
+            &mut buf,
+            (*pb).data,
+            len,
+            vis_flags::VIS_OCTAL | vis_flags::VIS_CSTYLE | vis_flags::VIS_TAB | vis_flags::VIS_NL,
+        );
+        if (*pb).size > width || buf.len() > width {
+            buf.extend(b"...");
+        }
+        String::from_utf8(buf).unwrap()
+    }
+}

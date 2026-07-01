@@ -1,0 +1,10 @@
+# Rust build cache and outputs
+target
+
+# Nix outputs
+/result
+# tmux log files
+tmux-*.log
+
+# github wiki in CI
+/wiki

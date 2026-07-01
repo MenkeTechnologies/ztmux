@@ -1,0 +1,78 @@
+# https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+name: build
+
+jobs:
+  asan-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system dependencies (ubuntu)
+        run: &ubuntu-install-cmd |
+          sudo apt-get update
+          sudo apt-get install -y libncurses-dev libevent-dev
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: |
+         RUSTFLAGS=-Zsanitizer=address cargo test --target x86_64-unknown-linux-gnu
+
+  clippy:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, ubuntu-24.04-arm]
+    steps:
+      - name: Install system dependencies (ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: *ubuntu-install-cmd
+      - &mac-deps
+        name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew update
+          brew install ncurses # libevent is already installed in github runner
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      # - uses: dtolnay/rust-toolchain@nightly
+        # with:
+          # components: clippy
+      - run: cargo +stable clippy -- -Dwarnings
+      # disable nightly clippy: too much noise in my opinion
+      # - run: cargo +nightly clippy -- -Dwarnings
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system dependencies (ubuntu)
+        run: *ubuntu-install-cmd
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      # should format cleanly on nightly and stable
+      - run: cargo +stable fmt --check # this will warn about unstable features, but that's fine
+      - run: cargo +nightly fmt --check
+
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, ubuntu-24.04-arm]
+    steps:
+      - name: Install system dependencies (ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: *ubuntu-install-cmd
+      - *mac-deps
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build
+      - run: cargo test

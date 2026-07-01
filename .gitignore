@@ -1,0 +1,18 @@
+# Rust build cache and outputs
+target
+vendor/tmux-rs/target
+
+# tmux log files
+tmux-*.log
+
+# tmux C build artifacts (in case the reference tree is configured/built locally)
+vendor/tmux/tmux
+vendor/tmux/*.o
+vendor/tmux/config.h
+vendor/tmux/config.log
+vendor/tmux/config.status
+vendor/tmux/autom4te.cache
+vendor/tmux/Makefile
+
+# macOS
+.DS_Store

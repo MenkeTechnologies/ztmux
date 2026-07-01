@@ -1,0 +1,4 @@
+[build]
+rustflags = [
+  # "-Zsanitizer=address",
+]
