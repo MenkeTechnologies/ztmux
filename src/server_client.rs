@@ -19,13 +19,13 @@ use crate::{
 use crate::options_::*;
 
 /// Compare client windows.
-// vendor/tmux/server-client.c:57  static int server_client_window_cmp(struct client_window *cw1, struct client_window *cw2)
+/// C `vendor/tmux/server-client.c:57`: `static int server_client_window_cmp(struct client_window *cw1, struct client_window *cw2)`
 pub fn server_client_window_cmp(cw1: &client_window, cw2: &client_window) -> std::cmp::Ordering {
     cw1.window.cmp(&cw2.window)
 }
 
 /// Number of attached clients.
-// vendor/tmux/server-client.c:70  u_int server_client_how_many(void)
+/// C `vendor/tmux/server-client.c:70`: `u_int server_client_how_many(void)`
 pub unsafe fn server_client_how_many() -> u32 {
     unsafe {
         tailq_foreach(&raw mut CLIENTS)
@@ -38,7 +38,7 @@ pub unsafe fn server_client_how_many() -> u32 {
 }
 
 /// Overlay timer callback.
-// vendor/tmux/server-client.c:85  static void server_client_overlay_timer(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/server-client.c:85`: `static void server_client_overlay_timer(__unused int fd, __unused short events, void *data)`
 pub unsafe extern "C-unwind" fn server_client_overlay_timer(
     _fd: i32,
     _events: i16,
@@ -50,7 +50,7 @@ pub unsafe extern "C-unwind" fn server_client_overlay_timer(
 }
 
 /// Set an overlay on client.
-// vendor/tmux/server-client.c:92  void server_client_set_overlay(struct client *c, u_int delay, overlay_check_cb checkcb, overlay_mode_cb modecb, overlay_draw_cb drawcb, overlay_key_cb keycb, overlay_free_cb freecb, overlay_resize_cb resizecb, void *data)
+/// C `vendor/tmux/server-client.c:92`: `void server_client_set_overlay(struct client *c, u_int delay, overlay_check_cb checkcb, overlay_mode_cb modecb, overlay_draw_cb drawcb, overlay_key_cb keycb, overlay_free_cb freecb, overlay_resize_cb resizecb, void *data)`
 pub unsafe fn server_client_set_overlay(
     c: *mut client,
     delay: u32,
@@ -103,7 +103,7 @@ pub unsafe fn server_client_set_overlay(
 }
 
 /// Clear overlay mode on client.
-// vendor/tmux/server-client.c:129  void server_client_clear_overlay(struct client *c)
+/// C `vendor/tmux/server-client.c:129`: `void server_client_clear_overlay(struct client *c)`
 pub unsafe fn server_client_clear_overlay(c: *mut client) {
     unsafe {
         if (*c).overlay_draw.is_none() {
@@ -131,7 +131,7 @@ pub unsafe fn server_client_clear_overlay(c: *mut client) {
 }
 
 /// Given overlay position and dimensions, return parts of the input range which are visible.
-// vendor/tmux/server-client.c:182  void server_client_overlay_range(u_int x, u_int y, u_int sx, u_int sy, u_int px, u_int py, u_int nx, struct visible_ranges *r)
+/// C `vendor/tmux/server-client.c:182`: `void server_client_overlay_range(u_int x, u_int y, u_int sx, u_int sy, u_int px, u_int py, u_int nx, struct visible_ranges *r)`
 pub unsafe fn server_client_overlay_range(
     x: u32,
     y: u32,
@@ -185,7 +185,7 @@ pub unsafe fn server_client_overlay_range(
 }
 
 /// Check if this client is inside this server.
-// vendor/tmux/server-client.c:225  int server_client_check_nested(struct client *c)
+/// C `vendor/tmux/server-client.c:225`: `int server_client_check_nested(struct client *c)`
 pub unsafe fn server_client_check_nested(c: *mut client) -> bool {
     unsafe {
         let envent = environ_find((*c).environ, c!("TMUX"));
@@ -203,7 +203,7 @@ pub unsafe fn server_client_check_nested(c: *mut client) -> bool {
 }
 
 /// Set client key table.
-// vendor/tmux/server-client.c:243  void server_client_set_key_table(struct client *c, const char *name)
+/// C `vendor/tmux/server-client.c:243`: `void server_client_set_key_table(struct client *c, const char *name)`
 pub unsafe fn server_client_set_key_table(c: *mut client, mut name: *const u8) {
     unsafe {
         if name.is_null() {
@@ -219,7 +219,7 @@ pub unsafe fn server_client_set_key_table(c: *mut client, mut name: *const u8) {
     }
 }
 
-// vendor/tmux/server-client.c:256  static uint64_t server_client_key_table_activity_diff(struct client *c)
+/// C `vendor/tmux/server-client.c:256`: `static uint64_t server_client_key_table_activity_diff(struct client *c)`
 pub unsafe fn server_client_key_table_activity_diff(c: *mut client) -> u64 {
     unsafe {
         let mut diff: libc::timeval = zeroed();
@@ -233,7 +233,7 @@ pub unsafe fn server_client_key_table_activity_diff(c: *mut client) -> u64 {
 }
 
 /// Get default key table.
-// vendor/tmux/server-client.c:266  const char *server_client_get_key_table(struct client *c)
+/// C `vendor/tmux/server-client.c:266`: `const char *server_client_get_key_table(struct client *c)`
 pub unsafe fn server_client_get_key_table(c: *mut client) -> *const u8 {
     unsafe {
         let s = (*c).session;
@@ -250,13 +250,13 @@ pub unsafe fn server_client_get_key_table(c: *mut client) -> *const u8 {
 }
 
 /// Is this table the default key table?
-// vendor/tmux/server-client.c:282  static int server_client_is_default_key_table(struct client *c, struct key_table *table)
+/// C `vendor/tmux/server-client.c:282`: `static int server_client_is_default_key_table(struct client *c, struct key_table *table)`
 pub unsafe fn server_client_is_default_key_table(c: *mut client, table: *mut key_table) -> bool {
     unsafe { libc::strcmp((*table).name, server_client_get_key_table(c)) == 0 }
 }
 
 /// Create a new client.
-// vendor/tmux/server-client.c:289  struct client *server_client_create(int fd)
+/// C `vendor/tmux/server-client.c:289`: `struct client *server_client_create(int fd)`
 pub unsafe fn server_client_create(fd: i32) -> *mut client {
     unsafe {
         setblocking(fd, 0);
@@ -306,7 +306,7 @@ pub unsafe fn server_client_create(fd: i32) -> *mut client {
 }
 
 /// Open client terminal if needed.
-// vendor/tmux/server-client.c:340  int server_client_open(struct client *c, char **cause)
+/// C `vendor/tmux/server-client.c:340`: `int server_client_open(struct client *c, char **cause)`
 pub unsafe fn server_client_open(c: *mut client, cause: *mut *mut u8) -> i32 {
     unsafe {
         let mut ttynam = _PATH_TTY;
@@ -353,7 +353,7 @@ pub unsafe fn server_client_open(c: *mut client, cause: *mut *mut u8) -> i32 {
 }
 
 /// Lost an attached client.
-// vendor/tmux/server-client.c:375  static void server_client_attached_lost(struct client *c)
+/// C `vendor/tmux/server-client.c:375`: `static void server_client_attached_lost(struct client *c)`
 pub unsafe fn server_client_attached_lost(c: *mut client) {
     unsafe {
         log_debug!("lost attached client {:p}", c);
@@ -386,7 +386,7 @@ pub unsafe fn server_client_attached_lost(c: *mut client) {
 }
 
 /// Set client session.
-// vendor/tmux/server-client.c:408  void server_client_set_session(struct client *c, struct session *s)
+/// C `vendor/tmux/server-client.c:408`: `void server_client_set_session(struct client *c, struct session *s)`
 pub unsafe fn server_client_set_session(c: *mut client, s: *mut session) {
     unsafe {
         let old = (*c).session;
@@ -422,7 +422,7 @@ pub unsafe fn server_client_set_session(c: *mut client, s: *mut session) {
 }
 
 /// Lost a client.
-// vendor/tmux/server-client.c:442  void server_client_lost(struct client *c)
+/// C `vendor/tmux/server-client.c:442`: `void server_client_lost(struct client *c)`
 pub unsafe fn server_client_lost(c: *mut client) {
     unsafe {
         (*c).flags |= client_flag::DEAD;
@@ -504,7 +504,7 @@ pub unsafe fn server_client_lost(c: *mut client) {
 }
 
 /// Remove reference from a client.
-// vendor/tmux/server-client.c:520  void server_client_unref(struct client *c)
+/// C `vendor/tmux/server-client.c:520`: `void server_client_unref(struct client *c)`
 pub unsafe fn server_client_unref(c: *mut client) {
     unsafe {
         log_debug!("unref client {:p} ({} references)", c, (*c).references);
@@ -523,7 +523,7 @@ pub unsafe fn server_client_unref(c: *mut client) {
 }
 
 /// Free dead client.
-// vendor/tmux/server-client.c:531  static void server_client_free(__unused int fd, __unused short events, void *arg)
+/// C `vendor/tmux/server-client.c:531`: `static void server_client_free(__unused int fd, __unused short events, void *arg)`
 pub unsafe extern "C-unwind" fn server_client_free(_fd: i32, _events: i16, arg: *mut c_void) {
     unsafe {
         let c: *mut client = arg.cast();
@@ -539,7 +539,7 @@ pub unsafe extern "C-unwind" fn server_client_free(_fd: i32, _events: i16, arg: 
 }
 
 /// Suspend a client.
-// vendor/tmux/server-client.c:549  void server_client_suspend(struct client *c)
+/// C `vendor/tmux/server-client.c:549`: `void server_client_suspend(struct client *c)`
 pub unsafe fn server_client_suspend(c: *mut client) {
     unsafe {
         let s: *mut session = (*c).session;
@@ -555,7 +555,7 @@ pub unsafe fn server_client_suspend(c: *mut client) {
 }
 
 /// Detach a client.
-// vendor/tmux/server-client.c:563  void server_client_detach(struct client *c, enum msgtype msgtype)
+/// C `vendor/tmux/server-client.c:563`: `void server_client_detach(struct client *c, enum msgtype msgtype)`
 pub unsafe fn server_client_detach(c: *mut client, msgtype: msgtype) {
     unsafe {
         let s = (*c).session;
@@ -573,7 +573,7 @@ pub unsafe fn server_client_detach(c: *mut client, msgtype: msgtype) {
 }
 
 /// Execute command to replace a client.
-// vendor/tmux/server-client.c:579  void server_client_exec(struct client *c, const char *cmd)
+/// C `vendor/tmux/server-client.c:579`: `void server_client_exec(struct client *c, const char *cmd)`
 pub unsafe fn server_client_exec(c: *mut client, cmd: *const u8) {
     unsafe {
         let s = (*c).session;
@@ -608,7 +608,7 @@ pub unsafe fn server_client_exec(c: *mut client, cmd: *const u8) {
 }
 
 /// Check for mouse keys.
-// vendor/tmux/server-client.c:808  static key_code server_client_check_mouse(struct client *c, struct key_event *event)
+/// C `vendor/tmux/server-client.c:808`: `static key_code server_client_check_mouse(struct client *c, struct key_event *event)`
 pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -> key_code {
     unsafe {
         let m = &raw mut (*event).m;
@@ -1808,7 +1808,7 @@ pub unsafe fn server_client_assume_paste(s: *mut session) -> bool {
 }
 
 /// Has the latest client changed?
-// vendor/tmux/server-client.c:1270  static void server_client_update_latest(struct client *c)
+/// C `vendor/tmux/server-client.c:1270`: `static void server_client_update_latest(struct client *c)`
 pub unsafe fn server_client_update_latest(c: *mut client) {
     unsafe {
         if (*c).session.is_null() {
@@ -1832,7 +1832,7 @@ pub unsafe fn server_client_update_latest(c: *mut client) {
 }
 
 /// Handle data key input from client. This owns and can modify the key event it is given and is responsible for freeing it.
-// vendor/tmux/server-client.c:1313  static enum cmd_retval server_client_key_callback(struct cmdq_item *item, void *data)
+/// C `vendor/tmux/server-client.c:1313`: `static enum cmd_retval server_client_key_callback(struct cmdq_item *item, void *data)`
 pub unsafe fn server_client_key_callback(item: *mut cmdq_item, data: *mut c_void) -> cmd_retval {
     unsafe {
         let c = cmdq_get_client(item);
@@ -2115,7 +2115,7 @@ pub unsafe fn server_client_key_callback(item: *mut cmdq_item, data: *mut c_void
 }
 
 /// Handle a key event.
-// vendor/tmux/server-client.c:1693  int server_client_handle_key(struct client *c, struct key_event *event)
+/// C `vendor/tmux/server-client.c:1693`: `int server_client_handle_key(struct client *c, struct key_event *event)`
 pub unsafe fn server_client_handle_key(c: *mut client, event: *mut key_event) -> i32 {
     unsafe {
         let s = (*c).session;
@@ -2159,7 +2159,7 @@ pub unsafe fn server_client_handle_key(c: *mut client, event: *mut key_event) ->
 }
 
 /// Client functions that need to happen every loop.
-// vendor/tmux/server-client.c:1708  void server_client_loop(void)
+/// C `vendor/tmux/server-client.c:1708`: `void server_client_loop(void)`
 pub unsafe fn server_client_loop() {
     unsafe {
         // Check for window resize. This is done before redrawing.
@@ -2192,7 +2192,7 @@ pub unsafe fn server_client_loop() {
 }
 
 /// Check if window needs to be resized.
-// vendor/tmux/server-client.c:1765  static void server_client_check_window_resize(struct window *w)
+/// C `vendor/tmux/server-client.c:1765`: `static void server_client_check_window_resize(struct window *w)`
 pub unsafe fn server_client_check_window_resize(w: *mut window) {
     unsafe {
         if !(*w).flags.intersects(window_flag::RESIZE) {
@@ -2226,7 +2226,7 @@ pub unsafe fn server_client_check_window_resize(w: *mut window) {
 }
 
 /// Resize timer event.
-// vendor/tmux/server-client.c:1785  static void server_client_resize_timer(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/server-client.c:1785`: `static void server_client_resize_timer(__unused int fd, __unused short events, void *data)`
 pub unsafe extern "C-unwind" fn server_client_resize_timer(
     _fd: i32,
     _events: i16,
@@ -2243,7 +2243,7 @@ pub unsafe extern "C-unwind" fn server_client_resize_timer(
 }
 
 /// Check if pane should be resized.
-// vendor/tmux/server-client.c:1795  static void server_client_check_pane_resize(struct window_pane *wp)
+/// C `vendor/tmux/server-client.c:1795`: `static void server_client_check_pane_resize(struct window_pane *wp)`
 pub unsafe fn server_client_check_pane_resize(wp: *mut window_pane) {
     unsafe {
         let mut tv: libc::timeval = libc::timeval {
@@ -2328,7 +2328,7 @@ pub unsafe fn server_client_check_pane_resize(wp: *mut window_pane) {
 }
 
 /// Check pane buffer size.
-// vendor/tmux/server-client.c:1856  static void server_client_check_pane_buffer(struct window_pane *wp)
+/// C `vendor/tmux/server-client.c:1856`: `static void server_client_check_pane_buffer(struct window_pane *wp)`
 pub unsafe fn server_client_check_pane_buffer(wp: *mut window_pane) {
     unsafe {
         let evb = (*(*wp).event).input;
@@ -2434,7 +2434,7 @@ pub unsafe fn server_client_check_pane_buffer(wp: *mut window_pane) {
 ///
 /// `tty_region/tty_reset/tty_update_mode` already take care of not resetting
 /// things that are already in their default state.
-// vendor/tmux/server-client.c:1989  static void server_client_reset_state(struct client *c)
+/// C `vendor/tmux/server-client.c:1989`: `static void server_client_reset_state(struct client *c)`
 pub unsafe fn server_client_reset_state(c: *mut client) {
     unsafe {
         let tty = &raw mut (*c).tty;
@@ -2560,7 +2560,7 @@ pub unsafe fn server_client_reset_state(c: *mut client) {
 }
 
 /// Repeat time callback.
-// vendor/tmux/server-client.c:2114  static void server_client_repeat_timer(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/server-client.c:2114`: `static void server_client_repeat_timer(__unused int fd, __unused short events, void *data)`
 pub unsafe extern "C-unwind" fn server_client_repeat_timer(
     _fd: i32,
     _events: i16,
@@ -2578,7 +2578,7 @@ pub unsafe extern "C-unwind" fn server_client_repeat_timer(
 }
 
 /// Double-click callback.
-// vendor/tmux/server-client.c:2127  static void server_client_click_timer(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/server-client.c:2127`: `static void server_client_click_timer(__unused int fd, __unused short events, void *data)`
 pub unsafe extern "C-unwind" fn server_client_click_timer(
     _fd: i32,
     _events: i16,
@@ -2603,7 +2603,7 @@ pub unsafe extern "C-unwind" fn server_client_click_timer(
 }
 
 /// Check if client should be exited.
-// vendor/tmux/server-client.c:2152  static void server_client_check_exit(struct client *c)
+/// C `vendor/tmux/server-client.c:2152`: `static void server_client_check_exit(struct client *c)`
 pub unsafe fn server_client_check_exit(c: *mut client) {
     unsafe {
         let name = (*c).exit_session;
@@ -2670,14 +2670,14 @@ pub unsafe fn server_client_check_exit(c: *mut client) {
 }
 
 /// Redraw timer callback.
-// vendor/tmux/server-client.c:2202  static void server_client_redraw_timer(__unused int fd, __unused short events, __unused void *data)
+/// C `vendor/tmux/server-client.c:2202`: `static void server_client_redraw_timer(__unused int fd, __unused short events, __unused void *data)`
 pub unsafe extern "C-unwind" fn server_client_redraw_timer(_fd: i32, _events: i16, _: *mut c_void) {
     log_debug!("redraw timer fired");
 }
 
 // Check if modes need to be updated. Only modes in the current window are
 // updated and it is done when the status line is redrawn.
-// vendor/tmux/server-client.c:2213  static void server_client_check_modes(struct client *c)
+/// C `vendor/tmux/server-client.c:2213`: `static void server_client_check_modes(struct client *c)`
 pub unsafe fn server_client_check_modes(c: *mut client) {
     unsafe {
         let w = (*(*(*c).session).curw).window;
@@ -2702,7 +2702,7 @@ pub unsafe fn server_client_check_modes(c: *mut client) {
 }
 
 /// Check for client redraws.
-// vendor/tmux/server-client.c:2249  static void server_client_check_redraw(struct client *c)
+/// C `vendor/tmux/server-client.c:2249`: `static void server_client_check_redraw(struct client *c)`
 pub unsafe fn server_client_check_redraw(c: *mut client) {
     static mut EV: event = unsafe { zeroed() };
     unsafe {
@@ -2847,7 +2847,7 @@ pub unsafe fn server_client_check_redraw(c: *mut client) {
 }
 
 /// Set client title.
-// vendor/tmux/server-client.c:2355  static void server_client_set_title(struct client *c)
+/// C `vendor/tmux/server-client.c:2355`: `static void server_client_set_title(struct client *c)`
 pub unsafe fn server_client_set_title(c: *mut client) {
     unsafe {
         let s = (*c).session;
@@ -2870,7 +2870,7 @@ pub unsafe fn server_client_set_title(c: *mut client) {
 }
 
 /// Set client path.
-// vendor/tmux/server-client.c:2380  static void server_client_set_path(struct client *c)
+/// C `vendor/tmux/server-client.c:2380`: `static void server_client_set_path(struct client *c)`
 pub unsafe fn server_client_set_path(c: *mut client) {
     unsafe {
         let s = (*c).session;
@@ -2892,7 +2892,7 @@ pub unsafe fn server_client_set_path(c: *mut client) {
 }
 
 /// Dispatch message from client.
-// vendor/tmux/server-client.c:2417  static void server_client_dispatch(struct imsg *imsg, void *arg)
+/// C `vendor/tmux/server-client.c:2417`: `static void server_client_dispatch(struct imsg *imsg, void *arg)`
 pub unsafe fn server_client_dispatch(imsg: *mut imsg, arg: *mut c_void) {
     unsafe {
         let c: *mut client = arg.cast();
@@ -2995,7 +2995,7 @@ pub unsafe fn server_client_dispatch(imsg: *mut imsg, arg: *mut c_void) {
 }
 
 /// Callback when command is not allowed.
-// vendor/tmux/server-client.c:2531  static enum cmd_retval server_client_read_only(struct cmdq_item *item, __unused void *data)
+/// C `vendor/tmux/server-client.c:2531`: `static enum cmd_retval server_client_read_only(struct cmdq_item *item, __unused void *data)`
 pub unsafe fn server_client_read_only(item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     unsafe {
         cmdq_error!(item, "client is read-only");
@@ -3004,7 +3004,7 @@ pub unsafe fn server_client_read_only(item: *mut cmdq_item, _data: *mut c_void) 
 }
 
 /// Callback when command is done.
-// vendor/tmux/server-client.c:2557  static enum cmd_retval server_client_command_done(struct cmdq_item *item, __unused void *data)
+/// C `vendor/tmux/server-client.c:2557`: `static enum cmd_retval server_client_command_done(struct cmdq_item *item, __unused void *data)`
 pub unsafe fn server_client_command_done(item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     unsafe {
         let c = cmdq_get_client(item);
@@ -3022,7 +3022,7 @@ pub unsafe fn server_client_command_done(item: *mut cmdq_item, _data: *mut c_voi
 }
 
 /// Handle command message.
-// vendor/tmux/server-client.c:2573  static int server_client_dispatch_command(struct client *c, struct imsg *imsg)
+/// C `vendor/tmux/server-client.c:2573`: `static int server_client_dispatch_command(struct client *c, struct imsg *imsg)`
 pub unsafe fn server_client_dispatch_command(c: *mut client, imsg: *mut imsg) {
     unsafe {
         let mut data: msg_command = zeroed();
@@ -3101,7 +3101,7 @@ pub unsafe fn server_client_dispatch_command(c: *mut client, imsg: *mut imsg) {
 }
 
 /// Handle identify message.
-// vendor/tmux/server-client.c:2643  static int server_client_dispatch_identify(struct client *c, struct imsg *imsg)
+/// C `vendor/tmux/server-client.c:2643`: `static int server_client_dispatch_identify(struct client *c, struct imsg *imsg)`
 pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
     unsafe {
         let mut feat: i32 = 0;
@@ -3260,7 +3260,7 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
 }
 
 /// Handle shell message.
-// vendor/tmux/server-client.c:2799  static int server_client_dispatch_shell(struct client *c)
+/// C `vendor/tmux/server-client.c:2799`: `static int server_client_dispatch_shell(struct client *c)`
 pub unsafe fn server_client_dispatch_shell(c: *mut client) {
     unsafe {
         let mut shell = options_get_string_(GLOBAL_S_OPTIONS, "default-shell");
@@ -3280,7 +3280,7 @@ pub unsafe fn server_client_dispatch_shell(c: *mut client) {
 }
 
 /// Get client working directory.
-// vendor/tmux/server-client.c:2814  const char *server_client_get_cwd(struct client *c, struct session *s)
+/// C `vendor/tmux/server-client.c:2814`: `const char *server_client_get_cwd(struct client *c, struct session *s)`
 pub unsafe fn server_client_get_cwd(c: *const client, s: *const session) -> *const u8 {
     unsafe {
         if !CFG_FINISHED.load(atomic::Ordering::Acquire) && !CFG_CLIENT.is_null() {
@@ -3304,7 +3304,7 @@ pub unsafe fn server_client_get_cwd(c: *const client, s: *const session) -> *con
 }
 
 /// Get control client flags.
-// vendor/tmux/server-client.c:2833  static uint64_t server_client_control_flags(struct client *c, const char *next)
+/// C `vendor/tmux/server-client.c:2833`: `static uint64_t server_client_control_flags(struct client *c, const char *next)`
 pub unsafe fn server_client_control_flags(c: *mut client, next: *const u8) -> client_flag {
     unsafe {
         if streq_(next, "pause-after") {
@@ -3329,7 +3329,7 @@ pub unsafe fn server_client_control_flags(c: *mut client, next: *const u8) -> cl
 }
 
 /// Set client flags.
-// vendor/tmux/server-client.c:2852  void server_client_set_flags(struct client *c, const char *flags)
+/// C `vendor/tmux/server-client.c:2852`: `void server_client_set_flags(struct client *c, const char *flags)`
 pub unsafe fn server_client_set_flags(c: *mut client, flags: *const u8) {
     unsafe {
         let mut next;
@@ -3388,7 +3388,7 @@ pub unsafe fn server_client_set_flags(c: *mut client, flags: *const u8) {
 }
 
 /// Get client flags. This is only flags useful to show to users.
-// vendor/tmux/server-client.c:2895  const char *server_client_get_flags(struct client *c)
+/// C `vendor/tmux/server-client.c:2895`: `const char *server_client_get_flags(struct client *c)`
 pub unsafe fn server_client_get_flags(c: *mut client) -> *const u8 {
     unsafe {
         const SIZEOF_S: usize = 256;
@@ -3444,7 +3444,7 @@ pub unsafe fn server_client_get_flags(c: *mut client) -> *const u8 {
 }
 
 /// Get client window.
-// vendor/tmux/server-client.c:2935  struct client_window *server_client_get_client_window(struct client *c, u_int id)
+/// C `vendor/tmux/server-client.c:2935`: `struct client_window *server_client_get_client_window(struct client *c, u_int id)`
 pub unsafe fn server_client_get_client_window(c: *mut client, id: u32) -> *mut client_window {
     unsafe {
         let mut cw: client_window = client_window {
@@ -3457,7 +3457,7 @@ pub unsafe fn server_client_get_client_window(c: *mut client, id: u32) -> *mut c
 }
 
 /// Add client window.
-// vendor/tmux/server-client.c:2944  struct client_window *server_client_add_client_window(struct client *c, u_int id)
+/// C `vendor/tmux/server-client.c:2944`: `struct client_window *server_client_add_client_window(struct client *c, u_int id)`
 pub unsafe fn server_client_add_client_window(c: *mut client, id: u32) -> NonNull<client_window> {
     unsafe {
         if let Some(cw) = NonNull::new(server_client_get_client_window(c, id)) {
@@ -3472,7 +3472,7 @@ pub unsafe fn server_client_add_client_window(c: *mut client, id: u32) -> NonNul
 }
 
 /// Get client active pane.
-// vendor/tmux/server-client.c:2959  struct window_pane *server_client_get_pane(struct client *c)
+/// C `vendor/tmux/server-client.c:2959`: `struct window_pane *server_client_get_pane(struct client *c)`
 pub unsafe fn server_client_get_pane(c: *mut client) -> *mut window_pane {
     unsafe {
         let s = (*c).session;
@@ -3493,7 +3493,7 @@ pub unsafe fn server_client_get_pane(c: *mut client) -> *mut window_pane {
 }
 
 // Set client active pane.
-// vendor/tmux/server-client.c:2977  void server_client_set_pane(struct client *c, struct window_pane *wp)
+/// C `vendor/tmux/server-client.c:2977`: `void server_client_set_pane(struct client *c, struct window_pane *wp)`
 pub unsafe fn server_client_set_pane(c: *mut client, wp: *mut window_pane) {
     unsafe {
         let s = (*c).session;
@@ -3509,7 +3509,7 @@ pub unsafe fn server_client_set_pane(c: *mut client, wp: *mut window_pane) {
 }
 
 /// Remove pane from client lists.
-// vendor/tmux/server-client.c:2992  void server_client_remove_pane(struct window_pane *wp)
+/// C `vendor/tmux/server-client.c:2992`: `void server_client_remove_pane(struct window_pane *wp)`
 pub unsafe fn server_client_remove_pane(wp: *mut window_pane) {
     unsafe {
         let w = (*wp).window;
@@ -3525,7 +3525,7 @@ pub unsafe fn server_client_remove_pane(wp: *mut window_pane) {
 }
 
 /// Print to a client.
-// vendor/tmux/server-client.c:3014  void server_client_print(struct client *c, int parse, struct evbuffer *evb)
+/// C `vendor/tmux/server-client.c:3014`: `void server_client_print(struct client *c, int parse, struct evbuffer *evb)`
 pub unsafe fn server_client_print(c: *mut client, parse: i32, evb: *mut evbuffer) {
     unsafe {
         let data = EVBUFFER_DATA(evb);

@@ -65,12 +65,12 @@ RB_GENERATE!(
     wait_channel_cmp
 );
 
-// vendor/tmux/cmd-wait-for.c:66  static int wait_channel_cmp(struct wait_channel *wc1, struct wait_channel *wc2)
+/// C `vendor/tmux/cmd-wait-for.c:66`: `static int wait_channel_cmp(struct wait_channel *wc1, struct wait_channel *wc2)`
 pub fn wait_channel_cmp(wc1: &wait_channel, wc2: &wait_channel) -> Ordering {
     unsafe { i32_to_ordering(libc::strcmp(wc1.name, wc2.name)) }
 }
 
-// vendor/tmux/cmd-wait-for.c:84  static struct wait_channel *cmd_wait_for_add(const char *name)
+/// C `vendor/tmux/cmd-wait-for.c:84`: `static struct wait_channel *cmd_wait_for_add(const char *name)`
 pub unsafe fn cmd_wait_for_add(name: *const u8) -> *mut wait_channel {
     unsafe {
         let wc = Box::leak(Box::new(wait_channel {
@@ -93,7 +93,7 @@ pub unsafe fn cmd_wait_for_add(name: *const u8) -> *mut wait_channel {
     }
 }
 
-// vendor/tmux/cmd-wait-for.c:105  static void cmd_wait_for_remove(struct wait_channel *wc)
+/// C `vendor/tmux/cmd-wait-for.c:105`: `static void cmd_wait_for_remove(struct wait_channel *wc)`
 pub unsafe fn cmd_wait_for_remove(wc: *mut wait_channel) {
     unsafe {
         if (*wc).locked {
@@ -112,7 +112,7 @@ pub unsafe fn cmd_wait_for_remove(wc: *mut wait_channel) {
     }
 }
 
-// vendor/tmux/cmd-wait-for.c:121  static enum cmd_retval cmd_wait_for_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-wait-for.c:121`: `static enum cmd_retval cmd_wait_for_exec(struct cmd *self, struct cmdq_item *item)`
 pub unsafe fn cmd_wait_for_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -137,7 +137,7 @@ pub unsafe fn cmd_wait_for_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
     }
 }
 
-// vendor/tmux/cmd-wait-for.c:140  static enum cmd_retval cmd_wait_for_signal(__unused struct cmdq_item *item, const char *name, struct wait_channel *wc)
+/// C `vendor/tmux/cmd-wait-for.c:140`: `static enum cmd_retval cmd_wait_for_signal(__unused struct cmdq_item *item, const char *name, struct wait_channel *wc)`
 pub unsafe fn cmd_wait_for_signal(
     _item: *const cmdq_item,
     name: *const u8,
@@ -168,7 +168,7 @@ pub unsafe fn cmd_wait_for_signal(
     }
 }
 
-// vendor/tmux/cmd-wait-for.c:167  static enum cmd_retval cmd_wait_for_wait(struct cmdq_item *item, const char *name, struct wait_channel *wc)
+/// C `vendor/tmux/cmd-wait-for.c:167`: `static enum cmd_retval cmd_wait_for_wait(struct cmdq_item *item, const char *name, struct wait_channel *wc)`
 pub unsafe fn cmd_wait_for_wait(
     item: *mut cmdq_item,
     name: *const u8,
@@ -200,7 +200,7 @@ pub unsafe fn cmd_wait_for_wait(
     cmd_retval::CMD_RETURN_WAIT
 }
 
-// vendor/tmux/cmd-wait-for.c:196  static enum cmd_retval cmd_wait_for_lock(struct cmdq_item *item, const char *name, struct wait_channel *wc)
+/// C `vendor/tmux/cmd-wait-for.c:196`: `static enum cmd_retval cmd_wait_for_lock(struct cmdq_item *item, const char *name, struct wait_channel *wc)`
 pub unsafe fn cmd_wait_for_lock(
     item: *mut cmdq_item,
     name: *const u8,
@@ -227,7 +227,7 @@ pub unsafe fn cmd_wait_for_lock(
     cmd_retval::CMD_RETURN_NORMAL
 }
 
-// vendor/tmux/cmd-wait-for.c:221  static enum cmd_retval cmd_wait_for_unlock(struct cmdq_item *item, const char *name, struct wait_channel *wc)
+/// C `vendor/tmux/cmd-wait-for.c:221`: `static enum cmd_retval cmd_wait_for_unlock(struct cmdq_item *item, const char *name, struct wait_channel *wc)`
 pub unsafe fn cmd_wait_for_unlock(
     item: *mut cmdq_item,
     name: *const u8,
@@ -252,7 +252,7 @@ pub unsafe fn cmd_wait_for_unlock(
     cmd_retval::CMD_RETURN_NORMAL
 }
 
-// vendor/tmux/cmd-wait-for.c:244  void cmd_wait_for_flush(void)
+/// C `vendor/tmux/cmd-wait-for.c:244`: `void cmd_wait_for_flush(void)`
 pub unsafe fn cmd_wait_for_flush() {
     unsafe {
         for wc in rb_foreach(&raw mut WAIT_CHANNELS).map(NonNull::as_ptr) {

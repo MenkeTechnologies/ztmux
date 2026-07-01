@@ -47,7 +47,7 @@ static CMD_FIND_PANE_TABLE: [[&str; 2]; 15] = [
     ["{right-of}", "{right-of}"],
 ];
 
-// vendor/tmux/cmd-find.c:80  static struct window_pane *cmd_find_inside_pane(struct client *c)
+/// C `vendor/tmux/cmd-find.c:80`: `static struct window_pane *cmd_find_inside_pane(struct client *c)`
 pub unsafe fn cmd_find_inside_pane(c: *mut client) -> *mut window_pane {
     let __func__ = "cmd_find_inside_pane";
     unsafe {
@@ -81,7 +81,7 @@ pub unsafe fn cmd_find_inside_pane(c: *mut client) -> *mut window_pane {
     }
 }
 
-// vendor/tmux/cmd-find.c:104  static int cmd_find_client_better(struct client *c, struct client *than)
+/// C `vendor/tmux/cmd-find.c:104`: `static int cmd_find_client_better(struct client *c, struct client *than)`
 pub unsafe fn cmd_find_client_better(c: *const client, than: *const client) -> i32 {
     if than.is_null() {
         return 1;
@@ -92,7 +92,7 @@ pub unsafe fn cmd_find_client_better(c: *const client, than: *const client) -> i
     }
 }
 
-// vendor/tmux/cmd-find.c:113  struct client *cmd_find_best_client(struct session *s)
+/// C `vendor/tmux/cmd-find.c:113`: `struct client *cmd_find_best_client(struct session *s)`
 pub unsafe fn cmd_find_best_client(mut s: *const session) -> *mut client {
     unsafe {
         if (*s).attached == 0 {
@@ -116,7 +116,7 @@ pub unsafe fn cmd_find_best_client(mut s: *const session) -> *mut client {
     }
 }
 
-// vendor/tmux/cmd-find.c:134  static int cmd_find_session_better(struct session *s, struct session *than, int flags)
+/// C `vendor/tmux/cmd-find.c:134`: `static int cmd_find_session_better(struct session *s, struct session *than, int flags)`
 pub unsafe fn cmd_find_session_better(
     s: *const session,
     than: *const session,
@@ -140,7 +140,7 @@ pub unsafe fn cmd_find_session_better(
     }
 }
 
-// vendor/tmux/cmd-find.c:164  static struct session *cmd_find_best_session(struct session **slist, u_int ssize, int flags)
+/// C `vendor/tmux/cmd-find.c:164`: `static struct session *cmd_find_best_session(struct session **slist, u_int ssize, int flags)`
 pub unsafe fn cmd_find_best_session(
     slist: *const *mut session,
     ssize: u32,
@@ -168,7 +168,7 @@ pub unsafe fn cmd_find_best_session(
     }
 }
 
-// vendor/tmux/cmd-find.c:192  static int cmd_find_best_session_with_window(struct cmd_find_state *fs)
+/// C `vendor/tmux/cmd-find.c:192`: `static int cmd_find_best_session_with_window(struct cmd_find_state *fs)`
 pub unsafe fn cmd_find_best_session_with_window(fs: *mut cmd_find_state) -> i32 {
     let __func__ = "cmd_find_best_session_with_window";
     unsafe {
@@ -202,7 +202,7 @@ pub unsafe fn cmd_find_best_session_with_window(fs: *mut cmd_find_state) -> i32 
     }
 }
 
-// vendor/tmux/cmd-find.c:225  static int cmd_find_best_winlink_with_window(struct cmd_find_state *fs)
+/// C `vendor/tmux/cmd-find.c:225`: `static int cmd_find_best_winlink_with_window(struct cmd_find_state *fs)`
 pub unsafe fn cmd_find_best_winlink_with_window(fs: *mut cmd_find_state) -> i32 {
     let __func__ = "cmd_find_best_winlink_with_window";
     unsafe {
@@ -228,7 +228,7 @@ pub unsafe fn cmd_find_best_winlink_with_window(fs: *mut cmd_find_state) -> i32 
     0
 }
 
-// vendor/tmux/cmd-find.c:251  static const char *cmd_find_map_table(const char *table[][2], const char *s)
+/// C `vendor/tmux/cmd-find.c:251`: `static const char *cmd_find_map_table(const char *table[][2], const char *s)`
 pub fn cmd_find_map_table<'a>(table: &[[&'static str; 2]], s: &'a str) -> &'a str {
     for entry in table {
         if s == entry[0] {
@@ -238,7 +238,7 @@ pub fn cmd_find_map_table<'a>(table: &[[&'static str; 2]], s: &'a str) -> &'a st
     s
 }
 
-// vendor/tmux/cmd-find.c:264  static int cmd_find_get_session(struct cmd_find_state *fs, const char *session)
+/// C `vendor/tmux/cmd-find.c:264`: `static int cmd_find_get_session(struct cmd_find_state *fs, const char *session)`
 pub unsafe fn cmd_find_get_session(fs: *mut cmd_find_state, session: &str) -> i32 {
     let __func__ = "cmd_find_get_session";
     unsafe {
@@ -319,7 +319,7 @@ pub unsafe fn cmd_find_get_session(fs: *mut cmd_find_state, session: &str) -> i3
     -1
 }
 
-// vendor/tmux/cmd-find.c:328  static int cmd_find_get_window(struct cmd_find_state *fs, const char *window, int only)
+/// C `vendor/tmux/cmd-find.c:328`: `static int cmd_find_get_window(struct cmd_find_state *fs, const char *window, int only)`
 pub unsafe fn cmd_find_get_window(fs: *mut cmd_find_state, window: &str, only: bool) -> i32 {
     let __func__ = "cmd_find_get_window";
     unsafe {
@@ -354,7 +354,7 @@ pub unsafe fn cmd_find_get_window(fs: *mut cmd_find_state, window: &str, only: b
     -1
 }
 
-// vendor/tmux/cmd-find.c:364  static int cmd_find_get_window_with_session(struct cmd_find_state *fs, const char *window)
+/// C `vendor/tmux/cmd-find.c:364`: `static int cmd_find_get_window_with_session(struct cmd_find_state *fs, const char *window)`
 pub unsafe fn cmd_find_get_window_with_session(fs: *mut cmd_find_state, window: &str) -> i32 {
     let __func__ = "cmd_find_get_window_with_session";
     unsafe {
@@ -524,7 +524,7 @@ pub unsafe fn cmd_find_get_window_with_session(fs: *mut cmd_find_state, window: 
     -1
 }
 
-// vendor/tmux/cmd-find.c:516  static int cmd_find_get_pane(struct cmd_find_state *fs, const char *pane, int only)
+/// C `vendor/tmux/cmd-find.c:516`: `static int cmd_find_get_pane(struct cmd_find_state *fs, const char *pane, int only)`
 pub unsafe fn cmd_find_get_pane(fs: *mut cmd_find_state, pane: &str, only: bool) -> i32 {
     let __func__ = "cmd_find_get_pane";
     unsafe {
@@ -556,7 +556,7 @@ pub unsafe fn cmd_find_get_pane(fs: *mut cmd_find_state, pane: &str, only: bool)
     -1
 }
 
-// vendor/tmux/cmd-find.c:553  static int cmd_find_get_pane_with_session(struct cmd_find_state *fs, const char *pane)
+/// C `vendor/tmux/cmd-find.c:553`: `static int cmd_find_get_pane_with_session(struct cmd_find_state *fs, const char *pane)`
 pub unsafe fn cmd_find_get_pane_with_session(fs: *mut cmd_find_state, pane: &str) -> i32 {
     let __func__ = "cmd_find_get_pane_with_session";
     unsafe {
@@ -579,7 +579,7 @@ pub unsafe fn cmd_find_get_pane_with_session(fs: *mut cmd_find_state, pane: &str
     }
 }
 
-// vendor/tmux/cmd-find.c:580  static int cmd_find_get_pane_with_window(struct cmd_find_state *fs, const char *pane)
+/// C `vendor/tmux/cmd-find.c:580`: `static int cmd_find_get_pane_with_window(struct cmd_find_state *fs, const char *pane)`
 pub unsafe fn cmd_find_get_pane_with_window(fs: *mut cmd_find_state, pane: &str) -> i32 {
     let __func__ = "cmd_find_get_pane_with_window";
     unsafe {
@@ -667,7 +667,7 @@ pub unsafe fn cmd_find_get_pane_with_window(fs: *mut cmd_find_state, pane: &str)
     -1
 }
 
-// vendor/tmux/cmd-find.c:660  void cmd_find_clear_state(struct cmd_find_state *fs, int flags)
+/// C `vendor/tmux/cmd-find.c:660`: `void cmd_find_clear_state(struct cmd_find_state *fs, int flags)`
 pub unsafe fn cmd_find_clear_state(fs: *mut cmd_find_state, flags: cmd_find_flags) {
     unsafe {
         memset0(fs);
@@ -678,14 +678,14 @@ pub unsafe fn cmd_find_clear_state(fs: *mut cmd_find_state, flags: cmd_find_flag
     }
 }
 
-// vendor/tmux/cmd-find.c:671  int cmd_find_empty_state(struct cmd_find_state *fs)
+/// C `vendor/tmux/cmd-find.c:671`: `int cmd_find_empty_state(struct cmd_find_state *fs)`
 pub unsafe fn cmd_find_empty_state(fs: *const cmd_find_state) -> i32 {
     unsafe {
         ((*fs).s.is_null() && (*fs).wl.is_null() && (*fs).w.is_null() && (*fs).wp.is_null()) as i32
     }
 }
 
-// vendor/tmux/cmd-find.c:680  int cmd_find_valid_state(struct cmd_find_state *fs)
+/// C `vendor/tmux/cmd-find.c:680`: `int cmd_find_valid_state(struct cmd_find_state *fs)`
 pub unsafe fn cmd_find_valid_state(fs: *const cmd_find_state) -> bool {
     unsafe {
         if (*fs).s.is_null() || (*fs).wl.is_null() || (*fs).w.is_null() || (*fs).wp.is_null() {
@@ -710,7 +710,7 @@ pub unsafe fn cmd_find_valid_state(fs: *const cmd_find_state) -> bool {
     }
 }
 
-// vendor/tmux/cmd-find.c:705  void cmd_find_copy_state(struct cmd_find_state *dst, struct cmd_find_state *src)
+/// C `vendor/tmux/cmd-find.c:705`: `void cmd_find_copy_state(struct cmd_find_state *dst, struct cmd_find_state *src)`
 pub unsafe fn cmd_find_copy_state(dst: *mut cmd_find_state, src: *const cmd_find_state) {
     unsafe {
         (*dst).s = (*src).s;
@@ -721,7 +721,7 @@ pub unsafe fn cmd_find_copy_state(dst: *mut cmd_find_state, src: *const cmd_find
     }
 }
 
-// vendor/tmux/cmd-find.c:716  static void cmd_find_log_state(const char *prefix, struct cmd_find_state *fs)
+/// C `vendor/tmux/cmd-find.c:716`: `static void cmd_find_log_state(const char *prefix, struct cmd_find_state *fs)`
 pub unsafe fn cmd_find_log_state(prefix: *const u8, fs: *const cmd_find_state) {
     unsafe {
         if !(*fs).s.is_null() {
@@ -747,7 +747,7 @@ pub unsafe fn cmd_find_log_state(prefix: *const u8, fs: *const cmd_find_state) {
     }
 }
 
-// vendor/tmux/cmd-find.c:739  void cmd_find_from_session(struct cmd_find_state *fs, struct session *s, int flags)
+/// C `vendor/tmux/cmd-find.c:739`: `void cmd_find_from_session(struct cmd_find_state *fs, struct session *s, int flags)`
 pub unsafe fn cmd_find_from_session(
     fs: *mut cmd_find_state,
     s: *mut session,
@@ -765,7 +765,7 @@ pub unsafe fn cmd_find_from_session(
     }
 }
 
-// vendor/tmux/cmd-find.c:753  void cmd_find_from_winlink(struct cmd_find_state *fs, struct winlink *wl, int flags)
+/// C `vendor/tmux/cmd-find.c:753`: `void cmd_find_from_winlink(struct cmd_find_state *fs, struct winlink *wl, int flags)`
 pub unsafe fn cmd_find_from_winlink(
     fs: *mut cmd_find_state,
     wl: *mut winlink,
@@ -783,7 +783,7 @@ pub unsafe fn cmd_find_from_winlink(
     }
 }
 
-// vendor/tmux/cmd-find.c:767  int cmd_find_from_session_window(struct cmd_find_state *fs, struct session *s, struct window *w, int flags)
+/// C `vendor/tmux/cmd-find.c:767`: `int cmd_find_from_session_window(struct cmd_find_state *fs, struct session *s, struct window *w, int flags)`
 pub unsafe fn cmd_find_from_session_window(
     fs: *mut cmd_find_state,
     s: *mut session,
@@ -806,7 +806,7 @@ pub unsafe fn cmd_find_from_session_window(
     0
 }
 
-// vendor/tmux/cmd-find.c:786  int cmd_find_from_window(struct cmd_find_state *fs, struct window *w, int flags)
+/// C `vendor/tmux/cmd-find.c:786`: `int cmd_find_from_window(struct cmd_find_state *fs, struct window *w, int flags)`
 pub unsafe fn cmd_find_from_window(
     fs: *mut cmd_find_state,
     w: *mut window,
@@ -831,7 +831,7 @@ pub unsafe fn cmd_find_from_window(
     }
 }
 
-// vendor/tmux/cmd-find.c:807  void cmd_find_from_winlink_pane(struct cmd_find_state *fs, struct winlink *wl, struct window_pane *wp, int flags)
+/// C `vendor/tmux/cmd-find.c:807`: `void cmd_find_from_winlink_pane(struct cmd_find_state *fs, struct winlink *wl, struct window_pane *wp, int flags)`
 pub unsafe fn cmd_find_from_winlink_pane(
     fs: *mut cmd_find_state,
     wl: *mut winlink,
@@ -851,7 +851,7 @@ pub unsafe fn cmd_find_from_winlink_pane(
     }
 }
 
-// vendor/tmux/cmd-find.c:823  int cmd_find_from_pane(struct cmd_find_state *fs, struct window_pane *wp, int flags)
+/// C `vendor/tmux/cmd-find.c:823`: `int cmd_find_from_pane(struct cmd_find_state *fs, struct window_pane *wp, int flags)`
 pub unsafe fn cmd_find_from_pane(
     fs: *mut cmd_find_state,
     wp: *mut window_pane,
@@ -869,7 +869,7 @@ pub unsafe fn cmd_find_from_pane(
     0
 }
 
-// vendor/tmux/cmd-find.c:835  int cmd_find_from_nothing(struct cmd_find_state *fs, int flags)
+/// C `vendor/tmux/cmd-find.c:835`: `int cmd_find_from_nothing(struct cmd_find_state *fs, int flags)`
 pub unsafe fn cmd_find_from_nothing(fs: *mut cmd_find_state, flags: cmd_find_flags) -> i32 {
     unsafe {
         cmd_find_clear_state(fs, flags);
@@ -889,7 +889,7 @@ pub unsafe fn cmd_find_from_nothing(fs: *mut cmd_find_state, flags: cmd_find_fla
     0
 }
 
-// vendor/tmux/cmd-find.c:855  int cmd_find_from_mouse(struct cmd_find_state *fs, struct mouse_event *m, int flags)
+/// C `vendor/tmux/cmd-find.c:855`: `int cmd_find_from_mouse(struct cmd_find_state *fs, struct mouse_event *m, int flags)`
 pub unsafe fn cmd_find_from_mouse(
     fs: *mut cmd_find_state,
     m: *mut mouse_event,
@@ -914,7 +914,7 @@ pub unsafe fn cmd_find_from_mouse(
     0
 }
 
-// vendor/tmux/cmd-find.c:875  int cmd_find_from_client(struct cmd_find_state *fs, struct client *c, int flags)
+/// C `vendor/tmux/cmd-find.c:875`: `int cmd_find_from_client(struct cmd_find_state *fs, struct client *c, int flags)`
 pub unsafe fn cmd_find_from_client(
     fs: *mut cmd_find_state,
     c: *mut client,
@@ -965,7 +965,7 @@ pub unsafe fn cmd_find_from_client(
     }
 }
 
-// vendor/tmux/cmd-find.c:939  int cmd_find_target(struct cmd_find_state *fs, struct cmdq_item *item, const char *target, enum cmd_find_type type, int flags)
+/// C `vendor/tmux/cmd-find.c:939`: `int cmd_find_target(struct cmd_find_state *fs, struct cmdq_item *item, const char *target, enum cmd_find_type type, int flags)`
 pub unsafe fn cmd_find_target(
     fs: *mut cmd_find_state,
     item: *mut cmdq_item,
@@ -1341,7 +1341,7 @@ pub unsafe fn cmd_find_target(
     }
 }
 
-// vendor/tmux/cmd-find.c:1274  static struct client *cmd_find_current_client(struct cmdq_item *item, int quiet)
+/// C `vendor/tmux/cmd-find.c:1274`: `static struct client *cmd_find_current_client(struct cmdq_item *item, int quiet)`
 pub unsafe fn cmd_find_current_client(item: *mut cmdq_item, quiet: i32) -> *mut client {
     let __func__ = "cmd_find_current_client";
     unsafe {
@@ -1382,7 +1382,7 @@ pub unsafe fn cmd_find_current_client(item: *mut cmdq_item, quiet: i32) -> *mut 
     }
 }
 
-// vendor/tmux/cmd-find.c:1305  struct client *cmd_find_client(struct cmdq_item *item, const char *target, int quiet)
+/// C `vendor/tmux/cmd-find.c:1305`: `struct client *cmd_find_client(struct cmdq_item *item, const char *target, int quiet)`
 pub unsafe fn cmd_find_client(
     item: *mut cmdq_item,
     target: Option<&str>,

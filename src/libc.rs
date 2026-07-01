@@ -7,7 +7,7 @@ pub type wchar_t = core::ffi::c_int;
 
 unsafe extern "C" {
     pub static mut environ: *mut *mut u8;
-    // vendor/tmux/compat/strsep.c:49  char *strsep(char **stringp, const char *delim)
+    /// C `vendor/tmux/compat/strsep.c:49`: `char *strsep(char **stringp, const char *delim)`
     pub fn strsep(_: *mut *mut u8, _delim: *const u8) -> *mut u8;
 }
 
@@ -56,7 +56,7 @@ pub unsafe fn strdup(cs: *const u8) -> *mut u8 {
     unsafe { ::libc::strdup(cs.cast()).cast() }
 }
 
-// vendor/tmux/compat/strndup.c:28  char *strndup(const char *str, size_t maxlen)
+/// C `vendor/tmux/compat/strndup.c:28`: `char *strndup(const char *str, size_t maxlen)`
 pub unsafe fn strndup(cs: *const u8, n: usize) -> *mut u8 {
     unsafe {
         let duplen = strnlen(cs, n);
@@ -75,7 +75,7 @@ pub unsafe fn strlen(cs: *const u8) -> usize {
     unsafe { ::libc::strlen(cs.cast()) }
 }
 
-// vendor/tmux/compat/strnlen.c:26  size_t strnlen(const char *str, size_t maxlen)
+/// C `vendor/tmux/compat/strnlen.c:26`: `size_t strnlen(const char *str, size_t maxlen)`
 pub unsafe fn strnlen(cs: *const u8, maxlen: usize) -> usize {
     unsafe { ::libc::strnlen(cs.cast(), maxlen) }
 }

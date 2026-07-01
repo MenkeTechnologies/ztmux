@@ -47,7 +47,7 @@ struct cmd_command_prompt_cdata<'a> {
     argv: *mut *mut u8,
 }
 
-// vendor/tmux/cmd-command-prompt.c:76  static enum args_parse_type cmd_command_prompt_args_parse(__unused struct args *args, __unused u_int idx, __unused char **cause)
+/// C `vendor/tmux/cmd-command-prompt.c:76`: `static enum args_parse_type cmd_command_prompt_args_parse(__unused struct args *args, __unused u_int idx, __unused char **cause)`
 fn cmd_command_prompt_args_parse(
     _args: *mut args,
     _idx: u32,
@@ -56,7 +56,7 @@ fn cmd_command_prompt_args_parse(
     args_parse_type::ARGS_PARSE_COMMANDS_OR_STRING
 }
 
-// vendor/tmux/cmd-command-prompt.c:83  static enum cmd_retval cmd_command_prompt_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-command-prompt.c:83`: `static enum cmd_retval cmd_command_prompt_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -183,7 +183,7 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
     }
 }
 
-// vendor/tmux/cmd-command-prompt.c:198  static enum prompt_result cmd_command_prompt_callback(struct client *c, void *data, const char *s, enum prompt_key_result key)
+/// C `vendor/tmux/cmd-command-prompt.c:198`: `static enum prompt_result cmd_command_prompt_callback(struct client *c, void *data, const char *s, enum prompt_key_result key)`
 unsafe fn cmd_command_prompt_callback(
     c: *mut client,
     cdata: NonNull<cmd_command_prompt_cdata>,
@@ -253,7 +253,7 @@ unsafe fn cmd_command_prompt_callback(
     }
 }
 
-// vendor/tmux/cmd-command-prompt.c:268  static void cmd_command_prompt_free(void *data)
+/// C `vendor/tmux/cmd-command-prompt.c:268`: `static void cmd_command_prompt_free(void *data)`
 unsafe fn cmd_command_prompt_free(cdata: NonNull<cmd_command_prompt_cdata>) {
     unsafe {
         for i in 0u32..(*cdata.as_ptr()).count {

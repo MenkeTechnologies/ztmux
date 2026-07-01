@@ -50,7 +50,7 @@ pub struct menu_data {
     pub data: *mut c_void,
 }
 
-// vendor/tmux/menu.c:54  void menu_add_items(struct menu *menu, const struct menu_item *items, struct cmdq_item *qitem, struct client *c, struct cmd_find_state *fs)
+/// C `vendor/tmux/menu.c:54`: `void menu_add_items(struct menu *menu, const struct menu_item *items, struct cmdq_item *qitem, struct client *c, struct cmd_find_state *fs)`
 pub unsafe fn menu_add_items(
     menu: *mut menu,
     items: &[menu_item],
@@ -65,7 +65,7 @@ pub unsafe fn menu_add_items(
     }
 }
 
-// vendor/tmux/menu.c:64  void menu_add_item(struct menu *menu, const struct menu_item *item, struct cmdq_item *qitem, struct client *c, struct cmd_find_state *fs)
+/// C `vendor/tmux/menu.c:64`: `void menu_add_item(struct menu *menu, const struct menu_item *item, struct cmdq_item *qitem, struct client *c, struct cmd_find_state *fs)`
 pub unsafe fn menu_add_item(
     menu: *mut menu,
     item: Option<&menu_item>,
@@ -164,7 +164,7 @@ pub unsafe fn menu_add_item(
     }
 }
 
-// vendor/tmux/menu.c:149  struct menu *menu_create(const char *title)
+/// C `vendor/tmux/menu.c:149`: `struct menu *menu_create(const char *title)`
 pub fn menu_create(title: &str) -> Box<menu> {
     Box::new(menu {
         title: title.to_string(),
@@ -173,7 +173,7 @@ pub fn menu_create(title: &str) -> Box<menu> {
     })
 }
 
-// vendor/tmux/menu.c:161  void menu_free(struct menu *menu)
+/// C `vendor/tmux/menu.c:161`: `void menu_free(struct menu *menu)`
 pub unsafe fn menu_free(menu: *mut menu) {
     unsafe {
         for item in (*menu).items.drain(..) {
@@ -186,7 +186,7 @@ pub unsafe fn menu_free(menu: *mut menu) {
     }
 }
 
-// vendor/tmux/menu.c:179  struct screen *menu_mode_cb(__unused struct client *c, void *data, u_int *cx, u_int *cy)
+/// C `vendor/tmux/menu.c:179`: `struct screen *menu_mode_cb(__unused struct client *c, void *data, u_int *cx, u_int *cy)`
 pub unsafe fn menu_mode_cb(
     _c: *mut client,
     data: *mut c_void,
@@ -207,7 +207,7 @@ pub unsafe fn menu_mode_cb(
     }
 }
 
-// vendor/tmux/menu.c:194  struct visible_ranges *menu_check_cb(__unused struct client *c, void *data, u_int px, u_int py, u_int nx)
+/// C `vendor/tmux/menu.c:194`: `struct visible_ranges *menu_check_cb(__unused struct client *c, void *data, u_int px, u_int py, u_int nx)`
 pub unsafe fn menu_check_cb(
     _c: *mut client,
     data: *mut c_void,
@@ -233,7 +233,7 @@ pub unsafe fn menu_check_cb(
     }
 }
 
-// vendor/tmux/menu.c:260  void menu_draw_cb(struct client *c, void *data)
+/// C `vendor/tmux/menu.c:260`: `void menu_draw_cb(struct client *c, void *data)`
 pub unsafe fn menu_draw_cb(c: *mut client, data: *mut c_void, _rctx: *mut screen_redraw_ctx) {
     unsafe {
         let md = data as *mut menu_data;
@@ -287,7 +287,7 @@ pub unsafe fn menu_draw_cb(c: *mut client, data: *mut c_void, _rctx: *mut screen
     }
 }
 
-// vendor/tmux/menu.c:288  void menu_free_cb(__unused struct client *c, void *data)
+/// C `vendor/tmux/menu.c:288`: `void menu_free_cb(__unused struct client *c, void *data)`
 pub unsafe fn menu_free_cb(_c: *mut client, data: *mut c_void) {
     unsafe {
         let md = data as *mut menu_data;
@@ -306,7 +306,7 @@ pub unsafe fn menu_free_cb(_c: *mut client, data: *mut c_void) {
     }
 }
 
-// vendor/tmux/menu.c:309  int menu_key_cb(struct client *c, void *data, struct key_event *event)
+/// C `vendor/tmux/menu.c:309`: `int menu_key_cb(struct client *c, void *data, struct key_event *event)`
 pub unsafe fn menu_key_cb(c: *mut client, data: *mut c_void, mut event: *mut key_event) -> i32 {
     unsafe {
         let md = data as *mut menu_data;
@@ -579,7 +579,7 @@ pub unsafe fn menu_set_style(
     }
 }
 
-// vendor/tmux/menu.c:543  struct menu_data *menu_prepare(struct menu *menu, int flags, int starting_choice, struct cmdq_item *item, u_int px, u_int py, struct client *c, enum box_lines lines, const char *style, const char *selected_style, const char *border_style, struct cmd_find_state *fs, menu_choice_cb cb, void *data)
+/// C `vendor/tmux/menu.c:543`: `struct menu_data *menu_prepare(struct menu *menu, int flags, int starting_choice, struct cmdq_item *item, u_int px, u_int py, struct client *c, enum box_lines lines, const char *style, const char *selected_style, const char *border_style, struct cmd_find_state *fs, menu_choice_cb cb, void *data)`
 pub unsafe fn menu_prepare(
     menu: *mut menu,
     flags: menu_flags,
@@ -699,7 +699,7 @@ pub unsafe fn menu_prepare(
     }
 }
 
-// vendor/tmux/menu.c:626  int menu_display(struct menu *menu, int flags, int starting_choice, struct cmdq_item *item, u_int px, u_int py, struct client *c, enum box_lines lines, const char *style, const char *selected_style, const char *border_style, struct cmd_find_state *fs, menu_choice_cb cb, void *data)
+/// C `vendor/tmux/menu.c:626`: `int menu_display(struct menu *menu, int flags, int starting_choice, struct cmdq_item *item, u_int px, u_int py, struct client *c, enum box_lines lines, const char *style, const char *selected_style, const char *border_style, struct cmd_find_state *fs, menu_choice_cb cb, void *data)`
 pub unsafe fn menu_display(
     menu: *mut menu,
     flags: menu_flags,

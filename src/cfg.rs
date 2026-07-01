@@ -26,7 +26,7 @@ pub static CFG_QUIET: AtomicBool = AtomicBool::new(true);
 
 pub static CFG_FILES: Mutex<Vec<CString>> = Mutex::new(Vec::new());
 
-// vendor/tmux/cfg.c:40  static enum cmd_retval cfg_client_done(__unused struct cmdq_item *item, __unused void *data)
+/// C `vendor/tmux/cfg.c:40`: `static enum cmd_retval cfg_client_done(__unused struct cmdq_item *item, __unused void *data)`
 fn cfg_client_done(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     if !CFG_FINISHED.load(atomic::Ordering::Acquire) {
         cmd_retval::CMD_RETURN_WAIT
@@ -35,7 +35,7 @@ fn cfg_client_done(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     }
 }
 
-// vendor/tmux/cfg.c:48  static enum cmd_retval cfg_done(__unused struct cmdq_item *item, __unused void *data)
+/// C `vendor/tmux/cfg.c:48`: `static enum cmd_retval cfg_done(__unused struct cmdq_item *item, __unused void *data)`
 unsafe fn cfg_done(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     unsafe {
         if CFG_FINISHED.load(atomic::Ordering::Acquire) {
@@ -55,7 +55,7 @@ unsafe fn cfg_done(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     }
 }
 
-// vendor/tmux/cfg.c:65  void start_cfg(void)
+/// C `vendor/tmux/cfg.c:65`: `void start_cfg(void)`
 pub fn start_cfg() {
     // Configuration files are loaded without a client, so commands are run
     // in the global queue with item->client NULL.
@@ -98,7 +98,7 @@ pub fn start_cfg() {
     }
 }
 
-// vendor/tmux/cfg.c:96  int load_cfg(const char *path, struct client *c, struct cmdq_item *item, struct cmd_find_state *current, int flags, struct cmdq_item **new_item)
+/// C `vendor/tmux/cfg.c:96`: `int load_cfg(const char *path, struct client *c, struct cmdq_item *item, struct cmd_find_state *current, int flags, struct cmdq_item **new_item)`
 pub unsafe fn load_cfg(
     path: &str,
     c: *mut client,
@@ -172,7 +172,7 @@ pub unsafe fn load_cfg(
     }
 }
 
-// vendor/tmux/cfg.c:155  int load_cfg_from_buffer(const void *buf, size_t len, const char *path, struct client *c, struct cmdq_item *item, struct cmd_find_state *current, int flags, struct cmdq_item **new_item)
+/// C `vendor/tmux/cfg.c:155`: `int load_cfg_from_buffer(const void *buf, size_t len, const char *path, struct client *c, struct cmdq_item *item, struct cmd_find_state *current, int flags, struct cmdq_item **new_item)`
 pub unsafe fn load_cfg_from_buffer(
     buf: &[u8],
     path: &str,
@@ -247,7 +247,7 @@ pub fn cfg_add_cause_(args: std::fmt::Arguments) {
         .push(CString::new(args.to_string()).unwrap());
 }
 
-// vendor/tmux/cfg.c:222  void cfg_print_causes(struct cmdq_item *item)
+/// C `vendor/tmux/cfg.c:222`: `void cfg_print_causes(struct cmdq_item *item)`
 pub unsafe fn cfg_print_causes(item: *mut cmdq_item) {
     for cause in CFG_CAUSES.lock().unwrap().drain(..) {
         unsafe {
@@ -256,7 +256,7 @@ pub unsafe fn cfg_print_causes(item: *mut cmdq_item) {
     }
 }
 
-// vendor/tmux/cfg.c:241  void cfg_show_causes(struct session *s)
+/// C `vendor/tmux/cfg.c:241`: `void cfg_show_causes(struct session *s)`
 pub unsafe fn cfg_show_causes(mut s: *mut session) {
     unsafe {
         let c = tailq_first(&raw mut CLIENTS);

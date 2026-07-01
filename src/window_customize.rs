@@ -99,7 +99,7 @@ pub struct window_customize_modedata {
     change: window_customize_change,
 }
 
-// vendor/tmux/window-customize.c:114  static uint64_t window_customize_get_tag(struct options_entry *o, int idx, const struct options_table_entry *oe)
+/// C `vendor/tmux/window-customize.c:114`: `static uint64_t window_customize_get_tag(struct options_entry *o, int idx, const struct options_table_entry *oe)`
 unsafe fn window_customize_get_tag(
     o: *mut options_entry,
     idx: i32,
@@ -117,7 +117,7 @@ unsafe fn window_customize_get_tag(
     }
 }
 
-// vendor/tmux/window-customize.c:126  static struct options *window_customize_get_tree(enum window_customize_scope scope, struct cmd_find_state *fs)
+/// C `vendor/tmux/window-customize.c:126`: `static struct options *window_customize_get_tree(enum window_customize_scope scope, struct cmd_find_state *fs)`
 unsafe fn window_customize_get_tree(
     scope: window_customize_scope,
     fs: *mut cmd_find_state,
@@ -136,7 +136,7 @@ unsafe fn window_customize_get_tree(
     }
 }
 
-// vendor/tmux/window-customize.c:150  static int window_customize_check_item(struct window_customize_modedata *data, struct window_customize_itemdata *item, struct cmd_find_state *fsp)
+/// C `vendor/tmux/window-customize.c:150`: `static int window_customize_check_item(struct window_customize_modedata *data, struct window_customize_itemdata *item, struct cmd_find_state *fsp)`
 unsafe fn window_customize_check_item(
     data: *mut window_customize_modedata,
     item: *mut window_customize_itemdata,
@@ -159,7 +159,7 @@ unsafe fn window_customize_check_item(
     }
 }
 
-// vendor/tmux/window-customize.c:166  static int window_customize_get_key(struct window_customize_itemdata *item, struct key_table **ktp, struct key_binding **bdp)
+/// C `vendor/tmux/window-customize.c:166`: `static int window_customize_get_key(struct window_customize_itemdata *item, struct key_table **ktp, struct key_binding **bdp)`
 unsafe fn window_customize_get_key(
     item: *const window_customize_itemdata,
     ktp: *mut *mut key_table,
@@ -184,7 +184,7 @@ unsafe fn window_customize_get_key(
     }
 }
 
-// vendor/tmux/window-customize.c:187  static char *window_customize_scope_text(enum window_customize_scope scope, struct cmd_find_state *fs)
+/// C `vendor/tmux/window-customize.c:187`: `static char *window_customize_scope_text(enum window_customize_scope scope, struct cmd_find_state *fs)`
 unsafe fn window_customize_scope_text(
     scope: window_customize_scope,
     fs: *mut cmd_find_state,
@@ -208,7 +208,7 @@ unsafe fn window_customize_scope_text(
     }
 }
 
-// vendor/tmux/window-customize.c:212  static struct window_customize_itemdata *window_customize_add_item(struct window_customize_modedata *data)
+/// C `vendor/tmux/window-customize.c:212`: `static struct window_customize_itemdata *window_customize_add_item(struct window_customize_modedata *data)`
 unsafe fn window_customize_add_item(
     data: *mut window_customize_modedata,
 ) -> *mut window_customize_itemdata {
@@ -223,7 +223,7 @@ unsafe fn window_customize_add_item(
     }
 }
 
-// vendor/tmux/window-customize.c:223  static void window_customize_free_item(struct window_customize_itemdata *item)
+/// C `vendor/tmux/window-customize.c:223`: `static void window_customize_free_item(struct window_customize_itemdata *item)`
 unsafe fn window_customize_free_item(item: *mut window_customize_itemdata) {
     unsafe {
         free_((*item).table);
@@ -232,7 +232,7 @@ unsafe fn window_customize_free_item(item: *mut window_customize_itemdata) {
     }
 }
 
-// vendor/tmux/window-customize.c:231  static void window_customize_build_array(struct window_customize_modedata *data, struct mode_tree_item *top, enum window_customize_scope scope, struct options_entry *o, struct format_tree *ft)
+/// C `vendor/tmux/window-customize.c:231`: `static void window_customize_build_array(struct window_customize_modedata *data, struct mode_tree_item *top, enum window_customize_scope scope, struct options_entry *o, struct format_tree *ft)`
 unsafe fn window_customize_build_array(
     data: *mut window_customize_modedata,
     top: *mut mode_tree_item,
@@ -279,7 +279,7 @@ unsafe fn window_customize_build_array(
     }
 }
 
-// vendor/tmux/window-customize.c:271  static void window_customize_build_option(struct window_customize_modedata *data, struct mode_tree_item *top, enum window_customize_scope scope, struct options_entry *o, struct format_tree *ft, const char *filter, struct cmd_find_state *fs)
+/// C `vendor/tmux/window-customize.c:271`: `static void window_customize_build_option(struct window_customize_modedata *data, struct mode_tree_item *top, enum window_customize_scope scope, struct options_entry *o, struct format_tree *ft, const char *filter, struct cmd_find_state *fs)`
 unsafe fn window_customize_build_option(
     data: *mut window_customize_modedata,
     top: *mut mode_tree_item,
@@ -371,7 +371,7 @@ unsafe fn window_customize_build_option(
     }
 }
 
-// vendor/tmux/window-customize.c:342  static void window_customize_find_user_options(struct options *oo, const char ***list, u_int *size)
+/// C `vendor/tmux/window-customize.c:342`: `static void window_customize_find_user_options(struct options *oo, const char ***list, u_int *size)`
 unsafe fn window_customize_find_user_options(
     oo: *mut options,
     list: &mut Vec<&str>
@@ -403,7 +403,7 @@ unsafe fn window_customize_find_user_options(
     }
 }
 
-// vendor/tmux/window-customize.c:372  static void window_customize_build_options(struct window_customize_modedata *data, const char *title, uint64_t tag, enum window_customize_scope scope0, struct options *oo0, enum window_customize_scope scope1, struct options *oo1, enum window_customize_scope scope2, struct options *oo2, struct format_tree *ft, const char *filter, struct cmd_find_state *fs)
+/// C `vendor/tmux/window-customize.c:372`: `static void window_customize_build_options(struct window_customize_modedata *data, const char *title, uint64_t tag, enum window_customize_scope scope0, struct options *oo0, enum window_customize_scope scope1, struct options *oo1, enum window_customize_scope scope2, struct options *oo2, struct format_tree *ft, const char *filter, struct cmd_find_state *fs)`
 unsafe fn window_customize_build_options(
     data: *mut window_customize_modedata,
     title: *const u8,
@@ -492,7 +492,7 @@ unsafe fn window_customize_build_options(
     }
 }
 
-// vendor/tmux/window-customize.c:444  static void window_customize_build_keys(struct window_customize_modedata *data, struct key_table *kt, struct format_tree *ft, const char *filter, struct cmd_find_state *fs, u_int number)
+/// C `vendor/tmux/window-customize.c:444`: `static void window_customize_build_keys(struct window_customize_modedata *data, struct key_table *kt, struct format_tree *ft, const char *filter, struct cmd_find_state *fs, u_int number)`
 unsafe fn window_customize_build_keys(
     data: *mut window_customize_modedata,
     kt: *mut key_table,
@@ -613,7 +613,7 @@ unsafe fn window_customize_build_keys(
     }
 }
 
-// vendor/tmux/window-customize.c:528  static void window_customize_build(void *modedata, __unused struct sort_criteria *sort_crit, __unused uint64_t *tag, const char *filter)
+/// C `vendor/tmux/window-customize.c:528`: `static void window_customize_build(void *modedata, __unused struct sort_criteria *sort_crit, __unused uint64_t *tag, const char *filter)`
 unsafe fn window_customize_build(
     modedata: NonNull<c_void>,
     _: *mut mode_tree_sort_criteria,
@@ -705,7 +705,7 @@ unsafe fn window_customize_build(
     }
 }
 
-// vendor/tmux/window-customize.c:591  static void window_customize_draw_key(__unused struct window_customize_modedata *data, struct window_customize_itemdata *item, struct screen_write_ctx *ctx, u_int sx, u_int sy)
+/// C `vendor/tmux/window-customize.c:591`: `static void window_customize_draw_key(__unused struct window_customize_modedata *data, struct window_customize_itemdata *item, struct screen_write_ctx *ctx, u_int sx, u_int sy)`
 unsafe fn window_customize_draw_key(
     _: *mut window_customize_modedata,
     item: *mut window_customize_itemdata,
@@ -823,7 +823,7 @@ unsafe fn window_customize_draw_key(
     }
 }
 
-// vendor/tmux/window-customize.c:650  static void window_customize_draw_option(struct window_customize_modedata *data, struct window_customize_itemdata *item, struct screen_write_ctx *ctx, u_int sx, u_int sy)
+/// C `vendor/tmux/window-customize.c:650`: `static void window_customize_draw_option(struct window_customize_modedata *data, struct window_customize_itemdata *item, struct screen_write_ctx *ctx, u_int sx, u_int sy)`
 unsafe fn window_customize_draw_option(
     data: *mut window_customize_modedata,
     item: *mut window_customize_itemdata,
@@ -1136,7 +1136,7 @@ unsafe fn window_customize_draw_option(
     }
 }
 
-// vendor/tmux/window-customize.c:849  static void window_customize_draw(void *modedata, void *itemdata, struct screen_write_ctx *ctx, u_int sx, u_int sy)
+/// C `vendor/tmux/window-customize.c:849`: `static void window_customize_draw(void *modedata, void *itemdata, struct screen_write_ctx *ctx, u_int sx, u_int sy)`
 unsafe fn window_customize_draw(
     modedata: *mut c_void,
     itemdata: Option<NonNull<c_void>>,
@@ -1160,7 +1160,7 @@ unsafe fn window_customize_draw(
     }
 }
 
-// vendor/tmux/window-customize.c:865  static void window_customize_menu(void *modedata, struct client *c, key_code key)
+/// C `vendor/tmux/window-customize.c:865`: `static void window_customize_menu(void *modedata, struct client *c, key_code key)`
 unsafe fn window_customize_menu(modedata: NonNull<c_void>, c: *mut client, key: key_code) {
     unsafe {
         let data: NonNull<window_customize_modedata> = modedata.cast();
@@ -1178,12 +1178,12 @@ unsafe fn window_customize_menu(modedata: NonNull<c_void>, c: *mut client, key: 
     }
 }
 
-// vendor/tmux/window-customize.c:878  static u_int window_customize_height(__unused void *modedata, __unused u_int height)
+/// C `vendor/tmux/window-customize.c:878`: `static u_int window_customize_height(__unused void *modedata, __unused u_int height)`
 unsafe fn window_customize_height(_modedata: *mut c_void, _height: u32) -> u32 {
     12
 }
 
-// vendor/tmux/window-customize.c:914  static struct screen *window_customize_init(struct window_mode_entry *wme, struct cmd_find_state *fs, struct args *args)
+/// C `vendor/tmux/window-customize.c:914`: `static struct screen *window_customize_init(struct window_mode_entry *wme, struct cmd_find_state *fs, struct args *args)`
 pub unsafe fn window_customize_init(
     wme: NonNull<window_mode_entry>,
     fs: *mut cmd_find_state,
@@ -1229,7 +1229,7 @@ pub unsafe fn window_customize_init(
     }
 }
 
-// vendor/tmux/window-customize.c:947  static void window_customize_destroy(struct window_customize_modedata *data)
+/// C `vendor/tmux/window-customize.c:947`: `static void window_customize_destroy(struct window_customize_modedata *data)`
 pub unsafe fn window_customize_destroy(data: *mut window_customize_modedata) {
     unsafe {
         (*data).references -= 1;
@@ -1248,7 +1248,7 @@ pub unsafe fn window_customize_destroy(data: *mut window_customize_modedata) {
     }
 }
 
-// vendor/tmux/window-customize.c:964  static void window_customize_free(struct window_mode_entry *wme)
+/// C `vendor/tmux/window-customize.c:964`: `static void window_customize_free(struct window_mode_entry *wme)`
 pub unsafe fn window_customize_free(wme: NonNull<window_mode_entry>) {
     unsafe {
         let data: *mut window_customize_modedata = (*wme.as_ptr()).data.cast();
@@ -1263,7 +1263,7 @@ pub unsafe fn window_customize_free(wme: NonNull<window_mode_entry>) {
     }
 }
 
-// vendor/tmux/window-customize.c:977  static void window_customize_resize(struct window_mode_entry *wme, u_int sx, u_int sy)
+/// C `vendor/tmux/window-customize.c:977`: `static void window_customize_resize(struct window_mode_entry *wme, u_int sx, u_int sy)`
 pub unsafe fn window_customize_resize(wme: NonNull<window_mode_entry>, sx: u32, sy: u32) {
     unsafe {
         let data: *mut window_customize_modedata = (*wme.as_ptr()).data.cast();
@@ -1272,14 +1272,14 @@ pub unsafe fn window_customize_resize(wme: NonNull<window_mode_entry>, sx: u32, 
     }
 }
 
-// vendor/tmux/window-customize.c:985  static void window_customize_free_callback(void *modedata)
+/// C `vendor/tmux/window-customize.c:985`: `static void window_customize_free_callback(void *modedata)`
 pub unsafe fn window_customize_free_callback(modedata: NonNull<window_customize_modedata>) {
     unsafe {
         window_customize_destroy(modedata.as_ptr());
     }
 }
 
-// vendor/tmux/window-customize.c:991  static void window_customize_free_item_callback(void *itemdata)
+/// C `vendor/tmux/window-customize.c:991`: `static void window_customize_free_item_callback(void *itemdata)`
 pub unsafe fn window_customize_free_item_callback(item: NonNull<window_customize_itemdata>) {
     unsafe {
         let data: *mut window_customize_modedata = (*item.as_ptr()).data;
@@ -1289,7 +1289,7 @@ pub unsafe fn window_customize_free_item_callback(item: NonNull<window_customize
     }
 }
 
-// vendor/tmux/window-customize.c:1001  static enum prompt_result window_customize_set_option_callback(struct client *c, void *itemdata, const char *s, __unused enum prompt_key_result key)
+/// C `vendor/tmux/window-customize.c:1001`: `static enum prompt_result window_customize_set_option_callback(struct client *c, void *itemdata, const char *s, __unused enum prompt_key_result key)`
 pub unsafe fn window_customize_set_option_callback(
     c: *mut client,
     item: NonNull<window_customize_itemdata>,
@@ -1346,7 +1346,7 @@ pub unsafe fn window_customize_set_option_callback(
     }
 }
 
-// vendor/tmux/window-customize.c:1051  static void window_customize_set_option(struct client *c, struct window_customize_modedata *data, struct window_customize_itemdata *item, int global, int pane)
+/// C `vendor/tmux/window-customize.c:1051`: `static void window_customize_set_option(struct client *c, struct window_customize_modedata *data, struct window_customize_itemdata *item, int global, int pane)`
 pub unsafe fn window_customize_set_option(
     c: *mut client,
     data: *mut window_customize_modedata,
@@ -1492,7 +1492,7 @@ pub unsafe fn window_customize_set_option(
     }
 }
 
-// vendor/tmux/window-customize.c:1177  static void window_customize_unset_option(struct window_customize_modedata *data, struct window_customize_itemdata *item)
+/// C `vendor/tmux/window-customize.c:1177`: `static void window_customize_unset_option(struct window_customize_modedata *data, struct window_customize_itemdata *item)`
 pub unsafe fn window_customize_unset_option(
     data: *mut window_customize_modedata,
     item: *mut window_customize_itemdata,
@@ -1513,7 +1513,7 @@ pub unsafe fn window_customize_unset_option(
     }
 }
 
-// vendor/tmux/window-customize.c:1194  static void window_customize_reset_option(struct window_customize_modedata *data, struct window_customize_itemdata *item)
+/// C `vendor/tmux/window-customize.c:1194`: `static void window_customize_reset_option(struct window_customize_modedata *data, struct window_customize_itemdata *item)`
 pub unsafe fn window_customize_reset_option(
     data: *mut window_customize_modedata,
     item: *mut window_customize_itemdata,
@@ -1537,7 +1537,7 @@ pub unsafe fn window_customize_reset_option(
     }
 }
 
-// vendor/tmux/window-customize.c:1215  static enum prompt_result window_customize_set_command_callback(struct client *c, void *itemdata, const char *s, __unused enum prompt_key_result key)
+/// C `vendor/tmux/window-customize.c:1215`: `static enum prompt_result window_customize_set_command_callback(struct client *c, void *itemdata, const char *s, __unused enum prompt_key_result key)`
 pub unsafe fn window_customize_set_command_callback(
     c: *mut client,
     item: NonNull<window_customize_itemdata>,
@@ -1582,7 +1582,7 @@ pub unsafe fn window_customize_set_command_callback(
     }
 }
 
-// vendor/tmux/window-customize.c:1254  static enum prompt_result window_customize_set_note_callback(__unused struct client *c, void *itemdata, const char *s, __unused enum prompt_key_result key)
+/// C `vendor/tmux/window-customize.c:1254`: `static enum prompt_result window_customize_set_note_callback(__unused struct client *c, void *itemdata, const char *s, __unused enum prompt_key_result key)`
 pub unsafe fn window_customize_set_note_callback(
     _c: *mut client,
     item: NonNull<window_customize_itemdata>,
@@ -1612,7 +1612,7 @@ pub unsafe fn window_customize_set_note_callback(
     }
 }
 
-// vendor/tmux/window-customize.c:1277  static void window_customize_set_key(struct client *c, struct window_customize_modedata *data, struct window_customize_itemdata *item)
+/// C `vendor/tmux/window-customize.c:1277`: `static void window_customize_set_key(struct client *c, struct window_customize_modedata *data, struct window_customize_itemdata *item)`
 pub unsafe fn window_customize_set_key(
     c: *mut client,
     data: *mut window_customize_modedata,
@@ -1693,7 +1693,7 @@ pub unsafe fn window_customize_set_key(
     }
 }
 
-// vendor/tmux/window-customize.c:1330  static void window_customize_unset_key(struct window_customize_modedata *data, struct window_customize_itemdata *item)
+/// C `vendor/tmux/window-customize.c:1330`: `static void window_customize_unset_key(struct window_customize_modedata *data, struct window_customize_itemdata *item)`
 pub unsafe fn window_customize_unset_key(
     data: *mut window_customize_modedata,
     item: *mut window_customize_itemdata,
@@ -1714,7 +1714,7 @@ pub unsafe fn window_customize_unset_key(
     }
 }
 
-// vendor/tmux/window-customize.c:1347  static void window_customize_reset_key(struct window_customize_modedata *data, struct window_customize_itemdata *item)
+/// C `vendor/tmux/window-customize.c:1347`: `static void window_customize_reset_key(struct window_customize_modedata *data, struct window_customize_itemdata *item)`
 pub unsafe fn window_customize_reset_key(
     data: *mut window_customize_modedata,
     item: *mut window_customize_itemdata,
@@ -1739,7 +1739,7 @@ pub unsafe fn window_customize_reset_key(
     }
 }
 
-// vendor/tmux/window-customize.c:1367  static void window_customize_change_each(void *modedata, void *itemdata, __unused struct client *c, __unused key_code key)
+/// C `vendor/tmux/window-customize.c:1367`: `static void window_customize_change_each(void *modedata, void *itemdata, __unused struct client *c, __unused key_code key)`
 pub unsafe fn window_customize_change_each(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -1775,7 +1775,7 @@ pub unsafe fn window_customize_change_each(
     }
 }
 
-// vendor/tmux/window-customize.c:1392  static enum prompt_result window_customize_change_current_callback(__unused struct client *c, void *modedata, const char *s, __unused enum prompt_key_result key)
+/// C `vendor/tmux/window-customize.c:1392`: `static enum prompt_result window_customize_change_current_callback(__unused struct client *c, void *modedata, const char *s, __unused enum prompt_key_result key)`
 pub unsafe fn window_customize_change_current_callback(
     _c: *mut client,
     modedata: NonNull<window_customize_modedata>,
@@ -1821,7 +1821,7 @@ pub unsafe fn window_customize_change_current_callback(
     }
 }
 
-// vendor/tmux/window-customize.c:1428  static enum prompt_result window_customize_change_tagged_callback(struct client *c, void *modedata, const char *s, __unused enum prompt_key_result key)
+/// C `vendor/tmux/window-customize.c:1428`: `static enum prompt_result window_customize_change_tagged_callback(struct client *c, void *modedata, const char *s, __unused enum prompt_key_result key)`
 pub unsafe fn window_customize_change_tagged_callback(
     c: *mut client,
     modedata: NonNull<window_customize_modedata>,
@@ -1853,7 +1853,7 @@ pub unsafe fn window_customize_change_tagged_callback(
     }
 }
 
-// vendor/tmux/window-customize.c:1448  static void window_customize_key(struct window_mode_entry *wme, struct client *c, __unused struct session *s, __unused struct winlink *wl, key_code key, struct mouse_event *m)
+/// C `vendor/tmux/window-customize.c:1448`: `static void window_customize_key(struct window_mode_entry *wme, struct client *c, __unused struct session *s, __unused struct winlink *wl, key_code key, struct mouse_event *m)`
 pub unsafe fn window_customize_key(
     wme: NonNull<window_mode_entry>,
     c: *mut client,

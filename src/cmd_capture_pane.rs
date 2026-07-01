@@ -47,7 +47,7 @@ pub static CMD_CLEAR_HISTORY_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_capture_pane_exec,
 };
 
-// vendor/tmux/cmd-capture-pane.c:69  static char *cmd_capture_pane_append(char *buf, size_t *len, const char *line, size_t linelen)
+/// C `vendor/tmux/cmd-capture-pane.c:69`: `static char *cmd_capture_pane_append(char *buf, size_t *len, const char *line, size_t linelen)`
 unsafe fn cmd_capture_pane_append(
     mut buf: *mut u8,
     len: *mut usize,
@@ -62,7 +62,7 @@ unsafe fn cmd_capture_pane_append(
     }
 }
 
-// vendor/tmux/cmd-capture-pane.c:79  static char *cmd_capture_pane_pending(struct args *args, struct window_pane *wp, size_t *len)
+/// C `vendor/tmux/cmd-capture-pane.c:79`: `static char *cmd_capture_pane_pending(struct args *args, struct window_pane *wp, size_t *len)`
 unsafe fn cmd_capture_pane_pending(
     args: *mut args,
     wp: *const window_pane,
@@ -98,7 +98,7 @@ unsafe fn cmd_capture_pane_pending(
     }
 }
 
-// vendor/tmux/cmd-capture-pane.c:151  static char *cmd_capture_pane_history(struct args *args, struct cmdq_item *item, struct window_pane *wp, size_t *len)
+/// C `vendor/tmux/cmd-capture-pane.c:151`: `static char *cmd_capture_pane_history(struct args *args, struct cmdq_item *item, struct window_pane *wp, size_t *len)`
 unsafe fn cmd_capture_pane_history(
     args: *mut args,
     item: *mut cmdq_item,
@@ -223,7 +223,7 @@ unsafe fn cmd_capture_pane_history(
     }
 }
 
-// vendor/tmux/cmd-capture-pane.c:307  static enum cmd_retval cmd_capture_pane_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-capture-pane.c:307`: `static enum cmd_retval cmd_capture_pane_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_capture_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -129,7 +129,7 @@ pub const CONTROL_MAXIMUM_AGE: u64 = 300000;
 pub const CONTROL_IGNORE_FLAGS: client_flag =
     client_flag::CONTROL_NOOUTPUT.union(CLIENT_UNATTACHEDFLAGS);
 
-// vendor/tmux/control.c:147  static int control_pane_cmp(struct control_pane *cp1, struct control_pane *cp2)
+/// C `vendor/tmux/control.c:147`: `static int control_pane_cmp(struct control_pane *cp1, struct control_pane *cp2)`
 pub fn control_pane_cmp(cp1: &control_pane, cp2: &control_pane) -> cmp::Ordering {
     cp1.pane.cmp(&cp2.pane)
 }
@@ -141,7 +141,7 @@ RB_GENERATE!(
     control_pane_cmp
 );
 
-// vendor/tmux/control.c:159  static int control_sub_cmp(struct control_sub *csub1, struct control_sub *csub2)
+/// C `vendor/tmux/control.c:159`: `static int control_sub_cmp(struct control_sub *csub1, struct control_sub *csub2)`
 pub fn control_sub_cmp(csub1: &control_sub, csub2: &control_sub) -> cmp::Ordering {
     unsafe { i32_to_ordering(libc::strcmp(csub1.name, csub2.name)) }
 }
@@ -153,7 +153,7 @@ RB_GENERATE!(
     control_sub_cmp
 );
 
-// vendor/tmux/control.c:167  static int control_sub_pane_cmp(struct control_sub_pane *csp1, struct control_sub_pane *csp2)
+/// C `vendor/tmux/control.c:167`: `static int control_sub_pane_cmp(struct control_sub_pane *csp1, struct control_sub_pane *csp2)`
 pub fn control_sub_pane_cmp(csp1: &control_sub_pane, csp2: &control_sub_pane) -> cmp::Ordering {
     csp1.pane
         .cmp(&csp2.pane)
@@ -167,7 +167,7 @@ RB_GENERATE!(
     control_sub_pane_cmp
 );
 
-// vendor/tmux/control.c:185  static int control_sub_window_cmp(struct control_sub_window *csw1, struct control_sub_window *csw2)
+/// C `vendor/tmux/control.c:185`: `static int control_sub_window_cmp(struct control_sub_window *csw1, struct control_sub_window *csw2)`
 pub fn control_sub_window_cmp(
     csw1: &control_sub_window,
     csw2: &control_sub_window,
@@ -184,7 +184,7 @@ RB_GENERATE!(
     control_sub_window_cmp
 );
 
-// vendor/tmux/control.c:203  static void control_free_sub(struct control_state *cs, struct control_sub *csub)
+/// C `vendor/tmux/control.c:203`: `static void control_free_sub(struct control_state *cs, struct control_sub *csub)`
 pub unsafe fn control_free_sub(cs: *mut control_state, csub: *mut control_sub) {
     unsafe {
         for csp in rb_foreach(&raw mut (*csub).panes).map(NonNull::as_ptr) {
@@ -204,7 +204,7 @@ pub unsafe fn control_free_sub(cs: *mut control_state, csub: *mut control_sub) {
     }
 }
 
-// vendor/tmux/control.c:228  static void control_free_block(struct control_state *cs, struct control_block *cb)
+/// C `vendor/tmux/control.c:228`: `static void control_free_block(struct control_state *cs, struct control_block *cb)`
 pub unsafe fn control_free_block(cs: *mut control_state, cb: *mut control_block) {
     unsafe {
         free_((*cb).line);
@@ -213,7 +213,7 @@ pub unsafe fn control_free_block(cs: *mut control_state, cb: *mut control_block)
     }
 }
 
-// vendor/tmux/control.c:237  static struct control_pane *control_get_pane(struct client *c, struct window_pane *wp)
+/// C `vendor/tmux/control.c:237`: `static struct control_pane *control_get_pane(struct client *c, struct window_pane *wp)`
 pub unsafe fn control_get_pane(c: *mut client, wp: *mut window_pane) -> *mut control_pane {
     unsafe {
         let cs = (*c).control_state;
@@ -223,7 +223,7 @@ pub unsafe fn control_get_pane(c: *mut client, wp: *mut window_pane) -> *mut con
     }
 }
 
-// vendor/tmux/control.c:247  static struct control_pane *control_add_pane(struct client *c, struct window_pane *wp)
+/// C `vendor/tmux/control.c:247`: `static struct control_pane *control_add_pane(struct client *c, struct window_pane *wp)`
 pub unsafe fn control_add_pane(c: *mut client, wp: *mut window_pane) -> NonNull<control_pane> {
     unsafe {
         let cs = (*c).control_state;
@@ -244,7 +244,7 @@ pub unsafe fn control_add_pane(c: *mut client, wp: *mut window_pane) -> NonNull<
     }
 }
 
-// vendor/tmux/control.c:269  static void control_discard_pane(struct client *c, struct control_pane *cp)
+/// C `vendor/tmux/control.c:269`: `static void control_discard_pane(struct client *c, struct control_pane *cp)`
 pub unsafe fn control_discard_pane(c: *mut client, cp: *mut control_pane) {
     unsafe {
         let cs = (*c).control_state;
@@ -256,7 +256,7 @@ pub unsafe fn control_discard_pane(c: *mut client, cp: *mut control_pane) {
     }
 }
 
-// vendor/tmux/control.c:282  static struct window_pane *control_window_pane(struct client *c, u_int pane)
+/// C `vendor/tmux/control.c:282`: `static struct window_pane *control_window_pane(struct client *c, u_int pane)`
 pub unsafe fn control_window_pane(c: *mut client, pane: u32) -> Option<NonNull<window_pane>> {
     unsafe {
         if (*c).session.is_null() {
@@ -270,7 +270,7 @@ pub unsafe fn control_window_pane(c: *mut client, pane: u32) -> Option<NonNull<w
     }
 }
 
-// vendor/tmux/control.c:297  void control_reset_offsets(struct client *c)
+/// C `vendor/tmux/control.c:297`: `void control_reset_offsets(struct client *c)`
 pub unsafe fn control_reset_offsets(c: *mut client) {
     unsafe {
         let cs = (*c).control_state;
@@ -285,7 +285,7 @@ pub unsafe fn control_reset_offsets(c: *mut client) {
     }
 }
 
-// vendor/tmux/control.c:314  struct window_pane_offset *control_pane_offset(struct client *c, struct window_pane *wp, int *off)
+/// C `vendor/tmux/control.c:314`: `struct window_pane_offset *control_pane_offset(struct client *c, struct window_pane *wp, int *off)`
 pub unsafe fn control_pane_offset(
     c: *mut client,
     wp: *mut window_pane,
@@ -313,7 +313,7 @@ pub unsafe fn control_pane_offset(
     }
 }
 
-// vendor/tmux/control.c:339  void control_set_pane_on(struct client *c, struct window_pane *wp)
+/// C `vendor/tmux/control.c:339`: `void control_set_pane_on(struct client *c, struct window_pane *wp)`
 pub unsafe fn control_set_pane_on(c: *mut client, wp: *mut window_pane) {
     unsafe {
         let cp = control_get_pane(c, wp);
@@ -325,7 +325,7 @@ pub unsafe fn control_set_pane_on(c: *mut client, wp: *mut window_pane) {
     }
 }
 
-// vendor/tmux/control.c:353  void control_set_pane_off(struct client *c, struct window_pane *wp)
+/// C `vendor/tmux/control.c:353`: `void control_set_pane_off(struct client *c, struct window_pane *wp)`
 pub unsafe fn control_set_pane_off(c: *mut client, wp: *mut window_pane) {
     unsafe {
         let cp = control_add_pane(c, wp);
@@ -333,7 +333,7 @@ pub unsafe fn control_set_pane_off(c: *mut client, wp: *mut window_pane) {
     }
 }
 
-// vendor/tmux/control.c:366  void control_continue_pane(struct client *c, struct window_pane *wp)
+/// C `vendor/tmux/control.c:366`: `void control_continue_pane(struct client *c, struct window_pane *wp)`
 pub unsafe fn control_continue_pane(c: *mut client, wp: *mut window_pane) {
     unsafe {
         let cp = control_get_pane(c, wp);
@@ -346,7 +346,7 @@ pub unsafe fn control_continue_pane(c: *mut client, wp: *mut window_pane) {
     }
 }
 
-// vendor/tmux/control.c:381  void control_pause_pane(struct client *c, struct window_pane *wp)
+/// C `vendor/tmux/control.c:381`: `void control_pause_pane(struct client *c, struct window_pane *wp)`
 pub unsafe fn control_pause_pane(c: *mut client, wp: *mut window_pane) {
     unsafe {
         let cp = control_add_pane(c, wp).as_ptr();
@@ -358,7 +358,7 @@ pub unsafe fn control_pause_pane(c: *mut client, wp: *mut window_pane) {
     }
 }
 
-// vendor/tmux/control.c:395  control_vwrite(struct client *c, const char *fmt, va_list ap)
+/// C `vendor/tmux/control.c:395`: `control_vwrite(struct client *c, const char *fmt, va_list ap)`
 pub unsafe fn control_vwrite(c: *mut client, args: std::fmt::Arguments) {
     unsafe {
         let cs = (*c).control_state;
@@ -415,7 +415,7 @@ pub unsafe fn control_write_(c: *mut client, args: std::fmt::Arguments) {
     }
 }
 
-// vendor/tmux/control.c:439  static int control_check_age(struct client *c, struct window_pane *wp, struct control_pane *cp)
+/// C `vendor/tmux/control.c:439`: `static int control_check_age(struct client *c, struct window_pane *wp, struct control_pane *cp)`
 pub unsafe fn control_check_age(
     c: *mut client,
     wp: *mut window_pane,
@@ -461,7 +461,7 @@ pub unsafe fn control_check_age(
     1
 }
 
-// vendor/tmux/control.c:474  void control_write_output(struct client *c, struct window_pane *wp)
+/// C `vendor/tmux/control.c:474`: `void control_write_output(struct client *c, struct window_pane *wp)`
 pub unsafe fn control_write_output(c: *mut client, wp: *mut window_pane) {
     let __func__ = "control_write_output";
     unsafe {
@@ -535,7 +535,7 @@ pub unsafe fn control_write_output(c: *mut client, wp: *mut window_pane) {
     }
 }
 
-// vendor/tmux/control.c:528  static enum cmd_retval control_error(struct cmdq_item *item, void *data)
+/// C `vendor/tmux/control.c:528`: `static enum cmd_retval control_error(struct cmdq_item *item, void *data)`
 pub unsafe fn control_error(item: *mut cmdq_item, data: *mut c_void) -> cmd_retval {
     unsafe {
         let c = cmdq_get_client(item);
@@ -550,7 +550,7 @@ pub unsafe fn control_error(item: *mut cmdq_item, data: *mut c_void) -> cmd_retv
     cmd_retval::CMD_RETURN_NORMAL
 }
 
-// vendor/tmux/control.c:543  static void control_error_callback(__unused struct bufferevent *bufev, __unused short what, void *data)
+/// C `vendor/tmux/control.c:543`: `static void control_error_callback(__unused struct bufferevent *bufev, __unused short what, void *data)`
 pub unsafe extern "C-unwind" fn control_error_callback(
     _bufev: *mut bufferevent,
     _what: i16,
@@ -563,7 +563,7 @@ pub unsafe extern "C-unwind" fn control_error_callback(
     }
 }
 
-// vendor/tmux/control.c:553  static void control_read_callback(__unused struct bufferevent *bufev, void *data)
+/// C `vendor/tmux/control.c:553`: `static void control_read_callback(__unused struct bufferevent *bufev, void *data)`
 pub unsafe extern "C-unwind" fn control_read_callback(_bufev: *mut bufferevent, data: *mut c_void) {
     let __func__ = "control_read_callback";
     let c: *mut client = data.cast();
@@ -598,7 +598,7 @@ pub unsafe extern "C-unwind" fn control_read_callback(_bufev: *mut bufferevent, 
     }
 }
 
-// vendor/tmux/control.c:585  int control_all_done(struct client *c)
+/// C `vendor/tmux/control.c:585`: `int control_all_done(struct client *c)`
 pub unsafe fn control_all_done(c: *mut client) -> i32 {
     unsafe {
         let cs = (*c).control_state;
@@ -610,7 +610,7 @@ pub unsafe fn control_all_done(c: *mut client) -> i32 {
     }
 }
 
-// vendor/tmux/control.c:596  static void control_flush_all_blocks(struct client *c)
+/// C `vendor/tmux/control.c:596`: `static void control_flush_all_blocks(struct client *c)`
 pub unsafe fn control_flush_all_blocks(c: *mut client) {
     let __func__ = "control_flush_all_blocks";
     unsafe {
@@ -636,7 +636,7 @@ pub unsafe fn control_flush_all_blocks(c: *mut client) {
     }
 }
 
-// vendor/tmux/control.c:615  static struct evbuffer *control_append_data(struct client *c, struct control_pane *cp, uint64_t age, struct evbuffer *message, struct window_pane *wp, size_t size)
+/// C `vendor/tmux/control.c:615`: `static struct evbuffer *control_append_data(struct client *c, struct control_pane *cp, uint64_t age, struct evbuffer *message, struct window_pane *wp, size_t size)`
 pub unsafe fn control_append_data(
     c: *mut client,
     cp: *mut control_pane,
@@ -676,7 +676,7 @@ pub unsafe fn control_append_data(
     }
 }
 
-// vendor/tmux/control.c:655  static void control_write_data(struct client *c, struct evbuffer *message)
+/// C `vendor/tmux/control.c:655`: `static void control_write_data(struct client *c, struct evbuffer *message)`
 pub unsafe fn control_write_data(c: *mut client, message: *mut evbuffer) {
     unsafe {
         let cs = (*c).control_state;
@@ -694,7 +694,7 @@ pub unsafe fn control_write_data(c: *mut client, message: *mut evbuffer) {
     }
 }
 
-// vendor/tmux/control.c:669  static int control_write_pending(struct client *c, struct control_pane *cp, size_t limit)
+/// C `vendor/tmux/control.c:669`: `static int control_write_pending(struct client *c, struct control_pane *cp, size_t limit)`
 pub unsafe fn control_write_pending(c: *mut client, cp: *mut control_pane, limit: usize) -> i32 {
     unsafe {
         let cs = (*c).control_state;
@@ -767,7 +767,7 @@ pub unsafe fn control_write_pending(c: *mut client, cp: *mut control_pane, limit
     }
 }
 
-// vendor/tmux/control.c:734  static void control_write_callback(__unused struct bufferevent *bufev, void *data)
+/// C `vendor/tmux/control.c:734`: `static void control_write_callback(__unused struct bufferevent *bufev, void *data)`
 pub unsafe extern "C-unwind" fn control_write_callback(
     _bufev: *mut bufferevent,
     data: *mut c_void,
@@ -817,7 +817,7 @@ pub unsafe extern "C-unwind" fn control_write_callback(
     }
 }
 
-// vendor/tmux/control.c:771  void control_start(struct client *c)
+/// C `vendor/tmux/control.c:771`: `void control_start(struct client *c)`
 pub unsafe fn control_start(c: *mut client) {
     unsafe {
         if (*c).flags.intersects(client_flag::CONTROLCONTROL) {
@@ -869,14 +869,14 @@ pub unsafe fn control_start(c: *mut client) {
     }
 }
 
-// vendor/tmux/control.c:812  void control_ready(struct client *c)
+/// C `vendor/tmux/control.c:812`: `void control_ready(struct client *c)`
 pub unsafe fn control_ready(c: *mut client) {
     unsafe {
         bufferevent_enable((*(*c).control_state).read_event, EV_READ);
     }
 }
 
-// vendor/tmux/control.c:819  void control_discard(struct client *c)
+/// C `vendor/tmux/control.c:819`: `void control_discard(struct client *c)`
 pub unsafe fn control_discard(c: *mut client) {
     unsafe {
         let cs = (*c).control_state;
@@ -887,7 +887,7 @@ pub unsafe fn control_discard(c: *mut client) {
     }
 }
 
-// vendor/tmux/control.c:831  void control_stop(struct client *c)
+/// C `vendor/tmux/control.c:831`: `void control_stop(struct client *c)`
 pub unsafe fn control_stop(c: *mut client) {
     unsafe {
         let cs = (*c).control_state;
@@ -914,7 +914,7 @@ pub unsafe fn control_stop(c: *mut client) {
     }
 }
 
-// vendor/tmux/control.c:859  static void control_check_subs_session(struct client *c, struct control_sub *csub, struct format_tree *ft)
+/// C `vendor/tmux/control.c:859`: `static void control_check_subs_session(struct client *c, struct control_sub *csub, struct format_tree *ft)`
 pub unsafe fn control_check_subs_session(c: *mut client, csub: *mut control_sub) {
     unsafe {
         let s = (*c).session;
@@ -939,7 +939,7 @@ pub unsafe fn control_check_subs_session(c: *mut client, csub: *mut control_sub)
     }
 }
 
-// vendor/tmux/control.c:880  static void control_check_subs_pane(struct client *c, struct control_sub *csub)
+/// C `vendor/tmux/control.c:880`: `static void control_check_subs_pane(struct client *c, struct control_sub *csub)`
 pub unsafe fn control_check_subs_pane(c: *mut client, csub: *mut control_sub) {
     unsafe {
         let s = (*c).session;
@@ -1035,7 +1035,7 @@ pub unsafe fn control_check_subs_all_panes(c: *mut client, csub: *mut control_su
     }
 }
 
-// vendor/tmux/control.c:962  static void control_check_subs_window(struct client *c, struct control_sub *csub)
+/// C `vendor/tmux/control.c:962`: `static void control_check_subs_window(struct client *c, struct control_sub *csub)`
 pub unsafe fn control_check_subs_window(c: *mut client, csub: *mut control_sub) {
     unsafe {
         let s = (*c).session;
@@ -1129,7 +1129,7 @@ pub unsafe fn control_check_subs_all_windows(c: *mut client, csub: *mut control_
     }
 }
 
-// vendor/tmux/control.c:1042  static void control_check_subs_timer(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/control.c:1042`: `static void control_check_subs_timer(__unused int fd, __unused short events, void *data)`
 pub unsafe extern "C-unwind" fn control_check_subs_timer(
     _fd: i32,
     _events: i16,
@@ -1160,7 +1160,7 @@ pub unsafe extern "C-unwind" fn control_check_subs_timer(
     }
 }
 
-// vendor/tmux/control.c:1139  void control_add_sub(struct client *c, const char *name, enum control_sub_type type, int id, const char *format)
+/// C `vendor/tmux/control.c:1139`: `void control_add_sub(struct client *c, const char *name, enum control_sub_type type, int id, const char *format)`
 pub unsafe fn control_add_sub(
     c: *mut client,
     name: *mut u8,
@@ -1206,7 +1206,7 @@ pub unsafe fn control_add_sub(
     }
 }
 
-// vendor/tmux/control.c:1168  void control_remove_sub(struct client *c, const char *name)
+/// C `vendor/tmux/control.c:1168`: `void control_remove_sub(struct client *c, const char *name)`
 pub unsafe fn control_remove_sub(c: *mut client, name: *mut u8) {
     unsafe {
         let cs = (*c).control_state;

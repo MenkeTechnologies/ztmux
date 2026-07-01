@@ -28,7 +28,7 @@ type format_ranges = tailq_head<format_range>;
 impl_tailq_entry!(format_range, entry, tailq_entry<format_range>);
 
 /// Does this range match this style?
-// vendor/tmux/format-draw.c:44  static int format_is_type(struct format_range *fr, struct style *sy)
+/// C `vendor/tmux/format-draw.c:44`: `static int format_is_type(struct format_range *fr, struct style *sy)`
 fn format_is_type(fr: &format_range, sy: &style) -> bool {
     if fr.type_ != sy.range_type {
         return false;
@@ -51,7 +51,7 @@ fn format_is_type(fr: &format_range, sy: &style) -> bool {
 }
 
 /// Free a range.
-// vendor/tmux/format-draw.c:66  static void format_free_range(struct format_ranges *frs, struct format_range *fr)
+/// C `vendor/tmux/format-draw.c:66`: `static void format_free_range(struct format_ranges *frs, struct format_range *fr)`
 unsafe fn format_free_range(frs: *mut format_ranges, fr: *mut format_range) {
     unsafe {
         tailq_remove(frs, fr);
@@ -60,7 +60,7 @@ unsafe fn format_free_range(frs: *mut format_ranges, fr: *mut format_range) {
 }
 
 /// Fix range positions.
-// vendor/tmux/format-draw.c:74  static void format_update_ranges(struct format_ranges *frs, struct screen *s, u_int offset, u_int start, u_int width)
+/// C `vendor/tmux/format-draw.c:74`: `static void format_update_ranges(struct format_ranges *frs, struct screen *s, u_int offset, u_int start, u_int width)`
 unsafe fn format_update_ranges(
     frs: *mut format_ranges,
     s: *mut screen,
@@ -104,7 +104,7 @@ unsafe fn format_update_ranges(
 }
 
 /// Draw a part of the format.
-// vendor/tmux/format-draw.c:110  static void format_draw_put(struct screen_write_ctx *octx, u_int ocx, u_int ocy, struct screen *s, struct format_ranges *frs, u_int offset, u_int start, u_int width)
+/// C `vendor/tmux/format-draw.c:110`: `static void format_draw_put(struct screen_write_ctx *octx, u_int ocx, u_int ocy, struct screen *s, struct format_ranges *frs, u_int offset, u_int start, u_int width)`
 unsafe fn format_draw_put(
     octx: *mut screen_write_ctx,
     ocx: u32,
@@ -125,7 +125,7 @@ unsafe fn format_draw_put(
 }
 
 /// Draw list part of format.
-// vendor/tmux/format-draw.c:125  static void format_draw_put_list(struct screen_write_ctx *octx, u_int ocx, u_int ocy, u_int offset, u_int width, struct screen *list, struct screen *list_left, struct screen *list_right, int focus_start, int focus_end, struct format_ranges *frs)
+/// C `vendor/tmux/format-draw.c:125`: `static void format_draw_put_list(struct screen_write_ctx *octx, u_int ocx, u_int ocy, u_int offset, u_int width, struct screen *list, struct screen *list_left, struct screen *list_right, int focus_start, int focus_end, struct format_ranges *frs)`
 unsafe fn format_draw_put_list(
     octx: *mut screen_write_ctx,
     ocx: u32,
@@ -178,7 +178,7 @@ unsafe fn format_draw_put_list(
 }
 
 /// Draw format with no list.
-// vendor/tmux/format-draw.c:169  static void format_draw_none(struct screen_write_ctx *octx, u_int available, u_int ocx, u_int ocy, struct screen *left, struct screen *centre, struct screen *right, struct screen *abs_centre, struct format_ranges *frs)
+/// C `vendor/tmux/format-draw.c:169`: `static void format_draw_none(struct screen_write_ctx *octx, u_int available, u_int ocx, u_int ocy, struct screen *left, struct screen *centre, struct screen *right, struct screen *abs_centre, struct format_ranges *frs)`
 unsafe fn format_draw_none(
     octx: *mut screen_write_ctx,
     available: u32,
@@ -255,7 +255,7 @@ unsafe fn format_draw_none(
 }
 
 /// Draw format with list on the left.
-// vendor/tmux/format-draw.c:228  static void format_draw_left(struct screen_write_ctx *octx, u_int available, u_int ocx, u_int ocy, struct screen *left, struct screen *centre, struct screen *right, struct screen *abs_centre, struct screen *list, struct screen *list_left, struct screen *list_right, struct screen *after, int focus_start, int focus_end, struct format_ranges *frs)
+/// C `vendor/tmux/format-draw.c:228`: `static void format_draw_left(struct screen_write_ctx *octx, u_int available, u_int ocx, u_int ocy, struct screen *left, struct screen *centre, struct screen *right, struct screen *abs_centre, struct screen *list, struct screen *list_left, struct screen *list_right, struct screen *after, int focus_start, int focus_end, struct format_ranges *frs)`
 unsafe fn format_draw_left(
     octx: *mut screen_write_ctx,
     available: u32,
@@ -395,7 +395,7 @@ unsafe fn format_draw_left(
 }
 
 /// Draw format with list in the centre.
-// vendor/tmux/format-draw.c:331  static void format_draw_centre(struct screen_write_ctx *octx, u_int available, u_int ocx, u_int ocy, struct screen *left, struct screen *centre, struct screen *right, struct screen *abs_centre, struct screen *list, struct screen *list_left, struct screen *list_right, struct screen *after, int focus_start, int focus_end, struct format_ranges *frs)
+/// C `vendor/tmux/format-draw.c:331`: `static void format_draw_centre(struct screen_write_ctx *octx, u_int available, u_int ocx, u_int ocy, struct screen *left, struct screen *centre, struct screen *right, struct screen *abs_centre, struct screen *list, struct screen *list_left, struct screen *list_right, struct screen *after, int focus_start, int focus_end, struct format_ranges *frs)`
 unsafe fn format_draw_centre(
     octx: *mut screen_write_ctx,
     available: u32,
@@ -536,7 +536,7 @@ unsafe fn format_draw_centre(
 }
 
 /// Draw format with list on the right.
-// vendor/tmux/format-draw.c:439  static void format_draw_right(struct screen_write_ctx *octx, u_int available, u_int ocx, u_int ocy, struct screen *left, struct screen *centre, struct screen *right, struct screen *abs_centre, struct screen *list, struct screen *list_left, struct screen *list_right, struct screen *after, int focus_start, int focus_end, struct format_ranges *frs)
+/// C `vendor/tmux/format-draw.c:439`: `static void format_draw_right(struct screen_write_ctx *octx, u_int available, u_int ocx, u_int ocy, struct screen *left, struct screen *centre, struct screen *right, struct screen *abs_centre, struct screen *list, struct screen *list_left, struct screen *list_right, struct screen *after, int focus_start, int focus_end, struct format_ranges *frs)`
 unsafe fn format_draw_right(
     octx: *mut screen_write_ctx,
     available: u32,
@@ -675,7 +675,7 @@ unsafe fn format_draw_right(
     }
 }
 
-// vendor/tmux/format-draw.c:545  static void format_draw_absolute_centre(struct screen_write_ctx *octx, u_int available, u_int ocx, u_int ocy, struct screen *left, struct screen *centre, struct screen *right, struct screen *abs_centre, struct screen *list, struct screen *list_left, struct screen *list_right, struct screen *after, int focus_start, int focus_end, struct format_ranges *frs)
+/// C `vendor/tmux/format-draw.c:545`: `static void format_draw_absolute_centre(struct screen_write_ctx *octx, u_int available, u_int ocx, u_int ocy, struct screen *left, struct screen *centre, struct screen *right, struct screen *abs_centre, struct screen *list, struct screen *list_left, struct screen *list_right, struct screen *after, int focus_start, int focus_end, struct format_ranges *frs)`
 unsafe fn format_draw_absolute_centre(
     octx: *mut screen_write_ctx,
     available: u32,
@@ -811,7 +811,7 @@ unsafe fn format_draw_absolute_centre(
 }
 
 /// Get width and count of any leading #s.
-// vendor/tmux/format-draw.c:648  static const char *format_leading_hashes(const char *cp, u_int *n, u_int *width)
+/// C `vendor/tmux/format-draw.c:648`: `static const char *format_leading_hashes(const char *cp, u_int *n, u_int *width)`
 unsafe fn format_leading_hashes(cp: *const u8, n: *mut u32, width: *mut u32) -> *const u8 {
     unsafe {
         *n = 0;
@@ -843,7 +843,7 @@ unsafe fn format_leading_hashes(cp: *const u8, n: *mut u32, width: *mut u32) -> 
 }
 
 /// Draw multiple characters.
-// vendor/tmux/format-draw.c:678  static void format_draw_many(struct screen_write_ctx *ctx, struct style *sy, char ch, u_int n)
+/// C `vendor/tmux/format-draw.c:678`: `static void format_draw_many(struct screen_write_ctx *ctx, struct style *sy, char ch, u_int n)`
 unsafe fn format_draw_many(ctx: *mut screen_write_ctx, sy: *mut style, ch: u8, n: u32) {
     unsafe {
         utf8_set(&raw mut (*sy).gc.data, ch);
@@ -854,7 +854,7 @@ unsafe fn format_draw_many(ctx: *mut screen_write_ctx, sy: *mut style, ch: u8, n
 }
 
 /// Draw a format to a screen.
-// vendor/tmux/format-draw.c:690  void format_draw(struct screen_write_ctx *octx, const struct grid_cell *base, u_int available, const char *expanded, struct style_ranges *srs, int default_colours)
+/// C `vendor/tmux/format-draw.c:690`: `void format_draw(struct screen_write_ctx *octx, const struct grid_cell *base, u_int available, const char *expanded, struct style_ranges *srs, int default_colours)`
 pub unsafe fn format_draw(
     octx: *mut screen_write_ctx,
     base: *const grid_cell,
@@ -1380,7 +1380,7 @@ pub unsafe fn format_draw(
 }
 
 /// Get width, taking #[] into account.
-// vendor/tmux/format-draw.c:1100  u_int format_width(const char *expanded)
+/// C `vendor/tmux/format-draw.c:1100`: `u_int format_width(const char *expanded)`
 pub unsafe fn format_width(expanded: &str) -> u32 {
     unsafe {
         let expanded = CString::new(expanded).unwrap(); // TODO FIXME extra allocation to
@@ -1436,7 +1436,7 @@ pub unsafe fn format_width(expanded: &str) -> u32 {
 ///
 /// Note, we copy the whole set of unescaped #s, but only add their escaped size to width.
 /// This is because the `format_draw` function will actually do the escaping when it runs
-// vendor/tmux/format-draw.c:1139  char *format_trim_left(const char *expanded, u_int limit)
+/// C `vendor/tmux/format-draw.c:1139`: `char *format_trim_left(const char *expanded, u_int limit)`
 pub unsafe fn format_trim_left(expanded: *const u8, limit: u32) -> *mut u8 {
     unsafe {
         let mut cp = expanded;
@@ -1515,7 +1515,7 @@ pub unsafe fn format_trim_left(expanded: *const u8, limit: u32) -> *mut u8 {
 }
 
 /// Trim on the right, taking #[] into account.
-// vendor/tmux/format-draw.c:1200  char *format_trim_right(const char *expanded, u_int limit)
+/// C `vendor/tmux/format-draw.c:1200`: `char *format_trim_right(const char *expanded, u_int limit)`
 pub unsafe fn format_trim_right(expanded: *const u8, limit: u32) -> *mut u8 {
     unsafe {
         let mut ud: utf8_data = std::mem::zeroed();

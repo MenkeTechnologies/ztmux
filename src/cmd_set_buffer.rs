@@ -41,7 +41,7 @@ pub static CMD_DELETE_BUFFER_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-set-buffer.c:56  static enum cmd_retval cmd_set_buffer_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-set-buffer.c:56`: `static enum cmd_retval cmd_set_buffer_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_set_buffer_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

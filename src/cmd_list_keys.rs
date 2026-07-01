@@ -42,7 +42,7 @@ pub static CMD_LIST_COMMANDS_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-list-keys.c:70  static u_int cmd_list_keys_get_width(struct key_binding **l, u_int n)
+/// C `vendor/tmux/cmd-list-keys.c:70`: `static u_int cmd_list_keys_get_width(struct key_binding **l, u_int n)`
 unsafe fn cmd_list_keys_get_width(tablename: *const u8, only: key_code) -> u32 {
     unsafe {
         let mut keywidth = 0u32;
@@ -124,7 +124,7 @@ unsafe fn cmd_list_keys_print_notes(
     }
 }
 
-// vendor/tmux/cmd-list-keys.c:56  static char *cmd_list_keys_get_prefix(struct args *args)
+/// C `vendor/tmux/cmd-list-keys.c:56`: `static char *cmd_list_keys_get_prefix(struct args *args)`
 unsafe fn cmd_list_keys_get_prefix(args: *mut args, prefix: *mut key_code) -> NonNull<u8> {
     unsafe {
         *prefix = options_get_number___::<i64>(&*GLOBAL_S_OPTIONS, "prefix") as _;
@@ -141,7 +141,7 @@ unsafe fn cmd_list_keys_get_prefix(args: *mut args, prefix: *mut key_code) -> No
     }
 }
 
-// vendor/tmux/cmd-list-keys.c:167  static enum cmd_retval cmd_list_keys_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-list-keys.c:167`: `static enum cmd_retval cmd_list_keys_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_list_keys_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

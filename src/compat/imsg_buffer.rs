@@ -19,7 +19,7 @@ use crate::errno;
 
 const IOV_MAX: usize = 1024; // TODO find where IOV_MAX is defined
 
-// vendor/tmux/compat/imsg-buffer.c:70  struct ibuf *ibuf_open(size_t len)
+/// C `vendor/tmux/compat/imsg-buffer.c:70`: `struct ibuf *ibuf_open(size_t len)`
 pub unsafe fn ibuf_open(len: usize) -> *mut ibuf {
     unsafe {
         if len == 0 {
@@ -44,7 +44,7 @@ pub unsafe fn ibuf_open(len: usize) -> *mut ibuf {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:89  struct ibuf *ibuf_dynamic(size_t len, size_t max)
+/// C `vendor/tmux/compat/imsg-buffer.c:89`: `struct ibuf *ibuf_dynamic(size_t len, size_t max)`
 pub unsafe fn ibuf_dynamic(len: usize, max: usize) -> *mut ibuf {
     unsafe {
         if len == 0 || max < len {
@@ -89,7 +89,7 @@ pub unsafe fn ibuf_realloc(buf: *mut ibuf, len: usize) -> i32 {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:114  void *ibuf_reserve(struct ibuf *buf, size_t len)
+/// C `vendor/tmux/compat/imsg-buffer.c:114`: `void *ibuf_reserve(struct ibuf *buf, size_t len)`
 pub unsafe fn ibuf_reserve(buf: *mut ibuf, len: usize) -> *mut c_void {
     unsafe {
         if len > usize::MAX - (*buf).wpos || (*buf).max == 0 {
@@ -107,7 +107,7 @@ pub unsafe fn ibuf_reserve(buf: *mut ibuf, len: usize) -> *mut c_void {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:150  int ibuf_add(struct ibuf *buf, const void *data, size_t len)
+/// C `vendor/tmux/compat/imsg-buffer.c:150`: `int ibuf_add(struct ibuf *buf, const void *data, size_t len)`
 pub unsafe fn ibuf_add(buf: *mut ibuf, data: *const c_void, len: usize) -> i32 {
     unsafe {
         let b = ibuf_reserve(buf, len);
@@ -120,7 +120,7 @@ pub unsafe fn ibuf_add(buf: *mut ibuf, data: *const c_void, len: usize) -> i32 {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:165  int ibuf_add_ibuf(struct ibuf *buf, const struct ibuf *from)
+/// C `vendor/tmux/compat/imsg-buffer.c:165`: `int ibuf_add_ibuf(struct ibuf *buf, const struct ibuf *from)`
 pub unsafe fn ibuf_add_ibuf(buf: *mut ibuf, from: *const ibuf) -> c_int {
     unsafe { ibuf_add(buf, ibuf_data(from), ibuf_size(from)) }
 }
@@ -129,7 +129,7 @@ pub unsafe fn ibuf_add_buf(buf: *mut ibuf, from: *const ibuf) -> c_int {
     unsafe { ibuf_add_ibuf(buf, from) }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:171  int ibuf_add_n8(struct ibuf *buf, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:171`: `int ibuf_add_n8(struct ibuf *buf, uint64_t value)`
 pub unsafe fn ibuf_add_n8(buf: *mut ibuf, value: u64) -> c_int {
     unsafe {
         if value > u8::MAX as u64 {
@@ -141,7 +141,7 @@ pub unsafe fn ibuf_add_n8(buf: *mut ibuf, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:184  int ibuf_add_n16(struct ibuf *buf, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:184`: `int ibuf_add_n16(struct ibuf *buf, uint64_t value)`
 pub unsafe fn ibuf_add_n16(buf: *mut ibuf, value: u64) -> c_int {
     unsafe {
         if value > u16::MAX as u64 {
@@ -153,7 +153,7 @@ pub unsafe fn ibuf_add_n16(buf: *mut ibuf, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:197  int ibuf_add_n32(struct ibuf *buf, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:197`: `int ibuf_add_n32(struct ibuf *buf, uint64_t value)`
 pub unsafe fn ibuf_add_n32(buf: *mut ibuf, value: u64) -> c_int {
     unsafe {
         if value > u32::MAX as u64 {
@@ -165,7 +165,7 @@ pub unsafe fn ibuf_add_n32(buf: *mut ibuf, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:210  int ibuf_add_n64(struct ibuf *buf, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:210`: `int ibuf_add_n64(struct ibuf *buf, uint64_t value)`
 pub unsafe fn ibuf_add_n64(buf: *mut ibuf, value: u64) -> c_int {
     unsafe {
         let v = value.to_be();
@@ -173,7 +173,7 @@ pub unsafe fn ibuf_add_n64(buf: *mut ibuf, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:217  int ibuf_add_h16(struct ibuf *buf, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:217`: `int ibuf_add_h16(struct ibuf *buf, uint64_t value)`
 pub unsafe fn ibuf_add_h16(buf: *mut ibuf, value: u64) -> c_int {
     unsafe {
         if value > u16::MAX as u64 {
@@ -185,7 +185,7 @@ pub unsafe fn ibuf_add_h16(buf: *mut ibuf, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:230  int ibuf_add_h32(struct ibuf *buf, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:230`: `int ibuf_add_h32(struct ibuf *buf, uint64_t value)`
 pub unsafe fn ibuf_add_h32(buf: *mut ibuf, value: u64) -> c_int {
     unsafe {
         if value > u32::MAX as u64 {
@@ -197,12 +197,12 @@ pub unsafe fn ibuf_add_h32(buf: *mut ibuf, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:243  int ibuf_add_h64(struct ibuf *buf, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:243`: `int ibuf_add_h64(struct ibuf *buf, uint64_t value)`
 pub unsafe fn ibuf_add_h64(buf: *mut ibuf, value: u64) -> c_int {
     unsafe { ibuf_add(buf, &raw const value as *const c_void, size_of::<u64>()) }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:249  int ibuf_add_zero(struct ibuf *buf, size_t len)
+/// C `vendor/tmux/compat/imsg-buffer.c:249`: `int ibuf_add_zero(struct ibuf *buf, size_t len)`
 pub unsafe fn ibuf_add_zero(buf: *mut ibuf, len: usize) -> c_int {
     unsafe {
         let b: *mut c_void = ibuf_reserve(buf, len);
@@ -214,7 +214,7 @@ pub unsafe fn ibuf_add_zero(buf: *mut ibuf, len: usize) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:282  void *ibuf_seek(struct ibuf *buf, size_t pos, size_t len)
+/// C `vendor/tmux/compat/imsg-buffer.c:282`: `void *ibuf_seek(struct ibuf *buf, size_t pos, size_t len)`
 pub unsafe fn ibuf_seek(buf: *mut ibuf, pos: usize, len: usize) -> *mut c_void {
     unsafe {
         // only allow seeking between rpos and wpos
@@ -227,7 +227,7 @@ pub unsafe fn ibuf_seek(buf: *mut ibuf, pos: usize, len: usize) -> *mut c_void {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:295  int ibuf_set(struct ibuf *buf, size_t pos, const void *data, size_t len)
+/// C `vendor/tmux/compat/imsg-buffer.c:295`: `int ibuf_set(struct ibuf *buf, size_t pos, const void *data, size_t len)`
 pub unsafe fn ibuf_set(buf: *mut ibuf, pos: usize, data: *const c_void, len: usize) -> c_int {
     unsafe {
         let b = ibuf_seek(buf, pos, len);
@@ -240,7 +240,7 @@ pub unsafe fn ibuf_set(buf: *mut ibuf, pos: usize, data: *const c_void, len: usi
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:309  int ibuf_set_n8(struct ibuf *buf, size_t pos, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:309`: `int ibuf_set_n8(struct ibuf *buf, size_t pos, uint64_t value)`
 pub unsafe fn ibuf_set_n8(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     unsafe {
         if value > u8::MAX as u64 {
@@ -252,7 +252,7 @@ pub unsafe fn ibuf_set_n8(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:322  int ibuf_set_n16(struct ibuf *buf, size_t pos, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:322`: `int ibuf_set_n16(struct ibuf *buf, size_t pos, uint64_t value)`
 pub unsafe fn ibuf_set_n16(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     unsafe {
         if value > u16::MAX as u64 {
@@ -264,7 +264,7 @@ pub unsafe fn ibuf_set_n16(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:335  int ibuf_set_n32(struct ibuf *buf, size_t pos, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:335`: `int ibuf_set_n32(struct ibuf *buf, size_t pos, uint64_t value)`
 pub unsafe fn ibuf_set_n32(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     unsafe {
         if value > u32::MAX as u64 {
@@ -276,7 +276,7 @@ pub unsafe fn ibuf_set_n32(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:348  int ibuf_set_n64(struct ibuf *buf, size_t pos, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:348`: `int ibuf_set_n64(struct ibuf *buf, size_t pos, uint64_t value)`
 pub unsafe fn ibuf_set_n64(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     unsafe {
         let v = u64::to_be(value);
@@ -284,7 +284,7 @@ pub unsafe fn ibuf_set_n64(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:355  int ibuf_set_h16(struct ibuf *buf, size_t pos, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:355`: `int ibuf_set_h16(struct ibuf *buf, size_t pos, uint64_t value)`
 pub unsafe fn ibuf_set_h16(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     unsafe {
         if value > u16::MAX as u64 {
@@ -296,7 +296,7 @@ pub unsafe fn ibuf_set_h16(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:368  int ibuf_set_h32(struct ibuf *buf, size_t pos, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:368`: `int ibuf_set_h32(struct ibuf *buf, size_t pos, uint64_t value)`
 pub unsafe fn ibuf_set_h32(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     unsafe {
         if value > u32::MAX as u64 {
@@ -308,7 +308,7 @@ pub unsafe fn ibuf_set_h32(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:381  int ibuf_set_h64(struct ibuf *buf, size_t pos, uint64_t value)
+/// C `vendor/tmux/compat/imsg-buffer.c:381`: `int ibuf_set_h64(struct ibuf *buf, size_t pos, uint64_t value)`
 pub unsafe fn ibuf_set_h64(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     unsafe {
         ibuf_set(
@@ -320,17 +320,17 @@ pub unsafe fn ibuf_set_h64(buf: *mut ibuf, pos: usize, value: u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:403  void *ibuf_data(const struct ibuf *buf)
+/// C `vendor/tmux/compat/imsg-buffer.c:403`: `void *ibuf_data(const struct ibuf *buf)`
 pub unsafe fn ibuf_data(buf: *const ibuf) -> *mut c_void {
     unsafe { (*buf).buf.add((*buf).rpos) as *mut c_void }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:409  size_t ibuf_size(const struct ibuf *buf)
+/// C `vendor/tmux/compat/imsg-buffer.c:409`: `size_t ibuf_size(const struct ibuf *buf)`
 pub unsafe fn ibuf_size(buf: *const ibuf) -> usize {
     unsafe { (*buf).wpos - (*buf).rpos }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:415  size_t ibuf_left(const struct ibuf *buf)
+/// C `vendor/tmux/compat/imsg-buffer.c:415`: `size_t ibuf_left(const struct ibuf *buf)`
 pub unsafe fn ibuf_left(buf: *const ibuf) -> usize {
     unsafe {
         if (*buf).max == 0 {
@@ -340,7 +340,7 @@ pub unsafe fn ibuf_left(buf: *const ibuf) -> usize {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:424  int ibuf_truncate(struct ibuf *buf, size_t len)
+/// C `vendor/tmux/compat/imsg-buffer.c:424`: `int ibuf_truncate(struct ibuf *buf, size_t len)`
 pub unsafe fn ibuf_truncate(buf: *mut ibuf, len: usize) -> c_int {
     unsafe {
         if ibuf_size(buf) >= len {
@@ -356,21 +356,21 @@ pub unsafe fn ibuf_truncate(buf: *mut ibuf, len: usize) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:439  void ibuf_rewind(struct ibuf *buf)
+/// C `vendor/tmux/compat/imsg-buffer.c:439`: `void ibuf_rewind(struct ibuf *buf)`
 pub unsafe fn ibuf_rewind(buf: *mut ibuf) {
     unsafe {
         (*buf).rpos = 0;
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:445  void ibuf_close(struct msgbuf *msgbuf, struct ibuf *buf)
+/// C `vendor/tmux/compat/imsg-buffer.c:445`: `void ibuf_close(struct msgbuf *msgbuf, struct ibuf *buf)`
 pub unsafe fn ibuf_close(msgbuf: *mut msgbuf, buf: *mut ibuf) {
     unsafe {
         ibuf_enqueue(msgbuf, buf);
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:451  void ibuf_from_buffer(struct ibuf *buf, void *data, size_t len)
+/// C `vendor/tmux/compat/imsg-buffer.c:451`: `void ibuf_from_buffer(struct ibuf *buf, void *data, size_t len)`
 pub unsafe fn ibuf_from_buffer(buf: *mut ibuf, data: *mut c_void, len: usize) {
     unsafe {
         memset(buf as _, 0, size_of::<ibuf>());
@@ -381,14 +381,14 @@ pub unsafe fn ibuf_from_buffer(buf: *mut ibuf, data: *mut c_void, len: usize) {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:460  void ibuf_from_ibuf(struct ibuf *buf, const struct ibuf *from)
+/// C `vendor/tmux/compat/imsg-buffer.c:460`: `void ibuf_from_ibuf(struct ibuf *buf, const struct ibuf *from)`
 pub unsafe fn ibuf_from_ibuf(buf: *mut ibuf, from: *const ibuf) {
     unsafe {
         ibuf_from_buffer(buf, ibuf_data(from), ibuf_size(from));
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:466  int ibuf_get(struct ibuf *buf, void *data, size_t len)
+/// C `vendor/tmux/compat/imsg-buffer.c:466`: `int ibuf_get(struct ibuf *buf, void *data, size_t len)`
 pub unsafe fn ibuf_get(buf: *mut ibuf, data: *mut c_void, len: usize) -> c_int {
     unsafe {
         if ibuf_size(buf) < len {
@@ -402,7 +402,7 @@ pub unsafe fn ibuf_get(buf: *mut ibuf, data: *mut c_void, len: usize) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:479  int ibuf_get_ibuf(struct ibuf *buf, size_t len, struct ibuf *new)
+/// C `vendor/tmux/compat/imsg-buffer.c:479`: `int ibuf_get_ibuf(struct ibuf *buf, size_t len, struct ibuf *new)`
 pub unsafe fn ibuf_get_ibuf(buf: *mut ibuf, len: usize, new: *mut ibuf) -> c_int {
     unsafe {
         if ibuf_size(buf) < len {
@@ -416,12 +416,12 @@ pub unsafe fn ibuf_get_ibuf(buf: *mut ibuf, len: usize, new: *mut ibuf) -> c_int
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:510  int ibuf_get_n8(struct ibuf *buf, uint8_t *value)
+/// C `vendor/tmux/compat/imsg-buffer.c:510`: `int ibuf_get_n8(struct ibuf *buf, uint8_t *value)`
 pub unsafe fn ibuf_get_n8(buf: *mut ibuf, value: *mut u8) -> c_int {
     unsafe { ibuf_get(buf, value as _, size_of::<u8>()) }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:516  int ibuf_get_n16(struct ibuf *buf, uint16_t *value)
+/// C `vendor/tmux/compat/imsg-buffer.c:516`: `int ibuf_get_n16(struct ibuf *buf, uint16_t *value)`
 pub unsafe fn ibuf_get_n16(buf: *mut ibuf, value: *mut u16) -> c_int {
     unsafe {
         let rv = ibuf_get(buf, value as _, size_of::<u16>());
@@ -430,7 +430,7 @@ pub unsafe fn ibuf_get_n16(buf: *mut ibuf, value: *mut u16) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:526  int ibuf_get_n32(struct ibuf *buf, uint32_t *value)
+/// C `vendor/tmux/compat/imsg-buffer.c:526`: `int ibuf_get_n32(struct ibuf *buf, uint32_t *value)`
 pub unsafe fn ibuf_get_n32(buf: *mut ibuf, value: *mut u32) -> c_int {
     unsafe {
         let rv = ibuf_get(buf, value as _, size_of::<u32>());
@@ -439,7 +439,7 @@ pub unsafe fn ibuf_get_n32(buf: *mut ibuf, value: *mut u32) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:536  int ibuf_get_n64(struct ibuf *buf, uint64_t *value)
+/// C `vendor/tmux/compat/imsg-buffer.c:536`: `int ibuf_get_n64(struct ibuf *buf, uint64_t *value)`
 pub unsafe fn ibuf_get_n64(buf: *mut ibuf, value: *mut u64) -> c_int {
     unsafe {
         let rv = ibuf_get(buf, value as _, size_of::<u64>());
@@ -448,22 +448,22 @@ pub unsafe fn ibuf_get_n64(buf: *mut ibuf, value: *mut u64) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:492  int ibuf_get_h16(struct ibuf *buf, uint16_t *value)
+/// C `vendor/tmux/compat/imsg-buffer.c:492`: `int ibuf_get_h16(struct ibuf *buf, uint16_t *value)`
 pub unsafe fn ibuf_get_h16(buf: *mut ibuf, value: *mut u16) -> c_int {
     unsafe { ibuf_get(buf, value as _, size_of::<u16>()) }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:498  int ibuf_get_h32(struct ibuf *buf, uint32_t *value)
+/// C `vendor/tmux/compat/imsg-buffer.c:498`: `int ibuf_get_h32(struct ibuf *buf, uint32_t *value)`
 pub unsafe fn ibuf_get_h32(buf: *mut ibuf, value: *mut u32) -> c_int {
     unsafe { ibuf_get(buf, value as _, size_of::<u32>()) }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:504  int ibuf_get_h64(struct ibuf *buf, uint64_t *value)
+/// C `vendor/tmux/compat/imsg-buffer.c:504`: `int ibuf_get_h64(struct ibuf *buf, uint64_t *value)`
 pub unsafe fn ibuf_get_h64(buf: *mut ibuf, value: *mut u64) -> c_int {
     unsafe { ibuf_get(buf, value as _, size_of::<u64>()) }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:581  int ibuf_skip(struct ibuf *buf, size_t len)
+/// C `vendor/tmux/compat/imsg-buffer.c:581`: `int ibuf_skip(struct ibuf *buf, size_t len)`
 pub unsafe fn ibuf_skip(buf: *mut ibuf, len: usize) -> c_int {
     unsafe {
         if ibuf_size(buf) < len {
@@ -476,7 +476,7 @@ pub unsafe fn ibuf_skip(buf: *mut ibuf, len: usize) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:593  void ibuf_free(struct ibuf *buf)
+/// C `vendor/tmux/compat/imsg-buffer.c:593`: `void ibuf_free(struct ibuf *buf)`
 pub unsafe fn ibuf_free(buf: *mut ibuf) {
     unsafe {
         if buf.is_null() {
@@ -494,12 +494,12 @@ pub unsafe fn ibuf_free(buf: *mut ibuf) {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:610  int ibuf_fd_avail(struct ibuf *buf)
+/// C `vendor/tmux/compat/imsg-buffer.c:610`: `int ibuf_fd_avail(struct ibuf *buf)`
 pub unsafe fn ibuf_fd_avail(buf: *mut ibuf) -> c_int {
     unsafe { ((*buf).fd != -1) as c_int }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:616  int ibuf_fd_get(struct ibuf *buf)
+/// C `vendor/tmux/compat/imsg-buffer.c:616`: `int ibuf_fd_get(struct ibuf *buf)`
 pub unsafe fn ibuf_fd_get(buf: *mut ibuf) -> c_int {
     unsafe {
         let fd = (*buf).fd;
@@ -508,7 +508,7 @@ pub unsafe fn ibuf_fd_get(buf: *mut ibuf) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:629  void ibuf_fd_set(struct ibuf *buf, int fd)
+/// C `vendor/tmux/compat/imsg-buffer.c:629`: `void ibuf_fd_set(struct ibuf *buf, int fd)`
 pub unsafe fn ibuf_fd_set(buf: *mut ibuf, fd: c_int) {
     unsafe {
         if (*buf).max == 0 {
@@ -522,7 +522,7 @@ pub unsafe fn ibuf_fd_set(buf: *mut ibuf, fd: c_int) {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:725  int ibuf_write(int fd, struct msgbuf *msgbuf)
+/// C `vendor/tmux/compat/imsg-buffer.c:725`: `int ibuf_write(int fd, struct msgbuf *msgbuf)`
 pub unsafe fn ibuf_write(msgbuf: *mut msgbuf) -> c_int {
     unsafe {
         let mut i: u32 = 0;
@@ -581,7 +581,7 @@ pub unsafe fn msgbuf_init(msgbuf: *mut msgbuf) {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:986  static void msgbuf_drain(struct msgbuf *msgbuf, size_t n)
+/// C `vendor/tmux/compat/imsg-buffer.c:986`: `static void msgbuf_drain(struct msgbuf *msgbuf, size_t n)`
 unsafe fn msgbuf_drain(msgbuf: *mut msgbuf, mut n: usize) {
     unsafe {
         let mut buf = tailq_first(&raw mut (*msgbuf).bufs);
@@ -600,7 +600,7 @@ unsafe fn msgbuf_drain(msgbuf: *mut msgbuf, mut n: usize) {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:700  void msgbuf_clear(struct msgbuf *msgbuf)
+/// C `vendor/tmux/compat/imsg-buffer.c:700`: `void msgbuf_clear(struct msgbuf *msgbuf)`
 pub unsafe fn msgbuf_clear(msgbuf: *mut msgbuf) {
     unsafe {
         let mut buf;
@@ -613,7 +613,7 @@ pub unsafe fn msgbuf_clear(msgbuf: *mut msgbuf) {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:758  int msgbuf_write(int fd, struct msgbuf *msgbuf)
+/// C `vendor/tmux/compat/imsg-buffer.c:758`: `int msgbuf_write(int fd, struct msgbuf *msgbuf)`
 pub unsafe fn msgbuf_write(msgbuf: *mut msgbuf) -> c_int {
     unsafe {
         let mut iov: [iovec; IOV_MAX] = std::mem::zeroed();
@@ -685,7 +685,7 @@ pub unsafe fn msgbuf_write(msgbuf: *mut msgbuf) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg-buffer.c:694  uint32_t msgbuf_queuelen(struct msgbuf *msgbuf)
+/// C `vendor/tmux/compat/imsg-buffer.c:694`: `uint32_t msgbuf_queuelen(struct msgbuf *msgbuf)`
 pub unsafe fn msgbuf_queuelen(msgbuf: *mut msgbuf) -> u32 {
     unsafe { (*msgbuf).queued }
 }

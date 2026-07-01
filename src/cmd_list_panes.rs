@@ -32,7 +32,7 @@ pub static CMD_LIST_PANES_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-list-panes.c:52  static enum cmd_retval cmd_list_panes_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-list-panes.c:52`: `static enum cmd_retval cmd_list_panes_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_list_panes_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -52,7 +52,7 @@ unsafe fn cmd_list_panes_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retv
     }
 }
 
-// vendor/tmux/cmd-list-panes.c:77  static void cmd_list_panes_server(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-list-panes.c:77`: `static void cmd_list_panes_server(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_list_panes_server(self_: *mut cmd, item: *mut cmdq_item) {
     unsafe {
         for s in rb_foreach(&raw mut SESSIONS).map(NonNull::as_ptr) {
@@ -61,7 +61,7 @@ unsafe fn cmd_list_panes_server(self_: *mut cmd, item: *mut cmdq_item) {
     }
 }
 
-// vendor/tmux/cmd-list-panes.c:86  static void cmd_list_panes_session(struct cmd *self, struct session *s, struct cmdq_item *item, int type)
+/// C `vendor/tmux/cmd-list-panes.c:86`: `static void cmd_list_panes_session(struct cmd *self, struct session *s, struct cmdq_item *item, int type)`
 unsafe fn cmd_list_panes_session(
     self_: *mut cmd,
     s: *mut session,
@@ -75,7 +75,7 @@ unsafe fn cmd_list_panes_session(
     }
 }
 
-// vendor/tmux/cmd-list-panes.c:96  static void cmd_list_panes_window(struct cmd *self, struct session *s, struct winlink *wl, struct cmdq_item *item, int type)
+/// C `vendor/tmux/cmd-list-panes.c:96`: `static void cmd_list_panes_window(struct cmd *self, struct session *s, struct winlink *wl, struct cmdq_item *item, int type)`
 fn cmd_list_panes_window(
     self_: *mut cmd,
     s: *mut session,

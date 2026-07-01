@@ -303,7 +303,7 @@ pub const unsafe fn tty_term_ncodes() -> u32 {
     TTY_TERM_CODES.len() as u32
 }
 
-// vendor/tmux/tty-term.c:301  static char *tty_term_strip(const char *s)
+/// C `vendor/tmux/tty-term.c:301`: `static char *tty_term_strip(const char *s)`
 pub unsafe fn tty_term_strip(s: *const u8) -> *mut u8 {
     let sizeof_buf: usize = 8192;
     static mut BUF: [u8; 8192] = [0; 8192];
@@ -346,7 +346,7 @@ pub unsafe fn tty_term_strip(s: *const u8) -> *mut u8 {
     }
 }
 
-// vendor/tmux/tty-term.c:332  static char *tty_term_override_next(const char *s, size_t *offset)
+/// C `vendor/tmux/tty-term.c:332`: `static char *tty_term_override_next(const char *s, size_t *offset)`
 pub unsafe fn tty_term_override_next(s: &str, offset: *mut usize) -> *mut u8 {
     const SIZEOF_VALUE: usize = 8192;
     static mut VALUE: [u8; 8192] = [0; 8192];
@@ -386,7 +386,7 @@ pub unsafe fn tty_term_override_next(s: &str, offset: *mut usize) -> *mut u8 {
     }
 }
 
-// vendor/tmux/tty-term.c:363  void tty_term_apply(struct tty_term *term, const char *capabilities, int quiet)
+/// C `vendor/tmux/tty-term.c:363`: `void tty_term_apply(struct tty_term *term, const char *capabilities, int quiet)`
 pub unsafe fn tty_term_apply(term: *mut tty_term, capabilities: &str, quiet: i32) {
     unsafe {
         let mut code: *mut tty_code;
@@ -472,7 +472,7 @@ pub unsafe fn tty_term_apply(term: *mut tty_term, capabilities: &str, quiet: i32
     }
 }
 
-// vendor/tmux/tty-term.c:439  void tty_term_apply_overrides(struct tty_term *term)
+/// C `vendor/tmux/tty-term.c:439`: `void tty_term_apply_overrides(struct tty_term *term)`
 pub unsafe fn tty_term_apply_overrides(term: *mut tty_term) {
     let mut ov: *mut options_value;
     let mut s: *const u8;
@@ -581,7 +581,7 @@ pub unsafe fn tty_term_apply_overrides(term: *mut tty_term) {
     }
 }
 
-// vendor/tmux/tty-term.c:525  struct tty_term *tty_term_create(struct tty *tty, char *name, char **caps, u_int ncaps, int *feat, char **cause)
+/// C `vendor/tmux/tty-term.c:525`: `struct tty_term *tty_term_create(struct tty *tty, char *name, char **caps, u_int ncaps, int *feat, char **cause)`
 pub unsafe fn tty_term_create(
     tty: *mut tty,
     name: *mut u8,
@@ -720,7 +720,7 @@ pub unsafe fn tty_term_create(
     }
 }
 
-// vendor/tmux/tty-term.c:672  void tty_term_free(struct tty_term *term)
+/// C `vendor/tmux/tty-term.c:672`: `void tty_term_free(struct tty_term *term)`
 pub unsafe fn tty_term_free(term: *mut tty_term) {
     unsafe {
         log_debug!("removing term {}", _s((*term).name));
@@ -738,7 +738,7 @@ pub unsafe fn tty_term_free(term: *mut tty_term) {
     }
 }
 
-// vendor/tmux/tty-term.c:690  int tty_term_read_list(const char *name, int fd, char ***caps, u_int *ncaps, char **cause)
+/// C `vendor/tmux/tty-term.c:690`: `int tty_term_read_list(const char *name, int fd, char ***caps, u_int *ncaps, char **cause)`
 pub unsafe fn tty_term_read_list(
     name: *const u8,
     _fd: i32,
@@ -804,7 +804,7 @@ pub unsafe fn tty_term_read_list(
     }
 }
 
-// vendor/tmux/tty-term.c:764  void tty_term_free_list(char **caps, u_int ncaps)
+/// C `vendor/tmux/tty-term.c:764`: `void tty_term_free_list(char **caps, u_int ncaps)`
 pub unsafe fn tty_term_free_list(caps: *mut *mut u8, ncaps: u32) {
     unsafe {
         for i in 0..ncaps {
@@ -814,12 +814,12 @@ pub unsafe fn tty_term_free_list(caps: *mut *mut u8, ncaps: u32) {
     }
 }
 
-// vendor/tmux/tty-term.c:774  int tty_term_has(struct tty_term *term, enum tty_code_code code)
+/// C `vendor/tmux/tty-term.c:774`: `int tty_term_has(struct tty_term *term, enum tty_code_code code)`
 pub unsafe fn tty_term_has(term: *mut tty_term, code: tty_code_code) -> bool {
     unsafe { (*(*term).codes.add(code as usize)).type_ != tty_code_type::None }
 }
 
-// vendor/tmux/tty-term.c:792  const char *tty_term_string(struct tty_term *term, enum tty_code_code code)
+/// C `vendor/tmux/tty-term.c:792`: `const char *tty_term_string(struct tty_term *term, enum tty_code_code code)`
 pub unsafe fn tty_term_string(term: *mut tty_term, code: tty_code_code) -> &'static [u8] {
     unsafe {
         if !tty_term_has(term, code) {
@@ -833,7 +833,7 @@ pub unsafe fn tty_term_string(term: *mut tty_term, code: tty_code_code) -> &'sta
     }
 }
 
-// vendor/tmux/tty-term.c:802  const char *tty_term_string_i(struct tty_term *term, enum tty_code_code code, int a)
+/// C `vendor/tmux/tty-term.c:802`: `const char *tty_term_string_i(struct tty_term *term, enum tty_code_code code, int a)`
 pub unsafe fn tty_term_string_i(term: *mut tty_term, code: tty_code_code, a: i32) -> Vec<u8> {
     unsafe {
         let x = tty_term_string(term, code);
@@ -851,7 +851,7 @@ pub unsafe fn tty_term_string_i(term: *mut tty_term, code: tty_code_code, a: i32
     }
 }
 
-// vendor/tmux/tty-term.c:821  const char *tty_term_string_ii(struct tty_term *term, enum tty_code_code code, int a, int b)
+/// C `vendor/tmux/tty-term.c:821`: `const char *tty_term_string_ii(struct tty_term *term, enum tty_code_code code, int a, int b)`
 pub unsafe fn tty_term_string_ii(
     term: *mut tty_term,
     code: tty_code_code,
@@ -874,7 +874,7 @@ pub unsafe fn tty_term_string_ii(
     }
 }
 
-// vendor/tmux/tty-term.c:840  const char *tty_term_string_iii(struct tty_term *term, enum tty_code_code code, int a, int b, int c)
+/// C `vendor/tmux/tty-term.c:840`: `const char *tty_term_string_iii(struct tty_term *term, enum tty_code_code code, int a, int b, int c)`
 pub unsafe fn tty_term_string_iii(
     term: *mut tty_term,
     code: tty_code_code,
@@ -898,7 +898,7 @@ pub unsafe fn tty_term_string_iii(
     }
 }
 
-// vendor/tmux/tty-term.c:860  const char *tty_term_string_s(struct tty_term *term, enum tty_code_code code, const char *a)
+/// C `vendor/tmux/tty-term.c:860`: `const char *tty_term_string_s(struct tty_term *term, enum tty_code_code code, const char *a)`
 pub unsafe fn tty_term_string_s(term: *mut tty_term, code: tty_code_code, a: *const u8) -> Vec<u8> {
     unsafe {
         let x = tty_term_string(term, code);
@@ -919,7 +919,7 @@ pub unsafe fn tty_term_string_s(term: *mut tty_term, code: tty_code_code, a: *co
     }
 }
 
-// vendor/tmux/tty-term.c:879  const char *tty_term_string_ss(struct tty_term *term, enum tty_code_code code, const char *a, const char *b)
+/// C `vendor/tmux/tty-term.c:879`: `const char *tty_term_string_ss(struct tty_term *term, enum tty_code_code code, const char *a, const char *b)`
 pub unsafe fn tty_term_string_ss(
     term: *mut tty_term,
     code: tty_code_code,
@@ -945,7 +945,7 @@ pub unsafe fn tty_term_string_ss(
     }
 }
 
-// vendor/tmux/tty-term.c:899  int tty_term_number(struct tty_term *term, enum tty_code_code code)
+/// C `vendor/tmux/tty-term.c:899`: `int tty_term_number(struct tty_term *term, enum tty_code_code code)`
 pub unsafe fn tty_term_number(term: *mut tty_term, code: tty_code_code) -> i32 {
     unsafe {
         if !tty_term_has(term, code) {
@@ -958,7 +958,7 @@ pub unsafe fn tty_term_number(term: *mut tty_term, code: tty_code_code) -> i32 {
     }
 }
 
-// vendor/tmux/tty-term.c:909  int tty_term_flag(struct tty_term *term, enum tty_code_code code)
+/// C `vendor/tmux/tty-term.c:909`: `int tty_term_flag(struct tty_term *term, enum tty_code_code code)`
 pub unsafe fn tty_term_flag(term: *mut tty_term, code: tty_code_code) -> i32 {
     unsafe {
         if !tty_term_has(term, code) {
@@ -971,7 +971,7 @@ pub unsafe fn tty_term_flag(term: *mut tty_term, code: tty_code_code) -> i32 {
     }
 }
 
-// vendor/tmux/tty-term.c:919  const char *tty_term_describe(struct tty_term *term, enum tty_code_code code)
+/// C `vendor/tmux/tty-term.c:919`: `const char *tty_term_describe(struct tty_term *term, enum tty_code_code code)`
 pub unsafe fn tty_term_describe(term: *mut tty_term, code: tty_code_code) -> *const u8 {
     let sizeof_s = 256;
     static mut S: [u8; 256] = [0; 256];

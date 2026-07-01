@@ -41,14 +41,14 @@ pub static mut STYLE_DEFAULT: style = style {
     default_type: style_default_type::STYLE_DEFAULT_BASE,
 };
 
-// vendor/tmux/style.c:58  static void style_set_range_string(struct style *sy, const char *s)
+/// C `vendor/tmux/style.c:58`: `static void style_set_range_string(struct style *sy, const char *s)`
 pub unsafe fn style_set_range_string(sy: *mut style, s: *const u8) {
     unsafe {
         strlcpy(&raw mut (*sy).range_string as _, s, 16); // TODO use better sizeof
     }
 }
 
-// vendor/tmux/style.c:69  int style_parse(struct style *sy, const struct grid_cell *base, const char *in)
+/// C `vendor/tmux/style.c:69`: `int style_parse(struct style *sy, const struct grid_cell *base, const char *in)`
 pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *const u8) -> i32 {
     unsafe {
         let delimiters = c!(" ,\n");
@@ -268,7 +268,7 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
     }
 }
 
-// vendor/tmux/style.c:303  const char *style_tostring(struct style *sy)
+/// C `vendor/tmux/style.c:303`: `const char *style_tostring(struct style *sy)`
 pub unsafe fn style_tostring(sy: *const style) -> *const u8 {
     type s_type = [i8; 256];
     static mut S_BUF: MaybeUninit<s_type> = MaybeUninit::<s_type>::uninit();
@@ -451,7 +451,7 @@ pub unsafe fn style_tostring(sy: *const style) -> *const u8 {
     }
 }
 
-// vendor/tmux/style.c:441  struct style *style_add(struct grid_cell *gc, struct options *oo, const char *name, struct format_tree *ft)
+/// C `vendor/tmux/style.c:441`: `struct style *style_add(struct grid_cell *gc, struct options *oo, const char *name, struct format_tree *ft)`
 pub unsafe fn style_add(
     gc: *mut grid_cell,
     oo: *mut options,
@@ -487,7 +487,7 @@ pub unsafe fn style_add(
     }
 }
 
-// vendor/tmux/style.c:468  void style_apply(struct grid_cell *gc, struct options *oo, const char *name, struct format_tree *ft)
+/// C `vendor/tmux/style.c:468`: `void style_apply(struct grid_cell *gc, struct options *oo, const char *name, struct format_tree *ft)`
 pub unsafe fn style_apply(
     gc: *mut grid_cell,
     oo: *mut options,
@@ -500,7 +500,7 @@ pub unsafe fn style_apply(
     }
 }
 
-// vendor/tmux/style.c:500  void style_set(struct style *sy, const struct grid_cell *gc)
+/// C `vendor/tmux/style.c:500`: `void style_set(struct style *sy, const struct grid_cell *gc)`
 pub unsafe fn style_set(sy: *mut style, gc: *const grid_cell) {
     unsafe {
         memcpy__(sy, &raw const STYLE_DEFAULT);
@@ -508,7 +508,7 @@ pub unsafe fn style_set(sy: *mut style, gc: *const grid_cell) {
     }
 }
 
-// vendor/tmux/style.c:508  void style_copy(struct style *dst, struct style *src)
+/// C `vendor/tmux/style.c:508`: `void style_copy(struct style *dst, struct style *src)`
 pub unsafe fn style_copy(dst: *mut style, src: *const style) {
     unsafe {
         memcpy__(dst, src);

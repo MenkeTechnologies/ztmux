@@ -6,7 +6,7 @@ sources (`vendor/tmux/**/*.c`) gets a one-line comment citing the C file, line,
 and the *full C signature* — return type, name, and parameter types **and
 names** — e.g.:
 
-    // vendor/tmux/grid.c:320  struct grid *grid_create(u_int sx, u_int sy, u_int hlimit)
+    /// C `vendor/tmux/grid.c:320`: `struct grid *grid_create(u_int sx, u_int sy, u_int hlimit)`
     pub unsafe fn grid_create(sx: u32, sy: u32, hlimit: u32) -> *mut grid {
 
 The signature (not just the name) is the point: it lets a reviewer diff the Rust
@@ -23,8 +23,8 @@ location is cited, per Rust fn:
   2. if the name is defined in exactly one C file, that one; else
   3. skip (ambiguous cross-file name — better no citation than a wrong one).
 
-Plain `//` comments (not `///`) so nothing attaches as rustdoc under the strict
-clippy doc-lints. Idempotent and self-updating: a function that already has a
+`///` doc citations (zshrs style); path and signature are backticked code
+spans so rustdoc and clippy doc-lints stay quiet. Idempotent and self-updating: a function that already has a
 `// vendor/tmux/…` citation directly above it has that line REPLACED with the
 current signature, so re-running refreshes stale citations and fills gaps.
 
@@ -41,7 +41,9 @@ sys.path.insert(0, str(HERE))
 import gen_port_report as g  # noqa: E402  (reuse ROOT / RS_DIRS / RE_RS_FN / C walk config)
 
 CITE_PREFIX = "vendor/tmux/"
-RE_EXISTING = re.compile(r"^\s*//\s*(?:vendor/tmux/|tmux/)\S+\.c:\d+\b")
+# Matches an existing citation, whether the old plain-`//` form or the new
+# `///` doc form, so re-runs replace it in place.
+RE_EXISTING = re.compile(r"^\s*//(?:/)?\s*(?:C\s+`)?(?:vendor/tmux/|tmux/)\S+\.c:\d+")
 
 C_KEYWORDS = {
     "if", "for", "while", "switch", "return", "else", "do", "sizeof", "static",
@@ -156,7 +158,10 @@ def annotate_file(path: Path, cidx: dict, check: bool) -> tuple[int, int]:
             if loc is not None:
                 rel, ln, sig = loc
                 indent = line[: len(line) - len(line.lstrip())]
-                want = f"{indent}// {rel}:{ln}  {sig}"
+                # zshrs-style `///` doc citation. Path and signature are code
+                # spans (backticks) so rustdoc/clippy's doc_markdown lint stays
+                # quiet and the `*`/`(...)` don't render as markdown.
+                want = f"{indent}/// C `{rel}:{ln}`: `{sig}`"
                 # Replace an existing citation directly above, else insert.
                 if out and RE_EXISTING.match(out[-1]):
                     if out[-1] != want:

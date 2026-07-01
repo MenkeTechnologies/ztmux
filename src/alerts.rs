@@ -30,7 +30,7 @@ thread_local! {
     static ALERTS_LIST: RefCell<LinkedList<NonNull<window>>> = const { RefCell::new(LinkedList::new()) };
 }
 
-// vendor/tmux/alerts.c:43  static void alerts_timer(__unused int fd, __unused short events, void *arg)
+/// C `vendor/tmux/alerts.c:43`: `static void alerts_timer(__unused int fd, __unused short events, void *arg)`
 unsafe extern "C-unwind" fn alerts_timer(_fd: i32, _events: i16, w: NonNull<window>) {
     unsafe {
         log_debug!("@{} alerts timer expired", (*w.as_ptr()).id);
@@ -38,7 +38,7 @@ unsafe extern "C-unwind" fn alerts_timer(_fd: i32, _events: i16, w: NonNull<wind
     }
 }
 
-// vendor/tmux/alerts.c:52  static void alerts_callback(__unused int fd, __unused short events, __unused void *arg)
+/// C `vendor/tmux/alerts.c:52`: `static void alerts_callback(__unused int fd, __unused short events, __unused void *arg)`
 unsafe extern "C-unwind" fn alerts_callback(_fd: c_int, _events: c_short, _arg: *mut c_void) {
     unsafe {
         ALERTS_LIST.with_borrow_mut(|alerts_list| {
@@ -58,7 +58,7 @@ unsafe extern "C-unwind" fn alerts_callback(_fd: c_int, _events: c_short, _arg: 
     }
 }
 
-// vendor/tmux/alerts.c:71  static int alerts_action_applies(struct winlink *wl, const char *name)
+/// C `vendor/tmux/alerts.c:71`: `static int alerts_action_applies(struct winlink *wl, const char *name)`
 fn alerts_action_applies(wl: &winlink, name: &str) -> bool {
     unsafe {
         match alert_option::try_from(options_get_number___::<i32>(&*(*wl.session).options, name)) {
@@ -70,12 +70,12 @@ fn alerts_action_applies(wl: &winlink, name: &str) -> bool {
     }
 }
 
-// vendor/tmux/alerts.c:92  static int alerts_check_all(struct window *w)
+/// C `vendor/tmux/alerts.c:92`: `static int alerts_check_all(struct window *w)`
 fn alerts_check_all(w: &window) -> window_flag {
     alerts_check_bell(w) | alerts_check_activity(w) | alerts_check_silence(w)
 }
 
-// vendor/tmux/alerts.c:103  void alerts_check_session(struct session *s)
+/// C `vendor/tmux/alerts.c:103`: `void alerts_check_session(struct session *s)`
 pub(crate) fn alerts_check_session(s: &session) {
     unsafe {
         for wl in rb_foreach_const(&raw const s.windows).map(NonNull::as_ptr) {
@@ -84,7 +84,7 @@ pub(crate) fn alerts_check_session(s: &session) {
     }
 }
 
-// vendor/tmux/alerts.c:112  static int alerts_enabled(struct window *w, int flags)
+/// C `vendor/tmux/alerts.c:112`: `static int alerts_enabled(struct window *w, int flags)`
 fn alerts_enabled(w: &window, flags: window_flag) -> bool {
     unsafe {
         if flags.intersects(window_flag::BELL)
@@ -107,7 +107,7 @@ fn alerts_enabled(w: &window, flags: window_flag) -> bool {
     false
 }
 
-// vendor/tmux/alerts.c:130  void alerts_reset_all(void)
+/// C `vendor/tmux/alerts.c:130`: `void alerts_reset_all(void)`
 pub(crate) unsafe fn alerts_reset_all() {
     unsafe {
         for w in rb_foreach(&raw mut WINDOWS) {
@@ -116,7 +116,7 @@ pub(crate) unsafe fn alerts_reset_all() {
     }
 }
 
-// vendor/tmux/alerts.c:139  static void alerts_reset(struct window *w)
+/// C `vendor/tmux/alerts.c:139`: `static void alerts_reset(struct window *w)`
 unsafe fn alerts_reset(w: NonNull<window>) {
     unsafe {
         if event_initialized(&raw const (*w.as_ptr()).alerts_timer) == 0 {
@@ -139,7 +139,7 @@ unsafe fn alerts_reset(w: NonNull<window>) {
     }
 }
 
-// vendor/tmux/alerts.c:158  void alerts_queue(struct window *w, int flags)
+/// C `vendor/tmux/alerts.c:158`: `void alerts_queue(struct window *w, int flags)`
 pub(crate) unsafe fn alerts_queue(w: NonNull<window>, flags: window_flag) {
     unsafe {
         alerts_reset(w);
@@ -174,7 +174,7 @@ pub(crate) unsafe fn alerts_queue(w: NonNull<window>, flags: window_flag) {
     }
 }
 
-// vendor/tmux/alerts.c:183  static int alerts_check_bell(struct window *w)
+/// C `vendor/tmux/alerts.c:183`: `static int alerts_check_bell(struct window *w)`
 fn alerts_check_bell(w: &window) -> window_flag {
     unsafe {
         if !w.flags.intersects(window_flag::BELL) {
@@ -214,7 +214,7 @@ fn alerts_check_bell(w: &window) -> window_flag {
     window_flag::BELL
 }
 
-// vendor/tmux/alerts.c:221  static int alerts_check_activity(struct window *w)
+/// C `vendor/tmux/alerts.c:221`: `static int alerts_check_activity(struct window *w)`
 fn alerts_check_activity(w: &window) -> window_flag {
     unsafe {
         if !w.flags.intersects(window_flag::ACTIVITY) {
@@ -254,7 +254,7 @@ fn alerts_check_activity(w: &window) -> window_flag {
     window_flag::ACTIVITY
 }
 
-// vendor/tmux/alerts.c:257  static int alerts_check_silence(struct window *w)
+/// C `vendor/tmux/alerts.c:257`: `static int alerts_check_silence(struct window *w)`
 fn alerts_check_silence(w: &window) -> window_flag {
     unsafe {
         if !w.flags.intersects(window_flag::SILENCE) {
@@ -298,7 +298,7 @@ fn alerts_check_silence(w: &window) -> window_flag {
     window_flag::SILENCE
 }
 
-// vendor/tmux/alerts.c:293  static void alerts_set_message(struct winlink *wl, const char *type, const char *option)
+/// C `vendor/tmux/alerts.c:293`: `static void alerts_set_message(struct winlink *wl, const char *type, const char *option)`
 fn alerts_set_message(wl: &winlink, type_: &str, option: &str) {
     unsafe {
         let visual =

@@ -27,12 +27,12 @@ pub static CMD_BIND_KEY_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-bind-key.c:48  static enum args_parse_type cmd_bind_key_args_parse(__unused struct args *args, __unused u_int idx, __unused char **cause)
+/// C `vendor/tmux/cmd-bind-key.c:48`: `static enum args_parse_type cmd_bind_key_args_parse(__unused struct args *args, __unused u_int idx, __unused char **cause)`
 fn cmd_bind_key_args_parse(_args: *mut args, _idx: u32, _cause: *mut *mut u8) -> args_parse_type {
     args_parse_type::ARGS_PARSE_COMMANDS_OR_STRING
 }
 
-// vendor/tmux/cmd-bind-key.c:55  static enum cmd_retval cmd_bind_key_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-bind-key.c:55`: `static enum cmd_retval cmd_bind_key_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_bind_key_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args: *mut args = cmd_get_args(self_);

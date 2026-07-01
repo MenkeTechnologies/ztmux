@@ -91,7 +91,7 @@ pub struct window_buffer_editdata {
     pub pb: *mut paste_buffer,
 }
 
-// vendor/tmux/window-buffer.c:118  static struct window_buffer_itemdata *window_buffer_add_item(struct window_buffer_modedata *data)
+/// C `vendor/tmux/window-buffer.c:118`: `static struct window_buffer_itemdata *window_buffer_add_item(struct window_buffer_modedata *data)`
 unsafe fn window_buffer_add_item(data: *mut window_buffer_modedata) -> *mut window_buffer_itemdata {
     unsafe {
         (*data).item_list =
@@ -103,7 +103,7 @@ unsafe fn window_buffer_add_item(data: *mut window_buffer_modedata) -> *mut wind
     }
 }
 
-// vendor/tmux/window-buffer.c:129  static void window_buffer_free_item(struct window_buffer_itemdata *item)
+/// C `vendor/tmux/window-buffer.c:129`: `static void window_buffer_free_item(struct window_buffer_itemdata *item)`
 unsafe fn window_buffer_free_item(item: *mut window_buffer_itemdata) {
     unsafe {
         (*item).name = String::new();
@@ -111,7 +111,7 @@ unsafe fn window_buffer_free_item(item: *mut window_buffer_itemdata) {
     }
 }
 
-// vendor/tmux/window-buffer.c:136  static void window_buffer_build(void *modedata, struct sort_criteria *sort_crit, __unused uint64_t *tag, const char *filter)
+/// C `vendor/tmux/window-buffer.c:136`: `static void window_buffer_build(void *modedata, struct sort_criteria *sort_crit, __unused uint64_t *tag, const char *filter)`
 pub unsafe fn window_buffer_build(
     modedata: NonNull<c_void>,
     sort_crit: *mut mode_tree_sort_criteria,
@@ -220,7 +220,7 @@ pub unsafe fn window_buffer_build(
     }
 }
 
-// vendor/tmux/window-buffer.c:199  static void window_buffer_draw(__unused void *modedata, void *itemdata, struct screen_write_ctx *ctx, u_int sx, u_int sy)
+/// C `vendor/tmux/window-buffer.c:199`: `static void window_buffer_draw(__unused void *modedata, void *itemdata, struct screen_write_ctx *ctx, u_int sx, u_int sy)`
 pub unsafe fn window_buffer_draw(
     _modedata: *mut c_void,
     itemdata: Option<NonNull<c_void>>,
@@ -275,7 +275,7 @@ pub unsafe fn window_buffer_draw(
     }
 }
 
-// vendor/tmux/window-buffer.c:257  static int window_buffer_search(__unused void *modedata, void *itemdata, const char *ss, int icase)
+/// C `vendor/tmux/window-buffer.c:257`: `static int window_buffer_search(__unused void *modedata, void *itemdata, const char *ss, int icase)`
 pub unsafe fn window_buffer_search(
     _modedata: *mut c_void,
     itemdata: NonNull<c_void>,
@@ -298,7 +298,7 @@ pub unsafe fn window_buffer_search(
     }
 }
 
-// vendor/tmux/window-buffer.c:283  static void window_buffer_menu(void *modedata, struct client *c, key_code key)
+/// C `vendor/tmux/window-buffer.c:283`: `static void window_buffer_menu(void *modedata, struct client *c, key_code key)`
 pub unsafe fn window_buffer_menu(modedata: NonNull<c_void>, c: *mut client, key: key_code) {
     unsafe {
         let data: NonNull<window_buffer_modedata> = modedata.cast();
@@ -312,7 +312,7 @@ pub unsafe fn window_buffer_menu(modedata: NonNull<c_void>, c: *mut client, key:
     }
 }
 
-// vendor/tmux/window-buffer.c:296  static key_code window_buffer_get_key(void *modedata, void *itemdata, u_int line)
+/// C `vendor/tmux/window-buffer.c:296`: `static key_code window_buffer_get_key(void *modedata, void *itemdata, u_int line)`
 pub unsafe fn window_buffer_get_key(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -348,7 +348,7 @@ pub unsafe fn window_buffer_get_key(
     }
 }
 
-// vendor/tmux/window-buffer.c:365  static struct screen *window_buffer_init(struct window_mode_entry *wme, struct cmd_find_state *fs, struct args *args)
+/// C `vendor/tmux/window-buffer.c:365`: `static struct screen *window_buffer_init(struct window_mode_entry *wme, struct cmd_find_state *fs, struct args *args)`
 pub unsafe fn window_buffer_init(
     wme: NonNull<window_mode_entry>,
     fs: *mut cmd_find_state,
@@ -401,7 +401,7 @@ pub unsafe fn window_buffer_init(
     }
 }
 
-// vendor/tmux/window-buffer.c:402  static void window_buffer_free(struct window_mode_entry *wme)
+/// C `vendor/tmux/window-buffer.c:402`: `static void window_buffer_free(struct window_mode_entry *wme)`
 pub unsafe fn window_buffer_free(wme: NonNull<window_mode_entry>) {
     unsafe {
         let data = (*wme.as_ptr()).data as *mut window_buffer_modedata;
@@ -425,7 +425,7 @@ pub unsafe fn window_buffer_free(wme: NonNull<window_mode_entry>) {
     }
 }
 
-// vendor/tmux/window-buffer.c:429  static void window_buffer_resize(struct window_mode_entry *wme, u_int sx, u_int sy)
+/// C `vendor/tmux/window-buffer.c:429`: `static void window_buffer_resize(struct window_mode_entry *wme, u_int sx, u_int sy)`
 pub unsafe fn window_buffer_resize(wme: NonNull<window_mode_entry>, sx: u32, sy: u32) {
     unsafe {
         let data = (*wme.as_ptr()).data as *mut window_buffer_modedata;
@@ -433,7 +433,7 @@ pub unsafe fn window_buffer_resize(wme: NonNull<window_mode_entry>, sx: u32, sy:
     }
 }
 
-// vendor/tmux/window-buffer.c:437  static void window_buffer_update(struct window_mode_entry *wme)
+/// C `vendor/tmux/window-buffer.c:437`: `static void window_buffer_update(struct window_mode_entry *wme)`
 pub unsafe fn window_buffer_update(wme: NonNull<window_mode_entry>) {
     unsafe {
         let data = (*wme.as_ptr()).data as *mut window_buffer_modedata;
@@ -444,7 +444,7 @@ pub unsafe fn window_buffer_update(wme: NonNull<window_mode_entry>) {
     }
 }
 
-// vendor/tmux/window-buffer.c:448  static void window_buffer_do_delete(void *modedata, void *itemdata, __unused struct client *c, __unused key_code key)
+/// C `vendor/tmux/window-buffer.c:448`: `static void window_buffer_do_delete(void *modedata, void *itemdata, __unused struct client *c, __unused key_code key)`
 pub unsafe fn window_buffer_do_delete(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -471,7 +471,7 @@ pub unsafe fn window_buffer_do_delete(
     }
 }
 
-// vendor/tmux/window-buffer.c:471  static void window_buffer_do_paste(void *modedata, void *itemdata, struct client *c, __unused key_code key)
+/// C `vendor/tmux/window-buffer.c:471`: `static void window_buffer_do_paste(void *modedata, void *itemdata, struct client *c, __unused key_code key)`
 pub unsafe fn window_buffer_do_paste(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -493,7 +493,7 @@ pub unsafe fn window_buffer_do_paste(
     }
 }
 
-// vendor/tmux/window-buffer.c:482  static void window_buffer_finish_edit(struct window_buffer_editdata *ed)
+/// C `vendor/tmux/window-buffer.c:482`: `static void window_buffer_finish_edit(struct window_buffer_editdata *ed)`
 pub unsafe fn window_buffer_finish_edit(ed: *mut window_buffer_editdata) {
     unsafe {
         (*ed).name = String::new();
@@ -501,7 +501,7 @@ pub unsafe fn window_buffer_finish_edit(ed: *mut window_buffer_editdata) {
     }
 }
 
-// vendor/tmux/window-buffer.c:532  static void window_buffer_edit_close_cb(char *buf, size_t len, void *arg)
+/// C `vendor/tmux/window-buffer.c:532`: `static void window_buffer_edit_close_cb(char *buf, size_t len, void *arg)`
 pub unsafe fn window_buffer_edit_close_cb(buf: *mut u8, mut len: usize, arg: *mut c_void) {
     unsafe {
         let ed = arg as *mut window_buffer_editdata;
@@ -541,7 +541,7 @@ pub unsafe fn window_buffer_edit_close_cb(buf: *mut u8, mut len: usize, arg: *mu
     }
 }
 
-// vendor/tmux/window-buffer.c:588  static void window_buffer_start_edit(struct window_buffer_modedata *data, struct window_buffer_itemdata *item, struct client *c)
+/// C `vendor/tmux/window-buffer.c:588`: `static void window_buffer_start_edit(struct window_buffer_modedata *data, struct window_buffer_itemdata *item, struct client *c)`
 unsafe fn window_buffer_start_edit(
     data: *mut window_buffer_modedata,
     item: *mut window_buffer_itemdata,
@@ -567,7 +567,7 @@ unsafe fn window_buffer_start_edit(
     }
 }
 
-// vendor/tmux/window-buffer.c:617  static void window_buffer_key(struct window_mode_entry *wme, struct client *c, __unused struct session *s, __unused struct winlink *wl, key_code key, struct mouse_event *m)
+/// C `vendor/tmux/window-buffer.c:617`: `static void window_buffer_key(struct window_mode_entry *wme, struct client *c, __unused struct session *s, __unused struct winlink *wl, key_code key, struct mouse_event *m)`
 pub unsafe fn window_buffer_key(
     wme: NonNull<window_mode_entry>,
     c: *mut client,

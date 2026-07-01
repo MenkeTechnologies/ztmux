@@ -768,7 +768,7 @@ static TTY_DEFAULT_CODE_KEYS: [tty_default_key_code; 136] = [
 ];
 
 /// Add key to tree.
-// vendor/tmux/tty-keys.c:434  static void tty_keys_add(struct tty *tty, const char *s, key_code key)
+/// C `vendor/tmux/tty-keys.c:434`: `static void tty_keys_add(struct tty *tty, const char *s, key_code key)`
 unsafe fn tty_keys_add(tty: *mut tty, s: &[u8], key: key_code) {
     unsafe {
         let mut size: usize = 0;
@@ -803,7 +803,7 @@ unsafe fn tty_keys_add_(tty: *mut tty, s: *const u8, key: key_code) {
 }
 
 /// Add next node to the tree.
-// vendor/tmux/tty-keys.c:452  static void tty_keys_add1(struct tty_key **tkp, const char *s, key_code key)
+/// C `vendor/tmux/tty-keys.c:452`: `static void tty_keys_add1(struct tty_key **tkp, const char *s, key_code key)`
 unsafe fn tty_keys_add1(mut tkp: *mut *mut tty_key, mut s: &[u8], key: key_code) {
     unsafe {
         // Allocate a tree entry if there isn't one already.
@@ -839,7 +839,7 @@ unsafe fn tty_keys_add1(mut tkp: *mut *mut tty_key, mut s: &[u8], key: key_code)
 }
 
 /// Initialise a key tree from the table.
-// vendor/tmux/tty-keys.c:490  void tty_keys_build(struct tty *tty)
+/// C `vendor/tmux/tty-keys.c:490`: `void tty_keys_build(struct tty *tty)`
 pub unsafe fn tty_keys_build(tty: *mut tty) {
     unsafe {
         let mut copy: [u8; 16] = [0; 16];
@@ -896,7 +896,7 @@ pub unsafe fn tty_keys_build(tty: *mut tty) {
 }
 
 /// Free the entire key tree.
-// vendor/tmux/tty-keys.c:547  void tty_keys_free(struct tty *tty)
+/// C `vendor/tmux/tty-keys.c:547`: `void tty_keys_free(struct tty *tty)`
 pub unsafe fn tty_keys_free(tty: *mut tty) {
     unsafe {
         tty_keys_free1((*tty).key_tree);
@@ -904,7 +904,7 @@ pub unsafe fn tty_keys_free(tty: *mut tty) {
 }
 
 /// Free a single key.
-// vendor/tmux/tty-keys.c:554  static void tty_keys_free1(struct tty_key *tk)
+/// C `vendor/tmux/tty-keys.c:554`: `static void tty_keys_free1(struct tty_key *tk)`
 unsafe fn tty_keys_free1(tk: *mut tty_key) {
     unsafe {
         if !(*tk).next.is_null() {
@@ -921,7 +921,7 @@ unsafe fn tty_keys_free1(tk: *mut tty_key) {
 }
 
 /// Lookup a key in the tree.
-// vendor/tmux/tty-keys.c:567  static struct tty_key *tty_keys_find(struct tty *tty, const char *buf, size_t len, size_t *size)
+/// C `vendor/tmux/tty-keys.c:567`: `static struct tty_key *tty_keys_find(struct tty *tty, const char *buf, size_t len, size_t *size)`
 pub unsafe fn tty_keys_find(
     tty: *mut tty,
     buf: *const u8,
@@ -934,7 +934,7 @@ pub unsafe fn tty_keys_find(
     }
 }
 
-// vendor/tmux/tty-keys.c:575  static struct tty_key *tty_keys_find1(struct tty_key *tk, const char *buf, size_t len, size_t *size)
+/// C `vendor/tmux/tty-keys.c:575`: `static struct tty_key *tty_keys_find1(struct tty_key *tk, const char *buf, size_t len, size_t *size)`
 unsafe fn tty_keys_find1(
     mut tk: *mut tty_key,
     mut buf: *const u8,
@@ -977,7 +977,7 @@ unsafe fn tty_keys_find1(
     }
 }
 
-// vendor/tmux/tty-keys.c:621  static int tty_keys_next1(struct tty *tty, const char *buf, size_t len, key_code *key, size_t *size, int expired)
+/// C `vendor/tmux/tty-keys.c:621`: `static int tty_keys_next1(struct tty *tty, const char *buf, size_t len, key_code *key, size_t *size, int expired)`
 unsafe fn tty_keys_next1(
     tty: *mut tty,
     buf: *const u8,
@@ -1044,7 +1044,7 @@ unsafe fn tty_keys_next1(
 
 // Process at least one key in the buffer. Return 0 if no keys present.
 
-// vendor/tmux/tty-keys.c:747  int tty_keys_next(struct tty *tty)
+/// C `vendor/tmux/tty-keys.c:747`: `int tty_keys_next(struct tty *tty)`
 pub unsafe fn tty_keys_next(tty: *mut tty) -> i32 {
     unsafe {
         let c = (*tty).client;
@@ -1356,7 +1356,7 @@ pub unsafe fn tty_keys_next(tty: *mut tty) -> i32 {
 }
 
 /// Key timer callback.
-// vendor/tmux/tty-keys.c:1049  static void tty_keys_callback(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/tty-keys.c:1049`: `static void tty_keys_callback(__unused int fd, __unused short events, void *data)`
 unsafe extern "C-unwind" fn tty_keys_callback(_fd: i32, _events: i16, tty: NonNull<tty>) {
     unsafe {
         if (*tty.as_ptr()).flags.intersects(tty_flags::TTY_TIMER) {
@@ -1368,7 +1368,7 @@ unsafe extern "C-unwind" fn tty_keys_callback(_fd: i32, _events: i16, tty: NonNu
 /// Handle extended key input. This has two forms: \x1b[27;m;k~ and \x1b[k;mu,
 /// where k is key as a number and m is a modifier. Returns 0 for success, -1
 /// for failure, 1 for partial;
-// vendor/tmux/tty-keys.c:1065  static int tty_keys_extended_key(struct tty *tty, const char *buf, size_t len, size_t *size, key_code *key)
+/// C `vendor/tmux/tty-keys.c:1065`: `static int tty_keys_extended_key(struct tty *tty, const char *buf, size_t len, size_t *size, key_code *key)`
 unsafe fn tty_keys_extended_key(
     tty: *mut tty,
     buf: *const u8,
@@ -1527,7 +1527,7 @@ unsafe fn tty_keys_extended_key(
 /// Handle mouse key input. Returns 0 for success, -1 for failure, 1 for partial
 /// (probably a mouse sequence but need more data), -2 if an invalid mouse
 /// sequence.
-// vendor/tmux/tty-keys.c:1186  static int tty_keys_mouse(struct tty *tty, const char *buf, size_t len, size_t *size, struct mouse_event *m)
+/// C `vendor/tmux/tty-keys.c:1186`: `static int tty_keys_mouse(struct tty *tty, const char *buf, size_t len, size_t *size, struct mouse_event *m)`
 unsafe fn tty_keys_mouse(
     tty: *mut tty,
     buf: *const u8,
@@ -1698,7 +1698,7 @@ unsafe fn tty_keys_mouse(
 // Handle OSC 52 clipboard input. Returns 0 for success, -1 for failure, 1 for
 // partial.
 
-// vendor/tmux/tty-keys.c:1330  static int tty_keys_clipboard(struct tty *tty, const char *buf, size_t len, size_t *size)
+/// C `vendor/tmux/tty-keys.c:1330`: `static int tty_keys_clipboard(struct tty *tty, const char *buf, size_t len, size_t *size)`
 unsafe fn tty_keys_clipboard(
     tty: *mut tty,
     mut buf: *const u8,
@@ -1829,7 +1829,7 @@ unsafe fn tty_keys_clipboard(
 // Handle primary device attributes input. Returns 0 for success, -1 for
 // failure, 1 for partial.
 
-// vendor/tmux/tty-keys.c:1444  static int tty_keys_device_attributes(struct tty *tty, const char *buf, size_t len, size_t *size)
+/// C `vendor/tmux/tty-keys.c:1444`: `static int tty_keys_device_attributes(struct tty *tty, const char *buf, size_t len, size_t *size)`
 unsafe fn tty_keys_device_attributes(
     tty: *mut tty,
     buf: *const u8,
@@ -1932,7 +1932,7 @@ unsafe fn tty_keys_device_attributes(
 }
 
 /// Handle secondary device attributes input. Returns 0 for success, -1 for failure, 1 for partial.
-// vendor/tmux/tty-keys.c:1528  static int tty_keys_device_attributes2(struct tty *tty, const char *buf, size_t len, size_t *size)
+/// C `vendor/tmux/tty-keys.c:1528`: `static int tty_keys_device_attributes2(struct tty *tty, const char *buf, size_t len, size_t *size)`
 unsafe fn tty_keys_device_attributes2(
     tty: *mut tty,
     buf: *const u8,
@@ -2039,7 +2039,7 @@ unsafe fn tty_keys_device_attributes2(
 // Handle extended device attributes input. Returns 0 for success, -1 for
 // failure, 1 for partial.
 
-// vendor/tmux/tty-keys.c:1608  static int tty_keys_extended_device_attributes(struct tty *tty, const char *buf, size_t len, size_t *size)
+/// C `vendor/tmux/tty-keys.c:1608`: `static int tty_keys_extended_device_attributes(struct tty *tty, const char *buf, size_t len, size_t *size)`
 unsafe fn tty_keys_extended_device_attributes(
     tty: *mut tty,
     buf: *const u8,
@@ -2127,7 +2127,7 @@ unsafe fn tty_keys_extended_device_attributes(
 // Handle foreground or background input. Returns 0 for success, -1 for
 // failure, 1 for partial.
 
-// vendor/tmux/tty-keys.c:1684  int tty_keys_colours(struct tty *tty, const char *buf, size_t len, size_t *size, int *fg, int *bg)
+/// C `vendor/tmux/tty-keys.c:1684`: `int tty_keys_colours(struct tty *tty, const char *buf, size_t len, size_t *size, int *fg, int *bg)`
 pub unsafe fn tty_keys_colours(
     tty: *mut tty,
     buf: *const u8,

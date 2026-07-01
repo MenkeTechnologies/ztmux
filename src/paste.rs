@@ -45,7 +45,7 @@ RB_GENERATE!(
     discr_name_entry,
     paste_cmp_names
 );
-// vendor/tmux/paste.c:47  static int paste_cmp_names(const struct paste_buffer *a, const struct paste_buffer *b)
+/// C `vendor/tmux/paste.c:47`: `static int paste_cmp_names(const struct paste_buffer *a, const struct paste_buffer *b)`
 fn paste_cmp_names(a: *const paste_buffer, b: *const paste_buffer) -> cmp::Ordering {
     unsafe { (*a).name.cmp(&(*b).name) }
 }
@@ -57,7 +57,7 @@ RB_GENERATE!(
     discr_time_entry,
     paste_cmp_times
 );
-// vendor/tmux/paste.c:53  static int paste_cmp_times(const struct paste_buffer *a, const struct paste_buffer *b)
+/// C `vendor/tmux/paste.c:53`: `static int paste_cmp_times(const struct paste_buffer *a, const struct paste_buffer *b)`
 fn paste_cmp_times(a: *const paste_buffer, b: *const paste_buffer) -> cmp::Ordering {
     unsafe {
         let x = (*a).order;
@@ -67,22 +67,22 @@ fn paste_cmp_times(a: *const paste_buffer, b: *const paste_buffer) -> cmp::Order
     }
 }
 
-// vendor/tmux/paste.c:64  const char *paste_buffer_name(struct paste_buffer *pb)
+/// C `vendor/tmux/paste.c:64`: `const char *paste_buffer_name(struct paste_buffer *pb)`
 pub unsafe fn paste_buffer_name<'a>(pb: NonNull<paste_buffer>) -> &'a str {
     unsafe { &(*pb.as_ptr()).name }
 }
 
-// vendor/tmux/paste.c:71  u_int paste_buffer_order(struct paste_buffer *pb)
+/// C `vendor/tmux/paste.c:71`: `u_int paste_buffer_order(struct paste_buffer *pb)`
 pub unsafe fn paste_buffer_order(pb: NonNull<paste_buffer>) -> u32 {
     unsafe { (*pb.as_ptr()).order }
 }
 
-// vendor/tmux/paste.c:78  time_t paste_buffer_created(struct paste_buffer *pb)
+/// C `vendor/tmux/paste.c:78`: `time_t paste_buffer_created(struct paste_buffer *pb)`
 pub unsafe fn paste_buffer_created(pb: NonNull<paste_buffer>) -> time_t {
     unsafe { (*pb.as_ptr()).created }
 }
 
-// vendor/tmux/paste.c:85  const char *paste_buffer_data(struct paste_buffer *pb, size_t *size)
+/// C `vendor/tmux/paste.c:85`: `const char *paste_buffer_data(struct paste_buffer *pb, size_t *size)`
 pub unsafe fn paste_buffer_data(pb: *mut paste_buffer, size: *mut usize) -> *const u8 {
     unsafe {
         if !size.is_null() {
@@ -99,7 +99,7 @@ pub unsafe fn paste_buffer_data_(pb: NonNull<paste_buffer>, size: &mut usize) ->
     }
 }
 
-// vendor/tmux/paste.c:94  struct paste_buffer *paste_walk(struct paste_buffer *pb)
+/// C `vendor/tmux/paste.c:94`: `struct paste_buffer *paste_walk(struct paste_buffer *pb)`
 pub unsafe fn paste_walk(pb: *mut paste_buffer) -> *mut paste_buffer {
     unsafe {
         if pb.is_null() {
@@ -109,12 +109,12 @@ pub unsafe fn paste_walk(pb: *mut paste_buffer) -> *mut paste_buffer {
     }
 }
 
-// vendor/tmux/paste.c:102  int paste_is_empty(void)
+/// C `vendor/tmux/paste.c:102`: `int paste_is_empty(void)`
 pub unsafe fn paste_is_empty() -> bool {
     unsafe { PASTE_BY_TIME.rbh_root.is_null() }
 }
 
-// vendor/tmux/paste.c:109  struct paste_buffer *paste_get_top(char **name)
+/// C `vendor/tmux/paste.c:109`: `struct paste_buffer *paste_get_top(char **name)`
 pub unsafe fn paste_get_top(name: *mut Option<&str>) -> *mut paste_buffer {
     unsafe {
         let mut pb = rb_min::<_, discr_time_entry>(&raw mut PASTE_BY_TIME);
@@ -132,7 +132,7 @@ pub unsafe fn paste_get_top(name: *mut Option<&str>) -> *mut paste_buffer {
     }
 }
 
-// vendor/tmux/paste.c:125  struct paste_buffer *paste_get_name(const char *name)
+/// C `vendor/tmux/paste.c:125`: `struct paste_buffer *paste_get_name(const char *name)`
 pub unsafe fn paste_get_name(name: Option<&str>) -> *mut paste_buffer {
     unsafe {
         let mut pbfind = MaybeUninit::<paste_buffer>::uninit();
@@ -150,7 +150,7 @@ pub unsafe fn paste_get_name(name: Option<&str>) -> *mut paste_buffer {
     }
 }
 
-// vendor/tmux/paste.c:138  void paste_free(struct paste_buffer *pb)
+/// C `vendor/tmux/paste.c:138`: `void paste_free(struct paste_buffer *pb)`
 pub unsafe fn paste_free(pb: NonNull<paste_buffer>) {
     unsafe {
         let pb = pb.as_ptr();
@@ -168,7 +168,7 @@ pub unsafe fn paste_free(pb: NonNull<paste_buffer>) {
     }
 }
 
-// vendor/tmux/paste.c:157  void paste_add(const char *prefix, char *data, size_t size)
+/// C `vendor/tmux/paste.c:157`: `void paste_add(const char *prefix, char *data, size_t size)`
 pub unsafe fn paste_add(mut prefix: *const u8, data: *mut u8, size: usize) {
     unsafe {
         if prefix.is_null() {
@@ -218,7 +218,7 @@ pub unsafe fn paste_add(mut prefix: *const u8, data: *mut u8, size: usize) {
     }
 }
 
-// vendor/tmux/paste.c:203  int paste_rename(const char *oldname, const char *newname, char **cause)
+/// C `vendor/tmux/paste.c:203`: `int paste_rename(const char *oldname, const char *newname, char **cause)`
 pub unsafe fn paste_rename(
     oldname: Option<&str>,
     newname: Option<&str>,
@@ -271,7 +271,7 @@ pub unsafe fn paste_rename(
     0
 }
 
-// vendor/tmux/paste.c:267  int paste_set(char *data, size_t size, const char *name, char **cause)
+/// C `vendor/tmux/paste.c:267`: `int paste_set(char *data, size_t size, const char *name, char **cause)`
 pub unsafe fn paste_set(
     data: *mut u8,
     size: usize,
@@ -323,7 +323,7 @@ pub unsafe fn paste_set(
     0
 }
 
-// vendor/tmux/paste.c:321  void paste_replace(struct paste_buffer *pb, char *data, size_t size)
+/// C `vendor/tmux/paste.c:321`: `void paste_replace(struct paste_buffer *pb, char *data, size_t size)`
 pub unsafe fn paste_replace(pb: NonNull<paste_buffer>, data: *mut u8, size: usize) {
     unsafe {
         free_((*pb.as_ptr()).data);
@@ -334,7 +334,7 @@ pub unsafe fn paste_replace(pb: NonNull<paste_buffer>, data: *mut u8, size: usiz
     }
 }
 
-// vendor/tmux/paste.c:332  char *paste_make_sample(struct paste_buffer *pb)
+/// C `vendor/tmux/paste.c:332`: `char *paste_make_sample(struct paste_buffer *pb)`
 pub unsafe fn paste_make_sample(pb: *mut paste_buffer) -> String {
     unsafe {
         let width = 200;

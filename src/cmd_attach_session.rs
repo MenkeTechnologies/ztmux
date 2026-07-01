@@ -28,7 +28,7 @@ pub static CMD_ATTACH_SESSION_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-attach-session.c:51  enum cmd_retval cmd_attach_session(struct cmdq_item *item, const char *tflag, int dflag, int xflag, int rflag, const char *cflag, int Eflag, const char *fflag)
+/// C `vendor/tmux/cmd-attach-session.c:51`: `enum cmd_retval cmd_attach_session(struct cmdq_item *item, const char *tflag, int dflag, int xflag, int rflag, const char *cflag, int Eflag, const char *fflag)`
 pub unsafe fn cmd_attach_session(
     item: *mut cmdq_item,
     tflag: Option<&str>,
@@ -173,7 +173,7 @@ pub unsafe fn cmd_attach_session(
     }
 }
 
-// vendor/tmux/cmd-attach-session.c:177  static enum cmd_retval cmd_attach_session_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-attach-session.c:177`: `static enum cmd_retval cmd_attach_session_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_attach_session_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

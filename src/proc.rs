@@ -67,7 +67,7 @@ pub struct tmuxpeer {
     pub entry: tailq_entry<tmuxpeer>,
 }
 
-// vendor/tmux/proc.c:75  static void proc_event_cb(__unused int fd, short events, void *arg)
+/// C `vendor/tmux/proc.c:75`: `static void proc_event_cb(__unused int fd, short events, void *arg)`
 pub unsafe extern "C-unwind" fn proc_event_cb(_fd: i32, events: i16, arg: *mut c_void) {
     unsafe {
         let peer = arg as *mut tmuxpeer;
@@ -123,7 +123,7 @@ pub unsafe extern "C-unwind" fn proc_event_cb(_fd: i32, events: i16, arg: *mut c
     }
 }
 
-// vendor/tmux/proc.c:121  static void proc_signal_cb(int signo, __unused short events, void *arg)
+/// C `vendor/tmux/proc.c:121`: `static void proc_signal_cb(int signo, __unused short events, void *arg)`
 pub unsafe extern "C-unwind" fn proc_signal_cb(signo: i32, _events: i16, arg: *mut c_void) {
     unsafe {
         let tp = arg as *mut tmuxproc;
@@ -132,7 +132,7 @@ pub unsafe extern "C-unwind" fn proc_signal_cb(signo: i32, _events: i16, arg: *m
     }
 }
 
-// vendor/tmux/proc.c:129  static int peer_check_version(struct tmuxpeer *peer, struct imsg *imsg)
+/// C `vendor/tmux/proc.c:129`: `static int peer_check_version(struct tmuxpeer *peer, struct imsg *imsg)`
 pub unsafe fn peer_check_version(peer: *mut tmuxpeer, imsg: *mut imsg) -> i32 {
     unsafe {
         let version = (*imsg).hdr.peerid & 0xff;
@@ -148,7 +148,7 @@ pub unsafe fn peer_check_version(peer: *mut tmuxpeer, imsg: *mut imsg) -> i32 {
     }
 }
 
-// vendor/tmux/proc.c:146  static void proc_update_event(struct tmuxpeer *peer)
+/// C `vendor/tmux/proc.c:146`: `static void proc_update_event(struct tmuxpeer *peer)`
 pub unsafe fn proc_update_event(peer: *mut tmuxpeer) {
     unsafe {
         event_del(&raw mut (*peer).event);
@@ -169,7 +169,7 @@ pub unsafe fn proc_update_event(peer: *mut tmuxpeer) {
     }
 }
 
-// vendor/tmux/proc.c:161  int proc_send(struct tmuxpeer *peer, enum msgtype type, int fd, const void *buf, size_t len)
+/// C `vendor/tmux/proc.c:161`: `int proc_send(struct tmuxpeer *peer, enum msgtype type, int fd, const void *buf, size_t len)`
 pub unsafe fn proc_send(
     peer: *mut tmuxpeer,
     type_: msgtype,
@@ -195,7 +195,7 @@ pub unsafe fn proc_send(
     }
 }
 
-// vendor/tmux/proc.c:180  struct tmuxproc *proc_start(const char *name)
+/// C `vendor/tmux/proc.c:180`: `struct tmuxproc *proc_start(const char *name)`
 pub fn proc_start(name: &CStr) -> *mut tmuxproc {
     unsafe {
         log_open(name);
@@ -240,7 +240,7 @@ pub fn proc_start(name: &CStr) -> *mut tmuxproc {
     }
 }
 
-// vendor/tmux/proc.c:210  void proc_loop(struct tmuxproc *tp, int (*loopcb)(void))
+/// C `vendor/tmux/proc.c:210`: `void proc_loop(struct tmuxproc *tp, int (*loopcb)(void))`
 pub unsafe fn proc_loop(tp: *mut tmuxproc, loopcb: Option<unsafe fn() -> i32>) {
     unsafe {
         log_debug!("{} loop enter", _s((*tp).name));
@@ -268,7 +268,7 @@ pub unsafe fn proc_loop(tp: *mut tmuxproc, loopcb: Option<unsafe fn() -> i32>) {
     }
 }
 
-// vendor/tmux/proc.c:220  void proc_exit(struct tmuxproc *tp)
+/// C `vendor/tmux/proc.c:220`: `void proc_exit(struct tmuxproc *tp)`
 pub unsafe fn proc_exit(tp: *mut tmuxproc) {
     unsafe {
         for peer in tailq_foreach(&raw mut (*tp).peers).map(NonNull::as_ptr) {
@@ -278,7 +278,7 @@ pub unsafe fn proc_exit(tp: *mut tmuxproc) {
     }
 }
 
-// vendor/tmux/proc.c:230  void proc_set_signals(struct tmuxproc *tp, void (*signalcb)(int))
+/// C `vendor/tmux/proc.c:230`: `void proc_set_signals(struct tmuxproc *tp, void (*signalcb)(int))`
 pub unsafe fn proc_set_signals(tp: *mut tmuxproc, signalcb: Option<unsafe fn(i32)>) {
     unsafe {
         let mut sa: sigaction = zeroed();
@@ -354,7 +354,7 @@ pub unsafe fn proc_set_signals(tp: *mut tmuxproc, signalcb: Option<unsafe fn(i32
     }
 }
 
-// vendor/tmux/proc.c:266  void proc_clear_signals(struct tmuxproc *tp, int defaults)
+/// C `vendor/tmux/proc.c:266`: `void proc_clear_signals(struct tmuxproc *tp, int defaults)`
 pub unsafe fn proc_clear_signals(tp: *mut tmuxproc, defaults: i32) {
     unsafe {
         let mut sa: sigaction = zeroed();
@@ -389,7 +389,7 @@ pub unsafe fn proc_clear_signals(tp: *mut tmuxproc, defaults: i32) {
     }
 }
 
-// vendor/tmux/proc.c:301  struct tmuxpeer *proc_add_peer(struct tmuxproc *tp, int fd, void (*dispatchcb)(struct imsg *, void *), void *arg)
+/// C `vendor/tmux/proc.c:301`: `struct tmuxpeer *proc_add_peer(struct tmuxproc *tp, int fd, void (*dispatchcb)(struct imsg *, void *), void *arg)`
 pub unsafe fn proc_add_peer(
     tp: *mut tmuxproc,
     fd: i32,
@@ -425,7 +425,7 @@ pub unsafe fn proc_add_peer(
     }
 }
 
-// vendor/tmux/proc.c:330  void proc_remove_peer(struct tmuxpeer *peer)
+/// C `vendor/tmux/proc.c:330`: `void proc_remove_peer(struct tmuxpeer *peer)`
 pub unsafe fn proc_remove_peer(peer: *mut tmuxpeer) {
     unsafe {
         tailq_remove(&raw mut (*(*peer).parent).peers, peer);
@@ -439,21 +439,21 @@ pub unsafe fn proc_remove_peer(peer: *mut tmuxpeer) {
     }
 }
 
-// vendor/tmux/proc.c:343  void proc_kill_peer(struct tmuxpeer *peer)
+/// C `vendor/tmux/proc.c:343`: `void proc_kill_peer(struct tmuxpeer *peer)`
 pub unsafe fn proc_kill_peer(peer: *mut tmuxpeer) {
     unsafe {
         (*peer).flags |= PEER_BAD;
     }
 }
 
-// vendor/tmux/proc.c:349  void proc_flush_peer(struct tmuxpeer *peer)
+/// C `vendor/tmux/proc.c:349`: `void proc_flush_peer(struct tmuxpeer *peer)`
 pub unsafe fn proc_flush_peer(peer: *mut tmuxpeer) {
     unsafe {
         imsg_flush(&raw mut (*peer).ibuf);
     }
 }
 
-// vendor/tmux/proc.c:355  void proc_toggle_log(struct tmuxproc *tp)
+/// C `vendor/tmux/proc.c:355`: `void proc_toggle_log(struct tmuxproc *tp)`
 pub unsafe fn proc_toggle_log(tp: *mut tmuxproc) {
     unsafe {
         log_toggle(CStr::from_ptr((*tp).name.cast()));
@@ -462,7 +462,7 @@ pub unsafe fn proc_toggle_log(tp: *mut tmuxproc) {
 
 #[cfg_attr(target_os = "macos", expect(deprecated))]
 /// On success, the PID of the child process is returned in the parent, and 0 is returned in the child.
-// vendor/tmux/proc.c:361  pid_t proc_fork_and_daemon(int *fd)
+/// C `vendor/tmux/proc.c:361`: `pid_t proc_fork_and_daemon(int *fd)`
 pub unsafe fn proc_fork_and_daemon(fd: *mut i32) -> pid_t {
     unsafe {
         let mut pair: [c_int; 2] = [0; 2];
@@ -496,7 +496,7 @@ pub unsafe fn proc_fork_and_daemon(fd: *mut i32) -> pid_t {
     }
 }
 
-// vendor/tmux/proc.c:385  uid_t proc_get_peer_uid(struct tmuxpeer *peer)
+/// C `vendor/tmux/proc.c:385`: `uid_t proc_get_peer_uid(struct tmuxpeer *peer)`
 pub unsafe fn proc_get_peer_uid(peer: *const tmuxpeer) -> uid_t {
     unsafe { (*peer).uid }
 }

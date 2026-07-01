@@ -13,7 +13,7 @@
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #[cfg(target_os = "macos")]
-// vendor/tmux/compat/reallocarray.c:32  void *reallocarray(void *optr, size_t nmemb, size_t size)
+/// C `vendor/tmux/compat/reallocarray.c:32`: `void *reallocarray(void *optr, size_t nmemb, size_t size)`
 pub unsafe fn reallocarray(
     optr: *mut core::ffi::c_void,
     nmemb: usize,

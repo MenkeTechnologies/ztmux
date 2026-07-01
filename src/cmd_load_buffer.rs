@@ -35,7 +35,7 @@ pub struct cmd_load_buffer_data {
     pub name: *mut u8,
 }
 
-// vendor/tmux/cmd-load-buffer.c:54  static void cmd_load_buffer_done(__unused struct client *c, const char *path, int error, int closed, struct evbuffer *buffer, void *data)
+/// C `vendor/tmux/cmd-load-buffer.c:54`: `static void cmd_load_buffer_done(__unused struct client *c, const char *path, int error, int closed, struct evbuffer *buffer, void *data)`
 unsafe fn cmd_load_buffer_done(
     _c: *mut client,
     path: *mut u8,
@@ -88,7 +88,7 @@ unsafe fn cmd_load_buffer_done(
     }
 }
 
-// vendor/tmux/cmd-load-buffer.c:91  static enum cmd_retval cmd_load_buffer_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-load-buffer.c:91`: `static enum cmd_retval cmd_load_buffer_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_load_buffer_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

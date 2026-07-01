@@ -47,7 +47,7 @@ pub struct cmd_run_shell_data<'a> {
     pub flags: job_flag,
 }
 
-// vendor/tmux/cmd-run-shell.c:70  static enum args_parse_type cmd_run_shell_args_parse(struct args *args, __unused u_int idx, __unused char **cause)
+/// C `vendor/tmux/cmd-run-shell.c:70`: `static enum args_parse_type cmd_run_shell_args_parse(struct args *args, __unused u_int idx, __unused char **cause)`
 pub unsafe fn cmd_run_shell_args_parse(
     args: *mut args,
     _idx: u32,
@@ -62,7 +62,7 @@ pub unsafe fn cmd_run_shell_args_parse(
     args_parse_type::ARGS_PARSE_STRING
 }
 
-// vendor/tmux/cmd-run-shell.c:79  static void cmd_run_shell_print(struct job *job, const char *msg)
+/// C `vendor/tmux/cmd-run-shell.c:79`: `static void cmd_run_shell_print(struct job *job, const char *msg)`
 pub unsafe fn cmd_run_shell_print(job: *mut job, msg: *const u8) {
     unsafe {
         let cdata: *mut cmd_run_shell_data = job_get_data(job) as *mut cmd_run_shell_data;
@@ -102,7 +102,7 @@ pub unsafe fn cmd_run_shell_print(job: *mut job, msg: *const u8) {
     }
 }
 
-// vendor/tmux/cmd-run-shell.c:108  static enum cmd_retval cmd_run_shell_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-run-shell.c:108`: `static enum cmd_retval cmd_run_shell_exec(struct cmd *self, struct cmdq_item *item)`
 pub unsafe fn cmd_run_shell_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     let __func__ = c!("cmd_run_shell_exec");
     unsafe {
@@ -186,7 +186,7 @@ pub unsafe fn cmd_run_shell_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
     cmd_retval::CMD_RETURN_WAIT
 }
 
-// vendor/tmux/cmd-run-shell.c:192  static void cmd_run_shell_timer(__unused int fd, __unused short events, void* arg)
+/// C `vendor/tmux/cmd-run-shell.c:192`: `static void cmd_run_shell_timer(__unused int fd, __unused short events, void* arg)`
 pub unsafe extern "C-unwind" fn cmd_run_shell_timer(
     _fd: i32,
     _events: i16,
@@ -253,7 +253,7 @@ pub unsafe extern "C-unwind" fn cmd_run_shell_timer(
     }
 }
 
-// vendor/tmux/cmd-run-shell.c:246  static void cmd_run_shell_callback(struct job *job)
+/// C `vendor/tmux/cmd-run-shell.c:246`: `static void cmd_run_shell_callback(struct job *job)`
 pub unsafe fn cmd_run_shell_callback(job: *mut job) {
     unsafe {
         let cdata = job_get_data(job) as *mut cmd_run_shell_data;
@@ -317,7 +317,7 @@ pub unsafe fn cmd_run_shell_callback(job: *mut job) {
     }
 }
 
-// vendor/tmux/cmd-run-shell.c:297  static void cmd_run_shell_free(void *data)
+/// C `vendor/tmux/cmd-run-shell.c:297`: `static void cmd_run_shell_free(void *data)`
 pub unsafe fn cmd_run_shell_free(data: *mut c_void) {
     unsafe {
         let __func__ = c!("cmd_run_shell_free");

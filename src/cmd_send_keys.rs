@@ -47,7 +47,7 @@ pub static CMD_SEND_PREFIX_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-send-keys.c:61  static struct cmdq_item *cmd_send_keys_inject_key(struct cmdq_item *item, struct cmdq_item *after, struct args *args, key_code key)
+/// C `vendor/tmux/cmd-send-keys.c:61`: `static struct cmdq_item *cmd_send_keys_inject_key(struct cmdq_item *item, struct cmdq_item *after, struct args *args, key_code key)`
 pub unsafe fn cmd_send_keys_inject_key(
     item: *mut cmdq_item,
     mut after: *mut cmdq_item,
@@ -95,7 +95,7 @@ pub unsafe fn cmd_send_keys_inject_key(
     }
 }
 
-// vendor/tmux/cmd-send-keys.c:112  static struct cmdq_item *cmd_send_keys_inject_string(struct cmdq_item *item, struct cmdq_item *after, struct args *args, int i)
+/// C `vendor/tmux/cmd-send-keys.c:112`: `static struct cmdq_item *cmd_send_keys_inject_string(struct cmdq_item *item, struct cmdq_item *after, struct args *args, int i)`
 pub unsafe fn cmd_send_keys_inject_string(
     item: *mut cmdq_item,
     mut after: *mut cmdq_item,
@@ -151,7 +151,7 @@ pub unsafe fn cmd_send_keys_inject_string(
     }
 }
 
-// vendor/tmux/cmd-send-keys.c:161  static enum cmd_retval cmd_send_keys_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-send-keys.c:161`: `static enum cmd_retval cmd_send_keys_exec(struct cmd *self, struct cmdq_item *item)`
 pub unsafe fn cmd_send_keys_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -51,7 +51,7 @@ pub struct hyperlinks {
     pub references: u32,
 }
 
-// vendor/tmux/hyperlinks.c:76  static int hyperlinks_by_uri_cmp(struct hyperlinks_uri *left, struct hyperlinks_uri *right)
+/// C `vendor/tmux/hyperlinks.c:76`: `static int hyperlinks_by_uri_cmp(struct hyperlinks_uri *left, struct hyperlinks_uri *right)`
 fn hyperlinks_by_uri_cmp(left: &hyperlinks_uri, right: &hyperlinks_uri) -> cmp::Ordering {
     unsafe {
         if *left.internal_id == b'\0' || *right.internal_id == b'\0' {
@@ -77,7 +77,7 @@ RB_GENERATE!(
     hyperlinks_by_uri_cmp
 );
 
-// vendor/tmux/hyperlinks.c:104  static int hyperlinks_by_inner_cmp(struct hyperlinks_uri *left, struct hyperlinks_uri *right)
+/// C `vendor/tmux/hyperlinks.c:104`: `static int hyperlinks_by_inner_cmp(struct hyperlinks_uri *left, struct hyperlinks_uri *right)`
 fn hyperlinks_by_inner_cmp(left: &hyperlinks_uri, right: &hyperlinks_uri) -> cmp::Ordering {
     left.inner.cmp(&right.inner)
 }
@@ -90,7 +90,7 @@ RB_GENERATE!(
     hyperlinks_by_inner_cmp
 );
 
-// vendor/tmux/hyperlinks.c:116  static void hyperlinks_remove(struct hyperlinks_uri *hlu)
+/// C `vendor/tmux/hyperlinks.c:116`: `static void hyperlinks_remove(struct hyperlinks_uri *hlu)`
 unsafe fn hyperlinks_remove(hlu: *mut hyperlinks_uri) {
     unsafe {
         let hl = (*hlu).tree;
@@ -108,7 +108,7 @@ unsafe fn hyperlinks_remove(hlu: *mut hyperlinks_uri) {
     }
 }
 
-// vendor/tmux/hyperlinks.c:134  u_int hyperlinks_put(struct hyperlinks *hl, const char *uri_in, const char *internal_id_in)
+/// C `vendor/tmux/hyperlinks.c:134`: `u_int hyperlinks_put(struct hyperlinks *hl, const char *uri_in, const char *internal_id_in)`
 pub unsafe fn hyperlinks_put(
     hl: *mut hyperlinks,
     uri_in: *const u8,
@@ -172,7 +172,7 @@ pub unsafe fn hyperlinks_put(
     }
 }
 
-// vendor/tmux/hyperlinks.c:186  int hyperlinks_get(struct hyperlinks *hl, u_int inner, const char **uri_out, const char **internal_id_out, const char **external_id_out)
+/// C `vendor/tmux/hyperlinks.c:186`: `int hyperlinks_get(struct hyperlinks *hl, u_int inner, const char **uri_out, const char **internal_id_out, const char **external_id_out)`
 pub unsafe fn hyperlinks_get(
     hl: *mut hyperlinks,
     inner: u32,
@@ -200,7 +200,7 @@ pub unsafe fn hyperlinks_get(
     }
 }
 
-// vendor/tmux/hyperlinks.c:206  struct hyperlinks *hyperlinks_init(void)
+/// C `vendor/tmux/hyperlinks.c:206`: `struct hyperlinks *hyperlinks_init(void)`
 pub unsafe fn hyperlinks_init() -> *mut hyperlinks {
     unsafe {
         let hl = xcalloc_::<hyperlinks>(1).as_ptr();
@@ -212,7 +212,7 @@ pub unsafe fn hyperlinks_init() -> *mut hyperlinks {
     }
 }
 
-// vendor/tmux/hyperlinks.c:220  struct hyperlinks *hyperlinks_copy(struct hyperlinks *hl)
+/// C `vendor/tmux/hyperlinks.c:220`: `struct hyperlinks *hyperlinks_copy(struct hyperlinks *hl)`
 pub unsafe fn hyperlinks_copy(hl: *mut hyperlinks) -> *mut hyperlinks {
     unsafe {
         (*hl).references += 1;
@@ -220,7 +220,7 @@ pub unsafe fn hyperlinks_copy(hl: *mut hyperlinks) -> *mut hyperlinks {
     hl
 }
 
-// vendor/tmux/hyperlinks.c:228  void hyperlinks_reset(struct hyperlinks *hl)
+/// C `vendor/tmux/hyperlinks.c:228`: `void hyperlinks_reset(struct hyperlinks *hl)`
 pub unsafe fn hyperlinks_reset(hl: *mut hyperlinks) {
     unsafe {
         for hlu in rb_foreach::<_, discr_by_inner_entry>(&raw mut (*hl).by_inner) {
@@ -229,7 +229,7 @@ pub unsafe fn hyperlinks_reset(hl: *mut hyperlinks) {
     }
 }
 
-// vendor/tmux/hyperlinks.c:238  void hyperlinks_free(struct hyperlinks *hl)
+/// C `vendor/tmux/hyperlinks.c:238`: `void hyperlinks_free(struct hyperlinks *hl)`
 pub unsafe fn hyperlinks_free(hl: *mut hyperlinks) {
     unsafe {
         (*hl).references -= 1;

@@ -22,7 +22,7 @@ use crate::*;
 
 pub static FILE_NEXT_STREAM: atomic::AtomicI32 = atomic::AtomicI32::new(3);
 
-// vendor/tmux/file.c:42  static char *file_get_path(struct client *c, const char *file)
+/// C `vendor/tmux/file.c:42`: `static char *file_get_path(struct client *c, const char *file)`
 pub unsafe fn file_get_path(c: *mut client, file: *const u8) -> NonNull<u8> {
     unsafe {
         if *file == b'/' {
@@ -38,12 +38,12 @@ pub unsafe fn file_get_path(c: *mut client, file: *const u8) -> NonNull<u8> {
     }
 }
 
-// vendor/tmux/file.c:64  int file_cmp(struct client_file *cf1, struct client_file *cf2)
+/// C `vendor/tmux/file.c:64`: `int file_cmp(struct client_file *cf1, struct client_file *cf2)`
 pub fn file_cmp(cf1: &client_file, cf2: &client_file) -> std::cmp::Ordering {
     cf1.stream.cmp(&cf2.stream)
 }
 
-// vendor/tmux/file.c:80  struct client_file *file_create_with_peer(struct tmuxpeer *peer, struct client_files *files, int stream, client_file_cb cb, void *cbdata)
+/// C `vendor/tmux/file.c:80`: `struct client_file *file_create_with_peer(struct tmuxpeer *peer, struct client_files *files, int stream, client_file_cb cb, void *cbdata)`
 pub unsafe fn file_create_with_peer(
     peer: *mut tmuxpeer,
     files: *mut client_files,
@@ -73,7 +73,7 @@ pub unsafe fn file_create_with_peer(
     }
 }
 
-// vendor/tmux/file.c:106  struct client_file *file_create_with_client(struct client *c, int stream, client_file_cb cb, void *cbdata)
+/// C `vendor/tmux/file.c:106`: `struct client_file *file_create_with_client(struct client *c, int stream, client_file_cb cb, void *cbdata)`
 pub unsafe fn file_create_with_client(
     mut c: *mut client,
     stream: c_int,
@@ -109,7 +109,7 @@ pub unsafe fn file_create_with_client(
     }
 }
 
-// vendor/tmux/file.c:138  void file_free(struct client_file *cf)
+/// C `vendor/tmux/file.c:138`: `void file_free(struct client_file *cf)`
 pub unsafe fn file_free(cf: *mut client_file) {
     unsafe {
         (*cf).references -= 1;
@@ -131,7 +131,7 @@ pub unsafe fn file_free(cf: *mut client_file) {
     }
 }
 
-// vendor/tmux/file.c:156  static void file_fire_done_cb(__unused int fd, __unused short events, void *arg)
+/// C `vendor/tmux/file.c:156`: `static void file_fire_done_cb(__unused int fd, __unused short events, void *arg)`
 pub unsafe extern "C-unwind" fn file_fire_done_cb(_fd: i32, _events: i16, arg: *mut c_void) {
     unsafe {
         let cf: *mut client_file = arg as _;
@@ -146,14 +146,14 @@ pub unsafe extern "C-unwind" fn file_fire_done_cb(_fd: i32, _events: i16, arg: *
     }
 }
 
-// vendor/tmux/file.c:169  void file_fire_done(struct client_file *cf)
+/// C `vendor/tmux/file.c:169`: `void file_fire_done(struct client_file *cf)`
 pub unsafe fn file_fire_done(cf: *mut client_file) {
     unsafe {
         event_once(-1, EV_TIMEOUT, Some(file_fire_done_cb), cf as _, null_mut());
     }
 }
 
-// vendor/tmux/file.c:176  void file_fire_read(struct client_file *cf)
+/// C `vendor/tmux/file.c:176`: `void file_fire_read(struct client_file *cf)`
 pub unsafe fn file_fire_read(cf: *mut client_file) {
     unsafe {
         if let Some(cb) = (*cf).cb {
@@ -169,7 +169,7 @@ pub unsafe fn file_fire_read(cf: *mut client_file) {
     }
 }
 
-// vendor/tmux/file.c:184  int file_can_print(struct client *c)
+/// C `vendor/tmux/file.c:184`: `int file_can_print(struct client *c)`
 pub unsafe fn file_can_print(c: *mut client) -> bool {
     unsafe {
         !(c.is_null()
@@ -185,7 +185,7 @@ macro_rules! file_print {
 }
 pub(crate) use file_print;
 
-// vendor/tmux/file.c:206  void file_vprint(struct client *c, const char *fmt, va_list ap)
+/// C `vendor/tmux/file.c:206`: `void file_vprint(struct client *c, const char *fmt, va_list ap)`
 pub unsafe fn file_vprint(c: *mut client, args: std::fmt::Arguments) {
     unsafe {
         let mut find: client_file = zeroed();
@@ -221,7 +221,7 @@ pub unsafe fn file_vprint(c: *mut client, args: std::fmt::Arguments) {
     }
 }
 
-// vendor/tmux/file.c:233  void file_print_buffer(struct client *c, void *data, size_t size)
+/// C `vendor/tmux/file.c:233`: `void file_print_buffer(struct client *c, void *data, size_t size)`
 pub unsafe fn file_print_buffer(c: *mut client, data: *mut c_void, size: usize) {
     unsafe {
         let mut find: client_file = zeroed();
@@ -297,7 +297,7 @@ pub unsafe fn file_error_(c: *mut client, args: std::fmt::Arguments) {
     }
 }
 
-// vendor/tmux/file.c:292  void file_write(struct client *c, const char *path, int flags, const void *bdata, size_t bsize, client_file_cb cb, void *cbdata)
+/// C `vendor/tmux/file.c:292`: `void file_write(struct client *c, const char *path, int flags, const void *bdata, size_t bsize, client_file_cb cb, void *cbdata)`
 pub unsafe fn file_write(
     c: *mut client,
     path: *const u8,
@@ -388,7 +388,7 @@ pub unsafe fn file_write(
     }
 }
 
-// vendor/tmux/file.c:366  struct client_file *file_read(struct client *c, const char *path, client_file_cb cb, void *cbdata)
+/// C `vendor/tmux/file.c:366`: `struct client_file *file_read(struct client *c, const char *path, client_file_cb cb, void *cbdata)`
 pub unsafe fn file_read(
     c: *mut client,
     path: *const u8,
@@ -478,7 +478,7 @@ pub unsafe fn file_read(
     }
 }
 
-// vendor/tmux/file.c:447  void file_cancel(struct client_file *cf)
+/// C `vendor/tmux/file.c:447`: `void file_cancel(struct client_file *cf)`
 pub unsafe fn file_cancel(cf: *mut client_file) {
     unsafe {
         log_debug!("read cancel file {}", (*cf).stream);
@@ -501,7 +501,7 @@ pub unsafe fn file_cancel(cf: *mut client_file) {
     }
 }
 
-// vendor/tmux/file.c:463  static void file_push_cb(__unused int fd, __unused short events, void *arg)
+/// C `vendor/tmux/file.c:463`: `static void file_push_cb(__unused int fd, __unused short events, void *arg)`
 pub unsafe extern "C-unwind" fn file_push_cb(_fd: i32, _events: i16, arg: *mut c_void) {
     let cf = arg as *mut client_file;
 
@@ -513,7 +513,7 @@ pub unsafe extern "C-unwind" fn file_push_cb(_fd: i32, _events: i16, arg: *mut c
     }
 }
 
-// vendor/tmux/file.c:474  void file_push(struct client_file *cf)
+/// C `vendor/tmux/file.c:474`: `void file_push(struct client_file *cf)`
 pub unsafe fn file_push(cf: *mut client_file) {
     unsafe {
         let mut msglen: usize;
@@ -573,7 +573,7 @@ pub unsafe fn file_push(cf: *mut client_file) {
     }
 }
 
-// vendor/tmux/file.c:511  int file_write_left(struct client_files *files)
+/// C `vendor/tmux/file.c:511`: `int file_write_left(struct client_files *files)`
 pub unsafe fn file_write_left(files: *mut client_files) -> c_int {
     let mut left;
     let mut waiting: i32 = 0;
@@ -594,7 +594,7 @@ pub unsafe fn file_write_left(files: *mut client_files) -> c_int {
     (waiting != 0) as i32
 }
 
-// vendor/tmux/file.c:531  static void file_write_error_callback(__unused struct bufferevent *bev, __unused short what, void *arg)
+/// C `vendor/tmux/file.c:531`: `static void file_write_error_callback(__unused struct bufferevent *bev, __unused short what, void *arg)`
 pub unsafe extern "C-unwind" fn file_write_error_callback(
     _bev: *mut bufferevent,
     _what: i16,
@@ -617,7 +617,7 @@ pub unsafe extern "C-unwind" fn file_write_error_callback(
     }
 }
 
-// vendor/tmux/file.c:550  static void file_write_callback(__unused struct bufferevent *bev, void *arg)
+/// C `vendor/tmux/file.c:550`: `static void file_write_callback(__unused struct bufferevent *bev, void *arg)`
 pub unsafe extern "C-unwind" fn file_write_callback(_bev: *mut bufferevent, arg: *mut c_void) {
     unsafe {
         let cf = arg as *mut client_file;
@@ -637,7 +637,7 @@ pub unsafe extern "C-unwind" fn file_write_callback(_bev: *mut bufferevent, arg:
     }
 }
 
-// vendor/tmux/file.c:569  void file_write_open(struct client_files *files, struct tmuxpeer *peer, struct imsg *imsg, int allow_streams, int close_received, client_file_cb cb, void *cbdata)
+/// C `vendor/tmux/file.c:569`: `void file_write_open(struct client_files *files, struct tmuxpeer *peer, struct imsg *imsg, int allow_streams, int close_received, client_file_cb cb, void *cbdata)`
 pub unsafe fn file_write_open(
     files: *mut client_files,
     peer: *mut tmuxpeer,
@@ -725,7 +725,7 @@ pub unsafe fn file_write_open(
     }
 }
 
-// vendor/tmux/file.c:633  void file_write_data(struct client_files *files, struct imsg *imsg)
+/// C `vendor/tmux/file.c:633`: `void file_write_data(struct client_files *files, struct imsg *imsg)`
 pub unsafe fn file_write_data(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_write_data;
@@ -749,7 +749,7 @@ pub unsafe fn file_write_data(files: *mut client_files, imsg: *mut imsg) {
     }
 }
 
-// vendor/tmux/file.c:653  void file_write_close(struct client_files *files, struct imsg *imsg)
+/// C `vendor/tmux/file.c:653`: `void file_write_close(struct client_files *files, struct imsg *imsg)`
 pub unsafe fn file_write_close(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_write_close;
@@ -780,7 +780,7 @@ pub unsafe fn file_write_close(files: *mut client_files, imsg: *mut imsg) {
     }
 }
 
-// vendor/tmux/file.c:678  static void file_read_error_callback(__unused struct bufferevent *bev, short what, void *arg)
+/// C `vendor/tmux/file.c:678`: `static void file_read_error_callback(__unused struct bufferevent *bev, short what, void *arg)`
 pub unsafe extern "C-unwind" fn file_read_error_callback(
     _bev: *mut bufferevent,
     _what: i16,
@@ -810,7 +810,7 @@ pub unsafe extern "C-unwind" fn file_read_error_callback(
     }
 }
 
-// vendor/tmux/file.c:698  static void file_read_callback(__unused struct bufferevent *bev, void *arg)
+/// C `vendor/tmux/file.c:698`: `static void file_read_callback(__unused struct bufferevent *bev, void *arg)`
 pub unsafe extern "C-unwind" fn file_read_callback(_bev: *mut bufferevent, arg: *mut c_void) {
     let cf = arg as *mut client_file;
     unsafe {
@@ -856,7 +856,7 @@ pub unsafe extern "C-unwind" fn file_read_callback(_bev: *mut bufferevent, arg: 
     }
 }
 
-// vendor/tmux/file.c:730  void file_read_open(struct client_files *files, struct tmuxpeer *peer, struct imsg *imsg, int allow_streams, int close_received, client_file_cb cb, void *cbdata)
+/// C `vendor/tmux/file.c:730`: `void file_read_open(struct client_files *files, struct tmuxpeer *peer, struct imsg *imsg, int allow_streams, int close_received, client_file_cb cb, void *cbdata)`
 pub unsafe fn file_read_open(
     files: *mut client_files,
     peer: *mut tmuxpeer,
@@ -946,7 +946,7 @@ pub unsafe fn file_read_open(
     }
 }
 
-// vendor/tmux/file.c:794  void file_read_cancel(struct client_files *files, struct imsg *imsg)
+/// C `vendor/tmux/file.c:794`: `void file_read_cancel(struct client_files *files, struct imsg *imsg)`
 pub unsafe fn file_read_cancel(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_read_cancel;
@@ -967,7 +967,7 @@ pub unsafe fn file_read_cancel(files: *mut client_files, imsg: *mut imsg) {
     }
 }
 
-// vendor/tmux/file.c:812  int file_write_ready(struct client_files *files, struct imsg *imsg)
+/// C `vendor/tmux/file.c:812`: `int file_write_ready(struct client_files *files, struct imsg *imsg)`
 pub unsafe fn file_write_ready(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_write_ready;
@@ -991,7 +991,7 @@ pub unsafe fn file_write_ready(files: *mut client_files, imsg: *mut imsg) {
     }
 }
 
-// vendor/tmux/file.c:833  int file_read_data(struct client_files *files, struct imsg *imsg)
+/// C `vendor/tmux/file.c:833`: `int file_read_data(struct client_files *files, struct imsg *imsg)`
 pub unsafe fn file_read_data(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_read_data;
@@ -1021,7 +1021,7 @@ pub unsafe fn file_read_data(files: *mut client_files, imsg: *mut imsg) {
     }
 }
 
-// vendor/tmux/file.c:860  int file_read_done(struct client_files *files, struct imsg *imsg)
+/// C `vendor/tmux/file.c:860`: `int file_read_done(struct client_files *files, struct imsg *imsg)`
 pub unsafe fn file_read_done(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_read_done;

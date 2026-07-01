@@ -43,7 +43,7 @@ unsafe fn TTY_BLOCK_STOP(tty: *const tty) -> u32 {
     unsafe { 1 + ((*tty).sx * (*tty).sy) / 8 }
 }
 
-// vendor/tmux/tty.c:93  void tty_create_log(void)
+/// C `vendor/tmux/tty.c:93`: `void tty_create_log(void)`
 pub unsafe fn tty_create_log() {
     unsafe {
         use std::os::fd::IntoRawFd;
@@ -67,7 +67,7 @@ pub unsafe fn tty_create_log() {
     }
 }
 
-// vendor/tmux/tty.c:105  int tty_init(struct tty *tty, struct client *c)
+/// C `vendor/tmux/tty.c:105`: `int tty_init(struct tty *tty, struct client *c)`
 pub unsafe fn tty_init(tty: *mut tty, c: *mut client) -> i32 {
     unsafe {
         if libc::isatty((*c).fd) == 0 {
@@ -90,7 +90,7 @@ pub unsafe fn tty_init(tty: *mut tty, c: *mut client) -> i32 {
     }
 }
 
-// vendor/tmux/tty.c:124  void tty_resize(struct tty *tty)
+/// C `vendor/tmux/tty.c:124`: `void tty_resize(struct tty *tty)`
 pub unsafe fn tty_resize(tty: *mut tty) {
     unsafe {
         let c = (*tty).client;
@@ -127,7 +127,7 @@ pub unsafe fn tty_resize(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:164  void tty_set_size(struct tty *tty, u_int sx, u_int sy, u_int xpixel, u_int ypixel)
+/// C `vendor/tmux/tty.c:164`: `void tty_set_size(struct tty *tty, u_int sx, u_int sy, u_int xpixel, u_int ypixel)`
 pub unsafe fn tty_set_size(tty: *mut tty, sx: u32, sy: u32, xpixel: u32, ypixel: u32) {
     unsafe {
         (*tty).sx = sx;
@@ -137,7 +137,7 @@ pub unsafe fn tty_set_size(tty: *mut tty, sx: u32, sy: u32, xpixel: u32, ypixel:
     }
 }
 
-// vendor/tmux/tty.c:173  static void tty_read_callback(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/tty.c:173`: `static void tty_read_callback(__unused int fd, __unused short events, void *data)`
 pub unsafe extern "C-unwind" fn tty_read_callback(_fd: i32, _events: i16, data: *mut c_void) {
     unsafe {
         let tty = data as *mut tty;
@@ -162,7 +162,7 @@ pub unsafe extern "C-unwind" fn tty_read_callback(_fd: i32, _events: i16, data: 
     }
 }
 
-// vendor/tmux/tty.c:198  static void tty_timer_callback(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/tty.c:198`: `static void tty_timer_callback(__unused int fd, __unused short events, void *data)`
 pub unsafe extern "C-unwind" fn tty_timer_callback(_fd: i32, _events: i16, tty: NonNull<tty>) {
     unsafe {
         let tty = tty.as_ptr();
@@ -187,7 +187,7 @@ pub unsafe extern "C-unwind" fn tty_timer_callback(_fd: i32, _events: i16, tty: 
     }
 }
 
-// vendor/tmux/tty.c:219  static int tty_block_maybe(struct tty *tty)
+/// C `vendor/tmux/tty.c:219`: `static int tty_block_maybe(struct tty *tty)`
 pub unsafe fn tty_block_maybe(tty: *mut tty) -> i32 {
     unsafe {
         let c = (*tty).client;
@@ -223,7 +223,7 @@ pub unsafe fn tty_block_maybe(tty: *mut tty) -> i32 {
     }
 }
 
-// vendor/tmux/tty.c:248  static void tty_write_callback(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/tty.c:248`: `static void tty_write_callback(__unused int fd, __unused short events, void *data)`
 pub unsafe extern "C-unwind" fn tty_write_callback(_fd: i32, _events: i16, data: *mut c_void) {
     unsafe {
         let tty = data as *mut tty;
@@ -258,7 +258,7 @@ pub unsafe extern "C-unwind" fn tty_write_callback(_fd: i32, _events: i16, data:
     }
 }
 
-// vendor/tmux/tty.c:275  int tty_open(struct tty *tty, char **cause)
+/// C `vendor/tmux/tty.c:275`: `int tty_open(struct tty *tty, char **cause)`
 pub unsafe fn tty_open(tty: *mut tty, cause: *mut *mut u8) -> i32 {
     unsafe {
         let c = (*tty).client;
@@ -319,7 +319,7 @@ pub unsafe fn tty_open(tty: *mut tty, cause: *mut *mut u8) -> i32 {
     }
 }
 
-// vendor/tmux/tty.c:311  static void tty_start_timer_callback(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/tty.c:311`: `static void tty_start_timer_callback(__unused int fd, __unused short events, void *data)`
 pub unsafe extern "C-unwind" fn tty_start_timer_callback(
     _fd: i32,
     _events: i16,
@@ -340,7 +340,7 @@ pub unsafe extern "C-unwind" fn tty_start_timer_callback(
     }
 }
 
-// vendor/tmux/tty.c:337  void tty_start_tty(struct tty *tty)
+/// C `vendor/tmux/tty.c:337`: `void tty_start_tty(struct tty *tty)`
 pub unsafe fn tty_start_tty(tty: *mut tty) {
     unsafe {
         let c = (*tty).client;
@@ -419,7 +419,7 @@ pub unsafe fn tty_start_tty(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:394  void tty_send_requests(struct tty *tty)
+/// C `vendor/tmux/tty.c:394`: `void tty_send_requests(struct tty *tty)`
 pub unsafe fn tty_send_requests(tty: *mut tty) {
     unsafe {
         if !(*tty).flags.intersects(tty_flags::TTY_STARTED) {
@@ -446,7 +446,7 @@ pub unsafe fn tty_send_requests(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:414  void tty_repeat_requests(struct tty *tty, int force)
+/// C `vendor/tmux/tty.c:414`: `void tty_repeat_requests(struct tty *tty, int force)`
 pub unsafe fn tty_repeat_requests(tty: *mut tty) {
     unsafe {
         let t = libc::time(null_mut());
@@ -467,7 +467,7 @@ pub unsafe fn tty_repeat_requests(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:440  void tty_stop_tty(struct tty *tty)
+/// C `vendor/tmux/tty.c:440`: `void tty_stop_tty(struct tty *tty)`
 pub unsafe fn tty_stop_tty(tty: *mut tty) {
     unsafe {
         let c = (*tty).client;
@@ -549,7 +549,7 @@ pub unsafe fn tty_stop_tty(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:507  void tty_close(struct tty *tty)
+/// C `vendor/tmux/tty.c:507`: `void tty_close(struct tty *tty)`
 pub unsafe fn tty_close(tty: *mut tty) {
     unsafe {
         if event_initialized(&raw mut (*tty).key_timer) != 0 {
@@ -571,14 +571,14 @@ pub unsafe fn tty_close(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:527  void tty_free(struct tty *tty)
+/// C `vendor/tmux/tty.c:527`: `void tty_free(struct tty *tty)`
 pub unsafe fn tty_free(tty: *mut tty) {
     unsafe {
         tty_close(tty);
     }
 }
 
-// vendor/tmux/tty.c:535  void tty_update_features(struct tty *tty)
+/// C `vendor/tmux/tty.c:535`: `void tty_update_features(struct tty *tty)`
 pub unsafe fn tty_update_features(tty: *mut tty) {
     unsafe {
         let c = (*tty).client;
@@ -608,7 +608,7 @@ pub unsafe fn tty_update_features(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:561  void tty_raw(struct tty *tty, const char *s)
+/// C `vendor/tmux/tty.c:561`: `void tty_raw(struct tty *tty, const char *s)`
 pub unsafe fn tty_raw(tty: *mut tty, mut s: &[u8]) {
     unsafe {
         let c = (*tty).client;
@@ -628,14 +628,14 @@ pub unsafe fn tty_raw(tty: *mut tty, mut s: &[u8]) {
     }
 }
 
-// vendor/tmux/tty.c:582  void tty_putcode(struct tty *tty, enum tty_code_code code)
+/// C `vendor/tmux/tty.c:582`: `void tty_putcode(struct tty *tty, enum tty_code_code code)`
 pub unsafe fn tty_putcode(tty: *mut tty, code: tty_code_code) {
     unsafe {
         tty_puts_(tty, tty_term_string((*tty).term, code));
     }
 }
 
-// vendor/tmux/tty.c:588  void tty_putcode_i(struct tty *tty, enum tty_code_code code, int a)
+/// C `vendor/tmux/tty.c:588`: `void tty_putcode_i(struct tty *tty, enum tty_code_code code, int a)`
 pub unsafe fn tty_putcode_i(tty: *mut tty, code: tty_code_code, a: i32) {
     unsafe {
         if a < 0 {
@@ -645,7 +645,7 @@ pub unsafe fn tty_putcode_i(tty: *mut tty, code: tty_code_code, a: i32) {
     }
 }
 
-// vendor/tmux/tty.c:596  void tty_putcode_ii(struct tty *tty, enum tty_code_code code, int a, int b)
+/// C `vendor/tmux/tty.c:596`: `void tty_putcode_ii(struct tty *tty, enum tty_code_code code, int a, int b)`
 pub unsafe fn tty_putcode_ii(tty: *mut tty, code: tty_code_code, a: i32, b: i32) {
     unsafe {
         if a < 0 || b < 0 {
@@ -655,7 +655,7 @@ pub unsafe fn tty_putcode_ii(tty: *mut tty, code: tty_code_code, a: i32, b: i32)
     }
 }
 
-// vendor/tmux/tty.c:604  void tty_putcode_iii(struct tty *tty, enum tty_code_code code, int a, int b, int c)
+/// C `vendor/tmux/tty.c:604`: `void tty_putcode_iii(struct tty *tty, enum tty_code_code code, int a, int b, int c)`
 pub unsafe fn tty_putcode_iii(tty: *mut tty, code: tty_code_code, a: i32, b: i32, c: i32) {
     unsafe {
         if a < 0 || b < 0 || c < 0 {
@@ -665,7 +665,7 @@ pub unsafe fn tty_putcode_iii(tty: *mut tty, code: tty_code_code, a: i32, b: i32
     }
 }
 
-// vendor/tmux/tty.c:612  void tty_putcode_s(struct tty *tty, enum tty_code_code code, const char *a)
+/// C `vendor/tmux/tty.c:612`: `void tty_putcode_s(struct tty *tty, enum tty_code_code code, const char *a)`
 pub unsafe fn tty_putcode_s(tty: *mut tty, code: tty_code_code, a: *const u8) {
     unsafe {
         if !a.is_null() {
@@ -674,7 +674,7 @@ pub unsafe fn tty_putcode_s(tty: *mut tty, code: tty_code_code, a: *const u8) {
     }
 }
 
-// vendor/tmux/tty.c:619  void tty_putcode_ss(struct tty *tty, enum tty_code_code code, const char *a, const char *b)
+/// C `vendor/tmux/tty.c:619`: `void tty_putcode_ss(struct tty *tty, enum tty_code_code code, const char *a, const char *b)`
 pub unsafe fn tty_putcode_ss(tty: *mut tty, code: tty_code_code, a: *const u8, b: *const u8) {
     unsafe {
         if !a.is_null() && !b.is_null() {
@@ -683,7 +683,7 @@ pub unsafe fn tty_putcode_ss(tty: *mut tty, code: tty_code_code, a: *const u8, b
     }
 }
 
-// vendor/tmux/tty.c:627  static void tty_add(struct tty *tty, const char *buf, size_t len)
+/// C `vendor/tmux/tty.c:627`: `static void tty_add(struct tty *tty, const char *buf, size_t len)`
 pub unsafe fn tty_add(tty: *mut tty, buf: *const u8, len: usize) {
     unsafe {
         let c = (*tty).client;
@@ -706,7 +706,7 @@ pub unsafe fn tty_add(tty: *mut tty, buf: *const u8, len: usize) {
     }
 }
 
-// vendor/tmux/tty.c:648  void tty_puts(struct tty *tty, const char *s)
+/// C `vendor/tmux/tty.c:648`: `void tty_puts(struct tty *tty, const char *s)`
 pub unsafe fn tty_puts(tty: *mut tty, s: *const u8) {
     unsafe {
         if *s != b'\0' {
@@ -723,7 +723,7 @@ pub unsafe fn tty_puts_(tty: *mut tty, s: &[u8]) {
     }
 }
 
-// vendor/tmux/tty.c:655  void tty_putc(struct tty *tty, u_char ch)
+/// C `vendor/tmux/tty.c:655`: `void tty_putc(struct tty *tty, u_char ch)`
 pub unsafe fn tty_putc(tty: *mut tty, ch: u8) {
     unsafe {
         if (*(*tty).term).flags.intersects(term_flags::TERM_NOAM)
@@ -771,7 +771,7 @@ pub unsafe fn tty_putc(tty: *mut tty, ch: u8) {
     }
 }
 
-// vendor/tmux/tty.c:693  void tty_putn(struct tty *tty, const void *buf, size_t len, u_int width)
+/// C `vendor/tmux/tty.c:693`: `void tty_putn(struct tty *tty, const void *buf, size_t len, u_int width)`
 pub unsafe fn tty_putn(tty: *mut tty, buf: *const c_void, mut len: usize, width: u32) {
     unsafe {
         if (*(*tty).term).flags.intersects(term_flags::TERM_NOAM)
@@ -796,7 +796,7 @@ pub unsafe fn tty_putn(tty: *mut tty, buf: *const c_void, mut len: usize, width:
     }
 }
 
-// vendor/tmux/tty.c:712  static void tty_set_italics(struct tty *tty)
+/// C `vendor/tmux/tty.c:712`: `static void tty_set_italics(struct tty *tty)`
 pub unsafe fn tty_set_italics(tty: *mut tty) {
     unsafe {
         if tty_term_has((*tty).term, tty_code_code::TTYC_SITM) {
@@ -810,7 +810,7 @@ pub unsafe fn tty_set_italics(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:727  void tty_set_title(struct tty *tty, const char *title)
+/// C `vendor/tmux/tty.c:727`: `void tty_set_title(struct tty *tty, const char *title)`
 pub unsafe fn tty_set_title(tty: *mut tty, title: *const u8) {
     unsafe {
         if !tty_term_has((*tty).term, tty_code_code::TTYC_TSL)
@@ -825,7 +825,7 @@ pub unsafe fn tty_set_title(tty: *mut tty, title: *const u8) {
     }
 }
 
-// vendor/tmux/tty.c:739  void tty_set_path(struct tty *tty, const char *title)
+/// C `vendor/tmux/tty.c:739`: `void tty_set_path(struct tty *tty, const char *title)`
 pub unsafe fn tty_set_path(tty: *mut tty, title: *const u8) {
     unsafe {
         if !tty_term_has((*tty).term, tty_code_code::TTYC_SWD)
@@ -840,7 +840,7 @@ pub unsafe fn tty_set_path(tty: *mut tty, title: *const u8) {
     }
 }
 
-// vendor/tmux/tty.c:751  static void tty_force_cursor_colour(struct tty *tty, int c)
+/// C `vendor/tmux/tty.c:751`: `static void tty_force_cursor_colour(struct tty *tty, int c)`
 pub unsafe fn tty_force_cursor_colour(tty: *mut tty, mut c: i32) {
     unsafe {
         let mut s: [u8; 13] = [0; 13];
@@ -862,7 +862,7 @@ pub unsafe fn tty_force_cursor_colour(tty: *mut tty, mut c: i32) {
     }
 }
 
-// vendor/tmux/tty.c:773  static int tty_update_cursor(struct tty *tty, int mode, struct screen *s)
+/// C `vendor/tmux/tty.c:773`: `static int tty_update_cursor(struct tty *tty, int mode, struct screen *s)`
 pub unsafe fn tty_update_cursor(tty: *mut tty, mode: mode_flag, s: *mut screen) -> mode_flag {
     unsafe {
         let mut cstyle: screen_cursor_style;
@@ -972,7 +972,7 @@ pub unsafe fn tty_update_cursor(tty: *mut tty, mode: mode_flag, s: *mut screen) 
     }
 }
 
-// vendor/tmux/tty.c:866  void tty_update_mode(struct tty *tty, int mode, struct screen *s)
+/// C `vendor/tmux/tty.c:866`: `void tty_update_mode(struct tty *tty, int mode, struct screen *s)`
 pub unsafe fn tty_update_mode(tty: *mut tty, mut mode: mode_flag, s: *mut screen) {
     unsafe {
         let term = (*tty).term;
@@ -1022,7 +1022,7 @@ pub unsafe fn tty_update_mode(tty: *mut tty, mut mode: mode_flag, s: *mut screen
     }
 }
 
-// vendor/tmux/tty.c:908  static void tty_emulate_repeat(struct tty *tty, enum tty_code_code code, enum tty_code_code code1, u_int n)
+/// C `vendor/tmux/tty.c:908`: `static void tty_emulate_repeat(struct tty *tty, enum tty_code_code code, enum tty_code_code code1, u_int n)`
 pub unsafe fn tty_emulate_repeat(
     tty: *mut tty,
     code: tty_code_code,
@@ -1043,7 +1043,7 @@ pub unsafe fn tty_emulate_repeat(
     }
 }
 
-// vendor/tmux/tty.c:920  void tty_repeat_space(struct tty *tty, u_int n)
+/// C `vendor/tmux/tty.c:920`: `void tty_repeat_space(struct tty *tty, u_int n)`
 pub unsafe fn tty_repeat_space(tty: *mut tty, mut n: u32) {
     const SIZEOF_S: usize = 500;
     static mut S: [u8; SIZEOF_S] = [0; SIZEOF_S];
@@ -1064,7 +1064,7 @@ pub unsafe fn tty_repeat_space(tty: *mut tty, mut n: u32) {
 }
 
 /// Is this window bigger than the terminal?
-// vendor/tmux/tty.c:937  int tty_window_bigger(struct tty *tty)
+/// C `vendor/tmux/tty.c:937`: `int tty_window_bigger(struct tty *tty)`
 pub unsafe fn tty_window_bigger(tty: *mut tty) -> bool {
     unsafe {
         let c = (*tty).client;
@@ -1075,7 +1075,7 @@ pub unsafe fn tty_window_bigger(tty: *mut tty) -> bool {
 }
 
 /// What offset should this window be drawn at?
-// vendor/tmux/tty.c:947  int tty_window_offset(struct tty *tty, u_int *ox, u_int *oy, u_int *sx, u_int *sy)
+/// C `vendor/tmux/tty.c:947`: `int tty_window_offset(struct tty *tty, u_int *ox, u_int *oy, u_int *sx, u_int *sy)`
 pub unsafe fn tty_window_offset(
     tty: *mut tty,
     ox: *mut u32,
@@ -1094,7 +1094,7 @@ pub unsafe fn tty_window_offset(
 }
 
 /// What offset should this window be drawn at?
-// vendor/tmux/tty.c:959  static int tty_window_offset1(struct tty *tty, u_int *ox, u_int *oy, u_int *sx, u_int *sy)
+/// C `vendor/tmux/tty.c:959`: `static int tty_window_offset1(struct tty *tty, u_int *ox, u_int *oy, u_int *sx, u_int *sy)`
 pub unsafe fn tty_window_offset1(
     tty: *mut tty,
     ox: *mut u32,
@@ -1170,7 +1170,7 @@ pub unsafe fn tty_window_offset1(
 }
 
 /// Update stored offsets for a window and redraw if necessary.
-// vendor/tmux/tty.c:1023  void tty_update_window_offset(struct window *w)
+/// C `vendor/tmux/tty.c:1023`: `void tty_update_window_offset(struct window *w)`
 pub unsafe fn tty_update_window_offset(w: *mut window) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -1185,7 +1185,7 @@ pub unsafe fn tty_update_window_offset(w: *mut window) {
 }
 
 /// Update stored offsets for a client and redraw if necessary.
-// vendor/tmux/tty.c:1037  void tty_update_client_offset(struct client *c)
+/// C `vendor/tmux/tty.c:1037`: `void tty_update_client_offset(struct client *c)`
 pub unsafe fn tty_update_client_offset(c: *mut client) {
     unsafe {
         let mut ox: u32 = 0;
@@ -1234,13 +1234,13 @@ pub unsafe fn tty_update_client_offset(c: *mut client) {
 /// Is the region large enough to be worth redrawing once later rather than
 /// probably several times now? Currently yes if it is more than 50% of the
 /// pane.
-// vendor/tmux/tty.c:1069  static int tty_large_region(__unused struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1069`: `static int tty_large_region(__unused struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_large_region(_tty: *mut tty, ctx: *const tty_ctx) -> bool {
     unsafe { (*ctx).orlower - (*ctx).orupper >= (*ctx).sy / 2 }
 }
 
 /// Return if BCE is needed but the terminal doesn't have it - it'll need to be emulated.
-// vendor/tmux/tty.c:1079  int tty_fake_bce(const struct tty *tty, const struct grid_cell *gc, u_int bg)
+/// C `vendor/tmux/tty.c:1079`: `int tty_fake_bce(const struct tty *tty, const struct grid_cell *gc, u_int bg)`
 pub unsafe fn tty_fake_bce(tty: *const tty, gc: *const grid_cell, bg: u32) -> bool {
     unsafe {
         if tty_term_flag((*tty).term, tty_code_code::TTYC_BCE) != 0 {
@@ -1255,7 +1255,7 @@ pub unsafe fn tty_fake_bce(tty: *const tty, gc: *const grid_cell, bg: u32) -> bo
 ///
 /// Used when CSR not supported, or window is a pane that doesn't
 /// take up the full width of the terminal.
-// vendor/tmux/tty.c:1094  static void tty_redraw_region(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1094`: `static void tty_redraw_region(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_redraw_region(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let c = (*tty).client;
@@ -1276,7 +1276,7 @@ pub unsafe fn tty_redraw_region(tty: *mut tty, ctx: *const tty_ctx) {
 
 /// Is this position visible in the pane?
 #[expect(clippy::needless_bool)]
-// vendor/tmux/tty.c:1117  static int tty_is_visible(__unused struct tty *tty, const struct tty_ctx *ctx, u_int px, u_int py, u_int nx, u_int ny)
+/// C `vendor/tmux/tty.c:1117`: `static int tty_is_visible(__unused struct tty *tty, const struct tty_ctx *ctx, u_int px, u_int py, u_int nx, u_int ny)`
 pub unsafe fn tty_is_visible(
     _tty: *mut tty,
     ctx: *const tty_ctx,
@@ -1304,7 +1304,7 @@ pub unsafe fn tty_is_visible(
 }
 
 /// Clamp line position to visible part of pane.
-// vendor/tmux/tty.c:1133  static int tty_clamp_line(struct tty *tty, const struct tty_ctx *ctx, u_int px, u_int py, u_int nx, u_int *i, u_int *x, u_int *rx, u_int *ry)
+/// C `vendor/tmux/tty.c:1133`: `static int tty_clamp_line(struct tty *tty, const struct tty_ctx *ctx, u_int px, u_int py, u_int nx, u_int *i, u_int *x, u_int *rx, u_int *ry)`
 pub unsafe fn tty_clamp_line(
     tty: *mut tty,
     ctx: *const tty_ctx,
@@ -1354,7 +1354,7 @@ pub unsafe fn tty_clamp_line(
 }
 
 /// Clear a line.
-// vendor/tmux/tty.c:1182  static void tty_clear_line(struct tty *tty, const struct grid_cell *defaults, u_int py, u_int px, u_int nx, u_int bg)
+/// C `vendor/tmux/tty.c:1182`: `static void tty_clear_line(struct tty *tty, const struct grid_cell *defaults, u_int py, u_int px, u_int nx, u_int bg)`
 pub unsafe fn tty_clear_line(
     tty: *mut tty,
     defaults: *const grid_cell,
@@ -1414,7 +1414,7 @@ pub unsafe fn tty_clear_line(
 }
 
 /// Clear a line, adjusting to visible part of pane.
-// vendor/tmux/tty.c:1236  static void tty_clear_pane_line(struct tty *tty, const struct tty_ctx *ctx, u_int py, u_int px, u_int nx, u_int bg)
+/// C `vendor/tmux/tty.c:1236`: `static void tty_clear_pane_line(struct tty *tty, const struct tty_ctx *ctx, u_int py, u_int px, u_int nx, u_int bg)`
 pub unsafe fn tty_clear_pane_line(
     tty: *mut tty,
     ctx: *const tty_ctx,
@@ -1456,7 +1456,7 @@ pub unsafe fn tty_clear_pane_line(
 }
 
 /// Clamp area position to visible part of pane.
-// vendor/tmux/tty.c:1260  static int tty_clamp_area(struct tty *tty, const struct tty_ctx *ctx, u_int px, u_int py, u_int nx, u_int ny, u_int *i, u_int *j, u_int *x, u_int *y, u_int *rx, u_int *ry)
+/// C `vendor/tmux/tty.c:1260`: `static int tty_clamp_area(struct tty *tty, const struct tty_ctx *ctx, u_int px, u_int py, u_int nx, u_int ny, u_int *i, u_int *j, u_int *x, u_int *y, u_int *rx, u_int *ry)`
 pub unsafe fn tty_clamp_area(
     tty: *mut tty,
     ctx: *const tty_ctx,
@@ -1534,7 +1534,7 @@ pub unsafe fn tty_clamp_area(
 }
 
 /// Clear an area, adjusting to visible part of pane.
-// vendor/tmux/tty.c:1322  static void tty_clear_area(struct tty *tty, const struct tty_ctx *ctx, u_int py, u_int ny, u_int px, u_int nx, u_int bg)
+/// C `vendor/tmux/tty.c:1322`: `static void tty_clear_area(struct tty *tty, const struct tty_ctx *ctx, u_int py, u_int ny, u_int px, u_int nx, u_int bg)`
 pub unsafe fn tty_clear_area(
     tty: *mut tty,
     defaults: *const grid_cell,
@@ -1624,7 +1624,7 @@ pub unsafe fn tty_clear_area(
 }
 
 /// Clear an area in a pane.
-// vendor/tmux/tty.c:1398  static void tty_clear_pane_area(struct tty *tty, const struct tty_ctx *ctx, u_int py, u_int ny, u_int px, u_int nx, u_int bg)
+/// C `vendor/tmux/tty.c:1398`: `static void tty_clear_pane_area(struct tty *tty, const struct tty_ctx *ctx, u_int py, u_int ny, u_int px, u_int nx, u_int bg)`
 pub unsafe fn tty_clear_pane_area(
     tty: *mut tty,
     ctx: *const tty_ctx,
@@ -1661,7 +1661,7 @@ pub unsafe fn tty_clear_pane_area(
     }
 }
 
-// vendor/tmux/tty.c:1409  static void tty_draw_pane(struct tty *tty, const struct tty_ctx *ctx, u_int py)
+/// C `vendor/tmux/tty.c:1409`: `static void tty_draw_pane(struct tty *tty, const struct tty_ctx *ctx, u_int py)`
 pub unsafe fn tty_draw_pane(tty: *mut tty, ctx: *const tty_ctx, py: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1713,7 +1713,7 @@ pub unsafe fn tty_draw_pane(tty: *mut tty, ctx: *const tty_ctx, py: u32) {
     }
 }
 
-// vendor/tmux/tty.c:1463  const struct grid_cell *tty_check_codeset(struct tty *tty, const struct grid_cell *gc)
+/// C `vendor/tmux/tty.c:1463`: `const struct grid_cell *tty_check_codeset(struct tty *tty, const struct grid_cell *gc)`
 pub unsafe fn tty_check_codeset(tty: *mut tty, gc: *const grid_cell) -> *const grid_cell {
     static mut NEW: grid_cell = unsafe { zeroed() };
     unsafe {
@@ -1755,7 +1755,7 @@ pub unsafe fn tty_check_codeset(tty: *mut tty, gc: *const grid_cell) -> *const g
 }
 
 /// Check if a single character is obstructed by the overlay and return a boolean.
-// vendor/tmux/tty.c:1497  static int tty_check_overlay(struct tty *tty, u_int px, u_int py)
+/// C `vendor/tmux/tty.c:1497`: `static int tty_check_overlay(struct tty *tty, u_int px, u_int py)`
 pub unsafe fn tty_check_overlay(tty: *mut tty, px: u32, py: u32) -> bool {
     unsafe {
         let mut r: overlay_ranges = zeroed();
@@ -1769,7 +1769,7 @@ pub unsafe fn tty_check_overlay(tty: *mut tty, px: u32, py: u32) -> bool {
 }
 
 /// Return parts of the input range which are visible.
-// vendor/tmux/tty.c:1511  struct visible_ranges *tty_check_overlay_range(struct tty *tty, u_int px, u_int py, u_int nx)
+/// C `vendor/tmux/tty.c:1511`: `struct visible_ranges *tty_check_overlay_range(struct tty *tty, u_int px, u_int py, u_int nx)`
 pub unsafe fn tty_check_overlay_range(
     tty: *mut tty,
     px: u32,
@@ -1793,7 +1793,7 @@ pub unsafe fn tty_check_overlay_range(
     }
 }
 
-// vendor/tmux/tty-draw.c:118  void tty_draw_line(struct tty *tty, struct screen *s, u_int px, u_int py, u_int nx, u_int atx, u_int aty, const struct tty_style_ctx *style_ctx)
+/// C `vendor/tmux/tty-draw.c:118`: `void tty_draw_line(struct tty *tty, struct screen *s, u_int px, u_int py, u_int nx, u_int atx, u_int aty, const struct tty_style_ctx *style_ctx)`
 pub unsafe fn tty_draw_line(
     tty: *mut tty,
     s: *mut screen,
@@ -1994,7 +1994,7 @@ pub unsafe fn tty_draw_line(
 
 /// Update context for client.
 #[cfg(feature = "sixel")]
-// vendor/tmux/tty.c:1528  static int tty_set_client_cb(struct tty_ctx *ttyctx, struct client *c)
+/// C `vendor/tmux/tty.c:1528`: `static int tty_set_client_cb(struct tty_ctx *ttyctx, struct client *c)`
 pub unsafe fn tty_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i32 {
     unsafe {
         let wp: *mut window_pane = (*ttyctx).arg.cast();
@@ -2026,7 +2026,7 @@ pub unsafe fn tty_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i32 {
 }
 
 #[cfg(feature = "sixel")]
-// vendor/tmux/tty.c:1551  void tty_draw_images(struct client *c, struct window_pane *wp)
+/// C `vendor/tmux/tty.c:1551`: `void tty_draw_images(struct client *c, struct window_pane *wp)`
 pub unsafe fn tty_draw_images(c: *mut client, wp: *mut window_pane, s: *mut screen) {
     unsafe {
         for im in tailq_foreach::<image, discr_entry>(&raw mut (*s).images).map(NonNull::as_ptr) {
@@ -2054,7 +2054,7 @@ pub unsafe fn tty_draw_images(c: *mut client, wp: *mut window_pane, s: *mut scre
     }
 }
 
-// vendor/tmux/tty.c:1580  void tty_sync_start(struct tty *tty)
+/// C `vendor/tmux/tty.c:1580`: `void tty_sync_start(struct tty *tty)`
 pub unsafe fn tty_sync_start(tty: *mut tty) {
     unsafe {
         if (*tty).flags.intersects(tty_flags::TTY_BLOCK) {
@@ -2072,7 +2072,7 @@ pub unsafe fn tty_sync_start(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:1595  void tty_sync_end(struct tty *tty)
+/// C `vendor/tmux/tty.c:1595`: `void tty_sync_end(struct tty *tty)`
 pub unsafe fn tty_sync_end(tty: *mut tty) {
     unsafe {
         if (*tty).flags.intersects(tty_flags::TTY_BLOCK) {
@@ -2090,7 +2090,7 @@ pub unsafe fn tty_sync_end(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:1610  static int tty_client_ready(const struct tty_ctx *ctx, struct client *c)
+/// C `vendor/tmux/tty.c:1610`: `static int tty_client_ready(const struct tty_ctx *ctx, struct client *c)`
 pub unsafe fn tty_client_ready(ctx: *const tty_ctx, c: *mut client) -> bool {
     unsafe {
         if (*c).session.is_null() || (*c).tty.term.is_null() {
@@ -2116,7 +2116,7 @@ pub unsafe fn tty_client_ready(ctx: *const tty_ctx, c: *mut client) -> bool {
     }
 }
 
-// vendor/tmux/tty.c:1632  void tty_write(void (*cmdfn)(struct tty *, const struct tty_ctx *), struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1632`: `void tty_write(void (*cmdfn)(struct tty *, const struct tty_ctx *), struct tty_ctx *ctx)`
 pub unsafe fn tty_write(cmdfn: unsafe fn(*mut tty, *const tty_ctx), ctx: *mut tty_ctx) {
     unsafe {
         let Some(set_client_cb) = (*ctx).set_client_cb else {
@@ -2140,7 +2140,7 @@ pub unsafe fn tty_write(cmdfn: unsafe fn(*mut tty, *const tty_ctx), ctx: *mut tt
 
 /// Only write to the incoming tty instead of every client.
 #[cfg(feature = "sixel")]
-// vendor/tmux/tty.c:1655  static void tty_write_one(void (*cmdfn)(struct tty *, const struct tty_ctx *), struct client *c, struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1655`: `static void tty_write_one(void (*cmdfn)(struct tty *, const struct tty_ctx *), struct client *c, struct tty_ctx *ctx)`
 pub unsafe fn tty_write_one(
     cmdfn: unsafe fn(*mut tty, *const tty_ctx),
     c: *mut client,
@@ -2156,7 +2156,7 @@ pub unsafe fn tty_write_one(
     }
 }
 
-// vendor/tmux/tty.c:1666  void tty_cmd_insertcharacter(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1666`: `void tty_cmd_insertcharacter(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_insertcharacter(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let c = (*tty).client;
@@ -2191,7 +2191,7 @@ pub unsafe fn tty_cmd_insertcharacter(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:1688  void tty_cmd_deletecharacter(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1688`: `void tty_cmd_deletecharacter(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_deletecharacter(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let c = (*tty).client;
@@ -2226,7 +2226,7 @@ pub unsafe fn tty_cmd_deletecharacter(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:1710  void tty_cmd_clearcharacter(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1710`: `void tty_cmd_clearcharacter(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_clearcharacter(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         tty_default_attributes(
@@ -2241,7 +2241,7 @@ pub unsafe fn tty_cmd_clearcharacter(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:1718  void tty_cmd_insertline(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1718`: `void tty_cmd_insertline(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_insertline(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let c = (*tty).client;
@@ -2282,7 +2282,7 @@ pub unsafe fn tty_cmd_insertline(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:1745  void tty_cmd_deleteline(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1745`: `void tty_cmd_deleteline(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_deleteline(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let c = (*tty).client;
@@ -2324,7 +2324,7 @@ pub unsafe fn tty_cmd_deleteline(tty: *mut tty, ctx: *const tty_ctx) {
 }
 
 #[expect(dead_code)]
-// vendor/tmux/tty.c:1772  void tty_cmd_clearline(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1772`: `void tty_cmd_clearline(struct tty *tty, const struct tty_ctx *ctx)`
 unsafe fn tty_cmd_clearline(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         tty_default_attributes(
@@ -2340,7 +2340,7 @@ unsafe fn tty_cmd_clearline(tty: *mut tty, ctx: *const tty_ctx) {
 }
 
 #[expect(dead_code)]
-// vendor/tmux/tty.c:1780  void tty_cmd_clearendofline(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1780`: `void tty_cmd_clearendofline(struct tty *tty, const struct tty_ctx *ctx)`
 unsafe fn tty_cmd_clearendofline(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let nx = (*ctx).sx - (*ctx).ocx;
@@ -2358,7 +2358,7 @@ unsafe fn tty_cmd_clearendofline(tty: *mut tty, ctx: *const tty_ctx) {
 }
 
 #[expect(dead_code)]
-// vendor/tmux/tty.c:1790  void tty_cmd_clearstartofline(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1790`: `void tty_cmd_clearstartofline(struct tty *tty, const struct tty_ctx *ctx)`
 unsafe fn tty_cmd_clearstartofline(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         tty_default_attributes(
@@ -2373,7 +2373,7 @@ unsafe fn tty_cmd_clearstartofline(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:1798  void tty_cmd_reverseindex(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1798`: `void tty_cmd_reverseindex(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_reverseindex(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let c = (*tty).client;
@@ -2417,7 +2417,7 @@ pub unsafe fn tty_cmd_reverseindex(tty: *mut tty, ctx: *const tty_ctx) {
 }
 
 #[expect(dead_code)]
-// vendor/tmux/tty.c:1831  void tty_cmd_linefeed(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1831`: `void tty_cmd_linefeed(struct tty *tty, const struct tty_ctx *ctx)`
 unsafe fn tty_cmd_linefeed(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let c = (*tty).client;
@@ -2468,7 +2468,7 @@ unsafe fn tty_cmd_linefeed(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:1873  void tty_cmd_scrollup(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1873`: `void tty_cmd_scrollup(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_scrollup(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let c = (*tty).client;
@@ -2516,7 +2516,7 @@ pub unsafe fn tty_cmd_scrollup(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:1911  void tty_cmd_scrolldown(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1911`: `void tty_cmd_scrolldown(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_scrolldown(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let c = (*tty).client;
@@ -2557,7 +2557,7 @@ pub unsafe fn tty_cmd_scrolldown(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:1944  void tty_cmd_clearendofscreen(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1944`: `void tty_cmd_clearendofscreen(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_clearendofscreen(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         tty_default_attributes(
@@ -2586,7 +2586,7 @@ pub unsafe fn tty_cmd_clearendofscreen(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:1968  void tty_cmd_clearstartofscreen(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1968`: `void tty_cmd_clearstartofscreen(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_clearstartofscreen(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         tty_default_attributes(
@@ -2615,7 +2615,7 @@ pub unsafe fn tty_cmd_clearstartofscreen(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:1992  void tty_cmd_clearscreen(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:1992`: `void tty_cmd_clearscreen(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_clearscreen(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         tty_default_attributes(
@@ -2638,7 +2638,7 @@ pub unsafe fn tty_cmd_clearscreen(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:2010  void tty_cmd_alignmenttest(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:2010`: `void tty_cmd_alignmenttest(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_alignmenttest(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         if (*ctx).bigger != 0 {
@@ -2666,7 +2666,7 @@ pub unsafe fn tty_cmd_alignmenttest(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:2034  void tty_cmd_cell(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:2034`: `void tty_cmd_cell(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_cell(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let gcp = (*ctx).cell;
@@ -2728,7 +2728,7 @@ pub unsafe fn tty_cmd_cell(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:2076  void tty_cmd_cells(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:2076`: `void tty_cmd_cells(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_cells(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let mut r: overlay_ranges = zeroed();
@@ -2789,7 +2789,7 @@ pub unsafe fn tty_cmd_cells(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:2123  void tty_cmd_setselection(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:2123`: `void tty_cmd_setselection(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_setselection(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         tty_set_selection(
@@ -2801,7 +2801,7 @@ pub unsafe fn tty_cmd_setselection(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:2129  void tty_set_selection(struct tty *tty, const char *clip, const char *buf, size_t len)
+/// C `vendor/tmux/tty.c:2129`: `void tty_set_selection(struct tty *tty, const char *clip, const char *buf, size_t len)`
 pub unsafe fn tty_set_selection(tty: *mut tty, flags: *const u8, buf: *const u8, len: usize) {
     unsafe {
         if !(*tty).flags.intersects(tty_flags::TTY_STARTED) {
@@ -2822,7 +2822,7 @@ pub unsafe fn tty_set_selection(tty: *mut tty, flags: *const u8, buf: *const u8,
     }
 }
 
-// vendor/tmux/tty.c:2151  void tty_cmd_rawstring(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:2151`: `void tty_cmd_rawstring(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_rawstring(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         (*tty).flags |= tty_flags::TTY_NOBLOCK;
@@ -2832,7 +2832,7 @@ pub unsafe fn tty_cmd_rawstring(tty: *mut tty, ctx: *const tty_ctx) {
 }
 
 #[cfg(feature = "sixel")]
-// vendor/tmux/tty.c:2160  void tty_cmd_sixelimage(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:2160`: `void tty_cmd_sixelimage(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_sixelimage(tty: *mut tty, ctx: *const tty_ctx) {
     use crate::image_sixel::{sixel_free, sixel_print, sixel_scale, sixel_size_in_cells};
 
@@ -2911,7 +2911,7 @@ pub unsafe fn tty_cmd_sixelimage(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:2211  void tty_cmd_syncstart(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:2211`: `void tty_cmd_syncstart(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_syncstart(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         if (*ctx).num == 0x11 {
@@ -2931,7 +2931,7 @@ pub unsafe fn tty_cmd_syncstart(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-// vendor/tmux/tty.c:2233  void tty_cell(struct tty *tty, const struct grid_cell *gc, const struct tty_style_ctx *style_ctx)
+/// C `vendor/tmux/tty.c:2233`: `void tty_cell(struct tty *tty, const struct grid_cell *gc, const struct tty_style_ctx *style_ctx)`
 pub unsafe fn tty_cell(
     tty: *mut tty,
     gc: *const grid_cell,
@@ -2977,7 +2977,7 @@ pub unsafe fn tty_cell(
     }
 }
 
-// vendor/tmux/tty.c:2269  void tty_reset(struct tty *tty)
+/// C `vendor/tmux/tty.c:2269`: `void tty_reset(struct tty *tty)`
 pub unsafe fn tty_reset(tty: *mut tty) {
     unsafe {
         let gc = &raw mut (*tty).cell;
@@ -2996,7 +2996,7 @@ pub unsafe fn tty_reset(tty: *mut tty) {
     }
 }
 
-// vendor/tmux/tty.c:2285  void tty_invalidate(struct tty *tty)
+/// C `vendor/tmux/tty.c:2285`: `void tty_invalidate(struct tty *tty)`
 pub unsafe fn tty_invalidate(tty: *mut tty) {
     unsafe {
         memcpy__(&raw mut (*tty).cell, &raw const GRID_DEFAULT_CELL);
@@ -3028,7 +3028,7 @@ pub unsafe fn tty_invalidate(tty: *mut tty) {
 }
 
 /// Turn off margin.
-// vendor/tmux/tty.c:2311  void tty_region_off(struct tty *tty)
+/// C `vendor/tmux/tty.c:2311`: `void tty_region_off(struct tty *tty)`
 pub unsafe fn tty_region_off(tty: *mut tty) {
     unsafe {
         tty_region(tty, 0, (*tty).sy - 1);
@@ -3036,7 +3036,7 @@ pub unsafe fn tty_region_off(tty: *mut tty) {
 }
 
 /// Set region inside pane.
-// vendor/tmux/tty.c:2318  static void tty_region_pane(struct tty *tty, const struct tty_ctx *ctx, u_int rupper, u_int rlower)
+/// C `vendor/tmux/tty.c:2318`: `static void tty_region_pane(struct tty *tty, const struct tty_ctx *ctx, u_int rupper, u_int rlower)`
 pub unsafe fn tty_region_pane(tty: *mut tty, ctx: *const tty_ctx, rupper: u32, rlower: u32) {
     unsafe {
         tty_region(
@@ -3048,7 +3048,7 @@ pub unsafe fn tty_region_pane(tty: *mut tty, ctx: *const tty_ctx, rupper: u32, r
 }
 
 /// Set region at absolute position.
-// vendor/tmux/tty.c:2327  static void tty_region(struct tty *tty, u_int rupper, u_int rlower)
+/// C `vendor/tmux/tty.c:2327`: `static void tty_region(struct tty *tty, u_int rupper, u_int rlower)`
 pub unsafe fn tty_region(tty: *mut tty, rupper: u32, rlower: u32) {
     unsafe {
         if (*tty).rlower == rlower && (*tty).rupper == rupper {
@@ -3085,7 +3085,7 @@ pub unsafe fn tty_region(tty: *mut tty, rupper: u32, rlower: u32) {
 }
 
 /// Turn off margin.
-// vendor/tmux/tty.c:2356  void tty_margin_off(struct tty *tty)
+/// C `vendor/tmux/tty.c:2356`: `void tty_margin_off(struct tty *tty)`
 pub unsafe fn tty_margin_off(tty: *mut tty) {
     unsafe {
         tty_margin(tty, 0, (*tty).sx - 1);
@@ -3093,7 +3093,7 @@ pub unsafe fn tty_margin_off(tty: *mut tty) {
 }
 
 /// Set margin inside pane.
-// vendor/tmux/tty.c:2363  static void tty_margin_pane(struct tty *tty, const struct tty_ctx *ctx)
+/// C `vendor/tmux/tty.c:2363`: `static void tty_margin_pane(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_margin_pane(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         tty_margin(
@@ -3106,7 +3106,7 @@ pub unsafe fn tty_margin_pane(tty: *mut tty, ctx: *const tty_ctx) {
 
 // Set margin at absolute position.
 
-// vendor/tmux/tty.c:2384  static void tty_margin(struct tty *tty, u_int rleft, u_int rright)
+/// C `vendor/tmux/tty.c:2384`: `static void tty_margin(struct tty *tty, u_int rleft, u_int rright)`
 pub unsafe fn tty_margin(tty: *mut tty, rleft: u32, rright: u32) {
     unsafe {
         if !tty_use_margin(tty) {
@@ -3139,7 +3139,7 @@ pub unsafe fn tty_margin(tty: *mut tty, rleft: u32, rright: u32) {
 // Move the cursor, unless it would wrap itself when the next character is
 // printed.
 
-// vendor/tmux/tty.c:2408  static void tty_cursor_pane_unless_wrap(struct tty *tty, const struct tty_ctx *ctx, u_int cx, u_int cy)
+/// C `vendor/tmux/tty.c:2408`: `static void tty_cursor_pane_unless_wrap(struct tty *tty, const struct tty_ctx *ctx, u_int cx, u_int cy)`
 pub unsafe fn tty_cursor_pane_unless_wrap(tty: *mut tty, ctx: *const tty_ctx, cx: u32, cy: u32) {
     unsafe {
         if !(*ctx).wrapped
@@ -3159,7 +3159,7 @@ pub unsafe fn tty_cursor_pane_unless_wrap(tty: *mut tty, ctx: *const tty_ctx, cx
 
 // Move cursor inside pane.
 
-// vendor/tmux/tty.c:2425  static void tty_cursor_pane(struct tty *tty, const struct tty_ctx *ctx, u_int cx, u_int cy)
+/// C `vendor/tmux/tty.c:2425`: `static void tty_cursor_pane(struct tty *tty, const struct tty_ctx *ctx, u_int cx, u_int cy)`
 pub unsafe fn tty_cursor_pane(tty: *mut tty, ctx: *const tty_ctx, cx: u32, cy: u32) {
     unsafe {
         tty_cursor(
@@ -3172,7 +3172,7 @@ pub unsafe fn tty_cursor_pane(tty: *mut tty, ctx: *const tty_ctx, cx: u32, cy: u
 
 // Move cursor to absolute position.
 
-// vendor/tmux/tty.c:2432  void tty_cursor(struct tty *tty, u_int cx, u_int cy)
+/// C `vendor/tmux/tty.c:2432`: `void tty_cursor(struct tty *tty, u_int cx, u_int cy)`
 pub unsafe fn tty_cursor(tty: *mut tty, mut cx: u32, cy: u32) {
     unsafe {
         let term = (*tty).term;
@@ -3323,7 +3323,7 @@ pub unsafe fn tty_cursor(tty: *mut tty, mut cx: u32, cy: u32) {
     }
 }
 
-// vendor/tmux/tty.c:2579  static void tty_hyperlink(struct tty *tty, const struct grid_cell *gc, struct hyperlinks *hl)
+/// C `vendor/tmux/tty.c:2579`: `static void tty_hyperlink(struct tty *tty, const struct grid_cell *gc, struct hyperlinks *hl)`
 pub unsafe fn tty_hyperlink(tty: *mut tty, gc: *const grid_cell, hl: *mut hyperlinks) {
     unsafe {
         if (*gc).link == (*tty).cell.link {
@@ -3346,7 +3346,7 @@ pub unsafe fn tty_hyperlink(tty: *mut tty, gc: *const grid_cell, hl: *mut hyperl
     }
 }
 
-// vendor/tmux/tty.c:2619  void tty_attributes(struct tty *tty, const struct grid_cell *gc, const struct tty_style_ctx *style_ctx)
+/// C `vendor/tmux/tty.c:2619`: `void tty_attributes(struct tty *tty, const struct grid_cell *gc, const struct tty_style_ctx *style_ctx)`
 pub unsafe fn tty_attributes(
     tty: *mut tty,
     gc: *const grid_cell,
@@ -3466,7 +3466,7 @@ pub unsafe fn tty_attributes(
     }
 }
 
-// vendor/tmux/tty.c:2749  static void tty_colours(struct tty *tty, const struct grid_cell *gc)
+/// C `vendor/tmux/tty.c:2749`: `static void tty_colours(struct tty *tty, const struct grid_cell *gc)`
 pub unsafe fn tty_colours(tty: *mut tty, gc: *const grid_cell) {
     unsafe {
         let tc = &raw mut (*tty).cell;
@@ -3520,7 +3520,7 @@ pub unsafe fn tty_colours(tty: *mut tty, gc: *const grid_cell) {
     }
 }
 
-// vendor/tmux/tty.c:2822  static void tty_check_fg(struct tty *tty, struct colour_palette *palette, struct grid_cell *gc)
+/// C `vendor/tmux/tty.c:2822`: `static void tty_check_fg(struct tty *tty, struct colour_palette *palette, struct grid_cell *gc)`
 pub unsafe fn tty_check_fg(tty: *const tty, palette: *const colour_palette, gc: *mut grid_cell) {
     unsafe {
         let mut c: i32;
@@ -3582,7 +3582,7 @@ pub unsafe fn tty_check_fg(tty: *const tty, palette: *const colour_palette, gc: 
     }
 }
 
-// vendor/tmux/tty.c:2892  static void tty_check_bg(struct tty *tty, struct colour_palette *palette, struct grid_cell *gc)
+/// C `vendor/tmux/tty.c:2892`: `static void tty_check_bg(struct tty *tty, struct colour_palette *palette, struct grid_cell *gc)`
 pub unsafe fn tty_check_bg(tty: *const tty, palette: *const colour_palette, gc: *mut grid_cell) {
     unsafe {
         let c: i32;
@@ -3636,7 +3636,7 @@ pub unsafe fn tty_check_bg(tty: *const tty, palette: *const colour_palette, gc: 
     }
 }
 
-// vendor/tmux/tty.c:2945  static void tty_check_us(__unused struct tty *tty, struct colour_palette *palette, struct grid_cell *gc)
+/// C `vendor/tmux/tty.c:2945`: `static void tty_check_us(__unused struct tty *tty, struct colour_palette *palette, struct grid_cell *gc)`
 pub unsafe fn tty_check_us(tty: *const tty, palette: *const colour_palette, gc: *mut grid_cell) {
     unsafe {
         let mut c;
@@ -3661,7 +3661,7 @@ pub unsafe fn tty_check_us(tty: *const tty, palette: *const colour_palette, gc: 
     }
 }
 
-// vendor/tmux/tty.c:2967  static void tty_colours_fg(struct tty *tty, const struct grid_cell *gc)
+/// C `vendor/tmux/tty.c:2967`: `static void tty_colours_fg(struct tty *tty, const struct grid_cell *gc)`
 pub unsafe fn tty_colours_fg(tty: *mut tty, gc: *const grid_cell) {
     unsafe {
         let tc = &raw mut (*tty).cell;
@@ -3704,7 +3704,7 @@ pub unsafe fn tty_colours_fg(tty: *mut tty, gc: *const grid_cell) {
     }
 }
 
-// vendor/tmux/tty.c:3008  static void tty_colours_bg(struct tty *tty, const struct grid_cell *gc)
+/// C `vendor/tmux/tty.c:3008`: `static void tty_colours_bg(struct tty *tty, const struct grid_cell *gc)`
 pub unsafe fn tty_colours_bg(tty: *mut tty, gc: *const grid_cell) {
     unsafe {
         let tc = &raw mut (*tty).cell;
@@ -3741,7 +3741,7 @@ pub unsafe fn tty_colours_bg(tty: *mut tty, gc: *const grid_cell) {
     }
 }
 
-// vendor/tmux/tty.c:3040  static void tty_colours_us(struct tty *tty, const struct grid_cell *gc)
+/// C `vendor/tmux/tty.c:3040`: `static void tty_colours_us(struct tty *tty, const struct grid_cell *gc)`
 pub unsafe fn tty_colours_us(tty: *mut tty, gc: *const grid_cell) {
     unsafe {
         let tc = &raw mut (*tty).cell;
@@ -3790,7 +3790,7 @@ pub unsafe fn tty_colours_us(tty: *mut tty, gc: *const grid_cell) {
     }
 }
 
-// vendor/tmux/tty.c:3087  static int tty_try_colour(struct tty *tty, int colour, const char *type)
+/// C `vendor/tmux/tty.c:3087`: `static int tty_try_colour(struct tty *tty, int colour, const char *type)`
 pub unsafe fn tty_try_colour(tty: *mut tty, colour: i32, type_: *const u8) -> i32 {
     unsafe {
         if colour & COLOUR_FLAG_256 != 0 {
@@ -3828,7 +3828,7 @@ pub unsafe fn tty_try_colour(tty: *mut tty, colour: i32, type_: *const u8) -> i3
     }
 }
 
-// vendor/tmux/tty.c:3112  static void tty_window_default_style(struct grid_cell *gc, struct window_pane *wp)
+/// C `vendor/tmux/tty.c:3112`: `static void tty_window_default_style(struct grid_cell *gc, struct window_pane *wp)`
 pub unsafe fn tty_window_default_style(gc: *mut grid_cell, wp: *mut window_pane) {
     unsafe {
         memcpy__(gc, &raw const GRID_DEFAULT_CELL);
@@ -3837,7 +3837,7 @@ pub unsafe fn tty_window_default_style(gc: *mut grid_cell, wp: *mut window_pane)
     }
 }
 
-// vendor/tmux/tty.c:3144  void tty_default_colours(struct grid_cell *gc, struct window_pane *wp, u_int *dim)
+/// C `vendor/tmux/tty.c:3144`: `void tty_default_colours(struct grid_cell *gc, struct window_pane *wp, u_int *dim)`
 pub unsafe fn tty_default_colours(gc: *mut grid_cell, wp: *mut window_pane) {
     unsafe {
         let oo = (*wp).options;
@@ -3885,7 +3885,7 @@ pub unsafe fn tty_default_colours(gc: *mut grid_cell, wp: *mut window_pane) {
     }
 }
 
-// vendor/tmux/tty.c:3168  void tty_default_attributes(struct tty *tty, u_int bg, const struct tty_style_ctx *style_ctx)
+/// C `vendor/tmux/tty.c:3168`: `void tty_default_attributes(struct tty *tty, u_int bg, const struct tty_style_ctx *style_ctx)`
 pub unsafe fn tty_default_attributes(
     tty: *mut tty,
     defaults: *const grid_cell,
@@ -3901,7 +3901,7 @@ pub unsafe fn tty_default_attributes(
     }
 }
 
-// vendor/tmux/tty.c:3179  static void tty_clipboard_query_callback(__unused int fd, __unused short events, void *data)
+/// C `vendor/tmux/tty.c:3179`: `static void tty_clipboard_query_callback(__unused int fd, __unused short events, void *data)`
 pub unsafe extern "C-unwind" fn tty_clipboard_query_callback(
     _fd: i32,
     _events: i16,
@@ -3919,7 +3919,7 @@ pub unsafe extern "C-unwind" fn tty_clipboard_query_callback(
     }
 }
 
-// vendor/tmux/tty.c:3187  void tty_clipboard_query(struct tty *tty)
+/// C `vendor/tmux/tty.c:3187`: `void tty_clipboard_query(struct tty *tty)`
 pub unsafe fn tty_clipboard_query(tty: *mut tty) {
     unsafe {
         let tv = libc::timeval {

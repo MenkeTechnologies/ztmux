@@ -31,7 +31,7 @@ pub static CMD_RESPAWN_WINDOW_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_respawn_window_exec,
 };
 
-// vendor/tmux/cmd-respawn-window.c:48  static enum cmd_retval cmd_respawn_window_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-respawn-window.c:48`: `static enum cmd_retval cmd_respawn_window_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_respawn_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

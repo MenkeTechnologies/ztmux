@@ -20,7 +20,7 @@ macro_rules! CONTROL_SHOULD_NOTIFY_CLIENT {
     };
 }
 
-// vendor/tmux/control-notify.c:31  void control_notify_pane_mode_changed(int pane)
+/// C `vendor/tmux/control-notify.c:31`: `void control_notify_pane_mode_changed(int pane)`
 pub unsafe fn control_notify_pane_mode_changed(pane: c_int) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -35,7 +35,7 @@ pub unsafe fn control_notify_pane_mode_changed(pane: c_int) {
     }
 }
 
-// vendor/tmux/control-notify.c:44  void control_notify_window_layout_changed(struct window *w)
+/// C `vendor/tmux/control-notify.c:44`: `void control_notify_window_layout_changed(struct window *w)`
 pub unsafe fn control_notify_window_layout_changed(w: *mut window) {
     let template = c!(
         "%layout-change #{window_id} #{window_layout} #{window_visible_layout} #{window_raw_flags}"
@@ -71,7 +71,7 @@ pub unsafe fn control_notify_window_layout_changed(w: *mut window) {
     }
 }
 
-// vendor/tmux/control-notify.c:76  void control_notify_window_pane_changed(struct window *w)
+/// C `vendor/tmux/control-notify.c:76`: `void control_notify_window_pane_changed(struct window *w)`
 pub unsafe fn control_notify_window_pane_changed(w: *mut window) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -91,7 +91,7 @@ pub unsafe fn control_notify_window_pane_changed(w: *mut window) {
     }
 }
 
-// vendor/tmux/control-notify.c:92  void control_notify_window_unlinked(__unused struct session *s, struct window *w)
+/// C `vendor/tmux/control-notify.c:92`: `void control_notify_window_unlinked(__unused struct session *s, struct window *w)`
 pub unsafe fn control_notify_window_unlinked(_s: *mut session, w: *mut window) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -111,7 +111,7 @@ pub unsafe fn control_notify_window_unlinked(_s: *mut session, w: *mut window) {
     }
 }
 
-// vendor/tmux/control-notify.c:110  void control_notify_window_linked(__unused struct session *s, struct window *w)
+/// C `vendor/tmux/control-notify.c:110`: `void control_notify_window_linked(__unused struct session *s, struct window *w)`
 pub unsafe fn control_notify_window_linked(_s: *mut session, w: *mut window) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -131,7 +131,7 @@ pub unsafe fn control_notify_window_linked(_s: *mut session, w: *mut window) {
     }
 }
 
-// vendor/tmux/control-notify.c:128  void control_notify_window_renamed(struct window *w)
+/// C `vendor/tmux/control-notify.c:128`: `void control_notify_window_renamed(struct window *w)`
 pub unsafe fn control_notify_window_renamed(w: *mut window) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -151,7 +151,7 @@ pub unsafe fn control_notify_window_renamed(w: *mut window) {
     }
 }
 
-// vendor/tmux/control-notify.c:149  void control_notify_client_session_changed(struct client *cc)
+/// C `vendor/tmux/control-notify.c:149`: `void control_notify_client_session_changed(struct client *cc)`
 pub unsafe fn control_notify_client_session_changed(cc: *mut client) {
     unsafe {
         if (*cc).session.is_null() {
@@ -181,7 +181,7 @@ pub unsafe fn control_notify_client_session_changed(cc: *mut client) {
     }
 }
 
-// vendor/tmux/control-notify.c:173  void control_notify_client_detached(struct client *cc)
+/// C `vendor/tmux/control-notify.c:173`: `void control_notify_client_detached(struct client *cc)`
 pub unsafe fn control_notify_client_detached(cc: *mut client) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -194,7 +194,7 @@ pub unsafe fn control_notify_client_detached(cc: *mut client) {
     }
 }
 
-// vendor/tmux/control-notify.c:184  void control_notify_session_renamed(struct session *s)
+/// C `vendor/tmux/control-notify.c:184`: `void control_notify_session_renamed(struct session *s)`
 pub unsafe fn control_notify_session_renamed(s: *mut session) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -209,7 +209,7 @@ pub unsafe fn control_notify_session_renamed(s: *mut session) {
     }
 }
 
-// vendor/tmux/control-notify.c:197  void control_notify_session_created(__unused struct session *s)
+/// C `vendor/tmux/control-notify.c:197`: `void control_notify_session_created(__unused struct session *s)`
 pub unsafe fn control_notify_session_created(_: *mut session) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -224,7 +224,7 @@ pub unsafe fn control_notify_session_created(_: *mut session) {
     }
 }
 
-// vendor/tmux/control-notify.c:210  void control_notify_session_closed(__unused struct session *s)
+/// C `vendor/tmux/control-notify.c:210`: `void control_notify_session_closed(__unused struct session *s)`
 pub unsafe fn control_notify_session_closed(_: *mut session) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -239,7 +239,7 @@ pub unsafe fn control_notify_session_closed(_: *mut session) {
     }
 }
 
-// vendor/tmux/control-notify.c:223  void control_notify_session_window_changed(struct session *s)
+/// C `vendor/tmux/control-notify.c:223`: `void control_notify_session_window_changed(struct session *s)`
 pub unsafe fn control_notify_session_window_changed(s: *mut session) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -259,7 +259,7 @@ pub unsafe fn control_notify_session_window_changed(s: *mut session) {
     }
 }
 
-// vendor/tmux/control-notify.c:245  void control_notify_paste_buffer_changed(const char *name)
+/// C `vendor/tmux/control-notify.c:245`: `void control_notify_paste_buffer_changed(const char *name)`
 pub unsafe fn control_notify_paste_buffer_changed(name: *const u8) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -274,7 +274,7 @@ pub unsafe fn control_notify_paste_buffer_changed(name: *const u8) {
     }
 }
 
-// vendor/tmux/control-notify.c:258  void control_notify_paste_buffer_deleted(const char *name)
+/// C `vendor/tmux/control-notify.c:258`: `void control_notify_paste_buffer_deleted(const char *name)`
 pub unsafe fn control_notify_paste_buffer_deleted(name: *const u8) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {

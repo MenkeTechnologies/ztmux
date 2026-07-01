@@ -85,17 +85,17 @@ RB_GENERATE!(
 RB_GENERATE!(key_tables, key_table, entry, discr_entry, key_table_cmp);
 static mut KEY_TABLES: key_tables = rb_initializer();
 
-// vendor/tmux/key-bindings.c:81  static int key_table_cmp(struct key_table *table1, struct key_table *table2)
+/// C `vendor/tmux/key-bindings.c:81`: `static int key_table_cmp(struct key_table *table1, struct key_table *table2)`
 pub fn key_table_cmp(table1: &key_table, table2: &key_table) -> cmp::Ordering {
     unsafe { i32_to_ordering(strcmp(table1.name, table2.name)) }
 }
 
-// vendor/tmux/key-bindings.c:87  static int key_bindings_cmp(struct key_binding *bd1, struct key_binding *bd2)
+/// C `vendor/tmux/key-bindings.c:87`: `static int key_bindings_cmp(struct key_binding *bd1, struct key_binding *bd2)`
 pub fn key_bindings_cmp(bd1: &key_binding, bd2: &key_binding) -> cmp::Ordering {
     bd1.key.cmp(&bd2.key)
 }
 
-// vendor/tmux/key-bindings.c:97  static void key_bindings_free(struct key_binding *bd)
+/// C `vendor/tmux/key-bindings.c:97`: `static void key_bindings_free(struct key_binding *bd)`
 pub unsafe fn key_bindings_free(bd: *mut key_binding) {
     unsafe {
         cmd_list_free((*bd).cmdlist);
@@ -104,7 +104,7 @@ pub unsafe fn key_bindings_free(bd: *mut key_binding) {
     }
 }
 
-// vendor/tmux/key-bindings.c:105  struct key_table *key_bindings_get_table(const char *name, int create)
+/// C `vendor/tmux/key-bindings.c:105`: `struct key_table *key_bindings_get_table(const char *name, int create)`
 pub unsafe fn key_bindings_get_table(name: *const u8, create: bool) -> *mut key_table {
     unsafe {
         let mut table_find = MaybeUninit::<key_table>::uninit();
@@ -133,17 +133,17 @@ pub unsafe fn key_bindings_get_table(name: *const u8, create: bool) -> *mut key_
     }
 }
 
-// vendor/tmux/key-bindings.c:126  struct key_table *key_bindings_first_table(void)
+/// C `vendor/tmux/key-bindings.c:126`: `struct key_table *key_bindings_first_table(void)`
 pub unsafe fn key_bindings_first_table() -> *mut key_table {
     unsafe { rb_min(&raw mut KEY_TABLES) }
 }
 
-// vendor/tmux/key-bindings.c:132  struct key_table *key_bindings_next_table(struct key_table *table)
+/// C `vendor/tmux/key-bindings.c:132`: `struct key_table *key_bindings_next_table(struct key_table *table)`
 pub unsafe fn key_bindings_next_table(table: *mut key_table) -> *mut key_table {
     unsafe { rb_next(table) }
 }
 
-// vendor/tmux/key-bindings.c:138  void key_bindings_unref_table(struct key_table *table)
+/// C `vendor/tmux/key-bindings.c:138`: `void key_bindings_unref_table(struct key_table *table)`
 pub unsafe fn key_bindings_unref_table(table: *mut key_table) {
     unsafe {
         (*table).references -= 1;
@@ -165,7 +165,7 @@ pub unsafe fn key_bindings_unref_table(table: *mut key_table) {
     }
 }
 
-// vendor/tmux/key-bindings.c:160  struct key_binding *key_bindings_get(struct key_table *table, key_code key)
+/// C `vendor/tmux/key-bindings.c:160`: `struct key_binding *key_bindings_get(struct key_table *table, key_code key)`
 pub unsafe fn key_bindings_get(table: NonNull<key_table>, key: key_code) -> *mut key_binding {
     unsafe {
         let mut bd = MaybeUninit::<key_binding>::uninit();
@@ -176,7 +176,7 @@ pub unsafe fn key_bindings_get(table: NonNull<key_table>, key: key_code) -> *mut
     }
 }
 
-// vendor/tmux/key-bindings.c:169  struct key_binding *key_bindings_get_default(struct key_table *table, key_code key)
+/// C `vendor/tmux/key-bindings.c:169`: `struct key_binding *key_bindings_get_default(struct key_table *table, key_code key)`
 pub unsafe fn key_bindings_get_default(table: *mut key_table, key: key_code) -> *mut key_binding {
     unsafe {
         let mut bd = MaybeUninit::<key_binding>::uninit();
@@ -187,17 +187,17 @@ pub unsafe fn key_bindings_get_default(table: *mut key_table, key: key_code) -> 
     }
 }
 
-// vendor/tmux/key-bindings.c:178  struct key_binding *key_bindings_first(struct key_table *table)
+/// C `vendor/tmux/key-bindings.c:178`: `struct key_binding *key_bindings_first(struct key_table *table)`
 pub unsafe fn key_bindings_first(table: *mut key_table) -> *mut key_binding {
     unsafe { rb_min(&raw mut (*table).key_bindings) }
 }
 
-// vendor/tmux/key-bindings.c:184  struct key_binding *key_bindings_next(__unused struct key_table *table, struct key_binding *bd)
+/// C `vendor/tmux/key-bindings.c:184`: `struct key_binding *key_bindings_next(__unused struct key_table *table, struct key_binding *bd)`
 pub unsafe fn key_bindings_next(_table: *mut key_table, bd: *mut key_binding) -> *mut key_binding {
     unsafe { rb_next(bd) }
 }
 
-// vendor/tmux/key-bindings.c:190  void key_bindings_add(const char *name, key_code key, const char *note, int repeat, struct cmd_list *cmdlist)
+/// C `vendor/tmux/key-bindings.c:190`: `void key_bindings_add(const char *name, key_code key, const char *note, int repeat, struct cmd_list *cmdlist)`
 pub unsafe fn key_bindings_add(
     name: *const u8,
     key: key_code,
@@ -249,7 +249,7 @@ pub unsafe fn key_bindings_add(
     }
 }
 
-// vendor/tmux/key-bindings.c:234  void key_bindings_remove(const char *name, key_code key)
+/// C `vendor/tmux/key-bindings.c:234`: `void key_bindings_remove(const char *name, key_code key)`
 pub unsafe fn key_bindings_remove(name: *const u8, key: key_code) {
     unsafe {
         let Some(table) = NonNull::new(key_bindings_get_table(name, false)) else {
@@ -280,7 +280,7 @@ pub unsafe fn key_bindings_remove(name: *const u8, key: key_code) {
     }
 }
 
-// vendor/tmux/key-bindings.c:261  void key_bindings_reset(const char *name, key_code key)
+/// C `vendor/tmux/key-bindings.c:261`: `void key_bindings_reset(const char *name, key_code key)`
 pub unsafe fn key_bindings_reset(name: *const u8, key: key_code) {
     unsafe {
         let Some(table) = NonNull::new(key_bindings_get_table(name, false)) else {
@@ -312,7 +312,7 @@ pub unsafe fn key_bindings_reset(name: *const u8, key: key_code) {
     }
 }
 
-// vendor/tmux/key-bindings.c:293  void key_bindings_remove_table(const char *name)
+/// C `vendor/tmux/key-bindings.c:293`: `void key_bindings_remove_table(const char *name)`
 pub unsafe fn key_bindings_remove_table(name: *const u8) {
     unsafe {
         let table = key_bindings_get_table(name, false);
@@ -329,7 +329,7 @@ pub unsafe fn key_bindings_remove_table(name: *const u8) {
 }
 
 #[expect(dead_code)]
-// vendor/tmux/key-bindings.c:310  void key_bindings_reset_table(const char *name)
+/// C `vendor/tmux/key-bindings.c:310`: `void key_bindings_reset_table(const char *name)`
 unsafe fn key_bindings_reset_table(name: *const u8) {
     unsafe {
         let table = key_bindings_get_table(name, false);
@@ -346,7 +346,7 @@ unsafe fn key_bindings_reset_table(name: *const u8) {
     }
 }
 
-// vendor/tmux/key-bindings.c:327  static enum cmd_retval key_bindings_init_done(__unused struct cmdq_item *item, __unused void *data)
+/// C `vendor/tmux/key-bindings.c:327`: `static enum cmd_retval key_bindings_init_done(__unused struct cmdq_item *item, __unused void *data)`
 unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     unsafe {
         for table in rb_foreach(&raw mut KEY_TABLES).map(NonNull::as_ptr) {
@@ -367,7 +367,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
     cmd_retval::CMD_RETURN_NORMAL
 }
 
-// vendor/tmux/key-bindings.c:349  void key_bindings_init(void)
+/// C `vendor/tmux/key-bindings.c:349`: `void key_bindings_init(void)`
 pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
     static DEFAULTS: [&str; 262] = [
@@ -672,7 +672,7 @@ pub unsafe fn key_bindings_init() {
     }
 }
 
-// vendor/tmux/key-bindings.c:691  static enum cmd_retval key_bindings_read_only(struct cmdq_item *item, __unused void *data)
+/// C `vendor/tmux/key-bindings.c:691`: `static enum cmd_retval key_bindings_read_only(struct cmdq_item *item, __unused void *data)`
 pub unsafe fn key_bindings_read_only(item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     unsafe {
         cmdq_error!(item, "client is read-only");
@@ -680,7 +680,7 @@ pub unsafe fn key_bindings_read_only(item: *mut cmdq_item, _data: *mut c_void) -
     cmd_retval::CMD_RETURN_ERROR
 }
 
-// vendor/tmux/key-bindings.c:698  struct cmdq_item *key_bindings_dispatch(struct key_binding *bd, struct cmdq_item *item, struct client *c, struct key_event *event, struct cmd_find_state *fs)
+/// C `vendor/tmux/key-bindings.c:698`: `struct cmdq_item *key_bindings_dispatch(struct key_binding *bd, struct cmdq_item *item, struct client *c, struct key_event *event, struct cmd_find_state *fs)`
 pub unsafe fn key_bindings_dispatch(
     bd: *mut key_binding,
     item: *mut cmdq_item,

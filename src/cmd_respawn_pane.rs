@@ -28,7 +28,7 @@ pub static CMD_RESPAWN_PANE_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-respawn-pane.c:48  static enum cmd_retval cmd_respawn_pane_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-respawn-pane.c:48`: `static enum cmd_retval cmd_respawn_pane_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_respawn_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -24,7 +24,7 @@ static UTF8_MODIFIER_TABLE: [wchar_t; 31] = [
     0x1F3FF,
 ];
 
-// vendor/tmux/utf8-combined.c:51  int utf8_has_zwj(const struct utf8_data *ud)
+/// C `vendor/tmux/utf8-combined.c:51`: `int utf8_has_zwj(const struct utf8_data *ud)`
 pub unsafe fn utf8_has_zwj(ud: *const utf8_data) -> bool {
     unsafe {
         if (*ud).size < 3 {
@@ -39,7 +39,7 @@ pub unsafe fn utf8_has_zwj(ud: *const utf8_data) -> bool {
     }
 }
 
-// vendor/tmux/utf8-combined.c:60  int utf8_is_zwj(const struct utf8_data *ud)
+/// C `vendor/tmux/utf8-combined.c:60`: `int utf8_is_zwj(const struct utf8_data *ud)`
 pub unsafe fn utf8_is_zwj(ud: *const utf8_data) -> bool {
     unsafe {
         if (*ud).size != 3 {
@@ -53,7 +53,7 @@ pub unsafe fn utf8_is_zwj(ud: *const utf8_data) -> bool {
     }
 }
 
-// vendor/tmux/utf8-combined.c:69  int utf8_is_vs(const struct utf8_data *ud)
+/// C `vendor/tmux/utf8-combined.c:69`: `int utf8_is_vs(const struct utf8_data *ud)`
 pub unsafe fn utf8_is_vs(ud: *const utf8_data) -> bool {
     unsafe {
         if (*ud).size != 3 {

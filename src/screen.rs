@@ -41,7 +41,7 @@ pub struct screen_title_entry {
 pub type screen_titles = tailq_head<screen_title_entry>;
 
 /// Free titles stack.
-// vendor/tmux/screen.c:57  static void screen_free_titles(struct screen *s)
+/// C `vendor/tmux/screen.c:57`: `static void screen_free_titles(struct screen *s)`
 pub unsafe fn screen_free_titles(s: *mut screen) {
     unsafe {
         if (*s).titles.is_null() {
@@ -61,7 +61,7 @@ pub unsafe fn screen_free_titles(s: *mut screen) {
 }
 
 /// Create a new screen.
-// vendor/tmux/screen.c:76  void screen_init(struct screen *s, u_int sx, u_int sy, u_int hlimit)
+/// C `vendor/tmux/screen.c:76`: `void screen_init(struct screen *s, u_int sx, u_int sy, u_int hlimit)`
 pub unsafe fn screen_init(s: *mut screen, sx: u32, sy: u32, hlimit: u32) {
     unsafe {
         (*s).grid = grid_create(sx, sy, hlimit);
@@ -91,7 +91,7 @@ pub unsafe fn screen_init(s: *mut screen, sx: u32, sy: u32, hlimit: u32) {
 }
 
 /// Reinitialise screen.
-// vendor/tmux/screen.c:107  void screen_reinit(struct screen *s)
+/// C `vendor/tmux/screen.c:107`: `void screen_reinit(struct screen *s)`
 pub unsafe fn screen_reinit(s: *mut screen) {
     unsafe {
         (*s).cx = 0;
@@ -128,7 +128,7 @@ pub unsafe fn screen_reinit(s: *mut screen) {
 }
 
 /// Reset hyperlinks of a screen.
-// vendor/tmux/screen.c:142  void screen_reset_hyperlinks(struct screen *s)
+/// C `vendor/tmux/screen.c:142`: `void screen_reset_hyperlinks(struct screen *s)`
 pub unsafe fn screen_reset_hyperlinks(s: *mut screen) {
     unsafe {
         if (*s).hyperlinks.is_null() {
@@ -140,7 +140,7 @@ pub unsafe fn screen_reset_hyperlinks(s: *mut screen) {
 }
 
 /// Destroy a screen.
-// vendor/tmux/screen.c:152  void screen_free(struct screen *s)
+/// C `vendor/tmux/screen.c:152`: `void screen_free(struct screen *s)`
 pub unsafe fn screen_free(s: *mut screen) {
     unsafe {
         free_((*s).sel);
@@ -168,7 +168,7 @@ pub unsafe fn screen_free(s: *mut screen) {
 }
 
 /// Reset tabs to default, eight spaces apart.
-// vendor/tmux/screen.c:177  void screen_reset_tabs(struct screen *s)
+/// C `vendor/tmux/screen.c:177`: `void screen_reset_tabs(struct screen *s)`
 pub unsafe fn screen_reset_tabs(s: *mut screen) {
     unsafe {
         (*s).tabs = Some(Rc::new(RefCell::new(BitStr::new(screen_size_x(s)))));
@@ -182,7 +182,7 @@ pub unsafe fn screen_reset_tabs(s: *mut screen) {
 }
 
 /// Set screen cursor style and mode.
-// vendor/tmux/screen.c:206  void screen_set_cursor_style(u_int style, enum screen_cursor_style *cstyle, int *mode)
+/// C `vendor/tmux/screen.c:206`: `void screen_set_cursor_style(u_int style, enum screen_cursor_style *cstyle, int *mode)`
 pub unsafe fn screen_set_cursor_style(
     style: u32,
     cstyle: *mut screen_cursor_style,
@@ -221,7 +221,7 @@ pub unsafe fn screen_set_cursor_style(
 }
 
 /// Set screen cursor colour.
-// vendor/tmux/screen.c:242  void screen_set_cursor_colour(struct screen *s, int colour)
+/// C `vendor/tmux/screen.c:242`: `void screen_set_cursor_colour(struct screen *s, int colour)`
 pub unsafe fn screen_set_cursor_colour(s: *mut screen, colour: c_int) {
     unsafe {
         (*s).ccolour = colour;
@@ -229,7 +229,7 @@ pub unsafe fn screen_set_cursor_colour(s: *mut screen, colour: c_int) {
 }
 
 /// Set screen title.
-// vendor/tmux/screen.c:249  int screen_set_title(struct screen *s, const char *title, int untrusted)
+/// C `vendor/tmux/screen.c:249`: `int screen_set_title(struct screen *s, const char *title, int untrusted)`
 pub unsafe fn screen_set_title(s: *mut screen, title: *const u8) -> c_int {
     unsafe {
         if !utf8_isvalid(title) {
@@ -242,7 +242,7 @@ pub unsafe fn screen_set_title(s: *mut screen, title: *const u8) -> c_int {
 }
 
 /// Set screen path.
-// vendor/tmux/screen.c:263  int screen_set_path(struct screen *s, const char *path, int untrusted)
+/// C `vendor/tmux/screen.c:263`: `int screen_set_path(struct screen *s, const char *path, int untrusted)`
 pub unsafe fn screen_set_path(s: *mut screen, path: *const u8) {
     unsafe {
         free_((*s).path);
@@ -255,7 +255,7 @@ pub unsafe fn screen_set_path(s: *mut screen, path: *const u8) {
 }
 
 /// Push the current title onto the stack.
-// vendor/tmux/screen.c:277  void screen_push_title(struct screen *s)
+/// C `vendor/tmux/screen.c:277`: `void screen_push_title(struct screen *s)`
 pub unsafe fn screen_push_title(s: *mut screen) {
     unsafe {
         if (*s).titles.is_null() {
@@ -275,7 +275,7 @@ pub unsafe fn screen_push_title(s: *mut screen) {
 }
 
 /// Pop a title from the stack and set it as the screen title. If the stack is empty, do nothing.
-// vendor/tmux/screen.c:306  void screen_pop_title(struct screen *s)
+/// C `vendor/tmux/screen.c:306`: `void screen_pop_title(struct screen *s)`
 pub unsafe fn screen_pop_title(s: *mut screen) {
     unsafe {
         if (*s).titles.is_null() {
@@ -293,7 +293,7 @@ pub unsafe fn screen_pop_title(s: *mut screen) {
 }
 
 /// Resize screen with options.
-// vendor/tmux/screen.c:339  void screen_resize_cursor(struct screen *s, u_int sx, u_int sy, int reflow, int eat_empty, int cursor)
+/// C `vendor/tmux/screen.c:339`: `void screen_resize_cursor(struct screen *s, u_int sx, u_int sy, int reflow, int eat_empty, int cursor)`
 pub unsafe fn screen_resize_cursor(
     s: *mut screen,
     sx: u32,
@@ -369,7 +369,7 @@ pub unsafe fn screen_resize_cursor(
 }
 
 /// Resize screen.
-// vendor/tmux/screen.c:389  void screen_resize(struct screen *s, u_int sx, u_int sy, int reflow)
+/// C `vendor/tmux/screen.c:389`: `void screen_resize(struct screen *s, u_int sx, u_int sy, int reflow)`
 pub unsafe fn screen_resize(s: *mut screen, sx: u32, sy: u32, reflow: i32) {
     unsafe {
         screen_resize_cursor(s, sx, sy, reflow, 1, 1);
@@ -377,7 +377,7 @@ pub unsafe fn screen_resize(s: *mut screen, sx: u32, sy: u32, reflow: i32) {
 }
 
 /// Resize screen vertically.
-// vendor/tmux/screen.c:395  static void screen_resize_y(struct screen *s, u_int sy, int eat_empty, u_int *cy)
+/// C `vendor/tmux/screen.c:395`: `static void screen_resize_y(struct screen *s, u_int sy, int eat_empty, u_int *cy)`
 unsafe fn screen_resize_y(s: *mut screen, sy: u32, eat_empty: i32, cy: *mut u32) {
     unsafe {
         let gd = (*s).grid;
@@ -463,7 +463,7 @@ unsafe fn screen_resize_y(s: *mut screen, sy: u32, eat_empty: i32, cy: *mut u32)
 }
 
 /// Set selection.
-// vendor/tmux/screen.c:482  void screen_set_selection(struct screen *s, u_int sx, u_int sy, u_int ex, u_int ey, u_int rectangle, u_int clipx, int modekeys, struct grid_cell *gc)
+/// C `vendor/tmux/screen.c:482`: `void screen_set_selection(struct screen *s, u_int sx, u_int sy, u_int ex, u_int ey, u_int rectangle, u_int clipx, int modekeys, struct grid_cell *gc)`
 pub unsafe fn screen_set_selection(
     s: *mut screen,
     sx: u32,
@@ -492,7 +492,7 @@ pub unsafe fn screen_set_selection(
 }
 
 /// Clear selection.
-// vendor/tmux/screen.c:503  void screen_clear_selection(struct screen *s)
+/// C `vendor/tmux/screen.c:503`: `void screen_clear_selection(struct screen *s)`
 pub unsafe fn screen_clear_selection(s: *mut screen) {
     unsafe {
         free_((*s).sel);
@@ -501,7 +501,7 @@ pub unsafe fn screen_clear_selection(s: *mut screen) {
 }
 
 /// Hide selection.
-// vendor/tmux/screen.c:511  void screen_hide_selection(struct screen *s)
+/// C `vendor/tmux/screen.c:511`: `void screen_hide_selection(struct screen *s)`
 pub unsafe fn screen_hide_selection(s: *mut screen) {
     unsafe {
         if !(*s).sel.is_null() {
@@ -511,7 +511,7 @@ pub unsafe fn screen_hide_selection(s: *mut screen) {
 }
 
 /// Check if cell in selection.
-// vendor/tmux/screen.c:519  int screen_check_selection(struct screen *s, u_int px, u_int py)
+/// C `vendor/tmux/screen.c:519`: `int screen_check_selection(struct screen *s, u_int px, u_int py)`
 pub unsafe fn screen_check_selection(s: *mut screen, px: u32, py: u32) -> c_int {
     unsafe {
         let sel = (*s).sel;
@@ -644,7 +644,7 @@ pub unsafe fn screen_check_selection(s: *mut screen, px: u32, py: u32) -> c_int 
 }
 
 /// Get selected grid cell.
-// vendor/tmux/screen.c:627  int screen_select_cell(struct screen *s, struct grid_cell *dst, const struct grid_cell *src)
+/// C `vendor/tmux/screen.c:627`: `int screen_select_cell(struct screen *s, struct grid_cell *dst, const struct grid_cell *src)`
 pub unsafe fn screen_select_cell(s: *mut screen, dst: *mut grid_cell, src: *const grid_cell) {
     unsafe {
         if (*s).sel.is_null() || (*(*s).sel).hidden != 0 {
@@ -661,7 +661,7 @@ pub unsafe fn screen_select_cell(s: *mut screen, dst: *mut grid_cell, src: *cons
 }
 
 /// Reflow wrapped lines.
-// vendor/tmux/screen.c:650  static void screen_reflow(struct screen *s, u_int new_x, u_int *cx, u_int *cy, int cursor)
+/// C `vendor/tmux/screen.c:650`: `static void screen_reflow(struct screen *s, u_int new_x, u_int *cx, u_int *cy, int cursor)`
 unsafe fn screen_reflow(s: *mut screen, new_x: u32, cx: *mut u32, cy: *mut u32, cursor: i32) {
     unsafe {
         let mut wx: u32 = 0;
@@ -693,7 +693,7 @@ unsafe fn screen_reflow(s: *mut screen, new_x: u32, cx: *mut u32, cy: *mut u32, 
 
 /// Enter alternative screen mode. A copy of the visible screen is saved and the
 /// history is not updated.
-// vendor/tmux/screen.c:677  int screen_alternate_on(struct screen *s, struct grid_cell *gc, int cursor)
+/// C `vendor/tmux/screen.c:677`: `int screen_alternate_on(struct screen *s, struct grid_cell *gc, int cursor)`
 pub unsafe fn screen_alternate_on(s: *mut screen, gc: *mut grid_cell, cursor: i32) {
     unsafe {
         if !(*s).saved_grid.is_null() {
@@ -718,7 +718,7 @@ pub unsafe fn screen_alternate_on(s: *mut screen, gc: *mut grid_cell, cursor: i3
 }
 
 /// Exit alternate screen mode and restore the copied grid.
-// vendor/tmux/screen.c:713  int screen_alternate_off(struct screen *s, struct grid_cell *gc, int cursor)
+/// C `vendor/tmux/screen.c:713`: `int screen_alternate_off(struct screen *s, struct grid_cell *gc, int cursor)`
 pub unsafe fn screen_alternate_off(s: *mut screen, gc: *mut grid_cell, cursor: i32) {
     unsafe {
         let sx = screen_size_x(s);
@@ -780,7 +780,7 @@ pub unsafe fn screen_alternate_off(s: *mut screen, gc: *mut grid_cell, cursor: i
 }
 
 /// Get mode as a string.
-// vendor/tmux/screen.c:779  const char *screen_mode_to_string(int mode)
+/// C `vendor/tmux/screen.c:779`: `const char *screen_mode_to_string(int mode)`
 pub unsafe fn screen_mode_to_string(mode: mode_flag) -> *const u8 {
     const TMP_LEN: usize = 1024;
     static mut TMP: [MaybeUninit<u8>; 1024] = [MaybeUninit::uninit(); 1024];

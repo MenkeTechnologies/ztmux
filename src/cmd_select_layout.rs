@@ -63,7 +63,7 @@ pub static CMD_PREVIOUS_LAYOUT_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-select-layout.c:72  static enum cmd_retval cmd_select_layout_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-select-layout.c:72`: `static enum cmd_retval cmd_select_layout_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_select_layout_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

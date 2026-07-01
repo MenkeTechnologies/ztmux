@@ -32,7 +32,7 @@ pub static CMD_PIPE_PANE_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_pipe_pane_exec,
 };
 
-// vendor/tmux/cmd-pipe-pane.c:56  static enum cmd_retval cmd_pipe_pane_exec(struct cmd *self, struct cmdq_item *item)
+/// C `vendor/tmux/cmd-pipe-pane.c:56`: `static enum cmd_retval cmd_pipe_pane_exec(struct cmd *self, struct cmdq_item *item)`
 pub unsafe fn cmd_pipe_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -193,7 +193,7 @@ pub unsafe fn cmd_pipe_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
     }
 }
 
-// vendor/tmux/cmd-pipe-pane.c:194  static void cmd_pipe_pane_read_callback(__unused struct bufferevent *bufev, void *data)
+/// C `vendor/tmux/cmd-pipe-pane.c:194`: `static void cmd_pipe_pane_read_callback(__unused struct bufferevent *bufev, void *data)`
 pub unsafe extern "C-unwind" fn cmd_pipe_pane_read_callback(
     _bufev: *mut bufferevent,
     data: *mut c_void,
@@ -214,7 +214,7 @@ pub unsafe extern "C-unwind" fn cmd_pipe_pane_read_callback(
     }
 }
 
-// vendor/tmux/cmd-pipe-pane.c:211  static void cmd_pipe_pane_write_callback(__unused struct bufferevent *bufev, void *data)
+/// C `vendor/tmux/cmd-pipe-pane.c:211`: `static void cmd_pipe_pane_write_callback(__unused struct bufferevent *bufev, void *data)`
 pub unsafe extern "C-unwind" fn cmd_pipe_pane_write_callback(
     _bufev: *mut bufferevent,
     data: *mut c_void,
@@ -230,7 +230,7 @@ pub unsafe extern "C-unwind" fn cmd_pipe_pane_write_callback(
     }
 }
 
-// vendor/tmux/cmd-pipe-pane.c:222  static void cmd_pipe_pane_error_callback(__unused struct bufferevent *bufev, __unused short what, void *data)
+/// C `vendor/tmux/cmd-pipe-pane.c:222`: `static void cmd_pipe_pane_error_callback(__unused struct bufferevent *bufev, __unused short what, void *data)`
 pub unsafe extern "C-unwind" fn cmd_pipe_pane_error_callback(
     _bufev: *mut bufferevent,
     _what: i16,

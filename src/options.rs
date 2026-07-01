@@ -25,7 +25,7 @@ pub struct options_array_item {
     pub entry: rb_entry<options_array_item>,
 }
 
-// vendor/tmux/options.c:40  static int options_array_cmp(struct options_array_item *a1, struct options_array_item *a2)
+/// C `vendor/tmux/options.c:40`: `static int options_array_cmp(struct options_array_item *a1, struct options_array_item *a2)`
 fn options_array_cmp(a1: &options_array_item, a2: &options_array_item) -> cmp::Ordering {
     a1.index.cmp(&a2.index)
 }
@@ -95,12 +95,12 @@ unsafe fn OPTIONS_IS_ARRAY(o: *const options_entry) -> bool {
 
 RB_GENERATE!(options_tree, options_entry, entry, discr_entry, options_cmp);
 
-// vendor/tmux/options.c:93  static int options_cmp(struct options_entry *lhs, struct options_entry *rhs)
+/// C `vendor/tmux/options.c:93`: `static int options_cmp(struct options_entry *lhs, struct options_entry *rhs)`
 fn options_cmp(lhs: &options_entry, rhs: &options_entry) -> cmp::Ordering {
     lhs.name.cmp(&rhs.name)
 }
 
-// vendor/tmux/options.c:99  static const char *options_map_name(const char *name)
+/// C `vendor/tmux/options.c:99`: `static const char *options_map_name(const char *name)`
 fn options_map_name(name: &str) -> Option<&'static str> {
     for &options_name_map { from, to} in &OPTIONS_OTHER_NAMES {
         if from == name {
@@ -119,7 +119,7 @@ fn options_map_name_str(name: &str) -> &str {
     name
 }
 
-// vendor/tmux/options.c:111  static const struct options_table_entry *options_parent_table_entry(struct options *oo, const char *s)
+/// C `vendor/tmux/options.c:111`: `static const struct options_table_entry *options_parent_table_entry(struct options *oo, const char *s)`
 unsafe fn options_parent_table_entry(
     oo: *mut options,
     s: &str,
@@ -138,7 +138,7 @@ unsafe fn options_parent_table_entry(
     }
 }
 
-// vendor/tmux/options.c:124  static void options_value_free(struct options_entry *o, union options_value *ov)
+/// C `vendor/tmux/options.c:124`: `static void options_value_free(struct options_entry *o, union options_value *ov)`
 unsafe fn options_value_free(o: *const options_entry, ov: *mut options_value) {
     unsafe {
         if OPTIONS_IS_STRING(o) {
@@ -150,7 +150,7 @@ unsafe fn options_value_free(o: *const options_entry, ov: *mut options_value) {
     }
 }
 
-// vendor/tmux/options.c:133  static char *options_value_to_string(struct options_entry *o, union options_value *ov, int numeric)
+/// C `vendor/tmux/options.c:133`: `static char *options_value_to_string(struct options_entry *o, union options_value *ov, int numeric)`
 unsafe fn options_value_to_string(
     o: *mut options_entry,
     ov: *mut options_value,
@@ -205,7 +205,7 @@ unsafe fn options_value_to_string(
     }
 }
 
-// vendor/tmux/options.c:171  struct options *options_create(struct options *parent)
+/// C `vendor/tmux/options.c:171`: `struct options *options_create(struct options *parent)`
 pub unsafe fn options_create(parent: *mut options) -> *mut options {
     unsafe {
         let oo = xcalloc1::<options>() as *mut options;
@@ -215,7 +215,7 @@ pub unsafe fn options_create(parent: *mut options) -> *mut options {
     }
 }
 
-// vendor/tmux/options.c:182  void options_free(struct options *oo)
+/// C `vendor/tmux/options.c:182`: `void options_free(struct options *oo)`
 pub unsafe fn options_free(oo: *mut options) {
     unsafe {
         for o in rb_foreach(&raw mut (*oo).tree) {
@@ -225,27 +225,27 @@ pub unsafe fn options_free(oo: *mut options) {
     }
 }
 
-// vendor/tmux/options.c:192  struct options *options_get_parent(struct options *oo)
+/// C `vendor/tmux/options.c:192`: `struct options *options_get_parent(struct options *oo)`
 pub unsafe fn options_get_parent(oo: *mut options) -> *mut options {
     unsafe { (*oo).parent }
 }
 
-// vendor/tmux/options.c:198  void options_set_parent(struct options *oo, struct options *parent)
+/// C `vendor/tmux/options.c:198`: `void options_set_parent(struct options *oo, struct options *parent)`
 pub fn options_set_parent(oo: &mut options, parent: *mut options) {
     oo.parent = parent;
 }
 
-// vendor/tmux/options.c:204  struct options_entry *options_first(struct options *oo)
+/// C `vendor/tmux/options.c:204`: `struct options_entry *options_first(struct options *oo)`
 pub unsafe fn options_first(oo: *mut options) -> *mut options_entry {
     unsafe { rb_min(&raw mut (*oo).tree) }
 }
 
-// vendor/tmux/options.c:210  struct options_entry *options_next(struct options_entry *o)
+/// C `vendor/tmux/options.c:210`: `struct options_entry *options_next(struct options_entry *o)`
 pub unsafe fn options_next(o: *mut options_entry) -> *mut options_entry {
     unsafe { rb_next(o) }
 }
 
-// vendor/tmux/options.c:216  struct options_entry *options_get_only(struct options *oo, const char *name)
+/// C `vendor/tmux/options.c:216`: `struct options_entry *options_get_only(struct options *oo, const char *name)`
 pub unsafe fn options_get_only(oo: *mut options, name: &str) -> *mut options_entry {
     unsafe {
         let name = std::mem::transmute::<&str, &'static str>(name);
@@ -293,7 +293,7 @@ pub unsafe fn options_get_only_const(oo: *const options, name: &str) -> *const o
     }
 }
 
-// vendor/tmux/options.c:229  struct options_entry *options_get(struct options *oo, const char *name)
+/// C `vendor/tmux/options.c:229`: `struct options_entry *options_get(struct options *oo, const char *name)`
 pub fn options_get(oo: &mut options, name: &str) -> *mut options_entry {
     #[expect(clippy::shadow_same)]
     let mut oo: *mut options = oo;
@@ -327,7 +327,7 @@ unsafe fn options_get_const(mut oo: *const options, name: &str) -> *const option
     }
 }
 
-// vendor/tmux/options.c:244  struct options_entry *options_empty(struct options *oo, const struct options_table_entry *oe)
+/// C `vendor/tmux/options.c:244`: `struct options_entry *options_empty(struct options *oo, const struct options_table_entry *oe)`
 pub unsafe fn options_empty(
     oo: *mut options,
     oe: *const options_table_entry,
@@ -343,7 +343,7 @@ pub unsafe fn options_empty(
     }
 }
 
-// vendor/tmux/options.c:258  struct options_entry *options_default(struct options *oo, const struct options_table_entry *oe)
+/// C `vendor/tmux/options.c:258`: `struct options_entry *options_default(struct options *oo, const struct options_table_entry *oe)`
 pub unsafe fn options_default(
     oo: *mut options,
     oe: *const options_table_entry,
@@ -382,7 +382,7 @@ pub unsafe fn options_default(
     }
 }
 
-// vendor/tmux/options.c:301  char *options_default_to_string(const struct options_table_entry *oe)
+/// C `vendor/tmux/options.c:301`: `char *options_default_to_string(const struct options_table_entry *oe)`
 pub unsafe fn options_default_to_string(oe: *const options_table_entry) -> NonNull<u8> {
     unsafe {
         match (*oe).type_ {
@@ -415,7 +415,7 @@ pub unsafe fn options_default_to_string(oe: *const options_table_entry) -> NonNu
     }
 }
 
-// vendor/tmux/options.c:332  static struct options_entry *options_add(struct options *oo, const char *name)
+/// C `vendor/tmux/options.c:332`: `static struct options_entry *options_add(struct options *oo, const char *name)`
 unsafe fn options_add(oo: *mut options, name: &str) -> *mut options_entry {
     unsafe {
         let mut o = options_get_only(oo, name);
@@ -440,7 +440,7 @@ unsafe fn options_add(oo: *mut options, name: &str) -> *mut options_entry {
     }
 }
 
-// vendor/tmux/options.c:349  static void options_remove(struct options_entry *o)
+/// C `vendor/tmux/options.c:349`: `static void options_remove(struct options_entry *o)`
 unsafe fn options_remove(o: *mut options_entry) {
     unsafe {
         let oo = (*o).owner;
@@ -456,22 +456,22 @@ unsafe fn options_remove(o: *mut options_entry) {
     }
 }
 
-// vendor/tmux/options.c:363  const char *options_name(struct options_entry *o)
+/// C `vendor/tmux/options.c:363`: `const char *options_name(struct options_entry *o)`
 pub unsafe fn options_name<'a>(o: *mut options_entry) -> &'a str {
     unsafe { &(*o).name }
 }
 
-// vendor/tmux/options.c:369  struct options *options_owner(struct options_entry *o)
+/// C `vendor/tmux/options.c:369`: `struct options *options_owner(struct options_entry *o)`
 pub unsafe fn options_owner(o: *mut options_entry) -> *mut options {
     unsafe { (*o).owner }
 }
 
-// vendor/tmux/options.c:375  const struct options_table_entry *options_table_entry(struct options_entry *o)
+/// C `vendor/tmux/options.c:375`: `const struct options_table_entry *options_table_entry(struct options_entry *o)`
 pub unsafe fn options_table_entry(o: *mut options_entry) -> *const options_table_entry {
     unsafe { (*o).tableentry }
 }
 
-// vendor/tmux/options.c:381  static struct options_array_item *options_array_item(struct options_entry *o, u_int idx)
+/// C `vendor/tmux/options.c:381`: `static struct options_array_item *options_array_item(struct options_entry *o, u_int idx)`
 unsafe fn options_array_item(o: *mut options_entry, idx: c_uint) -> *mut options_array_item {
     unsafe {
         let mut a = options_array_item {
@@ -482,7 +482,7 @@ unsafe fn options_array_item(o: *mut options_entry, idx: c_uint) -> *mut options
     }
 }
 
-// vendor/tmux/options.c:390  static struct options_array_item *options_array_new(struct options_entry *o, u_int idx)
+/// C `vendor/tmux/options.c:390`: `static struct options_array_item *options_array_new(struct options_entry *o, u_int idx)`
 unsafe fn options_array_new(o: *mut options_entry, idx: c_uint) -> *mut options_array_item {
     unsafe {
         let a = xcalloc1::<options_array_item>() as *mut options_array_item;
@@ -492,7 +492,7 @@ unsafe fn options_array_new(o: *mut options_entry, idx: c_uint) -> *mut options_
     }
 }
 
-// vendor/tmux/options.c:401  static void options_array_free(struct options_entry *o, struct options_array_item *a)
+/// C `vendor/tmux/options.c:401`: `static void options_array_free(struct options_entry *o, struct options_array_item *a)`
 unsafe fn options_array_free(o: *mut options_entry, a: *mut options_array_item) {
     unsafe {
         options_value_free(o, &mut (*a).value);
@@ -501,7 +501,7 @@ unsafe fn options_array_free(o: *mut options_entry, a: *mut options_array_item) 
     }
 }
 
-// vendor/tmux/options.c:409  void options_array_clear(struct options_entry *o)
+/// C `vendor/tmux/options.c:409`: `void options_array_clear(struct options_entry *o)`
 pub unsafe fn options_array_clear(o: *mut options_entry) {
     unsafe {
         if !options_is_array(o) {
@@ -517,7 +517,7 @@ pub unsafe fn options_array_clear(o: *mut options_entry) {
     }
 }
 
-// vendor/tmux/options.c:421  union options_value *options_array_get(struct options_entry *o, u_int idx)
+/// C `vendor/tmux/options.c:421`: `union options_value *options_array_get(struct options_entry *o, u_int idx)`
 pub unsafe fn options_array_get(o: *mut options_entry, idx: u32) -> *mut options_value {
     unsafe {
         if !options_is_array(o) {
@@ -531,7 +531,7 @@ pub unsafe fn options_array_get(o: *mut options_entry, idx: u32) -> *mut options
     }
 }
 
-// vendor/tmux/options.c:434  int options_array_set(struct options_entry *o, u_int idx, const char *value, int append, char **cause)
+/// C `vendor/tmux/options.c:434`: `int options_array_set(struct options_entry *o, u_int idx, const char *value, int append, char **cause)`
 pub unsafe fn options_array_set(
     o: *mut options_entry,
     idx: u32,
@@ -608,7 +608,7 @@ pub unsafe fn options_array_set(
 }
 
 // note one difference was that this function previously could avoid allocation on error
-// vendor/tmux/options.c:511  int options_array_assign(struct options_entry *o, const char *s, char **cause)
+/// C `vendor/tmux/options.c:511`: `int options_array_assign(struct options_entry *o, const char *s, char **cause)`
 pub unsafe fn options_array_assign(o: *mut options_entry, s: &str) -> Result<(), CString> {
     unsafe {
         let mut separator = (*(*o).tableentry).separator;
@@ -659,7 +659,7 @@ pub unsafe fn options_array_assign(o: *mut options_entry, s: &str) -> Result<(),
     }
 }
 
-// vendor/tmux/options.c:552  struct options_array_item *options_array_first(struct options_entry *o)
+/// C `vendor/tmux/options.c:552`: `struct options_array_item *options_array_first(struct options_entry *o)`
 pub unsafe fn options_array_first(o: *mut options_entry) -> *mut options_array_item {
     unsafe {
         if !OPTIONS_IS_ARRAY(o) {
@@ -669,32 +669,32 @@ pub unsafe fn options_array_first(o: *mut options_entry) -> *mut options_array_i
     }
 }
 
-// vendor/tmux/options.c:560  struct options_array_item *options_array_next(struct options_array_item *a)
+/// C `vendor/tmux/options.c:560`: `struct options_array_item *options_array_next(struct options_array_item *a)`
 pub unsafe fn options_array_next(a: *mut options_array_item) -> *mut options_array_item {
     unsafe { rb_next(a) }
 }
 
-// vendor/tmux/options.c:566  u_int options_array_item_index(struct options_array_item *a)
+/// C `vendor/tmux/options.c:566`: `u_int options_array_item_index(struct options_array_item *a)`
 pub unsafe fn options_array_item_index(a: *mut options_array_item) -> u32 {
     unsafe { (*a).index }
 }
 
-// vendor/tmux/options.c:572  union options_value *options_array_item_value(struct options_array_item *a)
+/// C `vendor/tmux/options.c:572`: `union options_value *options_array_item_value(struct options_array_item *a)`
 pub unsafe fn options_array_item_value(a: *mut options_array_item) -> *mut options_value {
     unsafe { &raw mut (*a).value }
 }
 
-// vendor/tmux/options.c:578  int options_is_array(struct options_entry *o)
+/// C `vendor/tmux/options.c:578`: `int options_is_array(struct options_entry *o)`
 pub unsafe fn options_is_array(o: *mut options_entry) -> bool {
     unsafe { OPTIONS_IS_ARRAY(o) }
 }
 
-// vendor/tmux/options.c:584  int options_is_string(struct options_entry *o)
+/// C `vendor/tmux/options.c:584`: `int options_is_string(struct options_entry *o)`
 pub unsafe fn options_is_string(o: *mut options_entry) -> bool {
     unsafe { OPTIONS_IS_STRING(o) }
 }
 
-// vendor/tmux/options.c:590  char *options_to_string(struct options_entry *o, int idx, int numeric)
+/// C `vendor/tmux/options.c:590`: `char *options_to_string(struct options_entry *o, int idx, int numeric)`
 pub unsafe fn options_to_string(o: *mut options_entry, idx: i32, numeric: i32) -> *mut u8 {
     unsafe {
         if OPTIONS_IS_ARRAY(o) {
@@ -740,7 +740,7 @@ pub unsafe fn options_to_string(o: *mut options_entry, idx: i32, numeric: i32) -
     }
 }
 
-// vendor/tmux/options.c:624  char *options_parse(const char *name, int *idx)
+/// C `vendor/tmux/options.c:624`: `char *options_parse(const char *name, int *idx)`
 pub fn options_parse(name: &str) -> Option<(String, i32)> {
     if name.is_empty() {
         return None;
@@ -766,7 +766,7 @@ pub fn options_parse(name: &str) -> Option<(String, i32)> {
     Some((copy, parsed_idx))
 }
 
-// vendor/tmux/options.c:649  struct options_entry *options_parse_get(struct options *oo, const char *s, int *idx, int only)
+/// C `vendor/tmux/options.c:649`: `struct options_entry *options_parse_get(struct options *oo, const char *s, int *idx, int only)`
 pub unsafe fn options_parse_get(
     oo: *mut options,
     s: &str,
@@ -787,7 +787,7 @@ pub unsafe fn options_parse_get(
     }
 }
 
-// vendor/tmux/options.c:678  char *options_match(const char *s, int *idx, int *ambiguous)
+/// C `vendor/tmux/options.c:678`: `char *options_match(const char *s, int *idx, int *ambiguous)`
 pub unsafe fn options_match(s: &str, idx: *mut i32, ambiguous: *mut i32) -> Option<String> {
     unsafe {
         let (parsed, idx_value) = options_parse(s)?;
@@ -826,7 +826,7 @@ pub unsafe fn options_match(s: &str, idx: *mut i32, ambiguous: *mut i32) -> Opti
 }
 
 #[expect(dead_code)]
-// vendor/tmux/options.c:720  struct options_entry *options_match_get(struct options *oo, const char *s, int *idx, int only, int *ambiguous)
+/// C `vendor/tmux/options.c:720`: `struct options_entry *options_match_get(struct options *oo, const char *s, int *idx, int only, int *ambiguous)`
 unsafe fn options_match_get(
     oo: *mut options,
     s: &str,
@@ -848,7 +848,7 @@ unsafe fn options_match_get(
     }
 }
 
-// vendor/tmux/options.c:739  const char *options_get_string(struct options *oo, const char *name)
+/// C `vendor/tmux/options.c:739`: `const char *options_get_string(struct options *oo, const char *name)`
 pub unsafe fn options_get_string(oo: *mut options, name: &str) -> *const u8 {
     unsafe {
         let o = options_get(&mut *oo, name);
@@ -875,7 +875,7 @@ pub unsafe fn options_get_string_(oo: *const options, name: &str) -> *const u8 {
     }
 }
 
-// vendor/tmux/options.c:752  long long options_get_number(struct options *oo, const char *name)
+/// C `vendor/tmux/options.c:752`: `long long options_get_number(struct options *oo, const char *name)`
 unsafe fn options_get_number(oo: *mut options, name: &str) -> i64 {
     unsafe {
         let o = options_get(&mut *oo, name);
@@ -975,7 +975,7 @@ pub unsafe fn options_set_string_(
     }
 }
 
-// vendor/tmux/options.c:818  struct options_entry *options_set_number(struct options *oo, const char *name, long long value)
+/// C `vendor/tmux/options.c:818`: `struct options_entry *options_set_number(struct options *oo, const char *name, long long value)`
 pub unsafe fn options_set_number(
     oo: *mut options,
     name: &str,
@@ -1002,7 +1002,7 @@ pub unsafe fn options_set_number(
     }
 }
 
-// vendor/tmux/options.c:863  int options_scope_from_name(struct args *args, int window, const char *name, struct cmd_find_state *fs, struct options **oo, char **cause)
+/// C `vendor/tmux/options.c:863`: `int options_scope_from_name(struct args *args, int window, const char *name, struct cmd_find_state *fs, struct options **oo, char **cause)`
 pub unsafe fn options_scope_from_name(
     args: *mut args,
     window: i32,
@@ -1090,7 +1090,7 @@ pub unsafe fn options_scope_from_name(
     }
 }
 
-// vendor/tmux/options.c:934  int options_scope_from_flags(struct args *args, int window, struct cmd_find_state *fs, struct options **oo, char **cause)
+/// C `vendor/tmux/options.c:934`: `int options_scope_from_flags(struct args *args, int window, struct cmd_find_state *fs, struct options **oo, char **cause)`
 pub unsafe fn options_scope_from_flags(
     args: *mut args,
     window: i32,
@@ -1154,7 +1154,7 @@ pub unsafe fn options_scope_from_flags(
     }
 }
 
-// vendor/tmux/options.c:989  struct style *options_string_to_style(struct options *oo, const char *name, struct format_tree *ft)
+/// C `vendor/tmux/options.c:989`: `struct style *options_string_to_style(struct options *oo, const char *name, struct format_tree *ft)`
 pub unsafe fn options_string_to_style(
     oo: *mut options,
     name: &str,
@@ -1190,7 +1190,7 @@ pub unsafe fn options_string_to_style(
     }
 }
 
-// vendor/tmux/options.c:1033  static int options_from_string_check(const struct options_table_entry *oe, const char *value, char **cause)
+/// C `vendor/tmux/options.c:1033`: `static int options_from_string_check(const struct options_table_entry *oe, const char *value, char **cause)`
 unsafe fn options_from_string_check(
     oe: *const options_table_entry,
     value: *const u8,
@@ -1217,7 +1217,7 @@ unsafe fn options_from_string_check(
     }
 }
 
-// vendor/tmux/options.c:1064  static int options_from_string_flag(struct options *oo, const char *name, const char *value, char **cause)
+/// C `vendor/tmux/options.c:1064`: `static int options_from_string_flag(struct options *oo, const char *name, const char *value, char **cause)`
 unsafe fn options_from_string_flag(
     oo: *mut options,
     name: &str,
@@ -1238,7 +1238,7 @@ unsafe fn options_from_string_flag(
     }
 }
 
-// vendor/tmux/options.c:1088  int options_find_choice(const struct options_table_entry *oe, const char *value, char **cause)
+/// C `vendor/tmux/options.c:1088`: `int options_find_choice(const struct options_table_entry *oe, const char *value, char **cause)`
 pub unsafe fn options_find_choice(
     oe: *const options_table_entry,
     value: *const u8,
@@ -1251,7 +1251,7 @@ pub unsafe fn options_find_choice(
     }
 }
 
-// vendor/tmux/options.c:1107  static int options_from_string_choice(const struct options_table_entry *oe, struct options *oo, const char *name, const char *value, char **cause)
+/// C `vendor/tmux/options.c:1107`: `static int options_from_string_choice(const struct options_table_entry *oe, struct options *oo, const char *name, const char *value, char **cause)`
 unsafe fn options_from_string_choice(
     oe: *const options_table_entry,
     oo: *mut options,
@@ -1274,7 +1274,7 @@ unsafe fn options_from_string_choice(
     }
 }
 
-// vendor/tmux/options.c:1126  int options_from_string(struct options *oo, const struct options_table_entry *oe, const char *name, const char *value, int append, char **cause)
+/// C `vendor/tmux/options.c:1126`: `int options_from_string(struct options *oo, const struct options_table_entry *oe, const char *name, const char *value, int append, char **cause)`
 pub unsafe fn options_from_string(
     oo: *mut options,
     oe: *const options_table_entry,
@@ -1367,7 +1367,7 @@ pub unsafe fn options_from_string(
     }
 }
 
-// vendor/tmux/options.c:1208  void options_push_changes(const char *name)
+/// C `vendor/tmux/options.c:1208`: `void options_push_changes(const char *name)`
 pub unsafe fn options_push_changes(name: &str) {
     let __func__ = c!("options_push_changes");
     unsafe {
@@ -1457,7 +1457,7 @@ pub unsafe fn options_push_changes(name: &str) {
 }
 
 // note one difference was that this function previously could avoid allocation on error
-// vendor/tmux/options.c:1328  int options_remove_or_default(struct options_entry *o, int idx, char **cause)
+/// C `vendor/tmux/options.c:1328`: `int options_remove_or_default(struct options_entry *o, int idx, char **cause)`
 pub unsafe fn options_remove_or_default(o: *mut options_entry, idx: i32) -> Result<(), CString> {
     unsafe {
         let oo = (*o).owner;
