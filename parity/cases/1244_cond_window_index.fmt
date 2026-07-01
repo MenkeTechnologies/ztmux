@@ -1,0 +1,1 @@
+#{?#{==:#{window_index},0},zero,other}

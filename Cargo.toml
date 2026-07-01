@@ -1,0 +1,157 @@
+# ztmux — a Rust port of tmux.
+#
+# Ported against the upstream tmux C sources pinned under vendor/tmux. That
+# vendored tree is a read-only reference; this crate is the living port we own and
+# evolve. See README.md for the porting plan and how the reference is used.
+#
+# `[workspace]` is declared here so Cargo treats this repo as its own workspace root
+# and does NOT walk up into the MenkeTechnologiesMeta superproject; the vendored
+# submodules under vendor/ are excluded so their manifests are never pulled in as
+# members.
+[workspace]
+exclude = ["vendor"]
+
+[package]
+name         = "ztmux"
+version      = "3.7.0"
+authors      = ["MenkeTechnologies"]
+categories   = ["command-line-utilities"]
+edition      = "2024"
+include      = ["/src", "COPYING", "README.md", "build.rs"]
+keywords     = ["tmux"]
+license      = "MIT"
+repository   = "https://github.com/MenkeTechnologies/ztmux"
+homepage     = "https://menketechnologies.github.io/MenkeTechnologiesMeta/ztmux/"
+documentation = "https://docs.rs/ztmux"
+rust-version = "1.88" # let chains
+description  = "A Rust port of tmux — the full terminal multiplexer, server and client"
+publish      = true
+
+# Note: most of these features are not supported yet
+# they just exist to make matching upstream's
+# configuration options easier. However, sixel support is implemented
+[features]
+default     = ["sixel"]
+cgroups     = []
+hyperlinks  = []
+iutf8       = []
+ncurses     = []
+nokerninfo  = []
+sixel       = []
+sys_signame = []
+systemd     = []
+utempter    = []
+utf8proc    = []
+
+# configure linking of external libraries
+# defaults to static linking on macOS, and dynamic linking on all other platforms
+static      = []
+dynamic     = []
+
+[dependencies]
+bitflags     = { version = "2.9.1" }
+lalrpop-util = { version = "0.22.2", default-features = false, features = ["unicode"] }
+libc         = { version = "0.2.174" }
+memchr       = { version = "2.7.6" }
+num_enum     = { version = "0.7.4" }
+paste        = { version = "1.0.15" }
+terminfo-lean = { version = "0.1.2" }
+# Original extensions (src/extensions), not part of the tmux port.
+ratatui      = { version = "0.30" }
+serde        = { version = "1", features = ["derive"] }
+serde_json   = { version = "1" }
+
+[build-dependencies]
+lalrpop      = { version = "0.22.2", default-features = false }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
+
+[lints.clippy]
+# Lint policy for the port. Kept deliberately strict so the code stays lint-clean
+# as we bring modules over from the C reference and shrink the unsafe surface.
+
+# Enabled by Default: disabled
+too_many_arguments                  = "allow" # match upstream code
+
+# Fires only on transitive duplicates we can't unify from here: e.g. hashbrown
+# (0.15/0.16/0.17 across indexmap, kasuari and ratatui's lru), windows-sys
+# (0.59 vs 0.61) and bitflags (1.x vs 2.x), all pulled at differing versions
+# deep inside the ratatui / lalrpop / crossterm subtrees. Nothing in ztmux's own
+# deps can converge them, so surface (not fail) the duplication.
+multiple_crate_versions             = "allow"
+
+# Disabled by Default (nursery): enabled
+literal_string_with_formatting_args = "warn"
+needless_pass_by_ref_mut            = "warn"
+too_long_first_doc_paragraph        = "warn"
+
+# Disabled by Default (restriction): enabled
+allow_attributes                    = "warn"
+shadow_same                         = "warn"
+unused_result_ok                    = "warn"
+
+# Disabled by Default (pedantic): enabled
+assigning_clones                    = "warn"
+bool_to_int_with_if                 = "warn"
+cloned_instead_of_copied            = "warn"
+comparison_chain                    = "warn"
+default_trait_access                = "warn" # consider disabling again
+doc_markdown                        = "warn"
+explicit_iter_loop                  = "warn"
+ignored_unit_patterns               = "warn"
+large_types_passed_by_value         = "warn"
+manual_is_variant_and               = "warn"
+manual_let_else                     = "warn"
+manual_midpoint                     = "warn"
+manual_string_new                   = "warn"
+map_unwrap_or                       = "warn"
+match_bool                          = "warn"
+no_effect_underscore_binding        = "warn"
+redundant_closure_for_method_calls  = "warn"
+semicolon_if_nothing_returned       = "warn"
+trivially_copy_pass_by_ref          = "warn"
+uninlined_format_args               = "warn"
+unnecessary_semicolon               = "warn"
+used_underscore_binding             = "warn"
+
+cast_lossless                       = "allow"
+cast_possible_truncation            = "allow"
+cast_possible_wrap                  = "allow"
+cast_precision_loss                 = "allow"
+cast_ptr_alignment                  = "allow"
+cast_sign_loss                      = "allow"
+items_after_statements              = "allow"
+manual_assert                       = "allow"
+many_single_char_names              = "allow"
+match_same_arms                     = "allow"
+match_wild_err_arm                  = "allow"
+match_wildcard_for_single_variants  = "allow"
+missing_panics_doc                  = "allow"
+needless_continue                   = "allow"
+ptr_as_ptr                          = "allow"
+ptr_cast_constness                  = "allow" # TODO this one probably does indicate some real issues
+redundant_else                      = "allow"
+ref_as_ptr                          = "allow" # enable after no raw pointers are used
+single_match_else                   = "allow"
+unnecessary_box_returns             = "allow"
+
+# WON'T FIX — these fire pervasively on the C-mirroring port; allowed by policy.
+borrow_as_ptr                       = "allow"
+fn_params_excessive_bools           = "allow"
+if_not_else                         = "allow"
+linkedlist                          = "allow"
+similar_names                       = "allow"
+struct_field_names                  = "allow"
+too_many_lines                      = "allow"
+unnested_or_patterns                = "allow"
+unreadable_literal                  = "allow"
+used_underscore_items               = "allow"
+wildcard_imports                    = "allow"
+
+# Transpile-era C idioms carried over from the seed. The ports mirror tmux's C
+# control flow 1:1 (explicit index counters, `if d != 0 { n / d }` guards); the
+# rewrites clippy suggests would diverge from the C reference we validate
+# against. Revisit per-module as the code is brought to idiomatic Rust.
+explicit_counter_loop               = "allow" # match upstream C index-loop structure
+manual_checked_ops                  = "allow" # match upstream C manual bounds/division guards

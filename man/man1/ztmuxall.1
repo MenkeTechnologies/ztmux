@@ -1,0 +1,112 @@
+.\" ztmuxall(1) — comprehensive all-in-one man page for ztmux
+.\" Modeled after zshall(1): every section in one document.
+.\" Render with:  man -l man/man1/ztmuxall.1
+.TH ZTMUXALL 1 "2026-07-01" "ztmux 3.7.0" "User Commands"
+.SH NAME
+ztmuxall \- the ztmux comprehensive reference (sessions, windows, panes, the command language, and the port model)
+.SH OVERVIEW
+This is the all-in-one
+.B ztmux
+manual, modeled on
+.BR zshall (1).
+It concatenates the major sections of the ztmux reference into a single page
+so you can search with
+.RB \` / \|'.
+.B ztmux
+is a from-source port of
+.BR tmux (1)
+to Rust; where behavior is unspecified here it follows upstream
+.BR tmux (1).
+.SH 1. INVOCATION
+.B ztmux
+.RB [ \-2CDlNuVv ]
+.RB [ \-c
+.IR shell-command ]
+.RB [ \-f
+.IR file ]
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.RB [ \-T
+.IR features ]
+.RI [ command
+.RI [ flags ]]
+.PP
+With no arguments a new session is created and attached. With a
+.I command
+the client connects to the server (starting one if necessary), runs the
+command, and exits.
+.SH 2. CONCEPTS
+.TP
+.B Server
+A single background process holding all state. Started on demand.
+.TP
+.B Session
+A collection of windows. Sessions can be detached and reattached.
+.TP
+.B Window
+A full-screen workspace linked into one or more sessions.
+.TP
+.B Pane
+A rectangular split of a window, backed by its own pseudo terminal.
+.SH 3. COMMON COMMANDS
+.TP
+.B new-session
+Create a new session.
+.TP
+.B attach-session
+Attach the current terminal to an existing session.
+.TP
+.B detach-client
+Detach the current client from its session.
+.TP
+.B list-sessions
+List all sessions managed by the server.
+.TP
+.B new-window \fR/\fP \fBsplit-window
+Create a new window, or split the current pane.
+.TP
+.B send-keys
+Send key presses to a pane.
+.TP
+.B kill-server
+Terminate the server and every session it holds.
+.SH 4. SOCKET NAMESPACE
+.B ztmux
+sockets live under a per-user directory
+.RI ( /tmp/ztmux- UID
+by default), keeping ztmux servers separate from
+.BR tmux (1)
+servers on the same host. Override the socket with
+.B \-L
+(name) or
+.B \-S
+(full path).
+.SH 5. CONFIGURATION
+On start the server reads
+.I ~/.ztmux.conf
+(or the file given with
+.BR \-f ),
+a list of
+.B ztmux
+commands run in order.
+.SH 6. THE PORT MODEL
+The ztmux repository vendors a read-only reference under
+.IR vendor/ :
+.I vendor/tmux
+(the upstream tmux C sources \(em the source of truth this port is validated
+against). The living port is the crate at the repository root. See the port
+report at
+.I docs/port_report.html
+for per-function C-to-Rust coverage.
+.SH 7. EXIT STATUS
+.B ztmux
+exits zero on success and non-zero on error (an unknown command, an
+unreachable server, or a failed operation).
+.SH SEE ALSO
+.BR tmux (1),
+.BR ztmux (1)
+.SH AUTHORS
+MenkeTechnologies. Ported against the tmux C sources by Nicholas Marriott
+and contributors.

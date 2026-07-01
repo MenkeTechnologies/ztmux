@@ -1,0 +1,1 @@
+#{s/[aeiou]/_/gi:HELLO}

@@ -1,0 +1,1122 @@
+#compdef ztmux
+# ztmux zsh completion — GENERATED from the cmd_entry table + src/extensions.
+# Do not edit by hand; regenerate with:  python3 scripts/gen_zsh_completion.py
+#
+# Covers every implemented command (and alias), the client subcommands
+# (dashboard, switch, tree, doctor, stats, graph, watch, events, ps, snapshot,
+# prune, layout), and the structured `-o json|jsonl|csv|tsv|table`
+# output flag on the list-* commands.
+
+__ztmux_run() { ztmux "$@" 2>/dev/null }
+__ztmux_sessions()  { local -a v; v=(${(f)"$(__ztmux_run list-sessions -F '#{session_name}')"}); compadd -a v }
+__ztmux_clients()   { local -a v; v=(${(f)"$(__ztmux_run list-clients  -F '#{client_name}')"}); compadd -a v }
+__ztmux_windows()   { local -a v; v=(${(f)"$(__ztmux_run list-windows -a -F '#{session_name}:#{window_index}')"}); compadd -a v }
+__ztmux_panes()     { local -a v; v=(${(f)"$(__ztmux_run list-panes  -a -F '#{session_name}:#{window_index}.#{pane_index}')"}); compadd -a v }
+__ztmux_buffers()   { local -a v; v=(${(f)"$(__ztmux_run list-buffers   -F '#{buffer_name}')"}); compadd -a v }
+__ztmux_key_tables() { compadd root prefix copy-mode copy-mode-vi }
+
+_ztmux() {
+  local curcontext="$curcontext" state line ret=1
+  local -a commands
+  commands=(
+    'attach-session:attach session'
+    'attach:attach session (alias)'
+    'bind-key:bind key'
+    'bind:bind key (alias)'
+    'break-pane:break pane'
+    'breakp:break pane (alias)'
+    'capture-pane:capture pane'
+    'capturep:capture pane (alias)'
+    'choose-buffer:choose buffer'
+    'choose-client:choose client'
+    'choose-tree:choose tree'
+    'clear-history:clear history'
+    'clearhist:clear history (alias)'
+    'clear-prompt-history:clear prompt history'
+    'clearphist:clear prompt history (alias)'
+    'clock-mode:clock mode'
+    'command-prompt:command prompt'
+    'confirm-before:confirm before'
+    'confirm:confirm before (alias)'
+    'copy-mode:copy mode'
+    'customize-mode:customize mode'
+    'delete-buffer:delete buffer'
+    'deleteb:delete buffer (alias)'
+    'detach-client:detach client'
+    'detach:detach client (alias)'
+    'display-menu:display menu'
+    'menu:display menu (alias)'
+    'display-message:display message'
+    'display:display message (alias)'
+    'display-panes:display panes'
+    'displayp:display panes (alias)'
+    'display-popup:display popup'
+    'popup:display popup (alias)'
+    'find-window:find window'
+    'findw:find window (alias)'
+    'has-session:has session'
+    'has:has session (alias)'
+    'if-shell:if shell'
+    'if:if shell (alias)'
+    'join-pane:join pane'
+    'joinp:join pane (alias)'
+    'kill-pane:kill pane'
+    'killp:kill pane (alias)'
+    'kill-server:kill server'
+    'kill-session:kill session'
+    'kill-window:kill window'
+    'killw:kill window (alias)'
+    'last-pane:last pane'
+    'lastp:last pane (alias)'
+    'last-window:last window'
+    'last:last window (alias)'
+    'link-window:link window'
+    'linkw:link window (alias)'
+    'list-buffers:list buffers'
+    'lsb:list buffers (alias)'
+    'list-clients:list clients'
+    'lsc:list clients (alias)'
+    'list-commands:list commands'
+    'lscm:list commands (alias)'
+    'list-keys:list keys'
+    'lsk:list keys (alias)'
+    'list-panes:list panes'
+    'lsp:list panes (alias)'
+    'list-sessions:list sessions'
+    'ls:list sessions (alias)'
+    'list-windows:list windows'
+    'lsw:list windows (alias)'
+    'load-buffer:load buffer'
+    'loadb:load buffer (alias)'
+    'lock-client:lock client'
+    'lockc:lock client (alias)'
+    'lock-server:lock server'
+    'lock:lock server (alias)'
+    'lock-session:lock session'
+    'locks:lock session (alias)'
+    'move-pane:move pane'
+    'movep:move pane (alias)'
+    'move-window:move window'
+    'movew:move window (alias)'
+    'new-pane:new pane'
+    'newp:new pane (alias)'
+    'new-session:new session'
+    'new:new session (alias)'
+    'new-window:new window'
+    'neww:new window (alias)'
+    'next-layout:next layout'
+    'nextl:next layout (alias)'
+    'next-window:next window'
+    'next:next window (alias)'
+    'paste-buffer:paste buffer'
+    'pasteb:paste buffer (alias)'
+    'pipe-pane:pipe pane'
+    'pipep:pipe pane (alias)'
+    'previous-layout:previous layout'
+    'prevl:previous layout (alias)'
+    'previous-window:previous window'
+    'prev:previous window (alias)'
+    'refresh-client:refresh client'
+    'refresh:refresh client (alias)'
+    'rename-session:rename session'
+    'rename:rename session (alias)'
+    'rename-window:rename window'
+    'renamew:rename window (alias)'
+    'resize-pane:resize pane'
+    'resizep:resize pane (alias)'
+    'resize-window:resize window'
+    'resizew:resize window (alias)'
+    'respawn-pane:respawn pane'
+    'respawnp:respawn pane (alias)'
+    'respawn-window:respawn window'
+    'respawnw:respawn window (alias)'
+    'rotate-window:rotate window'
+    'rotatew:rotate window (alias)'
+    'run-shell:run shell'
+    'run:run shell (alias)'
+    'save-buffer:save buffer'
+    'saveb:save buffer (alias)'
+    'select-layout:select layout'
+    'selectl:select layout (alias)'
+    'select-pane:select pane'
+    'selectp:select pane (alias)'
+    'select-window:select window'
+    'selectw:select window (alias)'
+    'send-keys:send keys'
+    'send:send keys (alias)'
+    'send-prefix:send prefix'
+    'server-access:server access'
+    'set-buffer:set buffer'
+    'setb:set buffer (alias)'
+    'set-environment:set environment'
+    'setenv:set environment (alias)'
+    'set-hook:set hook'
+    'set-option:set option'
+    'set:set option (alias)'
+    'set-window-option:set window option'
+    'setw:set window option (alias)'
+    'show-buffer:show buffer'
+    'showb:show buffer (alias)'
+    'show-environment:show environment'
+    'showenv:show environment (alias)'
+    'show-hooks:show hooks'
+    'show-messages:show messages'
+    'showmsgs:show messages (alias)'
+    'show-options:show options'
+    'show:show options (alias)'
+    'show-prompt-history:show prompt history'
+    'showphist:show prompt history (alias)'
+    'show-window-options:show window options'
+    'showw:show window options (alias)'
+    'source-file:source file'
+    'source:source file (alias)'
+    'split-window:split window'
+    'splitw:split window (alias)'
+    'start-server:start server'
+    'start:start server (alias)'
+    'suspend-client:suspend client'
+    'suspendc:suspend client (alias)'
+    'swap-pane:swap pane'
+    'swapp:swap pane (alias)'
+    'swap-window:swap window'
+    'swapw:swap window (alias)'
+    'switch-client:switch client'
+    'switchc:switch client (alias)'
+    'unbind-key:unbind key'
+    'unbind:unbind key (alias)'
+    'unlink-window:unlink window'
+    'unlinkw:unlink window (alias)'
+    'wait-for:wait for'
+    'wait:wait for (alias)'
+    'dashboard:live ratatui server dashboard (ztmux extension)'
+    'switch:interactive session/window/pane picker (ztmux extension)'
+    'tree:print the session/window/pane tree (ztmux extension)'
+    'doctor:environment / server health check (ztmux extension)'
+    'stats:one-shot server summary report (ztmux extension)'
+    'graph:render the server tree as DOT/Mermaid/HTML (ztmux extension)'
+    'watch:top-like live per-pane process monitor (ztmux extension)'
+    'events:stream server lifecycle events as JSONL (ztmux extension)'
+    'ps:one-shot pipeable per-pane process table (ztmux extension)'
+    'snapshot:dump the whole server as one nested JSON document (ztmux extension)'
+    'prune:remove dead/empty/idle server objects (ztmux extension)'
+    'layout:apply a named layout preset to a window (ztmux extension)'
+  )
+
+  _arguments -C \
+    '2[force 256 colours]' \
+    '-C[start in control mode]' \
+    '-D[do not daemonise the server]' \
+    '-l[behave as a login shell]' \
+    '-N[do not start the server]' \
+    '-q[suppress errors]' \
+    '-u[assume UTF-8]' \
+    '-U[unlock the server]' \
+    '-v[request verbose logging]' \
+    '-V[report version]' \
+    '-c[execute shell-command]:shell command: ' \
+    '-f[specify configuration file]:config file:_files' \
+    '-L[socket name]:socket name: ' \
+    '-S[socket path]:socket path:_files' \
+    '-T[terminal features]:features: ' \
+    '1: :->cmds' \
+    '*:: :->args' && ret=0
+
+  case $state in
+    cmds)
+      _describe -t commands 'ztmux command' commands && ret=0
+      ;;
+    args)
+      curcontext="${curcontext%:*:*}:ztmux-$line[1]:"
+      case $line[1] in
+      attach-session|attach)
+        _arguments -s \
+        '-d[flag d]' \
+        '-E[flag E]' \
+        '-r[flag r]' \
+        '-x[flag x]' \
+        '-c[option c]:working-directory:_files -/' \
+        '-f[option f]:flags:' \
+        '-t[option t]:target-session:__ztmux_sessions' && ret=0
+        ;;
+      bind-key|bind)
+        _arguments -s \
+        '-n[flag n]' \
+        '-r[flag r]' \
+        '-T[option T]:key-table:__ztmux_key_tables' \
+        '-N[option N]:note:' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      break-pane|breakp)
+        _arguments -s \
+        '-a[flag a]' \
+        '-b[flag b]' \
+        '-d[flag d]' \
+        '-P[flag P]' \
+        '-F[option F]:format:' \
+        '-n[option n]:window-name:' \
+        '-s[option s]:src-pane:__ztmux_panes' \
+        '-t[option t]:dst-window:__ztmux_windows' && ret=0
+        ;;
+      capture-pane|capturep)
+        _arguments -s \
+        '-a[flag a]' \
+        '-C[flag C]' \
+        '-e[flag e]' \
+        '-J[flag J]' \
+        '-N[flag N]' \
+        '-p[flag p]' \
+        '-P[flag P]' \
+        '-q[flag q]' \
+        '-T[flag T]' \
+        '-b[option b]:buffer-name:__ztmux_buffers' \
+        '-E[option E]:end-line:' \
+        '-S[option S]:start-line:' \
+        '-t[option t]:target-pane:__ztmux_panes' && ret=0
+        ;;
+      choose-buffer)
+        _arguments -s \
+        '-N[flag N]' \
+        '-r[flag r]' \
+        '-Z[flag Z]' \
+        '-F[option F]:format:' \
+        '-f[option f]:filter:' \
+        '-K[option K]:key-format:' \
+        '-O[option O]:sort-order:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      choose-client)
+        _arguments -s \
+        '-N[flag N]' \
+        '-r[flag r]' \
+        '-Z[flag Z]' \
+        '-F[option F]:format:' \
+        '-f[option f]:filter:' \
+        '-K[option K]:key-format:' \
+        '-O[option O]:sort-order:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      choose-tree)
+        _arguments -s \
+        '-G[flag G]' \
+        '-N[flag N]' \
+        '-r[flag r]' \
+        '-s[flag s]' \
+        '-w[flag w]' \
+        '-Z[flag Z]' \
+        '-F[option F]:format:' \
+        '-f[option f]:filter:' \
+        '-K[option K]:key-format:' \
+        '-O[option O]:sort-order:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      clear-history|clearhist)
+        _arguments -s \
+        '-H[flag H]' \
+        '-t[option t]:target-pane:__ztmux_panes' && ret=0
+        ;;
+      clear-prompt-history|clearphist)
+        _arguments -s \
+        '-T[option T]:prompt-type:' && ret=0
+        ;;
+      clock-mode)
+        _arguments -s \
+        '-t[option t]:target-pane:__ztmux_panes' && ret=0
+        ;;
+      command-prompt)
+        _arguments -s \
+        '-1[flag 1]' \
+        '-b[flag b]' \
+        '-F[flag F]' \
+        '-k[flag k]' \
+        '-i[flag i]' \
+        '-N[flag N]' \
+        '-I[option I]:inputs:' \
+        '-p[option p]:prompts:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '-T[option T]:type:' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      confirm-before|confirm)
+        _arguments -s \
+        '-b[flag b]' \
+        '-y[flag y]' \
+        '-c[option c]:confirm-key:' \
+        '-p[option p]:prompt:' \
+        '-t[option t]:target-client:__ztmux_clients' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      copy-mode)
+        _arguments -s \
+        '-d[flag d]' \
+        '-e[flag e]' \
+        '-H[flag H]' \
+        '-M[flag M]' \
+        '-u[flag u]' \
+        '-q[flag q]' \
+        '-s[option s]:src-pane:__ztmux_panes' \
+        '-t[option t]:target-pane:__ztmux_panes' && ret=0
+        ;;
+      customize-mode)
+        _arguments -s \
+        '-N[flag N]' \
+        '-Z[flag Z]' \
+        '-F[option F]:format:' \
+        '-f[option f]:filter:' \
+        '-t[option t]:target-pane:__ztmux_panes' && ret=0
+        ;;
+      delete-buffer|deleteb)
+        _arguments -s \
+        '-b[option b]:buffer-name:__ztmux_buffers' && ret=0
+        ;;
+      detach-client|detach)
+        _arguments -s \
+        '-a[flag a]' \
+        '-P[flag P]' \
+        '-E[option E]:shell-command: ' \
+        '-s[option s]:target-session:__ztmux_sessions' \
+        '-t[option t]:target-client:__ztmux_clients' && ret=0
+        ;;
+      display-menu|menu)
+        _arguments -s \
+        '-M[flag M]' \
+        '-O[flag O]' \
+        '-b[option b]:border-lines:' \
+        '-c[option c]:target-client:__ztmux_clients' \
+        '-C[option C]:starting-choice:' \
+        '-H[option H]:selected-style:' \
+        '-s[option s]:style:' \
+        '-S[option S]:border-style:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '-T[option T]:title:' \
+        '-x[option x]:position:' \
+        '-y[option y]:position:' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      display-message|display)
+        _arguments -s \
+        '-a[flag a]' \
+        '-C[flag C]' \
+        '-I[flag I]' \
+        '-l[flag l]' \
+        '-N[flag N]' \
+        '-p[flag p]' \
+        '-v[flag v]' \
+        '-c[option c]:target-client:__ztmux_clients' \
+        '-d[option d]:delay:' \
+        '-F[option F]:format:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      display-panes|displayp)
+        _arguments -s \
+        '-b[flag b]' \
+        '-N[flag N]' \
+        '-d[option d]:duration:' \
+        '-t[option t]:target-client:__ztmux_clients' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      display-popup|popup)
+        _arguments -s \
+        '-B[flag B]' \
+        '-C[flag C]' \
+        '-E[flag E]' \
+        '-b[option b]:border-lines:' \
+        '-c[option c]:target-client:__ztmux_clients' \
+        '-d[option d]:start-directory:' \
+        '-e[option e]:environment:' \
+        '-h[option h]:height:' \
+        '-s[option s]:style:' \
+        '-S[option S]:border-style:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '-T[option T]:title:' \
+        '-w[option w]:width:' \
+        '-x[option x]:position:' \
+        '-y[option y]:position:' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      find-window|findw)
+        _arguments -s \
+        '-C[flag C]' \
+        '-i[flag i]' \
+        '-N[flag N]' \
+        '-r[flag r]' \
+        '-T[flag T]' \
+        '-Z[flag Z]' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      has-session|has)
+        _arguments -s \
+        '-t[option t]:target-session:__ztmux_sessions' && ret=0
+        ;;
+      if-shell|if)
+        _arguments -s \
+        '-b[flag b]' \
+        '-F[flag F]' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      join-pane|joinp)
+        _arguments -s \
+        '-b[flag b]' \
+        '-d[flag d]' \
+        '-f[flag f]' \
+        '-h[flag h]' \
+        '-v[flag v]' \
+        '-l[option l]:size:' \
+        '-s[option s]:src-pane:__ztmux_panes' \
+        '-t[option t]:dst-pane:__ztmux_panes' && ret=0
+        ;;
+      kill-pane|killp)
+        _arguments -s \
+        '-a[flag a]' \
+        '-t[option t]:target-client:__ztmux_clients' && ret=0
+        ;;
+      kill-server)
+        _message 'no arguments'
+        ;;
+      kill-session)
+        _arguments -s \
+        '-a[flag a]' \
+        '-C[flag C]' \
+        '-t[option t]:target-session:__ztmux_sessions' && ret=0
+        ;;
+      kill-window|killw)
+        _arguments -s \
+        '-a[flag a]' \
+        '-t[option t]:target-window:__ztmux_windows' && ret=0
+        ;;
+      last-pane|lastp)
+        _arguments -s \
+        '-d[flag d]' \
+        '-e[flag e]' \
+        '-Z[flag Z]' \
+        '-t[option t]:target-window:__ztmux_windows' && ret=0
+        ;;
+      last-window|last)
+        _arguments -s \
+        '-t[option t]:target-session:__ztmux_sessions' && ret=0
+        ;;
+      link-window|linkw)
+        _arguments -s \
+        '-a[flag a]' \
+        '-b[flag b]' \
+        '-d[flag d]' \
+        '-k[flag k]' \
+        '-s[option s]:src-window:__ztmux_windows' \
+        '-t[option t]:dst-window:__ztmux_windows' && ret=0
+        ;;
+      list-buffers|lsb)
+        _arguments -s \
+        '-F[option F]:format:' \
+        '-f[option f]:filter:' \
+        '-O[option O]:order:' \
+        '-o[option o]:format:(json jsonl csv tsv table yaml)' \
+        '-r[flag r]' && ret=0
+        ;;
+      list-clients|lsc)
+        _arguments -s \
+        '-F[option F]:format:' \
+        '-f[option f]:filter:' \
+        '-o[option o]:format:(json jsonl csv tsv table yaml)' \
+        '-t[option t]:target-session:__ztmux_sessions' && ret=0
+        ;;
+      list-commands|lscm)
+        _arguments -s \
+        '-F[option F]:format:' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      list-keys|lsk)
+        _arguments -s \
+        '-1[flag 1]' \
+        '-a[flag a]' \
+        '-N[flag N]' \
+        '-P[option P]:prefix-string:' \
+        '-T[option T]:key-table:__ztmux_key_tables' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      list-panes|lsp)
+        _arguments -s \
+        '-a[flag a]' \
+        '-s[flag s]' \
+        '-F[option F]:format:' \
+        '-f[option f]:filter:' \
+        '-o[option o]:format:(json jsonl csv tsv table yaml)' \
+        '-t[option t]:target-window:__ztmux_windows' && ret=0
+        ;;
+      list-sessions|ls)
+        _arguments -s \
+        '-F[option F]:format:' \
+        '-f[option f]:filter:' \
+        '-o[option o]:format:(json jsonl csv tsv table yaml)' && ret=0
+        ;;
+      list-windows|lsw)
+        _arguments -s \
+        '-a[flag a]' \
+        '-F[option F]:format:' \
+        '-f[option f]:filter:' \
+        '-o[option o]:format:(json jsonl csv tsv table yaml)' \
+        '-t[option t]:target-session:__ztmux_sessions' && ret=0
+        ;;
+      load-buffer|loadb)
+        _arguments -s \
+        '-b[option b]:buffer-name:__ztmux_buffers' \
+        '-t[option t]:target-client:__ztmux_clients' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      lock-client|lockc)
+        _arguments -s \
+        '-t[option t]:target-client:__ztmux_clients' && ret=0
+        ;;
+      lock-server|lock)
+        _message 'no arguments'
+        ;;
+      lock-session|locks)
+        _arguments -s \
+        '-t[option t]:target-session:__ztmux_sessions' && ret=0
+        ;;
+      move-pane|movep)
+        _arguments -s \
+        '-b[flag b]' \
+        '-d[flag d]' \
+        '-f[flag f]' \
+        '-h[flag h]' \
+        '-v[flag v]' \
+        '-l[option l]:size:' \
+        '-s[option s]:src-pane:__ztmux_panes' \
+        '-t[option t]:dst-pane:__ztmux_panes' && ret=0
+        ;;
+      move-window|movew)
+        _arguments -s \
+        '-a[flag a]' \
+        '-b[flag b]' \
+        '-d[flag d]' \
+        '-k[flag k]' \
+        '-r[flag r]' \
+        '-s[option s]:src-window:__ztmux_windows' \
+        '-t[option t]:dst-window:__ztmux_windows' && ret=0
+        ;;
+      new-pane|newp)
+        _arguments -s \
+        '-b[flag b]' \
+        '-d[flag d]' \
+        '-e[flag e]' \
+        '-f[flag f]' \
+        '-h[flag h]' \
+        '-I[flag I]' \
+        '-k[flag k]' \
+        '-l[flag l]' \
+        '-P[flag P]' \
+        '-v[flag v]' \
+        '-W[flag W]' \
+        '-Z[flag Z]' \
+        '-B[option B]:border-lines:' \
+        '-c[option c]:start-directory:' \
+        '-e[option e]:environment:' \
+        '-F[option F]:format:' \
+        '-l[option l]:size:' \
+        '-m[option m]:message:' \
+        '-p[option p]:percentage:' \
+        '-s[option s]:style:' \
+        '-S[option S]:active-border-style:' \
+        '-R[option R]:inactive-border-style:' \
+        '-T[option T]:title:' \
+        '-x[option x]:width:' \
+        '-y[option y]:height:' \
+        '-X[option X]:x-position:' \
+        '-Y[option Y]:y-position:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      new-session|new)
+        _arguments -s \
+        '-A[flag A]' \
+        '-d[flag d]' \
+        '-D[flag D]' \
+        '-E[flag E]' \
+        '-P[flag P]' \
+        '-X[flag X]' \
+        '-c[option c]:start-directory:' \
+        '-e[option e]:environment:' \
+        '-F[option F]:format:' \
+        '-f[option f]:flags:' \
+        '-n[option n]:window-name:' \
+        '-s[option s]:session-name:' \
+        '-t[option t]:target-session:__ztmux_sessions' \
+        '-x[option x]:width:' \
+        '-y[option y]:height:' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      new-window|neww)
+        _arguments -s \
+        '-a[flag a]' \
+        '-b[flag b]' \
+        '-d[flag d]' \
+        '-k[flag k]' \
+        '-P[flag P]' \
+        '-S[flag S]' \
+        '-c[option c]:start-directory:' \
+        '-e[option e]:environment:' \
+        '-F[option F]:format:' \
+        '-n[option n]:window-name:' \
+        '-t[option t]:target-window:__ztmux_windows' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      next-layout|nextl)
+        _arguments -s \
+        '-t[option t]:target-window:__ztmux_windows' && ret=0
+        ;;
+      next-window|next)
+        _arguments -s \
+        '-a[flag a]' \
+        '-t[option t]:target-session:__ztmux_sessions' && ret=0
+        ;;
+      paste-buffer|pasteb)
+        _arguments -s \
+        '-d[flag d]' \
+        '-p[flag p]' \
+        '-r[flag r]' \
+        '-s[option s]:separator:' \
+        '-b[option b]:buffer-name:__ztmux_buffers' \
+        '-t[option t]:target-pane:__ztmux_panes' && ret=0
+        ;;
+      pipe-pane|pipep)
+        _arguments -s \
+        '-I[flag I]' \
+        '-O[flag O]' \
+        '-o[flag o]' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      previous-layout|prevl)
+        _arguments -s \
+        '-t[option t]:target-window:__ztmux_windows' && ret=0
+        ;;
+      previous-window|prev)
+        _arguments -s \
+        '-a[flag a]' \
+        '-t[option t]:target-session:__ztmux_sessions' && ret=0
+        ;;
+      refresh-client|refresh)
+        _arguments -s \
+        '-c[flag c]' \
+        '-D[flag D]' \
+        '-l[flag l]' \
+        '-L[flag L]' \
+        '-R[flag R]' \
+        '-S[flag S]' \
+        '-U[flag U]' \
+        '-A[option A]:pane state:' \
+        '-B[option B]:name what format:' \
+        '-C[option C]:XxY:' \
+        '-f[option f]:flags:' \
+        '-r[option r]:pane report:' \
+        '-t[option t]:target-client:__ztmux_clients' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      rename-session|rename)
+        _arguments -s \
+        '-t[option t]:target-session:__ztmux_sessions' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      rename-window|renamew)
+        _arguments -s \
+        '-t[option t]:target-window:__ztmux_windows' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      resize-pane|resizep)
+        _arguments -s \
+        '-D[flag D]' \
+        '-L[flag L]' \
+        '-M[flag M]' \
+        '-R[flag R]' \
+        '-T[flag T]' \
+        '-U[flag U]' \
+        '-Z[flag Z]' \
+        '-x[option x]:width:' \
+        '-y[option y]:height:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      resize-window|resizew)
+        _arguments -s \
+        '-a[flag a]' \
+        '-A[flag A]' \
+        '-D[flag D]' \
+        '-L[flag L]' \
+        '-R[flag R]' \
+        '-U[flag U]' \
+        '-x[option x]:width:' \
+        '-y[option y]:height:' \
+        '-t[option t]:target-window:__ztmux_windows' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      respawn-pane|respawnp)
+        _arguments -s \
+        '-k[flag k]' \
+        '-c[option c]:start-directory:' \
+        '-e[option e]:environment:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      respawn-window|respawnw)
+        _arguments -s \
+        '-k[flag k]' \
+        '-c[option c]:start-directory:' \
+        '-e[option e]:environment:' \
+        '-t[option t]:target-window:__ztmux_windows' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      rotate-window|rotatew)
+        _arguments -s \
+        '-D[flag D]' \
+        '-U[flag U]' \
+        '-Z[flag Z]' \
+        '-t[option t]:target-window:__ztmux_windows' && ret=0
+        ;;
+      run-shell|run)
+        _arguments -s \
+        '-b[flag b]' \
+        '-C[flag C]' \
+        '-c[option c]:start-directory:' \
+        '-d[option d]:delay:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      save-buffer|saveb)
+        _arguments -s \
+        '-a[flag a]' \
+        '-b[option b]:buffer-name:__ztmux_buffers' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      select-layout|selectl)
+        _arguments -s \
+        '-E[flag E]' \
+        '-n[flag n]' \
+        '-o[flag o]' \
+        '-p[flag p]' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      select-pane|selectp)
+        _arguments -s \
+        '-D[flag D]' \
+        '-d[flag d]' \
+        '-e[flag e]' \
+        '-L[flag L]' \
+        '-l[flag l]' \
+        '-M[flag M]' \
+        '-m[flag m]' \
+        '-R[flag R]' \
+        '-U[flag U]' \
+        '-Z[flag Z]' \
+        '-T[option T]:title:' \
+        '-t[option t]:target-pane:__ztmux_panes' && ret=0
+        ;;
+      select-window|selectw)
+        _arguments -s \
+        '-l[flag l]' \
+        '-n[flag n]' \
+        '-p[flag p]' \
+        '-T[flag T]' \
+        '-t[option t]:target-window:__ztmux_windows' && ret=0
+        ;;
+      send-keys|send)
+        _arguments -s \
+        '-F[flag F]' \
+        '-H[flag H]' \
+        '-K[flag K]' \
+        '-l[flag l]' \
+        '-M[flag M]' \
+        '-R[flag R]' \
+        '-X[flag X]' \
+        '-c[option c]:target-client:__ztmux_clients' \
+        '-N[option N]:repeat-count:' \
+        '-t[flag t]' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      send-prefix)
+        _arguments -s \
+        '-2[flag 2]' \
+        '-t[flag t]' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      server-access)
+        _arguments -s \
+        '-a[flag a]' \
+        '-d[flag d]' \
+        '-l[flag l]' \
+        '-r[flag r]' \
+        '-w[flag w]' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      set-buffer|setb)
+        _arguments -s \
+        '-a[flag a]' \
+        '-w[flag w]' \
+        '-b[option b]:buffer-name:__ztmux_buffers' \
+        '-n[option n]:new-buffer-name:' \
+        '-t[option t]:target-client:__ztmux_clients' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      set-environment|setenv)
+        _arguments -s \
+        '-F[flag F]' \
+        '-h[flag h]' \
+        '-g[flag g]' \
+        '-r[flag r]' \
+        '-u[flag u]' \
+        '-t[option t]:target-session:__ztmux_sessions' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      set-hook)
+        _arguments -s \
+        '-a[flag a]' \
+        '-g[flag g]' \
+        '-p[flag p]' \
+        '-R[flag R]' \
+        '-u[flag u]' \
+        '-w[flag w]' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      set-option|set)
+        _arguments -s \
+        '-a[flag a]' \
+        '-F[flag F]' \
+        '-g[flag g]' \
+        '-o[flag o]' \
+        '-p[flag p]' \
+        '-q[flag q]' \
+        '-s[flag s]' \
+        '-u[flag u]' \
+        '-U[flag U]' \
+        '-w[flag w]' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      set-window-option|setw)
+        _arguments -s \
+        '-a[flag a]' \
+        '-F[flag F]' \
+        '-g[flag g]' \
+        '-o[flag o]' \
+        '-q[flag q]' \
+        '-u[flag u]' \
+        '-t[option t]:target-window:__ztmux_windows' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      show-buffer|showb)
+        _arguments -s \
+        '-b[option b]:buffer-name:__ztmux_buffers' && ret=0
+        ;;
+      show-environment|showenv)
+        _arguments -s \
+        '-h[flag h]' \
+        '-g[flag g]' \
+        '-s[flag s]' \
+        '-t[option t]:target-session:__ztmux_sessions' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      show-hooks)
+        _arguments -s \
+        '-g[flag g]' \
+        '-p[flag p]' \
+        '-w[flag w]' \
+        '-t[option t]:target-pane:__ztmux_panes' && ret=0
+        ;;
+      show-messages|showmsgs)
+        _arguments -s \
+        '-J[flag J]' \
+        '-T[flag T]' \
+        '-t[option t]:target-client:__ztmux_clients' && ret=0
+        ;;
+      show-options|show)
+        _arguments -s \
+        '-A[flag A]' \
+        '-g[flag g]' \
+        '-H[flag H]' \
+        '-p[flag p]' \
+        '-q[flag q]' \
+        '-s[flag s]' \
+        '-v[flag v]' \
+        '-w[flag w]' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      show-prompt-history|showphist)
+        _arguments -s \
+        '-T[option T]:prompt-type:' && ret=0
+        ;;
+      show-window-options|showw)
+        _arguments -s \
+        '-g[flag g]' \
+        '-v[flag v]' \
+        '-t[option t]:target-window:__ztmux_windows' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      source-file|source)
+        _arguments -s \
+        '-F[flag F]' \
+        '-n[flag n]' \
+        '-q[flag q]' \
+        '-v[flag v]' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      split-window|splitw)
+        _arguments -s \
+        '-b[flag b]' \
+        '-d[flag d]' \
+        '-e[flag e]' \
+        '-f[flag f]' \
+        '-h[flag h]' \
+        '-I[flag I]' \
+        '-k[flag k]' \
+        '-l[flag l]' \
+        '-P[flag P]' \
+        '-v[flag v]' \
+        '-W[flag W]' \
+        '-Z[flag Z]' \
+        '-c[option c]:start-directory:' \
+        '-e[option e]:environment:' \
+        '-F[option F]:format:' \
+        '-l[option l]:size:' \
+        '-m[option m]:message:' \
+        '-p[option p]:percentage:' \
+        '-s[option s]:style:' \
+        '-S[option S]:active-border-style:' \
+        '-R[option R]:inactive-border-style:' \
+        '-T[option T]:title:' \
+        '-t[option t]:target-pane:__ztmux_panes' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      start-server|start)
+        _message 'no arguments'
+        ;;
+      suspend-client|suspendc)
+        _arguments -s \
+        '-t[option t]:target-client:__ztmux_clients' && ret=0
+        ;;
+      swap-pane|swapp)
+        _arguments -s \
+        '-d[flag d]' \
+        '-D[flag D]' \
+        '-U[flag U]' \
+        '-Z[flag Z]' \
+        '-s[option s]:src-pane:__ztmux_panes' \
+        '-t[option t]:dst-pane:__ztmux_panes' && ret=0
+        ;;
+      swap-window|swapw)
+        _arguments -s \
+        '-d[flag d]' \
+        '-s[option s]:src-window:__ztmux_windows' \
+        '-t[option t]:dst-window:__ztmux_windows' && ret=0
+        ;;
+      switch-client|switchc)
+        _arguments -s \
+        '-E[flag E]' \
+        '-l[flag l]' \
+        '-n[flag n]' \
+        '-p[flag p]' \
+        '-r[flag r]' \
+        '-Z[flag Z]' \
+        '-c[option c]:target-client:__ztmux_clients' \
+        '-t[option t]:target-session:__ztmux_sessions' \
+        '-T[option T]:key-table:__ztmux_key_tables' \
+        '-O[option O]:order:' && ret=0
+        ;;
+      unbind-key|unbind)
+        _arguments -s \
+        '-a[flag a]' \
+        '-n[flag n]' \
+        '-q[flag q]' \
+        '-T[option T]:key-table:__ztmux_key_tables' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      unlink-window|unlinkw)
+        _arguments -s \
+        '-k[flag k]' \
+        '-t[option t]:target-window:__ztmux_windows' && ret=0
+        ;;
+      wait-for|wait)
+        _arguments -s \
+        '-L[flag L]' \
+        '-|[flag |]' \
+        '--[flag -]' \
+        '-S[flag S]' \
+        '-|[flag |]' \
+        '--[flag -]' \
+        '-U[flag U]' \
+        '*:::arg:_normal' && ret=0
+        ;;
+      dashboard)
+        _message 'no arguments'
+        ;;
+      switch)
+        _message 'no arguments'
+        ;;
+      tree)
+        _message 'no arguments'
+        ;;
+      doctor)
+        _arguments -s \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
+        ;;
+      stats)
+        _arguments -s \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
+        ;;
+      graph)
+        _arguments -s \
+        '-o[diagram format]:format:(dot mermaid html)' && ret=0
+        ;;
+      watch)
+        _message 'no arguments'
+        ;;
+      events)
+        _arguments -s \
+        '-n[poll interval in ms]:ms' \
+        '--count[exit after N events]:count' && ret=0
+        ;;
+      ps)
+        _arguments -s \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
+        ;;
+      snapshot)
+        _message 'no arguments'
+        ;;
+      prune)
+        _arguments -s \
+        '--dead[prune dead panes]' \
+        '--empty[prune window-less sessions]' \
+        '--idle[prune detached sessions idle > N seconds]:seconds' \
+        '-f[actually remove (default: dry-run)]' \
+        '--force[actually remove (default: dry-run)]' \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
+        ;;
+      layout)
+        _arguments -s \
+        ':preset:(list even-h even-v main-h main-v tiled dev ide grid)' \
+        '-t[target window]:target' \
+        '-f[apply (default: dry-run)]' \
+        '--apply[apply (default: dry-run)]' && ret=0
+        ;;
+      *)
+        _default && ret=0
+        ;;
+      esac
+      ;;
+  esac
+  return ret
+}
+
+_ztmux "$@"

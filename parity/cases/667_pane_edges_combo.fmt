@@ -1,0 +1,1 @@
+#{?pane_at_left,L,-}#{?pane_at_right,R,-}#{?pane_at_top,T,-}#{?pane_at_bottom,B,-}

@@ -1,0 +1,176 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.0.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    continue-on-error: ${{ matrix.allow_failure || false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # --- macOS native ---
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          # x86_64 on the Intel runner (macos-latest is arm64; its Homebrew
+          # libevent is arm64-only, so a cross x86_64 link fails).
+          - os: macos-13
+            target: x86_64-apple-darwin
+          # --- Linux glibc native ---
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            allow_failure: true
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install libevent (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libevent-dev
+
+      - name: Install libevent (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libevent
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build binary
+        run: |
+          cargo build --release --locked --target ${{ matrix.target }} \
+            --bin ztmux
+
+      - name: Package
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          strip ztmux 2>/dev/null || true
+          tar czf ../../../ztmux-${{ github.ref_name }}-${{ matrix.target }}.tar.gz \
+            ztmux
+          cd ../../..
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ztmux-${{ matrix.target }}
+          path: ztmux-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            artifacts/*.tar.gz
+
+  homebrew:
+    name: Update Homebrew tap
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Compute SHA256 sums
+        id: sha
+        shell: bash
+        run: |
+          for f in artifacts/*.tar.gz; do
+            base=$(basename "$f")
+            sum=$(sha256sum "$f" | awk '{print $1}')
+            key=$(echo "$base" | sed 's/ztmux-v[^-]*-//; s/\.tar\.gz//; s/-/_/g; s/\./_/g')
+            echo "${key}=${sum}" >> "$GITHUB_OUTPUT"
+          done
+
+      - uses: actions/checkout@v6
+        with:
+          repository: MenkeTechnologies/homebrew-menketech
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update formula
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+          SHA_ARM_MACOS: ${{ steps.sha.outputs.aarch64_apple_darwin }}
+          SHA_X86_MACOS: ${{ steps.sha.outputs.x86_64_apple_darwin }}
+          SHA_X86_LINUX: ${{ steps.sha.outputs.x86_64_unknown_linux_gnu }}
+          SHA_ARM_LINUX: ${{ steps.sha.outputs.aarch64_unknown_linux_gnu }}
+        run: |
+          set -eu
+          V="${VERSION#v}"
+          BASE="https://github.com/MenkeTechnologies/ztmux/releases/download/v${V}"
+          emit() { local guard="$1" arch="$2" sha="$3"; [ -n "$sha" ] || return 0; printf '    %s do\n      url "%s/ztmux-v%s-%s.tar.gz"\n      sha256 "%s"\n    end\n' "$guard" "$BASE" "$V" "$arch" "$sha"; }
+          mac_blocks=$( { emit on_arm aarch64-apple-darwin "$SHA_ARM_MACOS"; emit on_intel x86_64-apple-darwin "$SHA_X86_MACOS"; } )
+          linux_blocks=$( { emit on_intel x86_64-unknown-linux-gnu "$SHA_X86_LINUX"; emit on_arm aarch64-unknown-linux-gnu "$SHA_ARM_LINUX"; } )
+          {
+            printf 'class Ztmux < Formula\n'
+            printf '  desc "Rust port of tmux — the full terminal multiplexer, server and client"\n'
+            printf '  homepage "https://github.com/MenkeTechnologies/ztmux"\n'
+            printf '  license "MIT"\n'
+            printf '  version "%s"\n\n' "$V"
+            printf '  depends_on "libevent"\n\n'
+            if [ -n "$mac_blocks" ]; then
+              printf '  on_macos do\n%s\n  end\n\n' "$mac_blocks"
+            fi
+            if [ -n "$linux_blocks" ]; then
+              printf '  on_linux do\n%s\n  end\n\n' "$linux_blocks"
+            fi
+            printf '  def install\n'
+            printf '    bin.install "ztmux"\n'
+            printf '  end\n\n'
+            printf '  test do\n'
+            printf '    assert_match "ztmux", shell_output("#{bin}/ztmux -V")\n'
+            printf '  end\n'
+            printf 'end\n'
+          } > tap/Formula/ztmux.rb
+
+      - name: Push formula update
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/ztmux.rb
+          if git diff --cached --quiet; then
+            echo "no changes — formula already up to date"
+            exit 0
+          fi
+          git commit -m "ztmux: bump to ${{ github.ref_name }}"
+          git push

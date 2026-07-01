@@ -1,0 +1,565 @@
+.TH ZTMUX 1 "2026-07-01" "ztmux 3.7.0" "User Commands"
+.SH NAME
+ztmux \- terminal multiplexer, a from-source Rust port of tmux
+.SH SYNOPSIS
+.B ztmux
+.RB [ \-2CDlNquvV ]
+.RB [ \-c
+.IR shell-command ]
+.RB [ \-f
+.IR file ]
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.RB [ \-T
+.IR features ]
+.RI [ command
+.RI [ flags ]]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B dashboard
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B switch
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B tree
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B doctor
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B stats
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B graph
+.RB [ \-o
+.IR dot | mermaid | html ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B watch
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B events
+.RB [ \-n
+.IR ms ]
+.RB [ \-\-count
+.IR N ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B ps
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B snapshot
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B prune
+.RB [ \-\-dead ]
+.RB [ \-\-empty ]
+.RB [ \-\-idle
+.IR secs ]
+.RB [ \-f ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B layout
+.I name
+.RB [ \-t
+.IR window ]
+.RB [ \-f ]
+.SH DESCRIPTION
+.B ztmux
+is a terminal multiplexer: it lets a number of terminals be created,
+accessed, and controlled from a single screen.
+.B ztmux
+may be detached from a screen and continue running in the background, then
+later reattached.
+.PP
+It is a from-source port of
+.BR tmux (1)
+to Rust \(em the whole program (server, client, the grid and screen model,
+the input parser, layouts, the command language, formats, and the terminal
+back end), not a wrapper around the
+.B tmux
+binary and not control mode.
+.PP
+When
+.B ztmux
+is started it creates a new session with a single window and displays it on
+screen. A status line at the bottom of the screen shows information on the
+current session and is used to enter interactive commands.
+.PP
+A session is a single collection of pseudo terminals under the management of
+.BR ztmux .
+Each session has one or more windows linked to it. A window occupies the
+entire screen and may be split into rectangular panes, each of which is a
+separate pseudo terminal. Any number of
+.B ztmux
+instances may connect to the same session, and any number of windows may be
+present in the same session.
+.PP
+.B ztmux
+keeps its state in a single server process, which manages all the clients,
+sessions, windows, and panes.
+.SS Compatibility with tmux
+.B ztmux
+is a drop-in reimplementation and deliberately shares
+.BR tmux (1)'s
+runtime conventions so existing configuration and tooling keep working:
+.RS
+.IP \(bu 2
+the client and server speak tmux's wire protocol over a socket kept under
+.IR $TMUX_TMPDIR / tmux- UID / (default
+.IR /tmp/tmux- UID /);
+.IP \(bu 2
+configuration is read from the tmux search path (see
+.B FILES
+below), i.e.
+.I ~/.tmux.conf
+by default;
+.IP \(bu 2
+the server exports
+.B $TMUX
+to each pane, identifying the socket, session, and pane.
+.RE
+.PP
+A running
+.B ztmux
+server is therefore reachable by any tmux-protocol client (including the
+.B ztmux
+binary itself, native GUI clients, and the standard
+.BR tmux (1)
+commands where compatible).
+.SH OPTIONS
+.TP
+.B \-2
+Force
+.B ztmux
+to assume the terminal supports 256 colours.
+.TP
+.B \-C
+Start in control mode. Given twice
+.RB ( \-CC )
+disables echo.
+.TP
+.B \-D
+Do not start the server as a daemon; run it in the foreground.
+.TP
+.BR \-c " " \fIshell-command\fP
+Execute
+.I shell-command
+using the default shell and exit.
+.TP
+.BR \-f " " \fIfile\fP
+Specify an alternative configuration
+.IR file .
+.TP
+.B \-l
+Behave as a login shell.
+.TP
+.BR \-L " " \fIsocket-name\fP
+Use a different
+.I socket-name
+under the
+.B ztmux
+socket directory rather than the default
+.RB ( default ).
+.TP
+.B \-N
+Do not start the server even if the command would normally do so.
+.TP
+.B \-q
+Suppress the printing of "no server running" style informational messages
+where applicable.
+.TP
+.BR \-S " " \fIsocket-path\fP
+Specify a full alternative path to the server socket.
+.TP
+.BR \-T " " \fIfeatures\fP
+Set terminal
+.I features
+for the client, as a comma-separated list.
+.TP
+.B \-u
+Assume the terminal supports UTF-8.
+.TP
+.B \-V
+Report the
+.B ztmux
+version and exit.
+.TP
+.B \-v
+Request verbose logging. May be specified multiple times for more detail.
+.PP
+The remaining arguments,
+.IR command " and " flags ,
+select a tmux command (for example
+.BR new-session ", " list-sessions ", or " split-window )
+and its options. With no command,
+.B ztmux
+attaches to the most recently used session, creating one if none exists.
+.SH EXTENSIONS
+The following capabilities are original to
+.B ztmux
+and have no counterpart in upstream
+.BR tmux (1).
+They live in the extension layer of the code base and are held apart from the
+ported core.
+.SS Structured output
+The listing commands
+.BR list-sessions ", " list-windows ", " list-panes ", " list-clients ,
+and
+.B list-buffers
+accept
+.B \-o
+.I format
+to emit machine-readable output instead of a formatted text line:
+.RS
+.TP
+.B json
+A pretty-printed JSON array of objects, one per item, with numbers and
+booleans typed natively and strings escaped.
+.TP
+.BR jsonl " (or " ndjson )
+One JSON object per line (newline-delimited JSON), with no enclosing array.
+.TP
+.B csv
+RFC 4180 comma-separated values with a header row.
+.TP
+.B tsv
+Tab-separated values with a header row.
+.TP
+.B table
+Human-readable, whitespace-aligned columns with a header and a rule.
+.RE
+.PP
+Each format uses a stable, per-command field schema, driven by the same
+.RB #{ ... }
+format engine as the text output, so the
+.B \-f
+.I filter
+option still applies. An unrecognised
+.I format
+is an error. For example:
+.PP
+.RS
+.EX
+ztmux list\-panes \-a \-o json
+ztmux list\-sessions \-o table
+.EE
+.RE
+.SS ztmux dashboard
+.B ztmux dashboard
+launches a live full-screen dashboard of the running server: a navigable
+session\(->window\(->pane tree, a detail panel (a pane table for the selected
+window, pane details for a selected pane, or session and client details for a
+selected session), a live
+.B capture-pane
+preview of the selected pane, header counts, and a pane-count sparkline. It
+refreshes once per second.
+Keys:
+.BR j / k " or " \(ua / \(da
+move,
+.BR g / G
+jump to top/bottom,
+.B Enter
+focus the selection (attach the client to it),
+.B r
+refresh now,
+.B x
+kill the selection \(en session, window, or pane \(en (with confirmation),
+.B ?
+toggle help, and
+.BR q " or " Escape
+quit. The mouse wheel scrolls the tree and a left click selects the row under
+the cursor.
+It is a client subcommand that reads the server through the structured output
+above and targets the socket selected by
+.BR \-L / \-S .
+.SS ztmux switch
+.B ztmux switch
+opens an interactive fuzzy picker over every session, window, and pane. Type
+to filter (case-insensitive subsequence match); the selection is applied with
+.BR switch-client ", " select-window ,
+and
+.B select-pane
+on
+.BR Enter ;
+.B Escape
+cancels.
+.SS ztmux tree
+.B ztmux tree
+prints the whole server as a one-shot session\(->window\(->pane ASCII tree
+(coloured when stdout is a terminal, plain when piped). It is built from the
+same structured output and targets the socket selected by
+.BR \-L / \-S .
+.SS ztmux doctor
+.B ztmux doctor
+runs a one-shot health check of the build, the terminal environment
+.RB ( TERM ,
+terminfo, colour, locale), the resolved socket, the reachable server, and
+resource limits. Output is a grouped, coloured report, or a machine-readable
+object with
+.B \-o
+.I json
+(or
+.BR \-\-json ).
+The process exit status is the worst severity seen \(en 0 all ok, 1 warnings,
+2 errors \(en so it drops into a CI gate. It is safe to run with no server up.
+.SS ztmux stats
+.B ztmux stats
+prints a one-shot summary of the server: session/window/pane/client counts,
+attached and dead counts, the busiest session, the largest window, the oldest
+session, and a per-command histogram. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same figures as a machine-readable object.
+.SS ztmux graph
+.B ztmux graph
+renders the session\(->window\(->pane tree as a diagram. Select the format with
+.B \-o
+.IR dot | mermaid | html
+(default
+.BR mermaid ):
+Graphviz DOT, Mermaid, or a self-contained HTML page that draws the Mermaid
+diagram. Useful for documentation and screenshots, e.g.
+.RS
+.EX
+ztmux graph \-o dot | dot \-Tpng > tree.png
+ztmux graph \-o html > tree.html
+.EE
+.RE
+.SS ztmux watch
+.B ztmux watch
+is a top-like live monitor: a table of every pane's process with %CPU, %MEM,
+RSS, and state (joined from
+.BR ps ),
+refreshed a few times a second and sortable by CPU, memory, or command.
+Keys:
+.BR j / k " or " \(ua / \(da
+move,
+.B s
+cycle the sort,
+.B r
+refresh now, and
+.BR q " or " Escape
+quit.
+.SS ztmux events
+.B ztmux events
+streams server lifecycle changes as newline-delimited JSON: session, window,
+and pane created/closed/renamed, window layout changes, pane command changes and
+deaths, and client attach/detach. It diffs successive snapshots, so a client can
+subscribe to changes instead of re-polling.
+.B \-n
+.I ms
+sets the poll interval (default 500) and
+.B \-\-count
+.I N
+exits after N events. It runs until interrupted otherwise.
+.SS ztmux ps
+.B ztmux ps
+prints a one-shot, pipeable table of every pane's process \(en pane id,
+location, command, pid, %CPU, %MEM, RSS, and state (joined from
+.BR ps ),
+sorted by CPU. It is the non-interactive complement to
+.BR "ztmux watch" .
+With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits a JSON array.
+.SS ztmux snapshot
+.B ztmux snapshot
+dumps the whole server as a single nested JSON document
+(sessions \(-> windows \(-> panes, plus the client list) \(en a convenient
+primitive for external tooling. It is read-only and is not a save/restore
+format.
+.SS ztmux prune
+.B ztmux prune
+finds and removes cleanup candidates: dead panes
+.RB ( \-\-dead ),
+window-less sessions
+.RB ( \-\-empty ),
+and detached sessions idle beyond a threshold
+.RB ( \-\-idle
+.IR seconds ).
+With no selector, both
+.B \-\-dead
+and
+.B \-\-empty
+apply. It is
+.B dry-run by default
+(prints what it would remove); pass
+.B \-f
+or
+.B \-\-force
+to actually kill.
+.B \-o
+.I json
+emits the plan as JSON.
+.SS ztmux layout
+.B ztmux layout
+.I name
+.RB [ \-t
+.IR window ]
+applies a named layout preset to a window: the five built-in tmux layouts
+.RB ( even-h ", " even-v ", " main-h ", " main-v ", " tiled )
+plus composite presets
+.RB ( dev ", " ide ", " grid )
+that create panes.
+.B "ztmux layout list"
+lists the presets. It is
+.B dry-run by default
+(prints the commands); pass
+.B \-f
+or
+.B \-\-apply
+to run them.
+.SS Default key bindings
+For convenience each extension is also bound under the prefix key (these
+bindings are original to
+.B ztmux
+and are added on top of the ported
+.BR tmux (1)
+defaults, which stay unchanged):
+.RS
+.TP
+.B prefix C\-d
+open the dashboard
+.TP
+.B prefix S
+open the interactive picker
+.TP
+.B prefix T
+show the server tree
+.TP
+.B prefix H
+run the health check
+.TP
+.B prefix W
+open the live process monitor
+.TP
+.B prefix I
+show the stats report
+.TP
+.B prefix G
+show the tree diagram
+.RE
+.PP
+Each opens the tool in a
+.B display\-popup
+pointed at the current server, so they work from any attached client. The
+streaming
+.B events
+subcommand runs until interrupted and is pipe oriented, so it is not bound by
+default.
+.SH ENVIRONMENT
+.TP
+.B TMUX
+Set by the server for each pane to identify the socket, session, and pane of
+the client.
+.TP
+.B TMUX_TMPDIR
+Directory under which the per-user socket directory
+.RI ( tmux- UID )
+is created; defaults to
+.IR /tmp .
+.TP
+.B TMUX_CONF
+Colon-separated list of configuration file paths overriding the default
+search path.
+.TP
+.B EDITOR
+.TQ
+.B VISUAL
+Used to select the editor for interactive editing.
+.SH FILES
+.TP
+.IR $TMUX_TMPDIR /tmux- UID /
+The directory holding
+.B ztmux
+server sockets for the user
+.IR UID ;
+by default
+.IR /tmp/tmux- UID / .
+The default socket is named
+.IR default .
+.TP
+.I ~/.tmux.conf
+Default per-user configuration file. The full default search path is
+.IR /etc/tmux.conf ,
+.IR ~/.tmux.conf ,
+.IR $XDG_CONFIG_HOME/tmux/tmux.conf ,
+and
+.IR ~/.config/tmux/tmux.conf .
+.SH SEE ALSO
+.BR tmux (1)
+.PP
+The upstream
+.BR tmux (1)
+sources are vendored under
+.I vendor/tmux
+in the ztmux repository as the reference this port is validated against, and a
+parity suite checks
+.B ztmux
+output byte-for-byte against them.
+.SH AUTHORS
+MenkeTechnologies. Ported against the tmux C sources by Nicholas Marriott
+and contributors.

@@ -1,0 +1,24 @@
+{
+  "name": "ztmux",
+  "version": "3.7.0",
+  "private": true,
+  "description": "ztmux — a from-source Rust port of tmux (the whole server + client). pnpm task runner over the cargo workflow (matches the sibling repos' dev/build/test interface). ztmux is a pure Rust CLI with no frontend, so these scripts wrap cargo, the parity suite (ztmux vs the vendored tmux), and the port-report tooling.",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev": "cargo run -p ztmux",
+    "build": "cargo build --release",
+    "build:debug": "cargo build",
+    "test": "cargo test --locked && bash parity/run_parity.sh --summary",
+    "test:rust": "cargo test --locked",
+    "test:parity": "bash parity/run_parity.sh --summary",
+    "lint": "cargo clippy --all-targets --locked -- -D warnings",
+    "fmt": "cargo fmt --all",
+    "fmt:check": "cargo fmt --all --check",
+    "doc": "RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps --locked",
+    "doc:open": "cargo doc --no-deps --open",
+    "localinstall": "cargo install --path .",
+    "port-report": "python3 scripts/gen_port_report.py",
+    "annotate": "python3 scripts/annotate_c_links.py",
+    "clean": "cargo clean"
+  }
+}

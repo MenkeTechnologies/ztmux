@@ -1,0 +1,350 @@
+# =====================================================================
+# ztmux fake-fn allowlist — READ THE HEADER BEFORE ADDING A LINE
+# =====================================================================
+#
+# Enforced by tests/ported_fn_names_match_c.rs, which runs in the CI
+# `test` gate. That test flags every free `fn` in src/**.rs whose name
+# does NOT exist as a function in the vendored tmux C sources
+# (vendor/tmux/**/*.c + cmd-parse.y). ztmux is a PORT of tmux; a Rust
+# function with no C counterpart is a "fake fn" that inflates apparent
+# port progress. New ones FAIL THE BUILD.
+#
+# This file is the frozen snapshot of pre-existing, accepted exceptions.
+# It is an AUDIT TRAIL, not a free pass: the goal is to SHRINK it, never
+# grow it. Before adding a name, STOP — port the function against the C
+# source, or inline it, instead. Adding a line needs a real reason.
+#
+# The current entries fall into these categories:
+#
+#   1. Macro-paired helpers (`foo_`) — C's variadic `foo(fmt, ...)` is
+#      ported as a Rust `macro_rules! foo` (which carries the real C
+#      name) plus a `foo_` helper fn the macro forwards to. The C name
+#      IS present (as the macro); the `_` fn is its impl detail.
+#      e.g. cfg_add_cause_, cmdq_print_, format_add_, control_write_.
+#
+#   2. C-fn-split variants (`foo_`, `foo__`, `foo___`) — one C function
+#      (e.g. xstrdup) ported as several Rust overloads for different
+#      argument types. These SHOULD be merged back toward the single
+#      C-named function over time; kept here until then.
+#      e.g. xstrdup_/__/___, vis_/__, utf8_strvis_, checkshell_.
+#
+#   3. libc / libevent shims — wrappers around C library functions that
+#      are not part of tmux's own source (so they have no vendor/tmux
+#      definition): evtimer_*, evbuffer_*, EVBUFFER_*, fopen, fnmatch,
+#      basename, memcpy_, free_, __bswap_32, etc.
+#
+#   4. Rust glue — genuinely Rust-only helpers with no C analog:
+#      _s, cstr_to_str, concat_array, assume_init_ref, format_nul_, etc.
+#
+# Regenerate after intentional churn:
+#   cargo test --test ported_fn_names_match_c -- --nocapture 2>&1 \
+#     | sed -n 's/^FAKE-FN \([A-Za-z0-9_]*\).*/\1/p' | sort -u
+# (then re-add this header)
+# =====================================================================
+
+__bswap_32
+_s
+args_get_
+args_has_count
+args_print_add_
+assume_init_ref
+basename
+cfg_add_cause_
+checkshell_
+cmd_display_menu_get_position
+cmd_list_keys_commands
+cmd_list_keys_print_notes
+cmd_list_windows_server
+cmd_list_windows_session
+cmd_log_argv_
+cmd_refresh_client_clipboard
+cmdq_add_format_
+cmdq_error_
+cmdq_insert_hook_
+cmdq_print_
+colour_256_to_rgb
+COLOUR_DEFAULT
+colour_parse_x11
+concat_array
+control_check_subs_all_panes
+control_check_subs_all_windows
+control_write_
+create_temp_file
+cstr_to_str
+cstr_to_str_
+encode_cstyle
+encode_cstyle_
+encode_octal
+encode_octal_
+encode_passthrough
+encode_passthrough_
+environ_log_
+environ_set_
+evbuffer_add_vprintf
+EVBUFFER_DATA
+EVBUFFER_LENGTH
+EVBUFFER_OUTPUT
+evtimer_add
+evtimer_del
+evtimer_initialized
+evtimer_pending
+evtimer_set
+evtimer_set_no_args
+fatalx_c
+file_error_
+fnmatch
+fopen
+format_add_
+format_log1_
+format_nul_
+free_
+gethostname
+glob
+grid_view_x
+grid_view_y
+i32_to_ordering
+ibuf_add_buf
+ibuf_dequeue
+ibuf_enqueue
+ibuf_realloc
+imsg_clear
+imsg_dequeue_fd
+imsg_flush
+imsg_init
+imsg_read
+input_get_bg_client
+input_get_bg_control_client
+input_get_fg_client
+input_get_fg_control_client
+input_reply_
+input_start_timer
+is_left_sibling
+is_right_sibling
+KEYC_IS_MOUSE
+KEYC_IS_UNICODE
+layout_add_border
+list_first
+list_foreach
+list_head_initializer
+list_insert_head
+list_next
+list_remove
+log_debug_rs
+log_vwrite_rs
+MB_CUR_MAX
+memcpy_
+memcpy__
+memset0
+menu_set_style
+mode_tree_filter_free
+mode_tree_search_free
+mode_tree_start
+MOUSE_BUTTONS
+MOUSE_DRAG
+MOUSE_RELEASE
+MOUSE_WHEEL
+msgbuf_init
+ntop
+open
+options_get_const
+options_get_number_
+options_get_number___
+options_get_only_
+options_get_only_const
+options_get_string_
+OPTIONS_IS_ARRAY
+OPTIONS_IS_COMMAND
+OPTIONS_IS_NUMBER
+OPTIONS_IS_STRING
+options_map_name_str
+options_set_string_
+paste_buffer_data_
+popup_editor
+popup_editor_close_cb
+popup_editor_free
+pton
+random_seed
+rb_color
+rb_empty
+rb_find
+rb_find_by
+rb_find_by_const
+rb_foreach
+rb_foreach_const
+rb_foreach_reverse
+rb_initializer
+rb_insert
+rb_insert_color
+rb_left
+rb_left_const
+rb_max
+rb_min
+rb_minmax
+rb_minmax_const
+rb_next
+rb_parent
+rb_parent_const
+rb_prev
+rb_remove
+rb_remove_color
+rb_right
+rb_right_const
+rb_root
+rb_rotate_left
+rb_rotate_right
+rb_set
+rb_set_blackred
+rb_set_color
+rb_set_left
+rb_set_parent
+rb_set_right
+rb_set_root
+regcomp
+regexec
+S_ISDIR
+screen_hlimit
+screen_hsize
+screen_redraw_border_set
+screen_redraw_cell_border
+screen_redraw_check_cell
+screen_redraw_check_is
+screen_redraw_draw_borders
+screen_redraw_draw_borders_cell
+screen_redraw_draw_borders_style
+screen_redraw_draw_pane
+screen_redraw_draw_pane_status
+screen_redraw_draw_panes
+screen_redraw_draw_status
+screen_redraw_make_pane_status
+screen_redraw_pane
+screen_redraw_pane_border
+screen_redraw_screen
+screen_redraw_set_context
+screen_redraw_two_panes
+screen_redraw_type_of_cell
+screen_redraw_update
+screen_size_x
+screen_size_y
+screen_write_strlen_
+screen_write_text_
+screen_write_vnputs_
+server_acl_get_uid
+server_acl_user_allow
+server_acl_user_allow_write
+server_acl_user_deny
+server_acl_user_deny_write
+server_acl_user_find
+server_add_message_
+server_client_assume_paste
+server_client_is_bracket_pasting
+session_check_name
+setlocale
+signal_add
+signal_set
+status_free_ranges
+status_message_set_
+status_prompt_add_history
+status_prompt_add_list
+status_prompt_add_typed_history
+status_prompt_backward_word
+status_prompt_complete
+status_prompt_complete_list
+status_prompt_complete_list_menu
+status_prompt_complete_prefix
+status_prompt_complete_session
+status_prompt_complete_window_menu
+status_prompt_down_history
+status_prompt_end_word
+status_prompt_find_history_file
+status_prompt_forward_word
+status_prompt_in_list
+status_prompt_load_history
+status_prompt_menu_callback
+status_prompt_paste
+status_prompt_replace_complete
+status_prompt_save_history
+status_prompt_space
+status_prompt_translate_key
+status_prompt_type
+status_prompt_type_string
+status_prompt_up_history
+strcasecmp_
+strcaseeq_
+strchr
+strchr_
+strcmp
+strcmp_
+strcspn
+strdup
+streq_
+strerror
+strftime
+strlcat_
+strlen
+strncasecmp
+strncmp
+strpbrk
+strrchr
+strspn
+strstr
+strtod
+strtol
+strtonum_
+strtoul
+tailq_concat
+tailq_empty
+tailq_first
+tailq_foreach
+tailq_foreach_const
+tailq_foreach_reverse
+tailq_init
+tailq_init_
+tailq_insert_after
+tailq_insert_before
+tailq_insert_head
+tailq_insert_tail
+tailq_last
+tailq_next
+tailq_prev
+tailq_remove
+tailq_replace
+time
+timerclear
+timersub
+tmux_main
+transmute_ptr
+TTY_BLOCK_START
+TTY_BLOCK_STOP
+tty_full_width
+tty_keys_add_
+tty_puts_
+tty_use_margin
+ttyname
+tzset
+unlink
+utf8_get_size
+utf8_get_width
+utf8_in_table
+utf8_is_modifier
+utf8_set_size
+utf8_set_width
+utf8_stravis_
+utf8_strvis_
+utf8_to_string
+vis_
+vis__
+window_copy_cmd_refresh_from_pane
+window_pane_visible
+xcalloc_
+xcalloc1
+xrealloc_
+xreallocarray_
+xreallocarray_old
+xrecallocarray_
+xrecallocarray__
+xsnprintf__
+xstrdup_
+xstrdup__
+xstrdup___
+yyerror_
+yyparse

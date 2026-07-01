@@ -1,0 +1,160 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - run: sudo apt-get update && sudo apt-get install -y libevent-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --all-targets --locked
+
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      RUST_BACKTRACE: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install libevent (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libevent-dev
+      - name: Install libevent (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libevent
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --locked --no-fail-fast
+
+  # fmt / clippy are blocking gates (like the sibling repos): the tree is
+  # rustfmt-clean and clippy-clean under the crate's inherited lint policy. Not
+  # in the release-build `needs:` — check/test/doc gate the artifact — but a
+  # regression in either now fails CI rather than being silently masked.
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - run: sudo apt-get update && sudo apt-get install -y libevent-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all-targets --locked -- -D warnings
+
+  doc:
+    name: Doc
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - run: sudo apt-get update && sudo apt-get install -y libevent-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --locked
+
+  # Parity vs the VENDORED tmux: run the same inputs through the exact tmux
+  # source ztmux ports (vendor/tmux, next-3.7) and diff byte-for-byte. The
+  # reference is BUILT from vendor/tmux — not apt's tmux, whose version differs
+  # and produces false diffs (layout rounding, div-by-zero formatting, etc.).
+  # Blocking gate now that the suite is reliably green (1080/1080); a parity
+  # regression fails CI. Not in the release-build `needs:` so an artifact still
+  # builds, but the failure log is uploaded and the pipeline goes red (see
+  # parity/PARITY_ROADMAP.md).
+  parity:
+    name: Parity vs vendored tmux
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      # Build deps for the vendored tmux reference (run_parity.sh builds it).
+      - run: sudo apt-get update && sudo apt-get install -y libevent-dev libncurses-dev automake autoconf pkg-config bison build-essential
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked
+      - name: Compare ztmux output to the vendored tmux on parity/cases
+        run: bash parity/run_parity.sh --summary --json parity/parity_summary.json
+        env:
+          ZTMUX: ${{ github.workspace }}/target/release/ztmux
+      - name: Upload parity failure log
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: parity-failures
+          path: parity/parity_failures.log
+          if-no-files-found: ignore
+
+  release-build:
+    name: Release Build
+    needs: [check, test, doc]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          # x86_64 on the Intel runner: macos-latest is arm64, and Homebrew's
+          # libevent there is arm64-only, so a cross x86_64 link fails.
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install libevent (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libevent-dev
+      - name: Install libevent (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libevent
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ztmux-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/ztmux

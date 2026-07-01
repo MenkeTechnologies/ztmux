@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="ztmux engineering report — a from-source Rust port of tmux. How the port is built from the vendored C reference, the 'done right' plan, the parity suite vs system tmux, and the anti-drift gate.">
+<title>ztmux — Engineering Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="hud-static.css">
+<link rel="stylesheet" href="tutorial.css">
+<style>
+  .tutorial-main { max-width: 76rem; }
+  .stat-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:0.6rem;margin:1rem 0; }
+  .stat-card { border:1px solid var(--border);border-top:3px solid var(--cyan);background:var(--bg-card);padding:0.7rem 0.9rem;border-radius:2px;text-align:center; }
+  .stat-card .stat-val { font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900;color:var(--cyan);line-height:1.1;text-shadow:0 0 14px var(--cyan-glow); }
+  .stat-card .stat-val.green { color:var(--green);text-shadow:0 0 14px rgba(57,255,20,.35); }
+  .stat-card .stat-val.red { color:#ff6b6b;text-shadow:0 0 14px rgba(255,107,107,.35); }
+  .stat-card .stat-label { font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin-top:.3rem; }
+  .prose { color:var(--text-dim);font-size:13px;line-height:1.75;max-width:62rem; }
+  .prose a { color:var(--cyan); }
+  .tutorial-main code { color:var(--cyan);font-family:'Share Tech Mono',monospace; }
+  table.hud { width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:12px;margin:.6rem 0; }
+  table.hud th { font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);text-align:left;padding:.5rem;border-bottom:1px solid var(--border); }
+  table.hud td { padding:.45rem .5rem;border-bottom:1px solid var(--border);color:var(--text-dim);vertical-align:top; }
+  table.hud td:first-child { color:var(--text); }
+  ol.steps { color:var(--text-dim);font-size:13px;line-height:1.8;padding-left:1.3rem; }
+  ol.steps b { color:var(--cyan); }
+  .status-banner { border:1px solid var(--cyan);border-radius:3px;background:var(--bg-card);padding:.7rem 1rem;margin:1rem 0;color:var(--text);font-size:12.5px;line-height:1.6; }
+  .status-banner strong { color:var(--cyan); }
+</style>
+</head>
+<body>
+<div class="app tutorial-app">
+  <div class="crt-scanline" aria-hidden="true"></div>
+  <div class="crt-scanline-v" aria-hidden="true"></div>
+
+  <header class="tutorial-header">
+    <div class="tutorial-header-inner">
+      <div>
+        <h1 class="tutorial-brand">// ZTMUX &mdash; ENGINEERING REPORT</h1>
+        <nav class="tutorial-crumbs" aria-label="Breadcrumb">
+          <span class="current">Engineering Report</span>
+          <span class="sep">/</span>
+          <a href="index.html">ztmux Docs</a>
+          <span class="sep">/</span>
+          <a href="port_report.html">Port Report</a>
+          <span class="sep">/</span>
+          <a href="https://github.com/MenkeTechnologies/ztmux" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </nav>
+        <p style="margin:0.35rem 0 0;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:0.03em;opacity:0.8;">
+          A Rust port of tmux &mdash; full server + client, ported against the tmux C sources.
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <main class="tutorial-main">
+    <div class="status-banner"><strong>Status: 100% functional &mdash; building, running, and self-hosting its own tooling.</strong> ztmux is the tmux program itself &mdash; server and client &mdash; reimplemented from the C in Rust. It builds and runs (<code>ztmux new-session</code>, <code>ztmux attach</code>), passes its <strong>1080-case parity suite at 100% (byte-for-byte vs upstream tmux, zero known divergences)</strong>, has every harness-found bug fixed, and ships original extensions the C tmux has no equivalent for.</div>
+
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>PARITY VS tmux</h2>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-val green">1080</div><div class="stat-label">Cases passing</div></div>
+      <div class="stat-card"><div class="stat-val">1080</div><div class="stat-label">Total parity cases</div></div>
+      <div class="stat-card"><div class="stat-val green">100%</div><div class="stat-label">vs tmux next-3.7</div></div>
+      <div class="stat-card"><div class="stat-val green">0</div><div class="stat-label">Known divergences</div></div>
+    </div>
+    <p class="prose">
+      ztmux is a port of tmux, so "correct" means <strong>tmux itself</strong>. The parity suite runs the same inputs
+      through the vendored <code>tmux</code> (reference) and <code>ztmux</code> (port) and compares byte-for-byte &mdash;
+      the same shape as the sibling ports (<a href="https://github.com/MenkeTechnologies/zshrs">zshrs</a> vs
+      <code>zsh</code>, <a href="https://github.com/MenkeTechnologies/strykelang">strykelang</a> vs <code>perl</code>).
+      The suite has grown from a handful of format cases to <strong>1080</strong> covering formats, arithmetic,
+      conditionals, string ops, options, buffers, windows, panes, and layouts &mdash; and every one now passes
+      byte-for-byte, with zero known divergences.
+    </p>
+
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>REPOSITORY LAYOUT</h2>
+    <p class="prose">Original code is kept apart from the port so the fidelity gate only judges what is meant to mirror C:</p>
+    <table class="hud">
+      <thead><tr><th>Path</th><th>What</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/ported/</code></td><td>The tmux port &mdash; <strong>138</strong> modules plus <strong>23</strong> compat shims that mirror <code>vendor/tmux</code> one-to-one. Held to C-name fidelity by the anti-drift gate.</td></tr>
+        <tr><td><code>src/extensions/</code></td><td>Original ztmux features with no C counterpart &mdash; the dashboard, fuzzy switcher, and structured output. Exempt from the gate.</td></tr>
+        <tr><td><code>src/lib.rs</code>, <code>src/main.rs</code></td><td>Crate roots: the module tree (which re-points every ported module's file into <code>ported/</code>) plus the binary entry.</td></tr>
+        <tr><td><code>vendor/tmux</code></td><td>Read-only, SHA-pinned reference &mdash; see <em>How the port is built</em>.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXTENSIONS &mdash; BEYOND tmux</h2>
+    <p class="prose">Because ztmux owns the whole stack, it adds capabilities upstream tmux does not have. All three are plain clients &mdash; they re-invoke the ztmux binary and read its own machine-readable output, so they need no linkage to the server internals:</p>
+    <table class="hud">
+      <thead><tr><th>Feature</th><th>Invocation</th><th>What</th></tr></thead>
+      <tbody>
+        <tr><td>Structured output</td><td><code>list-* -o json|jsonl|csv|tsv|table</code></td><td>Typed, machine-readable output for every <code>list-*</code> command, driven by the same <code>#{&hellip;}</code> format engine. <code>table</code> is aligned columns for humans; <code>json</code> feeds scripts and the TUIs below.</td></tr>
+        <tr><td>Live dashboard</td><td><code>ztmux dashboard</code></td><td>A ratatui TUI: the session&rarr;window&rarr;pane tree, per-pane detail table, live server stats with a pane-count sparkline, kill-with-confirm, and 1&nbsp;s auto-refresh.</td></tr>
+        <tr><td>Fuzzy switcher</td><td><code>ztmux switch</code></td><td>Type-to-filter picker over every session, window, and pane; Enter runs the right <code>switch-client</code>&nbsp;/&nbsp;<code>select-window</code>&nbsp;/&nbsp;<code>select-pane</code> to jump there.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>HOW THE PORT IS BUILT</h2>
+    <p class="prose">Two references, both vendored under <code>vendor/</code> as plain, read-only, SHA-pinned copies so the clone is self-contained:</p>
+    <table class="hud">
+      <thead><tr><th>Path</th><th>What</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td>vendor/tmux</td><td>upstream <a href="https://github.com/tmux/tmux">tmux</a> C sources (next-3.7)</td><td>Source of truth &mdash; every ported module is diffed against its C counterpart</td></tr>
+        <tr><td>src/ported/</td><td>the ztmux port</td><td>The living code we own and evolve toward safe, idiomatic Rust</td></tr>
+      </tbody>
+    </table>
+    <p class="prose">Every ported function carries a back-link to its C origin as a doc comment, e.g. <code>/// C <code>vendor/tmux/grid.c:320</code>: <code>grid_create()</code></code>. The <a href="port_report.html">port report</a> tracks per-function C&rarr;Rust coverage: <strong>2,127</strong> of tmux's <strong>2,696</strong> functions ported so far.</p>
+
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>BUGS THE HARNESS CAUGHT</h2>
+    <p class="prose">Verifying against C at every step turns "looks right" into "is right." A sample of faults the parity suite and unit tests root-caused to a single line &mdash; each now locked by a regression test (the full log is in <a href="BUGS.md">BUGS.md</a>):</p>
+    <ol class="steps">
+      <li><b>Mouse-driven TUIs froze mid-pane</b> &mdash; a stale <code>- 1</code> in the SGR-mouse encoder (<code>input_keys.rs</code>) dropped the sequence's <code>M</code>/<code>m</code> terminator after <code>xsnprintf</code> was corrected to exclude the NUL. ztmux wrote <code>\033[&lt;35;69;44</code> with no terminator; crossterm blocked in <code>read()</code> waiting for an end byte that never came, so rich ratatui/crossterm panes locked up on any click or focus change while keyboard input still worked.</li>
+      <li><b>ztmux hijacked real tmux's socket</b> &mdash; it resolved its default socket from <code>$TMUX</code>, so launched inside a tmux pane it connected to tmux's server and spoke protocol 8 at it (<code>server exited unexpectedly</code>). Fixed to resolve only from <code>$ZTMUX</code> and advertise both <code>$TMUX</code> and <code>$ZTMUX</code> to panes, so the two multiplexers run side by side.</li>
+      <li><b>Server crash on <code>bind-key h</code> then <code>l</code></b> &mdash; the red-black tree's delete rebalance (<code>rb_remove_color</code>, <code>compat/tree.rs</code>) rotated around the wrong node. Rebinding a key that already had a default removed the old node first, corrupting the key-bindings tree and segfaulting the server on startup.</li>
+      <li><b>Powerline glyphs rendered as <code>\202\202\202</code></b> &mdash; <code>utf8_strvis</code>'s inner loop never advanced the source pointer (the C is <code>while (++src &lt; end &hellip;)</code>), so each multibyte UTF-8 character was re-read and mangled into raw bytes plus octal escapes.</li>
+      <li><b>even-* layouts off by one</b> &mdash; <code>layout_spread_cell</code> dumped the leftover column on the last pane instead of handing it to the leading cells; an 80-col two-pane split came out <code>39|40</code> instead of tmux's <code>40|39</code>.</li>
+      <li><b>Pane spawn hung on macOS</b> &mdash; the ported <code>closefrom</code> looped <code>close()</code> up to the server-raised <code>RLIMIT_NOFILE</code>; replaced with the <code>libproc</code> <code>PROC_PIDLISTFDS</code> path tmux actually compiles on macOS, so the forked child reaches <code>execvp</code>.</li>
+    </ol>
+
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>ANTI-DRIFT GATE</h2>
+    <p class="prose">
+      A port can be faked by inventing Rust-only "helper" functions that don't exist in tmux, inflating apparent
+      completeness. <code>tests/ported_fn_names_match_c.rs</code> <strong>fails the build</strong> when a free
+      <code>fn</code> is added under <code>src/ported/</code> whose name has no counterpart in <code>vendor/tmux</code>.
+      <code>src/extensions/</code> is exempt by design &mdash; it is original code, not a mirror of C &mdash; exactly as
+      <code>#[cfg(test)]</code> blocks are skipped. Pre-existing exceptions (libc/libevent wrappers, Rust glue) are
+      frozen in an allowlist: an audit trail to burn down, not a free pass.
+    </p>
+
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>TESTING</h2>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-val green">1080/1080</div><div class="stat-label">Parity cases (100%)</div></div>
+      <div class="stat-card"><div class="stat-val">1253</div><div class="stat-label">Unit tests</div></div>
+      <div class="stat-card"><div class="stat-val">2127</div><div class="stat-label">C fns ported</div></div>
+      <div class="stat-card"><div class="stat-val">125k</div><div class="stat-label">Lines of Rust</div></div>
+    </div>
+    <p class="prose">Three layers stack: byte-for-byte <strong>parity</strong> against the vendored tmux; in-tree <strong>unit tests</strong> for pure logic (red-black tree invariants under randomized insert/delete, UTF-8 round-trips, layout arithmetic, and the extensions' rendering via ratatui's headless backend); and the <strong>anti-drift gate</strong> that fails the build on invented functions.</p>
+
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>"DONE RIGHT"</h2>
+    <ol class="steps">
+      <li><b>Start from a working skeleton</b> &mdash; a running program to refactor, not a blank page.</li>
+      <li><b>Shrink the unsafe surface</b> &mdash; replace raw-pointer intrusive lists and C-isms with safe Rust where behavior allows.</li>
+      <li><b>Verify against C at every step</b> &mdash; a module isn't "ported" until it matches the C reference (parity suite).</li>
+      <li><b>Keep it green</b> &mdash; <code>cargo build</code> and <code>cargo clippy</code> stay clean as code comes over.</li>
+    </ol>
+
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>BUILD &amp; RUN</h2>
+    <p class="prose">
+      Requires a C <code>libevent</code> and a terminfo database (ncurses), matching tmux itself. On macOS the build
+      links Homebrew's <code>libevent</code> automatically (<code>TMUX_RS_DISABLE_HOMEBREW_LIBS=1</code> to opt out).
+      Then the binary <code>ztmux</code> speaks the same commands as tmux &mdash; on its own socket namespace
+      (<code>ztmux-&lt;uid&gt;</code>, from <code>$ZTMUX</code>, never <code>$TMUX</code>) so it never collides with a
+      running tmux &mdash; plus the extension subcommands:
+    </p>
+    <table class="hud">
+      <thead><tr><th>Command</th><th>Does</th></tr></thead>
+      <tbody>
+        <tr><td><code>cargo build --release</code></td><td>Builds the <code>ztmux</code> server + client binary.</td></tr>
+        <tr><td><code>ztmux new-session -s work</code></td><td>Start a session (as tmux).</td></tr>
+        <tr><td><code>ztmux list-panes -a -o table</code></td><td>Every pane, as an aligned table (or <code>-o json</code>).</td></tr>
+        <tr><td><code>ztmux dashboard</code> / <code>ztmux switch</code></td><td>Launch the live dashboard / the fuzzy switcher.</td></tr>
+      </tbody>
+    </table>
+
+    <footer style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-dim);font-size:11px;font-family:'Share Tech Mono',monospace;">
+      MenkeTechnologies &middot; ztmux &middot; engineering report &middot; <a href="https://github.com/MenkeTechnologies/ztmux" style="color:var(--cyan);">ztmux</a> &middot; <a href="https://github.com/MenkeTechnologies/MenkeTechnologiesMeta" style="color:var(--cyan);">MenkeTechnologiesMeta</a>
+    </footer>
+  </main>
+</div>
+<script src="hud-theme.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+# Jekyll site config for the docs/ GitHub Pages publish.
+#
+# We use GH Pages purely to serve the hand-authored / generated HTML hub
+# (index.html, report.html, port_report.html, hud-static.css, hud-theme.js,
+# tutorial.css). Every Markdown file in this dir is an engineering document
+# meant to be read on github.com itself, not rendered through Jekyll.
+#
+# Why exclude every .md outright:
+#
+# 1) Liquid syntax errors. Our port docs are stuffed with Rust format-string
+#    escapes (`format!("{{ {} }}")`), shell snippets (`${VAR}`, `$((expr))`),
+#    and tmux format literals (`#{pane_id}`, `#{{...}}`) — all of which Liquid
+#    mis-parses as malformed variable interpolation and aborts the whole site
+#    build. The `render_with_liquid: false` frontmatter added in Jekyll 4.0 is
+#    silently ignored by GitHub Pages, which still ships Jekyll 3.10 — so
+#    excluding is the only thing that actually works in production CI.
+#
+# 2) The .md files aren't anchor targets for any link on the public hub. The
+#    HTML is the canonical public surface; .md files are linked via plain
+#    github.com URLs, which render fine there.
+#
+# If Pages ever pins Jekyll 4+, revisit — per-file `render_with_liquid: false`
+# would then let .md files build through.
+
+exclude:
+  - "*.md"
+  - "**/*.md"
+
+# Forward-compat with Jekyll 4+ (no-op on 3.10, harmless): disables Liquid on
+# every remaining file so any future .html holding a `{{` literal survives.
+defaults:
+  - scope:
+      path: ""
+    values:
+      render_with_liquid: false

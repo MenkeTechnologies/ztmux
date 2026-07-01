@@ -1,0 +1,1982 @@
+// Copyright (c) 2019 Nicholas Marriott <nicholas.marriott@gmail.com>
+//
+// Permission to use, copy, modify, and distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+// ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF MIND, USE, DATA OR PROFITS, WHETHER
+// IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
+// OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+use std::io::Read as _;
+use std::ops::BitAndAssign as _;
+use std::ops::BitOrAssign as _;
+
+use crate::xmalloc::xrecallocarray__;
+use crate::*;
+
+#[expect(unused_imports)]
+#[allow(clippy::all)]
+#[allow(clippy::pedantic)]
+#[allow(clippy::restriction)]
+mod lalrpop {
+    use lalrpop_util::lalrpop_mod;
+    lalrpop_mod!(pub(crate) cmd_parse);
+}
+use lalrpop::cmd_parse;
+
+/// C `vendor/tmux/cmd-parse.c:1241`: `int yyparse ()`
+fn yyparse(ps: &mut cmd_parse_state) -> Result<Option<&'static mut cmd_parse_commands>, ()> {
+    let parser = cmd_parse::LinesParser::new();
+
+    let ps = NonNull::new(ps).unwrap();
+    let lexer = lexer::Lexer::new(ps);
+
+    match parser.parse(ps, lexer) {
+        Ok(cmds) => Ok(cmds),
+        Err(parse_err) => {
+            log_debug!("parsing error {parse_err:?}");
+            Err(())
+        }
+    }
+}
+
+pub struct yystype_elif {
+    flag: i32,
+    commands: &'static mut cmd_parse_commands,
+}
+
+impl_tailq_entry!(cmd_parse_scope, entry, tailq_entry<cmd_parse_scope>);
+#[repr(C)]
+pub struct cmd_parse_scope {
+    pub flag: bool,
+    // #[entry]
+    pub entry: tailq_entry<cmd_parse_scope>,
+}
+
+#[repr(i32)]
+pub enum cmd_parse_argument_type {
+    /// string
+    String(*mut u8),
+    /// commands
+    Commands(&'static mut cmd_parse_commands),
+    /// cmdlist
+    ParsedCommands(*mut cmd_list),
+}
+
+impl_tailq_entry!(cmd_parse_argument, entry, tailq_entry<cmd_parse_argument>);
+#[repr(C)]
+pub struct cmd_parse_argument {
+    pub type_: cmd_parse_argument_type,
+
+    // #[entry]
+    pub entry: tailq_entry<cmd_parse_argument>,
+}
+pub type cmd_parse_arguments = tailq_head<cmd_parse_argument>;
+
+impl_tailq_entry!(cmd_parse_command, entry, tailq_entry<cmd_parse_command>);
+#[repr(C)]
+pub struct cmd_parse_command {
+    pub line: u32,
+    pub arguments: cmd_parse_arguments,
+
+    // #[entry]
+    pub entry: tailq_entry<cmd_parse_command>,
+}
+pub type cmd_parse_commands = tailq_head<cmd_parse_command>;
+
+#[repr(C)]
+pub struct cmd_parse_state<'a> {
+    pub f: Option<&'a mut std::io::BufReader<std::fs::File>>,
+    pub unget_buf: Option<i32>,
+
+    pub buf: Option<&'a [u8]>,
+    pub off: usize,
+
+    pub condition: i32,
+    pub eol: i32,
+    pub eof: i32,
+    pub input: Option<&'a cmd_parse_input<'a>>,
+    pub escapes: u32,
+
+    pub error: *mut u8,
+
+    pub scope: Option<&'a mut cmd_parse_scope>,
+    pub stack: tailq_head<cmd_parse_scope>,
+}
+
+/// C `vendor/tmux/cmd-parse.c:2277`: `static char *cmd_parse_get_error(const char *file, u_int line, const char *error)`
+pub unsafe fn cmd_parse_get_error(file: Option<&str>, line: u32, error: &str) -> CString {
+    match file {
+        None => CString::new(error).unwrap(),
+        Some(file) => CString::new(format!("{file}:{line}: {error}")).unwrap(),
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2289`: `static void cmd_parse_print_commands(struct cmd_parse_input *pi, struct cmd_list *cmdlist)`
+pub fn cmd_parse_print_commands(pi: &cmd_parse_input, cmdlist: &cmd_list) {
+    if pi.item.is_null()
+        || !pi
+            .flags
+            .intersects(cmd_parse_input_flags::CMD_PARSE_VERBOSE)
+    {
+        return;
+    }
+
+    let s = cmd_list_print(cmdlist, 0);
+
+    unsafe {
+        if let Some(file) = pi.file {
+            cmdq_print!(
+                pi.item,
+                "{}:{}: {}",
+                file,
+                pi.line.load(atomic::Ordering::SeqCst),
+                _s(s)
+            );
+        } else {
+            cmdq_print!(
+                pi.item,
+                "{}: {}",
+                pi.line.load(atomic::Ordering::SeqCst),
+                _s(s)
+            );
+        }
+        free_(s);
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2304`: `static void cmd_parse_free_argument(struct cmd_parse_argument *arg)`
+pub unsafe fn cmd_parse_free_argument(arg: *mut cmd_parse_argument) {
+    unsafe {
+        match &mut (*arg).type_ {
+            cmd_parse_argument_type::String(string) => free_(*string),
+            cmd_parse_argument_type::Commands(commands) => cmd_parse_free_commands(*commands),
+            cmd_parse_argument_type::ParsedCommands(cmdlist) => cmd_list_free(*cmdlist),
+        }
+        free_(arg);
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2321`: `static void cmd_parse_free_arguments(struct cmd_parse_arguments *args)`
+pub unsafe fn cmd_parse_free_arguments(args: &mut cmd_parse_arguments) {
+    unsafe {
+        for arg in tailq_foreach(args).map(NonNull::as_ptr) {
+            tailq_remove(args, arg);
+            cmd_parse_free_argument(arg);
+        }
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2332`: `static void cmd_parse_free_command(struct cmd_parse_command *cmd)`
+pub unsafe fn cmd_parse_free_command(cmd: *mut cmd_parse_command) {
+    unsafe {
+        cmd_parse_free_arguments(&mut (*cmd).arguments);
+        free_(cmd);
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2339`: `static struct cmd_parse_commands *cmd_parse_new_commands(void)`
+pub fn cmd_parse_new_commands() -> &'static mut cmd_parse_commands {
+    unsafe {
+        let cmds = Box::leak(Box::new(zeroed()));
+        tailq_init(cmds);
+        cmds
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2349`: `static void cmd_parse_free_commands(struct cmd_parse_commands *cmds)`
+pub unsafe fn cmd_parse_free_commands(cmds: *mut cmd_parse_commands) {
+    unsafe {
+        for cmd in tailq_foreach(cmds).map(NonNull::as_ptr) {
+            tailq_remove(cmds, cmd);
+            cmd_parse_free_command(cmd);
+        }
+        free_(cmds);
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2361`: `static struct cmd_parse_commands *cmd_parse_run_parser(char **cause)`
+pub unsafe fn cmd_parse_run_parser(
+    ps: &mut cmd_parse_state,
+) -> Result<&'static mut cmd_parse_commands, *mut u8> {
+    unsafe {
+        tailq_init(&mut ps.stack);
+
+        let retval = yyparse(ps);
+        for scope in tailq_foreach(&mut ps.stack).map(NonNull::as_ptr) {
+            tailq_remove(&mut ps.stack, scope);
+            free_(scope);
+        }
+
+        match retval {
+            Ok(Some(cmds)) => Ok(cmds),
+            Ok(None) => Ok(cmd_parse_new_commands()),
+            Err(()) => Err(ps.error),
+        }
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2386`: `static struct cmd_parse_commands *cmd_parse_do_file(FILE *f, struct cmd_parse_input *pi, char **cause)`
+pub unsafe fn cmd_parse_do_file<'a>(
+    f: &'a mut std::io::BufReader<std::fs::File>,
+    pi: &'a cmd_parse_input<'a>,
+) -> Result<&'static mut cmd_parse_commands, *mut u8> {
+    unsafe {
+        let mut ps: Box<cmd_parse_state> = Box::new(zeroed());
+        ps.input = Some(pi);
+        ps.f = Some(f);
+        cmd_parse_run_parser(&mut ps)
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2397`: `static struct cmd_parse_commands *cmd_parse_do_buffer(const char *buf, size_t len, struct cmd_parse_input *pi, char **cause)`
+pub unsafe fn cmd_parse_do_buffer<'a>(
+    buf: &'a [u8],
+    pi: &'a cmd_parse_input<'a>,
+) -> Result<&'static mut cmd_parse_commands, *mut u8> {
+    unsafe {
+        let mut ps: Box<cmd_parse_state> = Box::new(zeroed());
+
+        ps.input = Some(pi);
+        ps.buf = Some(buf);
+        cmd_parse_run_parser(&mut ps)
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2410`: `static void cmd_parse_log_commands(struct cmd_parse_commands *cmds, const char *prefix)`
+pub unsafe fn cmd_parse_log_commands(cmds: *mut cmd_parse_commands, prefix: *const u8) {
+    unsafe {
+        for (i, cmd) in tailq_foreach(cmds).map(NonNull::as_ptr).enumerate() {
+            for (j, arg) in tailq_foreach(&raw mut (*cmd).arguments)
+                .map(NonNull::as_ptr)
+                .enumerate()
+            {
+                match &mut (*arg).type_ {
+                    cmd_parse_argument_type::String(string) => {
+                        log_debug!("{} {}:{}: {}", _s(prefix), i, j, _s(*string));
+                    }
+                    cmd_parse_argument_type::Commands(commands) => {
+                        let s = format_nul!("{} {}:{}", _s(prefix), i, j);
+                        cmd_parse_log_commands(*commands, s);
+                        free_(s);
+                    }
+                    cmd_parse_argument_type::ParsedCommands(cmdlist) => {
+                        let s = cmd_list_print(&**cmdlist, 0);
+                        log_debug!("{} {}:{}: {}", _s(prefix), i, j, _s(s));
+                        free_(s);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2444`: `static int cmd_parse_expand_alias(struct cmd_parse_command *cmd, struct cmd_parse_input *pi, struct cmd_parse_result *pr)`
+pub unsafe fn cmd_parse_expand_alias<'a>(
+    cmd: *mut cmd_parse_command,
+    pi: &'a cmd_parse_input<'a>,
+    pr: &mut cmd_parse_result,
+) -> bool {
+    let __func__ = c!("cmd_parse_expand_alias");
+    unsafe {
+        if pi
+            .flags
+            .intersects(cmd_parse_input_flags::CMD_PARSE_NOALIAS)
+        {
+            return false;
+        }
+        *pr = Err(null_mut());
+
+        let first = tailq_first(&raw mut (*cmd).arguments);
+        if first.is_null() {
+            *pr = Ok(cmd_list_new());
+            return true;
+        }
+        let cmd_parse_argument_type::String(name) = (*first).type_ else {
+            *pr = Ok(cmd_list_new());
+            return true;
+        };
+
+        let alias = cmd_get_alias(name);
+        if alias.is_null() {
+            return false;
+        }
+        log_debug!(
+            "{}: {} alias {} = {}",
+            _s(__func__),
+            pi.line.load(atomic::Ordering::SeqCst),
+            _s(name),
+            _s(alias)
+        );
+
+        let result = cmd_parse_do_buffer(
+            std::slice::from_raw_parts(alias.cast(), libc::strlen(alias)),
+            pi,
+        );
+        free_(alias);
+        let cmds = match result {
+            Ok(cmds) => cmds,
+            Err(cause) => {
+                *pr = Err(cause);
+                return true;
+            }
+        };
+
+        let last = tailq_last(cmds);
+        if last.is_null() {
+            *pr = Ok(cmd_list_new());
+            return true;
+        }
+
+        tailq_remove(&raw mut (*cmd).arguments, first);
+        cmd_parse_free_argument(first);
+
+        for arg in tailq_foreach(&raw mut (*cmd).arguments).map(NonNull::as_ptr) {
+            tailq_remove(&raw mut (*cmd).arguments, arg);
+            tailq_insert_tail(&raw mut (*last).arguments, arg);
+        }
+        cmd_parse_log_commands(cmds, __func__);
+
+        (&pi.flags).bitor_assign(cmd_parse_input_flags::CMD_PARSE_NOALIAS);
+        cmd_parse_build_commands(cmds, pi, pr);
+        (&pi.flags).bitand_assign(!cmd_parse_input_flags::CMD_PARSE_NOALIAS);
+        true
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2497`: `static void cmd_parse_build_command(struct cmd_parse_command *cmd, struct cmd_parse_input *pi, struct cmd_parse_result *pr)`
+pub unsafe fn cmd_parse_build_command(
+    cmd: *mut cmd_parse_command,
+    pi: &cmd_parse_input,
+    pr: &mut cmd_parse_result,
+) {
+    unsafe {
+        let mut values: *mut args_value = null_mut();
+        let mut count: u32 = 0;
+        *pr = cmd_parse_result::Err(null_mut());
+
+        if cmd_parse_expand_alias(cmd, pi, pr) {
+            return;
+        }
+
+        'out: {
+            for arg in tailq_foreach(&raw mut (*cmd).arguments).map(NonNull::as_ptr) {
+                values = xrecallocarray__::<args_value>(values, count as usize, count as usize + 1)
+                    .as_ptr();
+                match &mut (*arg).type_ {
+                    cmd_parse_argument_type::String(string) => {
+                        (*values.add(count as usize)).type_ = args_type::ARGS_STRING;
+                        (*values.add(count as usize)).union_.string = xstrdup(*string).as_ptr();
+                    }
+                    cmd_parse_argument_type::Commands(commands) => {
+                        cmd_parse_build_commands(commands, pi, pr);
+                        match *pr {
+                            Err(_) => break 'out,
+                            Ok(cmdlist) => {
+                                (*values.add(count as _)).type_ = args_type::ARGS_COMMANDS;
+                                (*values.add(count as _)).union_.cmdlist = cmdlist;
+                            }
+                        }
+                    }
+                    cmd_parse_argument_type::ParsedCommands(cmdlist) => {
+                        (*values.add(count as _)).type_ = args_type::ARGS_COMMANDS;
+                        (*values.add(count as _)).union_.cmdlist = *cmdlist;
+                        (*(*values.add(count as _)).union_.cmdlist).references += 1;
+                    }
+                }
+                count += 1;
+            }
+
+            match cmd_parse(
+                values,
+                count,
+                pi.file,
+                pi.line.load(atomic::Ordering::SeqCst),
+            ) {
+                Ok(add) => {
+                    let cmdlist = cmd_list_new();
+                    *pr = Ok(cmdlist);
+                    cmd_list_append(cmdlist, add);
+                }
+                Err(cause) => {
+                    *pr = Err(cmd_parse_get_error(
+                        pi.file,
+                        pi.line.load(atomic::Ordering::SeqCst),
+                        &cause,
+                    )
+                    .into_raw()
+                    .cast());
+                    break 'out;
+                }
+            }
+        }
+        // out:
+        for idx in 0..count {
+            args_free_value(values.add(idx as usize));
+        }
+        free_(values);
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2553`: `static void cmd_parse_build_commands(struct cmd_parse_commands *cmds, struct cmd_parse_input *pi, struct cmd_parse_result *pr)`
+pub unsafe fn cmd_parse_build_commands(
+    cmds: &mut cmd_parse_commands,
+    pi: &cmd_parse_input,
+    pr: &mut cmd_parse_result,
+) {
+    unsafe {
+        let mut line = u32::MAX;
+        let mut current: *mut cmd_list = null_mut();
+
+        *pr = Err(null_mut());
+
+        // Check for an empty list.
+        if tailq_empty(cmds) {
+            *pr = Ok(cmd_list_new());
+            return;
+        }
+        cmd_parse_log_commands(cmds, c!("cmd_parse_build_commands"));
+
+        // Parse each command into a command list. Create a new command list
+        // for each line (unless the flag is set) so they get a new group (so
+        // the queue knows which ones to remove if a command fails when
+        // executed).
+        let result = cmd_list_new();
+        for cmd in tailq_foreach(cmds).map(NonNull::as_ptr) {
+            if !pi
+                .flags
+                .intersects(cmd_parse_input_flags::CMD_PARSE_ONEGROUP)
+                && (*cmd).line != line
+            {
+                if !current.is_null() {
+                    cmd_parse_print_commands(pi, &*current);
+                    cmd_list_move(result, current);
+                    cmd_list_free(current);
+                }
+                current = cmd_list_new();
+            }
+            if current.is_null() {
+                current = cmd_list_new();
+            }
+            line = (*cmd).line;
+            pi.line.store((*cmd).line, atomic::Ordering::SeqCst);
+
+            cmd_parse_build_command(cmd, pi, pr);
+            match *pr {
+                Err(_err) => {
+                    cmd_list_free(result);
+                    cmd_list_free(current);
+                    return;
+                }
+                Ok(cmdlist) => {
+                    cmd_list_append_all(current, cmdlist);
+                    cmd_list_free(cmdlist);
+                }
+            }
+        }
+
+        if !current.is_null() {
+            cmd_parse_print_commands(pi, &*current);
+            cmd_list_move(result, current);
+            cmd_list_free(current);
+        }
+
+        let s = cmd_list_print(result, 0);
+        log_debug!("cmd_parse_build_commands: {}", _s(s));
+        free_(s);
+
+        *pr = Ok(result);
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2615`: `struct cmd_parse_result *cmd_parse_from_file(FILE *f, struct cmd_parse_input *pi)`
+pub unsafe fn cmd_parse_from_file<'a>(
+    f: &'a mut std::io::BufReader<std::fs::File>,
+    pi: Option<&'a cmd_parse_input<'a>>,
+) -> cmd_parse_result {
+    unsafe {
+        let input: cmd_parse_input = zeroed();
+        let pi = pi.unwrap_or(&input);
+
+        let cmds = cmd_parse_do_file(f, pi)?;
+        let mut pr = Err(null_mut());
+        cmd_parse_build_commands(cmds, pi, &mut pr);
+        cmd_parse_free_commands(cmds);
+        pr
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2641`: `struct cmd_parse_result *cmd_parse_from_string(const char *s, struct cmd_parse_input *pi)`
+pub unsafe fn cmd_parse_from_string(s: &str, pi: Option<&cmd_parse_input>) -> cmd_parse_result {
+    unsafe {
+        let input: cmd_parse_input = cmd_parse_input::default();
+        let pi = pi.unwrap_or(&input);
+
+        (&pi.flags).bitor_assign(cmd_parse_input_flags::CMD_PARSE_ONEGROUP);
+        cmd_parse_from_buffer(s.as_bytes(), Some(pi))
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2684`: `enum cmd_parse_status cmd_parse_and_append(const char *s, struct cmd_parse_input *pi, struct client *c, struct cmdq_state *state, char **error)`
+pub unsafe fn cmd_parse_and_append(
+    s: &str,
+    pi: Option<&cmd_parse_input>,
+    c: *mut client,
+    state: *mut cmdq_state,
+    error: *mut *mut u8,
+) -> cmd_parse_status {
+    unsafe {
+        match cmd_parse_from_string(s, pi) {
+            Err(err) => {
+                if !error.is_null() {
+                    *error = err;
+                } else {
+                    free_(err);
+                }
+                cmd_parse_status::CMD_PARSE_ERROR
+            }
+            Ok(cmdlist) => {
+                let item = cmdq_get_command(cmdlist, state);
+                cmdq_append(c, item);
+                cmd_list_free(cmdlist);
+                cmd_parse_status::CMD_PARSE_SUCCESS
+            }
+        }
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2708`: `struct cmd_parse_result *cmd_parse_from_buffer(const void *buf, size_t len, struct cmd_parse_input *pi)`
+pub unsafe fn cmd_parse_from_buffer(buf: &[u8], pi: Option<&cmd_parse_input>) -> cmd_parse_result {
+    unsafe {
+        let input: cmd_parse_input = zeroed();
+        let pi = pi.unwrap_or(&input);
+
+        if buf.is_empty() {
+            return Ok(cmd_list_new());
+        }
+
+        let cmds = match cmd_parse_do_buffer(buf, pi) {
+            Ok(cmds) => cmds,
+            Err(cause) => {
+                return Err(cause);
+            }
+        };
+        let mut pr = Err(null_mut());
+        cmd_parse_build_commands(cmds, pi, &mut pr);
+        cmd_parse_free_commands(cmds);
+        pr
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2739`: `struct cmd_parse_result *cmd_parse_from_arguments(struct args_value *values, u_int count, struct cmd_parse_input *pi)`
+pub unsafe fn cmd_parse_from_arguments(
+    values: *mut args_value,
+    count: u32,
+    pi: Option<&mut cmd_parse_input>,
+) -> cmd_parse_result {
+    unsafe {
+        let mut input: cmd_parse_input = zeroed();
+        let pi = pi.unwrap_or(&mut input);
+        let mut pr = Err(null_mut());
+        let cmds = cmd_parse_new_commands();
+
+        let mut cmd = xcalloc1::<cmd_parse_command>() as *mut cmd_parse_command;
+        (*cmd).line = pi.line.load(atomic::Ordering::SeqCst);
+        tailq_init(&raw mut (*cmd).arguments);
+
+        for i in 0..count {
+            let mut end = 0;
+            if (*values.add(i as usize)).type_ == args_type::ARGS_STRING {
+                let copy = xstrdup((*values.add(i as usize)).union_.string).as_ptr();
+                let mut size = strlen(copy);
+                if size != 0 && *copy.add(size - 1) == b';' {
+                    size -= 1;
+                    *copy.add(size) = b'\0' as _;
+                    if size > 0 && *copy.add(size - 1) == b'\\' {
+                        *copy.add(size - 1) = b';' as _;
+                    } else {
+                        end = 1;
+                    }
+                }
+                if end == 0 || size != 0 {
+                    let arg = xcalloc1::<cmd_parse_argument>() as *mut cmd_parse_argument;
+                    (*arg).type_ = cmd_parse_argument_type::String(copy);
+                    tailq_insert_tail(&raw mut (*cmd).arguments, arg);
+                } else {
+                    free_(copy);
+                }
+            } else if (*values.add(i as usize)).type_ == args_type::ARGS_COMMANDS {
+                let arg = xcalloc1::<cmd_parse_argument>() as *mut cmd_parse_argument;
+                let cmdlist = (*values.add(i as usize)).union_.cmdlist;
+                (*cmdlist).references += 1;
+                (*arg).type_ = cmd_parse_argument_type::ParsedCommands(cmdlist);
+                tailq_insert_tail(&raw mut (*cmd).arguments, arg);
+            } else {
+                fatalx("unknown argument type");
+            }
+            if end != 0 {
+                tailq_insert_tail(cmds, cmd);
+                cmd = xcalloc1::<cmd_parse_command>();
+                (*cmd).line = pi.line.load(atomic::Ordering::SeqCst);
+                tailq_init(&raw mut (*cmd).arguments);
+            }
+        }
+        if !tailq_empty(&raw mut (*cmd).arguments) {
+            tailq_insert_tail(cmds, cmd);
+        } else {
+            free_(cmd);
+        }
+
+        cmd_parse_build_commands(cmds, pi, &mut pr);
+        cmd_parse_free_commands(cmds);
+        pr
+    }
+}
+
+mod lexer {
+    use core::ptr::NonNull;
+
+    use crate::{cmd_parse_state, transmute_ptr};
+
+    pub struct Lexer<'a> {
+        ps: NonNull<cmd_parse_state<'a>>,
+    }
+    impl<'a> Lexer<'a> {
+        pub fn new(ps: NonNull<cmd_parse_state<'a>>) -> Self {
+            Lexer { ps }
+        }
+    }
+
+    #[derive(Copy, Clone, Debug)]
+    pub enum Tok {
+        Newline,
+        Semicolon,
+        LeftBrace,
+        RightBrace,
+
+        Error,
+        Hidden,
+        If,
+        Else,
+        Elif,
+        Endif,
+
+        Format(Option<NonNull<u8>>),
+        Token(Option<NonNull<u8>>),
+        Equals(Option<NonNull<u8>>),
+    }
+    impl std::fmt::Display for Tok {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Tok::Newline => write!(f, "\\n"),
+                Tok::Semicolon => write!(f, ";"),
+                Tok::LeftBrace => write!(f, "{{"),
+                Tok::RightBrace => write!(f, "}}"),
+                Tok::Error => write!(f, "%error"),
+                Tok::Hidden => write!(f, "%hidden"),
+                Tok::If => write!(f, "%if"),
+                Tok::Else => write!(f, "%else"),
+                Tok::Elif => write!(f, "%elif"),
+                Tok::Endif => write!(f, "%endif"),
+                Tok::Format(non_null) => {
+                    write!(f, "format({})", unsafe {
+                        crate::_s(transmute_ptr(*non_null))
+                    })
+                }
+                Tok::Token(non_null) => write!(f, "token({})", unsafe {
+                    crate::_s(transmute_ptr(*non_null))
+                }),
+                Tok::Equals(non_null) => {
+                    write!(f, "equals({})", unsafe {
+                        crate::_s(transmute_ptr(*non_null))
+                    })
+                }
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum LexicalError {
+        // Not possible
+    }
+    type Loc = usize;
+    impl Iterator for Lexer<'_> {
+        type Item = Result<(Loc, Tok, Loc), LexicalError>;
+
+        fn next(&mut self) -> Option<Result<(Loc, Tok, Loc), LexicalError>> {
+            unsafe { super::yylex(&mut *self.ps.as_ptr()).map(|tok| Ok((0, tok, 0))) }
+        }
+    }
+}
+
+macro_rules! yyerror {
+   ($ps:expr, $fmt:literal $(, $args:expr)* $(,)?) => {
+        crate::cmd_parse::yyerror_(&mut *$ps, format_args!($fmt $(, $args)*))
+    };
+}
+unsafe fn yyerror_(ps: &mut cmd_parse_state, args: std::fmt::Arguments) -> i32 {
+    unsafe {
+        if !ps.error.is_null() {
+            return 0;
+        }
+
+        let pi = ps.input.as_mut().unwrap();
+
+        // C yyerror uses xvasprintf, which never embeds a NUL; cmd_parse_get_error
+        // builds a CString (adding its own terminator). Pushing a '\0' here made
+        // that CString::new reject the interior nul and panic.
+        let error = args.to_string();
+
+        ps.error = cmd_parse_get_error(pi.file, pi.line.load(atomic::Ordering::SeqCst), &error)
+            .into_raw()
+            .cast();
+        0
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2833`: `static int yylex_is_var(char ch, int first)`
+fn yylex_is_var(ch: u8, first: bool) -> bool {
+    if ch == b'=' || (first && ch.is_ascii_digit()) {
+        false
+    } else {
+        ch.is_ascii_alphanumeric() || ch == b'_'
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2843`: `static void yylex_append(char **buf, size_t *len, const char *add, size_t addlen)`
+fn yylex_append(buf: &mut Vec<u8>, add: &[u8]) {
+    if add.len() > usize::MAX - 1 || buf.len() > usize::MAX - 1 - add.len() {
+        fatalx("buffer is too big");
+    }
+    buf.extend_from_slice(add);
+}
+
+/// C `vendor/tmux/cmd-parse.c:2853`: `static void yylex_append1(char **buf, size_t *len, char add)`
+fn yylex_append1(buf: &mut Vec<u8>, add: u8) {
+    yylex_append(buf, &[add]);
+}
+
+/// C `vendor/tmux/cmd-parse.c:2859`: `static int yylex_getc1(void)`
+fn yylex_getc1(ps: &mut cmd_parse_state) -> i32 {
+    let ch;
+    if let Some(f) = ps.f.as_mut() {
+        if let Some(c) = ps.unget_buf.take() {
+            return c;
+        }
+        let mut buf: [u8; 1] = [0];
+        match f.read(&mut buf) {
+            Ok(count) => {
+                assert!(count == 0 || count == 1, "unexpected read size");
+                if count == 0 {
+                    ch = libc::EOF;
+                } else {
+                    ch = buf[0] as i32;
+                }
+            }
+            Err(_) => {
+                ch = libc::EOF;
+            }
+        }
+    } else if ps.off == ps.buf.unwrap().len() {
+        ch = libc::EOF;
+    } else {
+        ch = ps.buf.unwrap()[ps.off] as i32;
+        ps.off += 1;
+    }
+
+    ch
+}
+
+/// C `vendor/tmux/cmd-parse.c:2876`: `static void yylex_ungetc(int ch)`
+fn yylex_ungetc(ps: &mut cmd_parse_state, ch: i32) {
+    if let Some(_f) = ps.f.as_mut() {
+        ps.unget_buf = Some(ch);
+    } else if ps.off > 0 && ch != libc::EOF {
+        ps.off -= 1;
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2887`: `static int yylex_getc(void)`
+fn yylex_getc(ps: &mut cmd_parse_state) -> i32 {
+    if ps.escapes != 0 {
+        ps.escapes -= 1;
+        return '\\' as i32;
+    }
+    loop {
+        let ch = yylex_getc1(ps);
+        if ch == '\\' as i32 {
+            ps.escapes += 1;
+            continue;
+        }
+        if ch == '\n' as i32 && ps.escapes % 2 == 1 {
+            ps.input
+                .as_mut()
+                .unwrap()
+                .line
+                .fetch_add(1, atomic::Ordering::SeqCst);
+            ps.escapes -= 1;
+            continue;
+        }
+
+        if ps.escapes != 0 {
+            yylex_ungetc(ps, ch);
+            ps.escapes -= 1;
+            return '\\' as i32;
+        }
+        return ch;
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:2918`: `static char *yylex_get_word(int ch)`
+unsafe fn yylex_get_word(ps: &mut cmd_parse_state, mut ch: i32) -> *mut u8 {
+    unsafe {
+        let mut buf = Vec::new();
+
+        loop {
+            yylex_append1(&mut buf, ch as u8);
+            ch = yylex_getc(ps);
+            if ch == libc::EOF || !libc::strchr(c!(" \t\n"), ch).is_null() {
+                break;
+            }
+        }
+        yylex_ungetc(ps, ch);
+
+        buf.push(b'\0');
+        // log_debug("%s: %s", __func__, buf.as_ptr());
+        Box::leak(buf.into_boxed_slice()).as_mut_ptr()
+    }
+}
+
+use lexer::Tok;
+
+/// C `vendor/tmux/cmd-parse.c:2937`: `static int yylex(void)`
+unsafe fn yylex(ps: &mut cmd_parse_state) -> Option<Tok> {
+    unsafe {
+        if ps.eol != 0 {
+            ps.input
+                .as_mut()
+                .unwrap()
+                .line
+                .fetch_add(1, atomic::Ordering::SeqCst);
+        }
+        ps.eol = 0;
+
+        let condition = ps.condition;
+        ps.condition = 0;
+
+        loop {
+            let mut ch = yylex_getc(ps);
+
+            if ch == libc::EOF {
+                // Ensure every file or string is terminated by a
+                // newline. This keeps the parser simpler and avoids
+                // having to add a newline to each string.
+                if ps.eof != 0 {
+                    break;
+                }
+                ps.eof = 1;
+                return Some(Tok::Newline);
+            }
+
+            if ch == ' ' as i32 || ch == '\t' as i32 {
+                // Ignore whitespace.
+                continue;
+            }
+
+            if ch == '\r' as i32 {
+                // Treat \r\n as \n.
+                ch = yylex_getc(ps);
+                if ch != '\n' as i32 {
+                    yylex_ungetc(ps, ch);
+                    ch = '\r' as i32;
+                }
+            }
+            if ch == '\n' as i32 {
+                // End of line. Update the line number.
+                ps.eol = 1;
+                return Some(Tok::Newline);
+            }
+
+            if ch == ';' as i32 {
+                return Some(Tok::Semicolon);
+            }
+            if ch == '{' as i32 {
+                return Some(Tok::LeftBrace);
+            }
+            if ch == '}' as i32 {
+                return Some(Tok::RightBrace);
+            }
+
+            if ch == '#' as i32 {
+                // #{ after a condition opens a format; anything else
+                // is a comment, ignore up to the end of the line.
+                let mut next = yylex_getc(ps);
+                if condition != 0 && next == '{' as i32 {
+                    let yylval_token = yylex_format(ps);
+                    if yylval_token.is_none() {
+                        return Some(Tok::Error);
+                    }
+                    return Some(Tok::Format(yylval_token));
+                }
+                while next != '\n' as i32 && next != libc::EOF {
+                    next = yylex_getc(ps);
+                }
+                if next == '\n' as i32 {
+                    ps.input
+                        .as_mut()
+                        .unwrap()
+                        .line
+                        .fetch_add(1, atomic::Ordering::SeqCst);
+                    return Some(Tok::Newline);
+                }
+                continue;
+            }
+
+            if ch == '%' as i32 {
+                // % is a condition unless it is all % or all numbers,
+                // then it is a token.
+                let yylval_token = yylex_get_word(ps, '%' as i32);
+                let mut cp = yylval_token;
+                while *cp != b'\0' {
+                    if *cp != b'%' && !(*cp).is_ascii_digit() {
+                        break;
+                    }
+                    cp = cp.add(1);
+                }
+                if *cp == b'\0' {
+                    return Some(Tok::Token(NonNull::new(yylval_token)));
+                }
+                ps.condition = 1;
+                if streq_(yylval_token, "%hidden") {
+                    free_(yylval_token);
+                    return Some(Tok::Hidden);
+                }
+                if streq_(yylval_token, "%if") {
+                    free_(yylval_token);
+                    return Some(Tok::If);
+                }
+                if streq_(yylval_token, "%else") {
+                    free_(yylval_token);
+                    return Some(Tok::Else);
+                }
+                if streq_(yylval_token, "%elif") {
+                    free_(yylval_token);
+                    return Some(Tok::Elif);
+                }
+                if streq_(yylval_token, "%endif") {
+                    free_(yylval_token);
+                    return Some(Tok::Endif);
+                }
+                free_(yylval_token);
+                return Some(Tok::Error);
+            }
+
+            // Otherwise this is a token.
+            let token = yylex_token(ps, ch);
+            if token.is_null() {
+                return Some(Tok::Error);
+            }
+            let yylval_token = token;
+
+            if !libc::strchr(token, b'=' as i32).is_null() && yylex_is_var(*token, true) {
+                let mut cp = token.add(1);
+                while *cp != b'=' {
+                    if !yylex_is_var(*cp, false) {
+                        break;
+                    }
+                    cp = cp.add(1);
+                }
+                if *cp == b'=' {
+                    return Some(Tok::Equals(NonNull::new(yylval_token)));
+                }
+            }
+            return Some(Tok::Token(NonNull::new(yylval_token)));
+        }
+
+        None
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:3077`: `static char *yylex_format(void)`
+unsafe fn yylex_format(ps: &mut cmd_parse_state) -> Option<NonNull<u8>> {
+    let mut brackets = 1;
+    let mut buf = Vec::new();
+
+    'error: {
+        yylex_append(&mut buf, b"#{");
+        loop {
+            let mut ch = yylex_getc(ps);
+            if ch == libc::EOF || ch == '\n' as i32 {
+                break 'error;
+            }
+            if ch == '#' as i32 {
+                ch = yylex_getc(ps);
+                if ch == libc::EOF || ch == '\n' as i32 {
+                    break 'error;
+                }
+                if ch == '{' as i32 {
+                    brackets += 1;
+                }
+                yylex_append1(&mut buf, b'#');
+            } else if (ch == '}' as i32)
+                && brackets != 0
+                && ({
+                    brackets -= 1;
+                    brackets == 0
+                })
+            {
+                yylex_append1(&mut buf, ch as u8);
+                break;
+            }
+            yylex_append1(&mut buf, ch as u8);
+        }
+        if brackets != 0 {
+            break 'error;
+        }
+
+        buf.push(b'\0');
+        // log_debug("%s: %s", __func__, buf.as_ptr());
+        return NonNull::new(Box::leak(buf.into_boxed_slice()).as_mut_ptr());
+    } // error:
+
+    None
+}
+
+/// C `vendor/tmux/cmd-parse.c:3216`: `static int yylex_token_variable(char **buf, size_t *len)`
+unsafe fn yylex_token_variable(ps: &mut cmd_parse_state, buf: &mut Vec<u8>) -> bool {
+    unsafe {
+        let mut namelen: usize = 0;
+        let mut name: [u8; 1024] = [0; 1024];
+        const SIZEOF_NAME: usize = 1024;
+        let mut brackets = 0;
+
+        let mut ch = yylex_getc(ps);
+        if ch == libc::EOF {
+            return false;
+        }
+        if ch == '{' as i32 {
+            brackets = 1;
+        } else {
+            if !yylex_is_var(ch as u8, true) {
+                yylex_append1(buf, b'$');
+                yylex_ungetc(ps, ch);
+                return true;
+            }
+            name[namelen] = ch as u8;
+            namelen += 1;
+        }
+
+        loop {
+            ch = yylex_getc(ps);
+            if brackets != 0 && ch == '}' as i32 {
+                break;
+            }
+            if ch == libc::EOF || !yylex_is_var(ch as u8, false) {
+                if brackets == 0 {
+                    yylex_ungetc(ps, ch);
+                    break;
+                }
+                yyerror!(ps, "invalid environment variable");
+                return false;
+            }
+            if namelen == SIZEOF_NAME - 2 {
+                yyerror!(ps, "environment variable is too long");
+                return false;
+            }
+            name[namelen] = ch as u8;
+            namelen += 1;
+        }
+        name[namelen] = b'\0';
+
+        let envent = environ_find(GLOBAL_ENVIRON, (&raw const name).cast());
+        if !envent.is_null() && (*envent).value.is_some() {
+            let value = (*envent).value;
+            // log_debug("%s: %s -> %s", __func__, name, value);
+            let value_ptr: *const u8 = transmute_ptr(value);
+            let value_len = libc::strlen(transmute_ptr(value));
+            yylex_append(buf, core::slice::from_raw_parts(value_ptr, value_len));
+        }
+        true
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:3268`: `static int yylex_token_tilde(char **buf, size_t *len)`
+unsafe fn yylex_token_tilde(ps: &mut cmd_parse_state, buf: &mut Vec<u8>) -> bool {
+    unsafe {
+        let mut home = null();
+        let mut namelen: usize = 0;
+        let mut name: [u8; 1024] = [0; 1024];
+        const SIZEOF_NAME: usize = 1024;
+
+        loop {
+            let ch = yylex_getc(ps);
+            if ch == libc::EOF || !libc::strchr(c!("/ \t\n\"'"), ch).is_null() {
+                yylex_ungetc(ps, ch);
+                break;
+            }
+            if namelen == SIZEOF_NAME - 2 {
+                yyerror!(ps, "user name is too long");
+                return false;
+            }
+            name[namelen] = ch as u8;
+            namelen += 1;
+        }
+        name[namelen] = b'\0';
+
+        if name[0] == b'\0' {
+            let envent = environ_find(GLOBAL_ENVIRON, c!("HOME"));
+            if !envent.is_null() && (*(*envent).value.unwrap().as_ptr()) != b'\0' {
+                home = transmute_ptr((*envent).value);
+            } else if let Some(pw) = NonNull::new(libc::getpwuid(libc::getuid())) {
+                home = (*pw.as_ptr()).pw_dir.cast();
+            }
+        } else if let Some(pw) = NonNull::new(libc::getpwnam((&raw const name).cast())) {
+            home = (*pw.as_ptr()).pw_dir.cast();
+        }
+        if home.is_null() {
+            return false;
+        }
+
+        // log_debug("%s: ~%s -> %s", __func__, name, home);
+        let home_len = strlen(home);
+        yylex_append(buf, core::slice::from_raw_parts(home, home_len));
+        true
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:3312`: `static char *yylex_token(int ch)`
+unsafe fn yylex_token(ps: &mut cmd_parse_state, mut ch: i32) -> *mut u8 {
+    unsafe {
+        #[derive(Copy, Clone, Eq, PartialEq)]
+        enum State {
+            Start,
+            None,
+            DoubleQuotes,
+            SingleQuotes,
+        }
+
+        let mut state = State::None;
+        let mut last = State::Start;
+
+        let mut buf = Vec::new();
+
+        'error: {
+            'aloop: loop {
+                'next: {
+                    'skip: {
+                        // EOF or \n are always the end of the token.
+                        if ch == libc::EOF {
+                            // log_debug("%s: end at EOF", __func__);
+                            break 'aloop;
+                        }
+                        if state == State::None && ch == '\r' as i32 {
+                            ch = yylex_getc(ps);
+                            if ch != '\n' as i32 {
+                                yylex_ungetc(ps, ch);
+                                ch = '\r' as i32;
+                            }
+                        }
+                        if state == State::None && ch == '\n' as i32 {
+                            // log_debug("%s: end at EOL", __func__);
+                            break 'aloop;
+                        }
+
+                        // Whitespace or ; or } ends a token unless inside quotes.
+                        if state == State::None && (ch == ' ' as i32 || ch == '\t' as i32) {
+                            // log_debug("%s: end at WS", __func__);
+                            break 'aloop;
+                        }
+                        if state == State::None && (ch == ';' as i32 || ch == '}' as i32) {
+                            // log_debug("%s: end at %c", __func__, ch);
+                            break 'aloop;
+                        }
+
+                        // Spaces and comments inside quotes after \n are removed but
+                        // the \n is left.
+                        if ch == '\n' as i32 && state != State::None {
+                            yylex_append1(&mut buf, b'\n');
+                            while ({
+                                ch = yylex_getc(ps);
+                                ch == b' ' as i32
+                            }) || ch == '\t' as i32
+                            {}
+                            if ch != '#' as i32 {
+                                continue 'aloop;
+                            }
+                            ch = yylex_getc(ps);
+                            if !libc::strchr(c!(",#{}:"), ch).is_null() {
+                                yylex_ungetc(ps, ch);
+                                ch = '#' as i32;
+                            } else {
+                                while {
+                                    ch = yylex_getc(ps);
+                                    ch != '\n' as i32 && ch != libc::EOF
+                                } { /* nothing */ }
+                            }
+                            continue 'aloop;
+                        }
+
+                        // \ ~ and $ are expanded except in single quotes.
+                        if ch == '\\' as i32 && state != State::SingleQuotes {
+                            if !yylex_token_escape(ps, &mut buf) {
+                                break 'error;
+                            }
+                            break 'skip;
+                        }
+                        if ch == '~' as i32 && last != state && state != State::SingleQuotes {
+                            if !yylex_token_tilde(ps, &mut buf) {
+                                break 'error;
+                            }
+                            break 'skip;
+                        }
+                        if ch == '$' as i32 && state != State::SingleQuotes {
+                            if !yylex_token_variable(ps, &mut buf) {
+                                break 'error;
+                            }
+                            break 'skip;
+                        }
+                        if ch == '}' as i32 && state == State::None {
+                            break 'error; /* unmatched (matched ones were handled) */
+                        }
+
+                        // ' and " starts or end quotes (and is consumed).
+                        if ch == '\'' as i32 {
+                            if state == State::None {
+                                state = State::SingleQuotes;
+                                break 'next;
+                            }
+                            if state == State::SingleQuotes {
+                                state = State::None;
+                                break 'next;
+                            }
+                        }
+                        if ch == b'"' as i32 {
+                            if state == State::None {
+                                state = State::DoubleQuotes;
+                                break 'next;
+                            }
+                            if state == State::DoubleQuotes {
+                                state = State::None;
+                                break 'next;
+                            }
+                        }
+
+                        // Otherwise add the character to the buffer.
+                        yylex_append1(&mut buf, ch as u8);
+                    }
+                    // skip:
+                    last = state;
+                }
+                // next:
+                ch = yylex_getc(ps);
+            }
+            yylex_ungetc(ps, ch);
+
+            buf.push(b'\0');
+            // log_debug("%s: %s", __func__, buf.as_ptr());
+            return Box::leak(buf.into_boxed_slice()).as_mut_ptr();
+        } // error:
+
+        null_mut()
+    }
+}
+
+/// C `vendor/tmux/cmd-parse.c:3117`: `static int yylex_token_escape(char **buf, size_t *len)`
+unsafe fn yylex_token_escape(ps: &mut cmd_parse_state, buf: &mut Vec<u8>) -> bool {
+    unsafe {
+        #[cfg(not(target_os = "macos"))]
+        const SIZEOF_M: usize = libc::_SC_MB_LEN_MAX as usize;
+
+        // TODO determine a more stable way to get this value on mac
+        #[cfg(target_os = "macos")]
+        const SIZEOF_M: usize = 6; // compiled and printed constant from C
+
+        let mut tmp: u32 = 0;
+        let mut s: [u8; 9] = [0; 9];
+        let mut m: [u8; SIZEOF_M] = [0; SIZEOF_M];
+        let size: usize;
+        let type_: i32;
+
+        'unicode: {
+            let mut ch = yylex_getc(ps);
+
+            if ch >= '4' as i32 && ch <= '7' as i32 {
+                yyerror!(ps, "invalid octal escape");
+                return false;
+            }
+            if ch >= '0' as i32 && ch <= '3' as i32 {
+                let o2 = yylex_getc(ps);
+                if o2 >= '0' as i32 && o2 <= '7' as i32 {
+                    let o3 = yylex_getc(ps);
+                    if o3 >= '0' as i32 && o3 <= '7' as i32 {
+                        ch = 64 * (ch - '0' as i32) + 8 * (o2 - '0' as i32) + (o3 - '0' as i32);
+                        yylex_append1(buf, ch as u8);
+                        return true;
+                    }
+                }
+                yyerror!(ps, "invalid octal escape");
+                return false;
+            }
+
+            if ch == libc::EOF {
+                return false;
+            }
+
+            match ch as u8 as char {
+                'a' => ch = '\x07' as i32,
+                'b' => ch = '\x08' as i32,
+                'e' => ch = '\x1B' as i32,
+                'f' => ch = '\x0C' as i32,
+                's' => ch = ' ' as i32,
+                'v' => ch = '\x0B' as i32,
+                'r' => ch = '\r' as i32,
+                'n' => ch = '\n' as i32,
+                't' => ch = '\t' as i32,
+                'u' => {
+                    type_ = 'u' as i32;
+                    size = 4;
+                    break 'unicode;
+                }
+                'U' => {
+                    type_ = 'U' as i32;
+                    size = 8;
+                    break 'unicode;
+                }
+                _ => (),
+            }
+
+            yylex_append1(buf, ch as u8);
+            return true;
+        } // unicode:
+        let mut i = 0;
+        for i_ in 0..size {
+            i = i_;
+            let ch = yylex_getc(ps);
+            if ch == libc::EOF || ch == '\n' as i32 {
+                return false;
+            }
+            if !(ch as u8).is_ascii_hexdigit() {
+                yyerror!(ps, "invalid \\{} argument", type_ as u8 as char);
+                return false;
+            }
+            s[i] = ch as u8;
+        }
+        s[i] = b'\0';
+
+        if (size == 4 && libc::sscanf((&raw mut s).cast(), c"%4x".as_ptr(), &raw mut tmp) != 1)
+            || (size == 8 && libc::sscanf((&raw mut s).cast(), c"%8x".as_ptr(), &raw mut tmp) != 1)
+        {
+            yyerror!(ps, "invalid \\{} argument", type_ as u8 as char);
+            return false;
+        }
+        let mlen = wctomb((&raw mut m).cast(), tmp as i32);
+        if mlen <= 0 || mlen > SIZEOF_M as i32 {
+            yyerror!(ps, "invalid \\{} argument", type_ as u8 as char);
+            return false;
+        }
+        yylex_append(buf, &m[..mlen as usize]);
+
+        true
+    }
+}
+
+// # Notes:
+//
+// <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>
+// <https://github.com/lalrpop/lalrpop/blob/master/README.md>
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // An input that disables alias expansion so the parser never touches
+    // GLOBAL_OPTIONS (which is null in a bare test binary). NOALIAS makes
+    // cmd_parse_expand_alias return false immediately
+    // (vendor/tmux/cmd-parse.c:2450).
+    fn noalias_input() -> cmd_parse_input<'static> {
+        cmd_parse_input {
+            flags: cmd_parse_input_flags::CMD_PARSE_NOALIAS.into(),
+            ..Default::default()
+        }
+    }
+
+    // Parse `s`, assert it succeeded, and return the round-tripped
+    // `cmd_list_print` string. Frees the produced cmd_list.
+    unsafe fn parse_print(s: &str) -> String {
+        unsafe {
+            let pi = noalias_input();
+            match cmd_parse_from_string(s, Some(&pi)) {
+                Ok(cmdlist) => {
+                    let p = cmd_list_print(&*cmdlist, 0);
+                    let out = CStr::from_ptr(p.cast()).to_str().unwrap().to_owned();
+                    free_(p);
+                    cmd_list_free(cmdlist);
+                    out
+                }
+                Err(e) => {
+                    let msg = CStr::from_ptr(e.cast()).to_str().unwrap().to_owned();
+                    free_(e);
+                    panic!("expected Ok for {s:?}, got Err({msg:?})");
+                }
+            }
+        }
+    }
+
+    // Count the commands in a parsed list via cmd_list_first / cmd_list_next
+    // (vendor/tmux/cmd.c:724, cmd.c:731).
+    unsafe fn cmd_count(cmdlist: *mut cmd_list) -> usize {
+        unsafe {
+            let mut n = 0;
+            let mut c = cmd_list_first(cmdlist);
+            while !c.is_null() {
+                n += 1;
+                c = cmd_list_next(c);
+            }
+            n
+        }
+    }
+
+    // "new-window" parses to a single command, round-tripping to its own name.
+    #[test]
+    fn from_string_single_command() {
+        unsafe {
+            let pi = noalias_input();
+            let cmdlist = cmd_parse_from_string("new-window", Some(&pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 1);
+            let p = cmd_list_print(&*cmdlist, 0);
+            assert_eq!(CStr::from_ptr(p.cast()).to_str().unwrap(), "new-window");
+            free_(p);
+            cmd_list_free(cmdlist);
+        }
+    }
+
+    // A flag argument is preserved through parse + print.
+    #[test]
+    fn from_string_flag_argument() {
+        unsafe {
+            assert_eq!(parse_print("split-window -h"), "split-window -h");
+        }
+    }
+
+    // Single- and double-quoted arguments both round-trip to the same
+    // double-quoted form (args_print, vendor/tmux/arguments.c). The quotes
+    // group "hello world" into one argument.
+    #[test]
+    fn from_string_quoted_arguments() {
+        unsafe {
+            assert_eq!(
+                parse_print("display-message 'hello world'"),
+                "display-message \"hello world\""
+            );
+            assert_eq!(
+                parse_print("display-message \"hello world\""),
+                "display-message \"hello world\""
+            );
+        }
+    }
+
+    // Two commands separated by ';' produce two commands. cmd_parse_from_string
+    // sets CMD_PARSE_ONEGROUP (vendor/tmux/cmd-parse.c:2647) so both land in the
+    // same group and cmd_list_print joins them with a single " ; " separator
+    // (vendor/tmux/cmd.c:685).
+    #[test]
+    fn from_string_semicolon_two_commands() {
+        unsafe {
+            let pi = noalias_input();
+            let cmdlist = cmd_parse_from_string("new-window ; split-window", Some(&pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 2);
+            let p = cmd_list_print(&*cmdlist, 0);
+            assert_eq!(
+                CStr::from_ptr(p.cast()).to_str().unwrap(),
+                "new-window ; split-window"
+            );
+            free_(p);
+            cmd_list_free(cmdlist);
+        }
+    }
+
+    // An empty string yields an empty (but valid) command list, never an error.
+    // cmd_parse_from_buffer short-circuits an empty buffer to a new cmd_list
+    // (vendor/tmux/cmd-parse.c:2714).
+    #[test]
+    fn from_string_empty_is_empty_list() {
+        unsafe {
+            let pi = noalias_input();
+            let cmdlist = cmd_parse_from_string("", Some(&pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 0);
+            cmd_list_free(cmdlist);
+        }
+    }
+
+    // A line that is only a comment lexes to nothing (yylex treats '#' not
+    // followed by '{' as a comment to end of line, vendor/tmux/cmd-parse.c:2999),
+    // producing an empty command list.
+    #[test]
+    fn from_string_comment_only_is_empty_list() {
+        unsafe {
+            let pi = noalias_input();
+            let cmdlist = cmd_parse_from_string("# just a comment", Some(&pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 0);
+            cmd_list_free(cmdlist);
+        }
+    }
+
+    // An unknown command name yields an error result (not a panic). The error
+    // string comes from cmd_parse -> cmd_find (vendor/tmux/cmd.c:462) via
+    // cmd_parse_build_command (vendor/tmux/cmd-parse.c:2543).
+    #[test]
+    fn from_string_unknown_command_is_error() {
+        unsafe {
+            let pi = noalias_input();
+            match cmd_parse_from_string("definitely-not-a-real-command", Some(&pi)) {
+                Ok(cmdlist) => {
+                    cmd_list_free(cmdlist);
+                    panic!("expected Err for unknown command");
+                }
+                Err(e) => {
+                    assert!(!e.is_null());
+                    let msg = CStr::from_ptr(e.cast()).to_str().unwrap().to_owned();
+                    assert!(
+                        msg.contains("unknown command"),
+                        "unexpected error message: {msg:?}"
+                    );
+                    free_(e);
+                }
+            }
+        }
+    }
+
+    // cmd_parse_from_buffer is the byte-slice entry point that from_string
+    // delegates to (vendor/tmux/cmd-parse.c:2708); it round-trips identically.
+    #[test]
+    fn from_buffer_matches_from_string() {
+        unsafe {
+            let pi = noalias_input();
+            (&pi.flags).bitor_assign(cmd_parse_input_flags::CMD_PARSE_ONEGROUP);
+            let cmdlist = cmd_parse_from_buffer(b"kill-window -a", Some(&pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 1);
+            let p = cmd_list_print(&*cmdlist, 0);
+            assert_eq!(CStr::from_ptr(p.cast()).to_str().unwrap(), "kill-window -a");
+            free_(p);
+            cmd_list_free(cmdlist);
+        }
+    }
+
+    // An empty buffer returns an empty command list directly
+    // (vendor/tmux/cmd-parse.c:2714: `if (len == 0) return cmd_list_new()`).
+    #[test]
+    fn from_buffer_empty_is_empty_list() {
+        unsafe {
+            let pi = noalias_input();
+            let cmdlist = cmd_parse_from_buffer(b"", Some(&pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 0);
+            cmd_list_free(cmdlist);
+        }
+    }
+
+    // A genuine *lexer* syntax error. `\4` is an invalid octal escape
+    // (vendor/tmux/cmd-parse.c:3123-3124), which in C makes yylex_token_escape
+    // call yyerror("invalid octal escape") and return an error result whose
+    // message is "invalid octal escape" (file == NULL branch of
+    // cmd_parse_get_error, vendor/tmux/cmd-parse.c:2280).
+    //
+    // In ztmux this PANICS instead: yyerror_ appends a trailing '\0' to the
+    // message (src/cmd_parse.rs:730) and cmd_parse_get_error then does
+    // CString::new(error).unwrap(), which rejects the interior nul. C's yyerror
+    // never embeds a nul (vendor/tmux/cmd-parse.c:1149 xvasprintf), so this is a
+    // ztmux divergence.
+    #[test]
+    fn from_string_lexer_error_is_error_not_panic() {
+        unsafe {
+            let pi = noalias_input();
+            match cmd_parse_from_string("new-window \\4", Some(&pi)) {
+                Ok(cmdlist) => {
+                    cmd_list_free(cmdlist);
+                    panic!("expected Err for invalid octal escape");
+                }
+                Err(e) => {
+                    assert!(!e.is_null());
+                    let msg = CStr::from_ptr(e.cast()).to_str().unwrap().to_owned();
+                    assert_eq!(msg, "invalid octal escape");
+                    free_(e);
+                }
+            }
+        }
+    }
+
+    // yylex_is_var classifies environment-variable name characters
+    // (vendor/tmux/cmd-parse.c:2833): '=' is never a var char; a leading digit
+    // is rejected; otherwise alphanumerics and '_' are accepted.
+    #[test]
+    fn yylex_is_var_classification() {
+        // '=' rejected regardless of position.
+        assert!(!yylex_is_var(b'=', true));
+        assert!(!yylex_is_var(b'=', false));
+        // Leading digit rejected, non-leading digit accepted.
+        assert!(!yylex_is_var(b'7', true));
+        assert!(yylex_is_var(b'7', false));
+        // Letters and underscore accepted in either position.
+        assert!(yylex_is_var(b'a', true));
+        assert!(yylex_is_var(b'Z', false));
+        assert!(yylex_is_var(b'_', true));
+        assert!(yylex_is_var(b'_', false));
+        // Other punctuation rejected.
+        assert!(!yylex_is_var(b'-', false));
+        assert!(!yylex_is_var(b'.', false));
+    }
+
+    // yylex_get_word (vendor/tmux/cmd-parse.c:2918) accumulates from the given
+    // first character until whitespace/newline/EOF, then ungets the delimiter.
+    // The first char is passed in already-consumed, so buf holds the remainder.
+    #[test]
+    fn yylex_get_word_reads_until_whitespace() {
+        unsafe {
+            let buf: &[u8] = b"ello world";
+            let mut ps: cmd_parse_state = zeroed();
+            ps.buf = Some(buf);
+
+            let word = yylex_get_word(&mut ps, b'h' as i32);
+            assert_eq!(CStr::from_ptr(word.cast()).to_str().unwrap(), "hello");
+            free_(word);
+
+            // The terminating space was ungot, so off points back at it and the
+            // next getc returns the space.
+            assert_eq!(yylex_getc(&mut ps), b' ' as i32);
+        }
+    }
+
+    // A word that runs to EOF still terminates and does not include a delimiter.
+    #[test]
+    fn yylex_get_word_reads_until_eof() {
+        unsafe {
+            let buf: &[u8] = b"bc";
+            let mut ps: cmd_parse_state = zeroed();
+            ps.buf = Some(buf);
+
+            let word = yylex_get_word(&mut ps, b'a' as i32);
+            assert_eq!(CStr::from_ptr(word.cast()).to_str().unwrap(), "abc");
+            free_(word);
+        }
+    }
+
+    // yylex_getc / yylex_ungetc over a buffer walk the offset and honour a
+    // one-char pushback (vendor/tmux/cmd-parse.c:2859, 2876, 2887).
+    #[test]
+    fn yylex_getc_and_ungetc_over_buffer() {
+        unsafe {
+            let buf: &[u8] = b"ab";
+            let mut ps: cmd_parse_state = zeroed();
+            ps.buf = Some(buf);
+
+            assert_eq!(yylex_getc(&mut ps), b'a' as i32);
+            assert_eq!(yylex_getc(&mut ps), b'b' as i32);
+            // At end of buffer, EOF is returned.
+            assert_eq!(yylex_getc(&mut ps), libc::EOF);
+            // Unget of a real char steps the offset back so it is re-read.
+            yylex_ungetc(&mut ps, b'b' as i32);
+            assert_eq!(yylex_getc(&mut ps), b'b' as i32);
+        }
+    }
+
+    // yylex_getc collapses escape sequences: a lone backslash is buffered and
+    // re-emitted (ps.escapes bookkeeping, vendor/tmux/cmd-parse.c:2887).
+    #[test]
+    fn yylex_getc_backslash_bookkeeping() {
+        unsafe {
+            // A single backslash followed by 'x': first getc returns '\\',
+            // second returns 'x'.
+            let buf: &[u8] = b"\\x";
+            let mut ps: cmd_parse_state = zeroed();
+            ps.buf = Some(buf);
+            assert_eq!(yylex_getc(&mut ps), b'\\' as i32);
+            assert_eq!(yylex_getc(&mut ps), b'x' as i32);
+        }
+    }
+
+    // A command entry alias (cmd.c:462 cmd_find alias branch) is resolved during
+    // parse, so the printed form is the canonical command name. "neww" ->
+    // new-window, "lsw" -> list-windows.
+    #[test]
+    fn from_string_resolves_entry_alias() {
+        unsafe {
+            assert_eq!(parse_print("neww"), "new-window");
+            assert_eq!(parse_print("lsw"), "list-windows");
+        }
+    }
+
+    // An alias with a flag round-trips to the canonical name plus the flag.
+    #[test]
+    fn from_string_alias_with_flag() {
+        unsafe {
+            assert_eq!(parse_print("splitw -v"), "split-window -v");
+        }
+    }
+
+    // Two boolean flags in one token are preserved and printed in args_cmp
+    // (sorted) order: 'd' < 'k', so "-dk".
+    #[test]
+    fn from_string_combined_flags_sorted() {
+        unsafe {
+            assert_eq!(parse_print("new-window -dk"), "new-window -dk");
+        }
+    }
+
+    // A flag with a value round-trips through parse + print.
+    #[test]
+    fn from_string_flag_with_value() {
+        unsafe {
+            assert_eq!(parse_print("new-window -n mywin"), "new-window -n mywin");
+        }
+    }
+
+    // A trailing comment after a command is stripped by the lexer; the command
+    // still parses to itself (vendor/tmux/cmd-parse.c yylex '#' handling).
+    #[test]
+    fn from_string_trailing_comment_stripped() {
+        unsafe {
+            let pi = noalias_input();
+            let cmdlist = cmd_parse_from_string("new-window # a comment", Some(&pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 1);
+            let p = cmd_list_print(&*cmdlist, 0);
+            assert_eq!(CStr::from_ptr(p.cast()).to_str().unwrap(), "new-window");
+            free_(p);
+            cmd_list_free(cmdlist);
+        }
+    }
+
+    // Leading and trailing whitespace around a command is ignored.
+    #[test]
+    fn from_string_surrounding_whitespace() {
+        unsafe {
+            assert_eq!(parse_print("   new-window   "), "new-window");
+        }
+    }
+
+    // A newline separates commands within a group; under CMD_PARSE_ONEGROUP
+    // (set by cmd_parse_from_string) both land in one group and print joins with
+    // a single " ; " (vendor/tmux/cmd.c:685).
+    #[test]
+    fn from_string_newline_separates_commands() {
+        unsafe {
+            let pi = noalias_input();
+            let cmdlist = cmd_parse_from_string("new-window\nsplit-window", Some(&pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 2);
+            let p = cmd_list_print(&*cmdlist, 0);
+            assert_eq!(
+                CStr::from_ptr(p.cast()).to_str().unwrap(),
+                "new-window ; split-window"
+            );
+            free_(p);
+            cmd_list_free(cmdlist);
+        }
+    }
+
+    // args_parse bound violations surface as parse errors. kill-window has upper
+    // bound 0 (template "at:", 0, 0), so a positional argument is rejected with
+    // "too many arguments" (arguments.c:345 via cmd_parse_build_command).
+    #[test]
+    fn from_string_arg_count_violation_is_error() {
+        unsafe {
+            let pi = noalias_input();
+            match cmd_parse_from_string("kill-window extra-arg", Some(&pi)) {
+                Ok(cmdlist) => {
+                    cmd_list_free(cmdlist);
+                    panic!("expected Err for too many arguments");
+                }
+                Err(e) => {
+                    let msg = CStr::from_ptr(e.cast()).to_str().unwrap().to_owned();
+                    assert!(
+                        msg.contains("too many arguments"),
+                        "unexpected error: {msg:?}"
+                    );
+                    free_(e);
+                }
+            }
+        }
+    }
+
+    // An unknown flag on an otherwise valid command is an error carrying the
+    // args_parse message (arguments.c:238 "unknown flag").
+    #[test]
+    fn from_string_unknown_flag_is_error() {
+        unsafe {
+            let pi = noalias_input();
+            match cmd_parse_from_string("new-window -Q", Some(&pi)) {
+                Ok(cmdlist) => {
+                    cmd_list_free(cmdlist);
+                    panic!("expected Err for unknown flag");
+                }
+                Err(e) => {
+                    let msg = CStr::from_ptr(e.cast()).to_str().unwrap().to_owned();
+                    assert!(msg.contains("unknown flag"), "unexpected error: {msg:?}");
+                    free_(e);
+                }
+            }
+        }
+    }
+
+    // yylex_is_var: '{' and '}' and other punctuation are not variable-name
+    // characters (vendor/tmux/cmd-parse.c:2833).
+    #[test]
+    fn yylex_is_var_rejects_punctuation() {
+        assert!(!yylex_is_var(b'{', false));
+        assert!(!yylex_is_var(b'}', false));
+        assert!(!yylex_is_var(b'$', false));
+        assert!(!yylex_is_var(b' ', false));
+        // Digits still allowed when not first.
+        assert!(yylex_is_var(b'0', false));
+        assert!(!yylex_is_var(b'0', true));
+    }
+
+    // A backslash-escaped ';' inside a token (vendor/tmux/cmd-parse.c:3117
+    // yylex_token_escape default case) is a literal ';', not a command separator,
+    // so it stays part of the single argument. args_print then double-quotes it
+    // because ';' is in the double-quote set (arguments.c:606).
+    #[test]
+    fn from_string_escaped_semicolon_is_literal() {
+        unsafe {
+            assert_eq!(
+                parse_print("display-message a\\;b"),
+                "display-message \"a;b\""
+            );
+        }
+    }
+
+    // An empty single-quoted token is a real (empty) argument; args_escape renders
+    // the empty string as '' (arguments.c:611).
+    #[test]
+    fn from_string_empty_quoted_argument() {
+        unsafe {
+            assert_eq!(parse_print("display-message ''"), "display-message ''");
+        }
+    }
+
+    // Two boolean flags given as separate tokens are merged onto one entry and
+    // printed combined in sorted order ('d' < 'k'), matching the combined-token
+    // form (vendor/tmux/arguments.c args_set / args_print).
+    #[test]
+    fn from_string_separate_flags_combine() {
+        unsafe {
+            assert_eq!(parse_print("new-window -d -k"), "new-window -dk");
+        }
+    }
+
+    // A backslash before a newline is a line continuation: yylex_getc consumes both
+    // and advances the line, so the following token continues the command
+    // (vendor/tmux/cmd-parse.c:2887 escape/newline bookkeeping).
+    #[test]
+    fn from_string_line_continuation() {
+        unsafe {
+            assert_eq!(parse_print("new-window \\\n-d"), "new-window -d");
+        }
+    }
+
+    // A trailing ';' after a single command does not create a second (empty)
+    // command; the list still holds exactly one command.
+    #[test]
+    fn from_string_trailing_semicolon_one_command() {
+        unsafe {
+            let pi = noalias_input();
+            let cmdlist = cmd_parse_from_string("new-window ;", Some(&pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 1);
+            cmd_list_free(cmdlist);
+        }
+    }
+
+    // When the second of two ';'-separated commands is unknown, the whole parse
+    // fails and surfaces the cmd_find error (vendor/tmux/cmd.c:462 via
+    // cmd_parse_build_command).
+    #[test]
+    fn from_string_second_command_unknown_is_error() {
+        unsafe {
+            let pi = noalias_input();
+            match cmd_parse_from_string("new-window ; bogus-command-xyz", Some(&pi)) {
+                Ok(cmdlist) => {
+                    cmd_list_free(cmdlist);
+                    panic!("expected Err for unknown second command");
+                }
+                Err(e) => {
+                    let msg = CStr::from_ptr(e.cast()).to_str().unwrap().to_owned();
+                    assert!(msg.contains("unknown command"), "unexpected error: {msg:?}");
+                    free_(e);
+                }
+            }
+        }
+    }
+
+    // A value-taking flag with no argument at end of input surfaces the args_parse
+    // "expects an argument" error (arguments.c:180) through cmd_parse.
+    #[test]
+    fn from_string_flag_missing_value_is_error() {
+        unsafe {
+            let pi = noalias_input();
+            match cmd_parse_from_string("new-window -n", Some(&pi)) {
+                Ok(cmdlist) => {
+                    cmd_list_free(cmdlist);
+                    panic!("expected Err for flag missing value");
+                }
+                Err(e) => {
+                    let msg = CStr::from_ptr(e.cast()).to_str().unwrap().to_owned();
+                    assert!(
+                        msg.contains("expects an argument"),
+                        "unexpected error: {msg:?}"
+                    );
+                    free_(e);
+                }
+            }
+        }
+    }
+
+    // A valid 3-digit octal escape (vendor/tmux/cmd-parse.c:3128) decodes to the
+    // corresponding byte: \101 == 'A'.
+    #[test]
+    fn from_string_octal_escape_decodes() {
+        unsafe {
+            assert_eq!(parse_print("display-message \\101"), "display-message A");
+        }
+    }
+
+    // cmd_parse_from_arguments (vendor/tmux/cmd-parse.c:2739) splits its argument
+    // vector on a standalone ";" value into separate commands.
+    #[test]
+    fn from_arguments_splits_on_semicolon() {
+        unsafe {
+            // Build ARGS_STRING values: "new-window", ";", "split-window".
+            let mut values: [args_value; 3] = [zeroed(), zeroed(), zeroed()];
+            for (i, s) in ["new-window", ";", "split-window"].iter().enumerate() {
+                let c = CString::new(*s).unwrap();
+                values[i].type_ = args_type::ARGS_STRING;
+                values[i].union_.string = xstrdup(c.as_ptr().cast()).as_ptr();
+            }
+            let mut pi = noalias_input();
+            let cmdlist =
+                cmd_parse_from_arguments(values.as_mut_ptr(), 3, Some(&mut pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 2);
+            let p = cmd_list_print(&*cmdlist, 0);
+            assert_eq!(
+                CStr::from_ptr(p.cast()).to_str().unwrap(),
+                "new-window ; split-window"
+            );
+            free_(p);
+            cmd_list_free(cmdlist);
+            args_free_values(values.as_mut_ptr(), 3);
+        }
+    }
+
+    // A comment-only line between two commands (vendor/tmux/cmd-parse.c yylex '#'
+    // handling) is dropped, leaving exactly the two real commands.
+    #[test]
+    fn from_buffer_comment_line_between_commands() {
+        unsafe {
+            let pi = noalias_input();
+            let cmdlist =
+                cmd_parse_from_buffer(b"new-window\n# a comment\nsplit-window", Some(&pi)).unwrap();
+            assert_eq!(cmd_count(cmdlist), 2);
+            cmd_list_free(cmdlist);
+        }
+    }
+}

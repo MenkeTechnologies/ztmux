@@ -1,0 +1,28 @@
+# Rust build cache and outputs
+target
+
+# ztmux ships a binary, so its lock file is committed for reproducible builds and
+# the `--locked` CI gates. Override the global gitignore rule that drops it.
+!Cargo.lock
+
+# tmux log files
+tmux-*.log
+
+# tmux C build artifacts (in case the reference tree is configured/built locally)
+vendor/tmux/tmux
+vendor/tmux/*.o
+vendor/tmux/config.h
+vendor/tmux/config.log
+vendor/tmux/config.status
+vendor/tmux/autom4te.cache
+vendor/tmux/Makefile
+
+# Parity suite runtime failure log (regenerated each run; the committed
+# parity_summary.json is the durable snapshot).
+parity/parity_failures.log
+
+# macOS
+.DS_Store
+
+# pnpm task-runner (package.json wraps cargo; no JS deps, but guard the dir)
+node_modules/

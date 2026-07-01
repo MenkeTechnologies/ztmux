@@ -1,0 +1,1 @@
+#{s/(cat|dog)/pet:\1/:#{l:dog}}

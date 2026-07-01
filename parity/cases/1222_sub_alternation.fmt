@@ -1,0 +1,1 @@
+#{s/(cat|dog)/pet/g:cat and dog}

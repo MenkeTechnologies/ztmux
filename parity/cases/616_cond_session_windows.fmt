@@ -1,0 +1,1 @@
+#{?#{==:#{session_windows},1},one-window,many}

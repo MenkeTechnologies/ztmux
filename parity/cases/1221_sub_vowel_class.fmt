@@ -1,0 +1,1 @@
+#{s/[aeiou]/_/g:hello world}
