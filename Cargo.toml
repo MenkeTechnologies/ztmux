@@ -20,11 +20,11 @@ categories   = ["command-line-utilities"]
 edition      = "2024"
 include      = ["/src", "COPYING", "README.md", "build.rs"]
 keywords     = ["tmux"]
-license      = "ISC"
+license      = "MIT"
 repository   = "https://github.com/MenkeTechnologies/ztmux"
 homepage     = "https://menketechnologies.github.io/MenkeTechnologiesMeta/ztmux/"
 rust-version = "1.88" # let chains
-description  = "A Rust port of tmux"
+description  = "A Rust port of tmux — the full terminal multiplexer, server and client"
 publish      = false
 
 # Note: most of these features are not supported yet

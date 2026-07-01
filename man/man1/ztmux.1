@@ -1,0 +1,144 @@
+.TH ZTMUX 1 "2026-07-01" "ztmux 0.0.1" "User Commands"
+.SH NAME
+ztmux \- terminal multiplexer, a Rust port of tmux
+.SH SYNOPSIS
+.B ztmux
+.RB [ \-2CDlNuVv ]
+.RB [ \-c
+.IR shell-command ]
+.RB [ \-f
+.IR file ]
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.RB [ \-T
+.IR features ]
+.RI [ command
+.RI [ flags ]]
+.SH DESCRIPTION
+.B ztmux
+is a terminal multiplexer: it lets a number of terminals be created,
+accessed, and controlled from a single screen.
+.B ztmux
+may be detached from a screen and continue running in the background, then
+later reattached.
+.PP
+It is a from-source port of
+.BR tmux (1)
+to Rust \(em the whole program (server, client, the grid and screen model,
+the input parser, layouts, the command language, formats, and the terminal
+back end), not a wrapper around the
+.B tmux
+binary and not control mode.
+.PP
+When
+.B ztmux
+is started it creates a new session with a single window and displays it on
+screen. A status line at the bottom of the screen shows information on the
+current session and is used to enter interactive commands.
+.PP
+A session is a single collection of pseudo terminals under the management of
+.BR ztmux .
+Each session has one or more windows linked to it. A window occupies the
+entire screen and may be split into rectangular panes, each of which is a
+separate pseudo terminal. Any number of
+.B ztmux
+instances may connect to the same session, and any number of windows may be
+present in the same session.
+.PP
+.B ztmux
+keeps its state in a single server process, which manages all the clients,
+sessions, windows, and panes. The client and server communicate over a socket
+kept under a per-user directory named
+.IR ztmux- UID ,
+so a
+.B ztmux
+server never collides with a running
+.BR tmux (1)
+server.
+.SH OPTIONS
+.TP
+.B \-2
+Force
+.B ztmux
+to assume the terminal supports 256 colours.
+.TP
+.B \-C
+Start in control mode. Given twice
+.RB ( \-CC )
+disables echo.
+.TP
+.B \-D
+Do not start the server as a daemon; run it in the foreground.
+.TP
+.BR \-c " " \fIshell-command\fP
+Execute
+.I shell-command
+using the default shell and exit.
+.TP
+.BR \-f " " \fIfile\fP
+Specify an alternative configuration
+.IR file .
+.TP
+.B \-l
+Behave as a login shell.
+.TP
+.BR \-L " " \fIsocket-name\fP
+Use a different
+.I socket-name
+under the
+.B ztmux
+socket directory rather than the default.
+.TP
+.B \-N
+Do not start the server even if the command would normally do so.
+.TP
+.BR \-S " " \fIsocket-path\fP
+Specify a full alternative path to the server socket.
+.TP
+.BR \-T " " \fIfeatures\fP
+Set terminal
+.I features
+for the client, as a comma-separated list.
+.TP
+.B \-u
+Assume the terminal supports UTF-8.
+.TP
+.B \-V
+Report the
+.B ztmux
+version and exit.
+.TP
+.B \-v
+Request verbose logging. May be specified multiple times.
+.SH ENVIRONMENT
+.TP
+.B ZTMUX
+Set by the server to identify the socket, window, and pane of the client.
+.TP
+.B EDITOR
+.TQ
+.B VISUAL
+Used to select the editor for interactive editing.
+.SH FILES
+.TP
+.IR /tmp/ztmux- UID /
+The default directory holding
+.B ztmux
+server sockets for the user
+.IR UID .
+.TP
+.I ~/.ztmux.conf
+Default per-user configuration file.
+.SH SEE ALSO
+.BR tmux (1)
+.PP
+The upstream
+.BR tmux (1)
+sources are vendored under
+.I vendor/tmux
+in the ztmux repository as the reference this port is validated against.
+.SH AUTHORS
+MenkeTechnologies. Seeded from the tmux-rs port by Collin Richards and ported
+against the tmux C sources by Nicholas Marriott and contributors.

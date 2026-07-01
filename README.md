@@ -76,4 +76,6 @@ Linking can be forced with the `static` / `dynamic` features; set
 
 ## License
 
-ISC — see [COPYING](COPYING). Derived from tmux and tmux-rs, both ISC.
+MIT — see [LICENSE](LICENSE). ztmux is a derivative of tmux and tmux-rs (both
+ISC); their original notices are retained in [COPYING](COPYING) and under
+`vendor/`.
