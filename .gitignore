@@ -2,6 +2,10 @@
 target
 vendor/tmux-rs/target
 
+# ztmux ships a binary, so its lock file is committed for reproducible builds and
+# the `--locked` CI gates. Override the global gitignore rule that drops it.
+!Cargo.lock
+
 # tmux log files
 tmux-*.log
 
