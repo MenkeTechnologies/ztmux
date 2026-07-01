@@ -12,6 +12,10 @@
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #![expect(rustdoc::broken_intra_doc_links, reason = "github markdown callout")]
+// The README is included as crate docs; its ASCII banner and layout-tree fences
+// are plain text, not Rust, so allow rustdoc's code-block parse lint (keeps the
+// strict `RUSTDOCFLAGS=-D warnings` CI doc gate green).
+#![allow(rustdoc::invalid_rust_codeblocks)]
 #![cfg_attr(doc, doc = include_str!("../README.md"))]
 #![cfg_attr(
     fuzzing,

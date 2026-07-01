@@ -1,4 +1,4 @@
-```
+```text
      _                        
  ___| |_ _ __ ___  _   ___  __
 |_  / __| '_ ` _ \| | | \ \/ /
@@ -41,7 +41,7 @@ shows exactly what has diverged since the fork, and upstream fixes can be cherry
 
 ## Layout
 
-```
+```text
 ztmux/
 ├── Cargo.toml         # the ztmux crate (own workspace root; excludes vendor/)
 ├── build.rs           # lalrpop (command grammar) + libevent linking
