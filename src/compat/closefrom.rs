@@ -19,13 +19,56 @@ unsafe extern "C" {
 }
 
 #[cfg(target_os = "macos")]
-/// Closes all file descriptors >= `start_fd`.
-// vendor/tmux/compat/closefrom.c:90  closefrom()
-pub fn closefrom(start_fd: i32) {
+// vendor/tmux/compat/closefrom.c:63  closefrom_fallback()
+fn closefrom_fallback(lowfd: i32) {
     unsafe {
-        let max_fd = libc::getdtablesize();
-        for fd in start_fd..max_fd {
-            libc::close(fd); // ignore close errors
+        let mut maxfd = libc::sysconf(libc::_SC_OPEN_MAX);
+        if maxfd < 0 {
+            maxfd = 256; // OPEN_MAX
         }
+        let mut fd = lowfd as libc::c_long;
+        while fd < maxfd {
+            libc::close(fd as i32);
+            fd += 1;
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+/// Closes all file descriptors >= `lowfd`.
+// vendor/tmux/compat/closefrom.c:98  closefrom() — the HAVE_LIBPROC_H variant.
+//
+// Enumerate the process's OPEN fds with proc_pidinfo(PROC_PIDLISTFDS) and close
+// only those >= lowfd. The previous port looped close() from lowfd up to
+// getdtablesize() — i.e. the (server-raised) RLIMIT_NOFILE, which can be
+// millions — so the pane child hung here between fork and exec and never reached
+// execvp (pane_current_command then reported the server binary, not the child).
+pub fn closefrom(lowfd: i32) {
+    unsafe {
+        let pid = libc::getpid();
+        let sz = libc::proc_pidinfo(pid, libc::PROC_PIDLISTFDS, 0, std::ptr::null_mut(), 0);
+        if sz == 0 {
+            return; // no fds, really?
+        }
+        if sz < 0 {
+            return closefrom_fallback(lowfd);
+        }
+        let fdinfo_buf = libc::malloc(sz as usize) as *mut libc::proc_fdinfo;
+        if fdinfo_buf.is_null() {
+            return closefrom_fallback(lowfd);
+        }
+        let r = libc::proc_pidinfo(pid, libc::PROC_PIDLISTFDS, 0, fdinfo_buf.cast(), sz);
+        if r < 0 || r > sz {
+            libc::free(fdinfo_buf.cast());
+            return closefrom_fallback(lowfd);
+        }
+        let count = r as usize / size_of::<libc::proc_fdinfo>();
+        for i in 0..count {
+            let fd = (*fdinfo_buf.add(i)).proc_fd;
+            if fd >= lowfd {
+                libc::close(fd);
+            }
+        }
+        libc::free(fdinfo_buf.cast());
     }
 }
