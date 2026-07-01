@@ -31,18 +31,26 @@ pub(crate) use crate::libc::*;
 pub(crate) use crate::libc::{free_, memcpy_, memcpy__, streq_};
 
 // libevent2
+#[path = "event.rs"]
 mod event_;
 use terminfo_lean::expand::ExpandContext;
 
 use crate::event_::*;
 
 macro_rules! cfg_pub_mods {
-    ($( mod $mod_name:ident; )*) => {
+    // Optional `#[path = "..."]` bridges a module whose file was renamed to the
+    // tmux C-mirroring convention (e.g. file `grid.rs`) while keeping the module
+    // identifier (`grid_`) that avoids clashing with the same-named transpiled
+    // struct at the crate root. When those placeholder structs are replaced, the
+    // `#[path]` + trailing underscore can drop and the module becomes `mod grid;`.
+    ($( $(#[path = $p:literal])? mod $mod_name:ident; )*) => {
         $(
             #[cfg(fuzzing)]
+            $(#[path = $p])?
             pub mod $mod_name;
 
             #[cfg(not(fuzzing))]
+            $(#[path = $p])?
             mod $mod_name;
         )*
     };
@@ -53,34 +61,46 @@ cfg_pub_mods! {
     mod arguments;
     mod attributes;
     mod bitstr;
+    #[path = "cfg.rs"]
     mod cfg_;
+    #[path = "client.rs"]
     mod client_;
+    #[path = "cmd.rs"]
     mod cmd_;
     mod cmd_parse;
     mod colour;
     mod compat;
     mod control;
     mod control_notify;
+    #[path = "environ.rs"]
     mod environ_;
     mod file;
     mod format;
+    #[path = "format_draw.rs"]
     mod format_draw_;
+    #[path = "grid.rs"]
     mod grid_;
+    #[path = "grid_reader.rs"]
     mod grid_reader_;
     mod grid_view;
+    #[path = "hyperlinks.rs"]
     mod hyperlinks_;
     mod input;
     mod input_keys;
+    #[path = "job.rs"]
     mod job_;
+    #[path = "key_bindings.rs"]
     mod key_bindings_;
     mod key_string;
     mod layout;
     mod layout_custom;
     mod layout_set;
+    #[path = "menu.rs"]
     mod menu_;
     mod mode_tree;
     mod names;
     mod notify;
+    #[path = "options.rs"]
     mod options_;
     mod options_table;
     mod osdep;
@@ -89,6 +109,7 @@ cfg_pub_mods! {
     mod proc;
     mod regsub;
     mod resize;
+    #[path = "screen.rs"]
     mod screen_;
     mod screen_redraw;
     mod screen_write;
@@ -96,19 +117,25 @@ cfg_pub_mods! {
     mod server_acl;
     mod server_client;
     mod server_fn;
+    #[path = "session.rs"]
     mod session_;
     mod spawn;
     mod status;
+    #[path = "style.rs"]
     mod style_;
     mod tmux;
+    #[path = "tmux_protocol_h.rs"]
     mod tmux_protocol;
+    #[path = "tty.rs"]
     mod tty_;
     mod tty_acs;
     mod tty_features;
     mod tty_keys;
+    #[path = "tty_term.rs"]
     mod tty_term_;
     mod utf8;
     mod utf8_combined;
+    #[path = "window.rs"]
     mod window_;
     mod window_buffer;
     mod window_client;
@@ -215,6 +242,7 @@ use crate::{
 };
 
 #[cfg(feature = "sixel")]
+#[path = "image.rs"]
 mod image_;
 #[cfg(feature = "sixel")]
 mod image_sixel;
