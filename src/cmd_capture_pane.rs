@@ -47,6 +47,7 @@ pub static CMD_CLEAR_HISTORY_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_capture_pane_exec,
 };
 
+// vendor/tmux/cmd-capture-pane.c:69  cmd_capture_pane_append()
 unsafe fn cmd_capture_pane_append(
     mut buf: *mut u8,
     len: *mut usize,
@@ -61,6 +62,7 @@ unsafe fn cmd_capture_pane_append(
     }
 }
 
+// vendor/tmux/cmd-capture-pane.c:79  cmd_capture_pane_pending()
 unsafe fn cmd_capture_pane_pending(
     args: *mut args,
     wp: *const window_pane,
@@ -96,6 +98,7 @@ unsafe fn cmd_capture_pane_pending(
     }
 }
 
+// vendor/tmux/cmd-capture-pane.c:151  cmd_capture_pane_history()
 unsafe fn cmd_capture_pane_history(
     args: *mut args,
     item: *mut cmdq_item,
@@ -220,6 +223,7 @@ unsafe fn cmd_capture_pane_history(
     }
 }
 
+// vendor/tmux/cmd-capture-pane.c:307  cmd_capture_pane_exec()
 unsafe fn cmd_capture_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

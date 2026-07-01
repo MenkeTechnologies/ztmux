@@ -36,6 +36,7 @@ pub static CMD_LIST_CLIENTS_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-list-clients.c:54  cmd_list_clients_exec()
 unsafe fn cmd_list_clients_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

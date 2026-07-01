@@ -29,6 +29,7 @@ pub static CMD_RESIZE_PANE_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-resize-pane.c:55  cmd_resize_pane_exec()
 unsafe fn cmd_resize_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -157,6 +158,7 @@ unsafe fn cmd_resize_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
     cmd_retval::CMD_RETURN_NORMAL
 }
 
+// vendor/tmux/cmd-resize-pane.c:192  cmd_resize_pane_mouse_update()
 unsafe fn cmd_resize_pane_mouse_update(c: *mut client, m: *mut mouse_event) {
     unsafe {
         let mut y: u32;

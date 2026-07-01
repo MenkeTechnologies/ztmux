@@ -32,6 +32,7 @@ pub static CMD_KILL_SESSION_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_kill_session_exec,
 };
 
+// vendor/tmux/cmd-kill-session.c:51  cmd_kill_session_exec()
 unsafe fn cmd_kill_session_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

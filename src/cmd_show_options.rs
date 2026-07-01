@@ -70,6 +70,7 @@ pub static CMD_SHOW_HOOKS_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-show-options.c:77  cmd_show_options_exec()
 unsafe fn cmd_show_options_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -156,6 +157,7 @@ unsafe fn cmd_show_options_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
     }
 }
 
+// vendor/tmux/cmd-show-options.c:148  cmd_show_options_print()
 pub unsafe fn cmd_show_options_print(
     self_: *mut cmd,
     item: *mut cmdq_item,
@@ -209,6 +211,7 @@ pub unsafe fn cmd_show_options_print(
     }
 }
 
+// vendor/tmux/cmd-show-options.c:199  cmd_show_options_all()
 pub unsafe fn cmd_show_options_all(
     self_: *mut cmd,
     item: *mut cmdq_item,

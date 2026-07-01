@@ -22,6 +22,7 @@ use crate::*;
 
 pub static FILE_NEXT_STREAM: atomic::AtomicI32 = atomic::AtomicI32::new(3);
 
+// vendor/tmux/file.c:42  file_get_path()
 pub unsafe fn file_get_path(c: *mut client, file: *const u8) -> NonNull<u8> {
     unsafe {
         if *file == b'/' {
@@ -37,10 +38,12 @@ pub unsafe fn file_get_path(c: *mut client, file: *const u8) -> NonNull<u8> {
     }
 }
 
+// vendor/tmux/file.c:64  file_cmp()
 pub fn file_cmp(cf1: &client_file, cf2: &client_file) -> std::cmp::Ordering {
     cf1.stream.cmp(&cf2.stream)
 }
 
+// vendor/tmux/file.c:80  file_create_with_peer()
 pub unsafe fn file_create_with_peer(
     peer: *mut tmuxpeer,
     files: *mut client_files,
@@ -70,6 +73,7 @@ pub unsafe fn file_create_with_peer(
     }
 }
 
+// vendor/tmux/file.c:106  file_create_with_client()
 pub unsafe fn file_create_with_client(
     mut c: *mut client,
     stream: c_int,
@@ -105,6 +109,7 @@ pub unsafe fn file_create_with_client(
     }
 }
 
+// vendor/tmux/file.c:138  file_free()
 pub unsafe fn file_free(cf: *mut client_file) {
     unsafe {
         (*cf).references -= 1;
@@ -126,6 +131,7 @@ pub unsafe fn file_free(cf: *mut client_file) {
     }
 }
 
+// vendor/tmux/file.c:156  file_fire_done_cb()
 pub unsafe extern "C-unwind" fn file_fire_done_cb(_fd: i32, _events: i16, arg: *mut c_void) {
     unsafe {
         let cf: *mut client_file = arg as _;
@@ -140,12 +146,14 @@ pub unsafe extern "C-unwind" fn file_fire_done_cb(_fd: i32, _events: i16, arg: *
     }
 }
 
+// vendor/tmux/file.c:169  file_fire_done()
 pub unsafe fn file_fire_done(cf: *mut client_file) {
     unsafe {
         event_once(-1, EV_TIMEOUT, Some(file_fire_done_cb), cf as _, null_mut());
     }
 }
 
+// vendor/tmux/file.c:176  file_fire_read()
 pub unsafe fn file_fire_read(cf: *mut client_file) {
     unsafe {
         if let Some(cb) = (*cf).cb {
@@ -161,6 +169,7 @@ pub unsafe fn file_fire_read(cf: *mut client_file) {
     }
 }
 
+// vendor/tmux/file.c:184  file_can_print()
 pub unsafe fn file_can_print(c: *mut client) -> bool {
     unsafe {
         !(c.is_null()
@@ -176,6 +185,7 @@ macro_rules! file_print {
 }
 pub(crate) use file_print;
 
+// vendor/tmux/file.c:206  file_vprint()
 pub unsafe fn file_vprint(c: *mut client, args: std::fmt::Arguments) {
     unsafe {
         let mut find: client_file = zeroed();
@@ -211,6 +221,7 @@ pub unsafe fn file_vprint(c: *mut client, args: std::fmt::Arguments) {
     }
 }
 
+// vendor/tmux/file.c:233  file_print_buffer()
 pub unsafe fn file_print_buffer(c: *mut client, data: *mut c_void, size: usize) {
     unsafe {
         let mut find: client_file = zeroed();
@@ -286,6 +297,7 @@ pub unsafe fn file_error_(c: *mut client, args: std::fmt::Arguments) {
     }
 }
 
+// vendor/tmux/file.c:292  file_write()
 pub unsafe fn file_write(
     c: *mut client,
     path: *const u8,
@@ -376,6 +388,7 @@ pub unsafe fn file_write(
     }
 }
 
+// vendor/tmux/file.c:366  file_read()
 pub unsafe fn file_read(
     c: *mut client,
     path: *const u8,
@@ -465,6 +478,7 @@ pub unsafe fn file_read(
     }
 }
 
+// vendor/tmux/file.c:447  file_cancel()
 pub unsafe fn file_cancel(cf: *mut client_file) {
     unsafe {
         log_debug!("read cancel file {}", (*cf).stream);
@@ -487,6 +501,7 @@ pub unsafe fn file_cancel(cf: *mut client_file) {
     }
 }
 
+// vendor/tmux/file.c:463  file_push_cb()
 pub unsafe extern "C-unwind" fn file_push_cb(_fd: i32, _events: i16, arg: *mut c_void) {
     let cf = arg as *mut client_file;
 
@@ -498,6 +513,7 @@ pub unsafe extern "C-unwind" fn file_push_cb(_fd: i32, _events: i16, arg: *mut c
     }
 }
 
+// vendor/tmux/file.c:474  file_push()
 pub unsafe fn file_push(cf: *mut client_file) {
     unsafe {
         let mut msglen: usize;
@@ -557,6 +573,7 @@ pub unsafe fn file_push(cf: *mut client_file) {
     }
 }
 
+// vendor/tmux/file.c:511  file_write_left()
 pub unsafe fn file_write_left(files: *mut client_files) -> c_int {
     let mut left;
     let mut waiting: i32 = 0;
@@ -577,6 +594,7 @@ pub unsafe fn file_write_left(files: *mut client_files) -> c_int {
     (waiting != 0) as i32
 }
 
+// vendor/tmux/file.c:531  file_write_error_callback()
 pub unsafe extern "C-unwind" fn file_write_error_callback(
     _bev: *mut bufferevent,
     _what: i16,
@@ -599,6 +617,7 @@ pub unsafe extern "C-unwind" fn file_write_error_callback(
     }
 }
 
+// vendor/tmux/file.c:550  file_write_callback()
 pub unsafe extern "C-unwind" fn file_write_callback(_bev: *mut bufferevent, arg: *mut c_void) {
     unsafe {
         let cf = arg as *mut client_file;
@@ -618,6 +637,7 @@ pub unsafe extern "C-unwind" fn file_write_callback(_bev: *mut bufferevent, arg:
     }
 }
 
+// vendor/tmux/file.c:569  file_write_open()
 pub unsafe fn file_write_open(
     files: *mut client_files,
     peer: *mut tmuxpeer,
@@ -705,6 +725,7 @@ pub unsafe fn file_write_open(
     }
 }
 
+// vendor/tmux/file.c:633  file_write_data()
 pub unsafe fn file_write_data(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_write_data;
@@ -728,6 +749,7 @@ pub unsafe fn file_write_data(files: *mut client_files, imsg: *mut imsg) {
     }
 }
 
+// vendor/tmux/file.c:653  file_write_close()
 pub unsafe fn file_write_close(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_write_close;
@@ -758,6 +780,7 @@ pub unsafe fn file_write_close(files: *mut client_files, imsg: *mut imsg) {
     }
 }
 
+// vendor/tmux/file.c:678  file_read_error_callback()
 pub unsafe extern "C-unwind" fn file_read_error_callback(
     _bev: *mut bufferevent,
     _what: i16,
@@ -787,6 +810,7 @@ pub unsafe extern "C-unwind" fn file_read_error_callback(
     }
 }
 
+// vendor/tmux/file.c:698  file_read_callback()
 pub unsafe extern "C-unwind" fn file_read_callback(_bev: *mut bufferevent, arg: *mut c_void) {
     let cf = arg as *mut client_file;
     unsafe {
@@ -832,6 +856,7 @@ pub unsafe extern "C-unwind" fn file_read_callback(_bev: *mut bufferevent, arg: 
     }
 }
 
+// vendor/tmux/file.c:730  file_read_open()
 pub unsafe fn file_read_open(
     files: *mut client_files,
     peer: *mut tmuxpeer,
@@ -921,6 +946,7 @@ pub unsafe fn file_read_open(
     }
 }
 
+// vendor/tmux/file.c:794  file_read_cancel()
 pub unsafe fn file_read_cancel(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_read_cancel;
@@ -941,6 +967,7 @@ pub unsafe fn file_read_cancel(files: *mut client_files, imsg: *mut imsg) {
     }
 }
 
+// vendor/tmux/file.c:812  file_write_ready()
 pub unsafe fn file_write_ready(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_write_ready;
@@ -964,6 +991,7 @@ pub unsafe fn file_write_ready(files: *mut client_files, imsg: *mut imsg) {
     }
 }
 
+// vendor/tmux/file.c:833  file_read_data()
 pub unsafe fn file_read_data(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_read_data;
@@ -993,6 +1021,7 @@ pub unsafe fn file_read_data(files: *mut client_files, imsg: *mut imsg) {
     }
 }
 
+// vendor/tmux/file.c:860  file_read_done()
 pub unsafe fn file_read_done(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_read_done;

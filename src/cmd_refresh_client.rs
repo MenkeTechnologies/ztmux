@@ -27,6 +27,7 @@ pub static CMD_REFRESH_CLIENT_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-refresh-client.c:47  cmd_refresh_client_update_subscription()
 pub unsafe fn cmd_refresh_client_update_subscription(tc: *mut client, value: *const u8) {
     unsafe {
         let subid = -1;
@@ -69,6 +70,7 @@ pub unsafe fn cmd_refresh_client_update_subscription(tc: *mut client, value: *co
     }
 }
 
+// vendor/tmux/cmd-refresh-client.c:82  cmd_refresh_client_control_client_size()
 pub unsafe fn cmd_refresh_client_control_client_size(
     self_: *mut cmd,
     item: *mut cmdq_item,
@@ -148,6 +150,7 @@ pub unsafe fn cmd_refresh_client_control_client_size(
     cmd_retval::CMD_RETURN_NORMAL
 }
 
+// vendor/tmux/cmd-refresh-client.c:134  cmd_refresh_client_update_offset()
 pub unsafe fn cmd_refresh_client_update_offset(tc: *mut client, value: *const u8) {
     unsafe {
         let mut pane: u32 = 0;
@@ -234,6 +237,7 @@ pub unsafe fn cmd_refresh_client_clipboard(self_: *mut cmd, item: *mut cmdq_item
     cmd_retval::CMD_RETURN_NORMAL
 }
 
+// vendor/tmux/cmd-refresh-client.c:167  cmd_refresh_report()
 pub unsafe fn cmd_refresh_report(tty: *mut tty, value: *const u8) {
     unsafe {
         let pane: u32 = 0;
@@ -273,6 +277,7 @@ pub unsafe fn cmd_refresh_report(tty: *mut tty, value: *const u8) {
     }
 }
 
+// vendor/tmux/cmd-refresh-client.c:202  cmd_refresh_client_exec()
 pub unsafe fn cmd_refresh_client_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

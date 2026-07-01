@@ -42,6 +42,7 @@ pub static CMD_CLOCK_MODE_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_copy_mode_exec,
 };
 
+// vendor/tmux/cmd-copy-mode.c:57  cmd_copy_mode_exec()
 unsafe fn cmd_copy_mode_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

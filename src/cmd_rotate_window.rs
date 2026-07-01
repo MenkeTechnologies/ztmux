@@ -35,6 +35,7 @@ pub static CMD_ROTATE_WINDOW_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-rotate-window.c:44  cmd_rotate_window_exec()
 unsafe fn cmd_rotate_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

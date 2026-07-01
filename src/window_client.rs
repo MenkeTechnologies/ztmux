@@ -71,6 +71,7 @@ pub struct window_client_modedata {
     item_list: Vec<*mut window_client_itemdata>,
 }
 
+// vendor/tmux/window-client.c:193  window_client_add_item()
 pub unsafe fn window_client_add_item(
     data: *mut window_client_modedata,
 ) -> *mut window_client_itemdata {
@@ -83,6 +84,7 @@ pub unsafe fn window_client_add_item(
     }
 }
 
+// vendor/tmux/window-client.c:204  window_client_free_item()
 pub unsafe fn window_client_free_item(item: *mut window_client_itemdata) {
     unsafe {
         server_client_unref((*item).c);
@@ -90,6 +92,7 @@ pub unsafe fn window_client_free_item(item: *mut window_client_itemdata) {
     }
 }
 
+// vendor/tmux/window-client.c:211  window_client_build()
 pub unsafe fn window_client_build(
     modedata: NonNull<c_void>,
     sort_crit: *mut mode_tree_sort_criteria,
@@ -191,6 +194,7 @@ pub unsafe fn window_client_build(
     }
 }
 
+// vendor/tmux/window-client.c:293  window_client_draw()
 pub unsafe fn window_client_draw(
     _modedata: *mut c_void,
     itemdata: Option<NonNull<c_void>>,
@@ -236,6 +240,7 @@ pub unsafe fn window_client_draw(
     }
 }
 
+// vendor/tmux/window-client.c:349  window_client_menu()
 pub unsafe fn window_client_menu(modedata: NonNull<c_void>, c: *mut client, key: key_code) {
     unsafe {
         let data: NonNull<window_client_modedata> = modedata.cast();
@@ -249,6 +254,7 @@ pub unsafe fn window_client_menu(modedata: NonNull<c_void>, c: *mut client, key:
     }
 }
 
+// vendor/tmux/window-client.c:362  window_client_get_key()
 pub unsafe fn window_client_get_key(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -270,6 +276,7 @@ pub unsafe fn window_client_get_key(
     }
 }
 
+// vendor/tmux/window-client.c:420  window_client_init()
 pub unsafe fn window_client_init(
     wme: NonNull<window_mode_entry>,
     _fs: *mut cmd_find_state,
@@ -323,6 +330,7 @@ pub unsafe fn window_client_init(
     }
 }
 
+// vendor/tmux/window-client.c:463  window_client_free()
 pub unsafe fn window_client_free(wme: NonNull<window_mode_entry>) {
     unsafe {
         let data: *mut window_client_modedata = (*wme.as_ptr()).data as *mut window_client_modedata;
@@ -346,6 +354,7 @@ pub unsafe fn window_client_free(wme: NonNull<window_mode_entry>) {
     }
 }
 
+// vendor/tmux/window-client.c:485  window_client_resize()
 pub unsafe fn window_client_resize(wme: NonNull<window_mode_entry>, sx: u32, sy: u32) {
     unsafe {
         let data = (*wme.as_ptr()).data as *mut window_client_modedata;
@@ -354,6 +363,7 @@ pub unsafe fn window_client_resize(wme: NonNull<window_mode_entry>, sx: u32, sy:
     }
 }
 
+// vendor/tmux/window-client.c:493  window_client_update()
 pub unsafe fn window_client_update(wme: NonNull<window_mode_entry>) {
     unsafe {
         let data = (*wme.as_ptr()).data as *mut window_client_modedata;
@@ -364,6 +374,7 @@ pub unsafe fn window_client_update(wme: NonNull<window_mode_entry>) {
     }
 }
 
+// vendor/tmux/window-client.c:503  window_client_do_detach()
 pub unsafe fn window_client_do_detach(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -389,6 +400,7 @@ pub unsafe fn window_client_do_detach(
     }
 }
 
+// vendor/tmux/window-client.c:520  window_client_key()
 pub unsafe fn window_client_key(
     wme: NonNull<window_mode_entry>,
     c: *mut client,

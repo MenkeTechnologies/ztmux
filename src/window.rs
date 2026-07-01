@@ -47,18 +47,22 @@ RB_GENERATE!(
     window_pane_cmp
 );
 
+// vendor/tmux/window.c:91  window_cmp()
 pub fn window_cmp(w1: &window, w2: &window) -> cmp::Ordering {
     w1.id.cmp(&w2.id)
 }
 
+// vendor/tmux/window.c:97  winlink_cmp()
 pub fn winlink_cmp(wl1: &winlink, wl2: &winlink) -> cmp::Ordering {
     wl1.idx.cmp(&wl2.idx)
 }
 
+// vendor/tmux/window.c:103  window_pane_cmp()
 pub fn window_pane_cmp(wp1: &window_pane, wp2: &window_pane) -> cmp::Ordering {
     wp1.id.cmp(&wp2.id)
 }
 
+// vendor/tmux/window.c:109  winlink_find_by_window()
 pub unsafe fn winlink_find_by_window(
     wwl: *mut winlinks,
     w: *mut window,
@@ -73,6 +77,7 @@ pub unsafe fn winlink_find_by_window(
     }
 }
 
+// vendor/tmux/window.c:122  winlink_find_by_index()
 pub unsafe fn winlink_find_by_index(wwl: *mut winlinks, idx: i32) -> *mut winlink {
     unsafe {
         if idx < 0 {
@@ -86,6 +91,7 @@ pub unsafe fn winlink_find_by_index(wwl: *mut winlinks, idx: i32) -> *mut winlin
     }
 }
 
+// vendor/tmux/window.c:134  winlink_find_by_window_id()
 pub unsafe fn winlink_find_by_window_id(wwl: *mut winlinks, id: u32) -> *mut winlink {
     unsafe {
         for wl in rb_foreach(wwl).map(NonNull::as_ptr) {
@@ -98,6 +104,7 @@ pub unsafe fn winlink_find_by_window_id(wwl: *mut winlinks, id: u32) -> *mut win
     }
 }
 
+// vendor/tmux/window.c:146  winlink_next_index()
 unsafe fn winlink_next_index(wwl: *mut winlinks, idx: i32) -> i32 {
     let mut i = idx;
 
@@ -120,10 +127,12 @@ unsafe fn winlink_next_index(wwl: *mut winlinks, idx: i32) -> i32 {
     -1
 }
 
+// vendor/tmux/window.c:163  winlink_count()
 pub unsafe fn winlink_count(wwl: *mut winlinks) -> u32 {
     unsafe { rb_foreach(wwl).count() as u32 }
 }
 
+// vendor/tmux/window.c:176  winlink_add()
 pub unsafe fn winlink_add(wwl: *mut winlinks, mut idx: i32) -> *mut winlink {
     unsafe {
         if idx < 0 {
@@ -143,6 +152,7 @@ pub unsafe fn winlink_add(wwl: *mut winlinks, mut idx: i32) -> *mut winlink {
     }
 }
 
+// vendor/tmux/window.c:194  winlink_set_window()
 pub unsafe fn winlink_set_window(wl: *mut winlink, w: *mut window) {
     unsafe {
         if !(*wl).window.is_null() {
@@ -155,6 +165,7 @@ pub unsafe fn winlink_set_window(wl: *mut winlink, w: *mut window) {
     }
 }
 
+// vendor/tmux/window.c:206  winlink_remove()
 pub unsafe fn winlink_remove(wwl: *mut winlinks, wl: *mut winlink) {
     unsafe {
         let w = (*wl).window;
@@ -169,14 +180,17 @@ pub unsafe fn winlink_remove(wwl: *mut winlinks, wl: *mut winlink) {
     }
 }
 
+// vendor/tmux/window.c:220  winlink_next()
 pub unsafe fn winlink_next(wl: *mut winlink) -> *mut winlink {
     unsafe { rb_next(wl) }
 }
 
+// vendor/tmux/window.c:226  winlink_previous()
 pub unsafe fn winlink_previous(wl: *mut winlink) -> *mut winlink {
     unsafe { rb_prev(wl) }
 }
 
+// vendor/tmux/window.c:232  winlink_next_by_number()
 pub unsafe fn winlink_next_by_number(
     mut wl: *mut winlink,
     s: *mut session,
@@ -194,6 +208,7 @@ pub unsafe fn winlink_next_by_number(
     wl
 }
 
+// vendor/tmux/window.c:243  winlink_previous_by_number()
 pub unsafe fn winlink_previous_by_number(
     mut wl: *mut winlink,
     s: *mut session,
@@ -211,6 +226,7 @@ pub unsafe fn winlink_previous_by_number(
     wl
 }
 
+// vendor/tmux/window.c:254  winlink_stack_push()
 pub unsafe fn winlink_stack_push(stack: *mut winlink_stack, wl: *mut winlink) {
     if wl.is_null() {
         return;
@@ -223,6 +239,7 @@ pub unsafe fn winlink_stack_push(stack: *mut winlink_stack, wl: *mut winlink) {
     }
 }
 
+// vendor/tmux/window.c:265  winlink_stack_remove()
 pub unsafe fn winlink_stack_remove(stack: *mut winlink_stack, wl: *mut winlink) {
     unsafe {
         if !wl.is_null() && (*wl).flags.intersects(winlink_flags::WINLINK_VISITED) {
@@ -232,6 +249,7 @@ pub unsafe fn winlink_stack_remove(stack: *mut winlink_stack, wl: *mut winlink) 
     }
 }
 
+// vendor/tmux/window.c:274  window_find_by_id_str()
 pub unsafe fn window_find_by_id_str(s: &str) -> *mut window {
     unsafe {
         if !s.starts_with('@') {
@@ -246,6 +264,7 @@ pub unsafe fn window_find_by_id_str(s: &str) -> *mut window {
     }
 }
 
+// vendor/tmux/window.c:289  window_find_by_id()
 pub unsafe fn window_find_by_id(id: u32) -> *mut window {
     unsafe {
         let mut w: window = std::mem::zeroed();
@@ -255,6 +274,7 @@ pub unsafe fn window_find_by_id(id: u32) -> *mut window {
     }
 }
 
+// vendor/tmux/window.c:298  window_update_activity()
 pub unsafe fn window_update_activity(w: NonNull<window>) {
     unsafe {
         gettimeofday(&raw mut (*w.as_ptr()).activity_time, null_mut());
@@ -262,6 +282,7 @@ pub unsafe fn window_update_activity(w: NonNull<window>) {
     }
 }
 
+// vendor/tmux/window.c:305  window_create()
 pub unsafe fn window_create(sx: u32, sy: u32, mut xpixel: u32, mut ypixel: u32) -> *mut window {
     static NEXT_WINDOW_ID: AtomicU32 = AtomicU32::new(0);
 
@@ -314,6 +335,7 @@ pub unsafe fn window_create(sx: u32, sy: u32, mut xpixel: u32, mut ypixel: u32) 
     }
 }
 
+// vendor/tmux/window.c:353  window_destroy()
 unsafe fn window_destroy(w: *mut window) {
     unsafe {
         log_debug!(
@@ -354,6 +376,7 @@ unsafe fn window_destroy(w: *mut window) {
     }
 }
 
+// vendor/tmux/window.c:382  window_pane_destroy_ready()
 pub unsafe fn window_pane_destroy_ready(wp: *mut window_pane) -> bool {
     let mut n = 0;
     unsafe {
@@ -374,6 +397,7 @@ pub unsafe fn window_pane_destroy_ready(wp: *mut window_pane) -> bool {
     true
 }
 
+// vendor/tmux/window.c:406  window_add_ref()
 pub unsafe fn window_add_ref(w: *mut window, from: *const u8) {
     unsafe {
         (*w).references += 1;
@@ -387,6 +411,7 @@ pub unsafe fn window_add_ref(w: *mut window, from: *const u8) {
     }
 }
 
+// vendor/tmux/window.c:413  window_remove_ref()
 pub unsafe fn window_remove_ref(w: *mut window, from: *const u8) {
     unsafe {
         (*w).references -= 1;
@@ -404,6 +429,7 @@ pub unsafe fn window_remove_ref(w: *mut window, from: *const u8) {
     }
 }
 
+// vendor/tmux/window.c:423  window_set_name()
 pub unsafe fn window_set_name(w: *mut window, new_name: *const u8) {
     unsafe {
         free_((*w).name);
@@ -416,6 +442,7 @@ pub unsafe fn window_set_name(w: *mut window, new_name: *const u8) {
     }
 }
 
+// vendor/tmux/window.c:436  window_resize()
 pub unsafe fn window_resize(w: *mut window, sx: u32, sy: u32, mut xpixel: i32, mut ypixel: i32) {
     if xpixel == 0 {
         xpixel = DEFAULT_XPIXEL as i32;
@@ -454,6 +481,7 @@ pub unsafe fn window_resize(w: *mut window, sx: u32, sy: u32, mut xpixel: i32, m
     }
 }
 
+// vendor/tmux/window.c:455  window_pane_send_resize()
 pub unsafe fn window_pane_send_resize(wp: *mut window_pane, sx: u32, sy: u32) {
     unsafe {
         let w = (*wp).window;
@@ -486,10 +514,12 @@ pub unsafe fn window_pane_send_resize(wp: *mut window_pane, sx: u32, sy: u32) {
     }
 }
 
+// vendor/tmux/window.c:496  window_has_pane()
 pub unsafe fn window_has_pane(w: *mut window, wp: *mut window_pane) -> bool {
     unsafe { tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).any(|wp1| wp1.as_ptr() == wp) }
 }
 
+// vendor/tmux/window.c:508  window_update_focus()
 pub unsafe fn window_update_focus(w: *mut window) {
     unsafe {
         if !w.is_null() {
@@ -499,6 +529,7 @@ pub unsafe fn window_update_focus(w: *mut window) {
     }
 }
 
+// vendor/tmux/window.c:517  window_pane_update_focus()
 pub unsafe fn window_pane_update_focus(wp: *mut window_pane) {
     unsafe {
         let mut focused = false;
@@ -543,6 +574,7 @@ pub unsafe fn window_pane_update_focus(wp: *mut window_pane) {
     }
 }
 
+// vendor/tmux/window.c:555  window_set_active_pane()
 pub unsafe fn window_set_active_pane(w: *mut window, wp: *mut window_pane, notify: i32) -> i32 {
     static NEXT_ACTIVE_POINT: AtomicU32 = AtomicU32::new(0);
 
@@ -576,6 +608,7 @@ pub unsafe fn window_set_active_pane(w: *mut window, wp: *mut window_pane, notif
     1
 }
 
+// vendor/tmux/window.c:588  window_pane_get_palette()
 fn window_pane_get_palette(wp: Option<&window_pane>, c: i32) -> i32 {
     if let Some(wp) = wp {
         colour_palette_get(Some(&wp.palette), c)
@@ -584,6 +617,7 @@ fn window_pane_get_palette(wp: Option<&window_pane>, c: i32) -> i32 {
     }
 }
 
+// vendor/tmux/window.c:596  window_redraw_active_switch()
 pub unsafe fn window_redraw_active_switch(w: *mut window, mut wp: *mut window_pane) {
     unsafe {
         if wp == (*w).active {
@@ -618,6 +652,7 @@ pub unsafe fn window_redraw_active_switch(w: *mut window, mut wp: *mut window_pa
     }
 }
 
+// vendor/tmux/window.c:645  window_get_active_at()
 pub unsafe fn window_get_active_at(w: *mut window, x: u32, y: u32) -> *mut window_pane {
     unsafe {
         for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
@@ -636,6 +671,7 @@ pub unsafe fn window_get_active_at(w: *mut window, x: u32, y: u32) -> *mut windo
     }
 }
 
+// vendor/tmux/window.c:710  window_find_string()
 pub unsafe fn window_find_string(w: *mut window, s: &str) -> *mut window_pane {
     unsafe {
         let mut top: u32 = 0;
@@ -680,6 +716,7 @@ pub unsafe fn window_find_string(w: *mut window, s: &str) -> *mut window_pane {
     }
 }
 
+// vendor/tmux/window.c:751  window_zoom()
 pub unsafe fn window_zoom(wp: *mut window_pane) -> i32 {
     unsafe {
         let w = (*wp).window;
@@ -710,6 +747,7 @@ pub unsafe fn window_zoom(wp: *mut window_pane) -> i32 {
     }
 }
 
+// vendor/tmux/window.c:780  window_unzoom()
 pub unsafe fn window_unzoom(w: *mut window, notify: i32) -> i32 {
     unsafe {
         if !(*w).flags.intersects(window_flag::ZOOMED) {
@@ -735,6 +773,7 @@ pub unsafe fn window_unzoom(w: *mut window, notify: i32) -> i32 {
     }
 }
 
+// vendor/tmux/window.c:807  window_push_zoom()
 pub unsafe fn window_push_zoom(w: *mut window, always: bool, flag: bool) -> bool {
     unsafe {
         log_debug!(
@@ -753,6 +792,7 @@ pub unsafe fn window_push_zoom(w: *mut window, always: bool, flag: bool) -> bool
     }
 }
 
+// vendor/tmux/window.c:819  window_pop_zoom()
 pub unsafe fn window_pop_zoom(w: *mut window) -> bool {
     unsafe {
         log_debug!(
@@ -769,6 +809,7 @@ pub unsafe fn window_pop_zoom(w: *mut window) -> bool {
     false
 }
 
+// vendor/tmux/window.c:829  window_add_pane()
 pub unsafe fn window_add_pane(
     w: *mut window,
     mut other: *mut window_pane,
@@ -805,6 +846,7 @@ pub unsafe fn window_add_pane(
     }
 }
 
+// vendor/tmux/window.c:864  window_lost_pane()
 pub unsafe fn window_lost_pane(w: *mut window, wp: *mut window_pane) {
     unsafe {
         log_debug!("{}: @{} pane %%{}", "window_lost_pane", (*w).id, (*wp).id);
@@ -832,6 +874,7 @@ pub unsafe fn window_lost_pane(w: *mut window, wp: *mut window_pane) {
     }
 }
 
+// vendor/tmux/window.c:890  window_remove_pane()
 pub unsafe fn window_remove_pane(w: *mut window, wp: *mut window_pane) {
     unsafe {
         window_lost_pane(w, wp);
@@ -841,6 +884,7 @@ pub unsafe fn window_remove_pane(w: *mut window, wp: *mut window_pane) {
     }
 }
 
+// vendor/tmux/window.c:900  window_pane_at_index()
 pub unsafe fn window_pane_at_index(w: *mut window, idx: u32) -> *mut window_pane {
     unsafe {
         let mut n: u32 = options_get_number___::<u32>(&*(*w).options, "pane-base-index");
@@ -856,6 +900,7 @@ pub unsafe fn window_pane_at_index(w: *mut window, idx: u32) -> *mut window_pane
     }
 }
 
+// vendor/tmux/window.c:915  window_pane_next_by_number()
 pub unsafe fn window_pane_next_by_number(
     w: *mut window,
     mut wp: *mut window_pane,
@@ -873,6 +918,7 @@ pub unsafe fn window_pane_next_by_number(
     wp
 }
 
+// vendor/tmux/window.c:926  window_pane_previous_by_number()
 pub unsafe fn window_pane_previous_by_number(
     w: *mut window,
     mut wp: *mut window_pane,
@@ -890,6 +936,7 @@ pub unsafe fn window_pane_previous_by_number(
     wp
 }
 
+// vendor/tmux/window.c:938  window_pane_index()
 pub unsafe fn window_pane_index(wp: *mut window_pane, i: *mut u32) -> i32 {
     unsafe {
         let w = (*wp).window;
@@ -905,10 +952,12 @@ pub unsafe fn window_pane_index(wp: *mut window_pane, i: *mut u32) -> i32 {
     }
 }
 
+// vendor/tmux/window.c:975  window_count_panes()
 pub unsafe fn window_count_panes(w: *mut window) -> u32 {
     unsafe { tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).count() as u32 }
 }
 
+// vendor/tmux/window.c:988  window_destroy_panes()
 pub unsafe fn window_destroy_panes(w: *mut window) {
     let mut wp: *mut window_pane;
     unsafe {
@@ -925,6 +974,7 @@ pub unsafe fn window_destroy_panes(w: *mut window) {
     }
 }
 
+// vendor/tmux/window.c:1006  window_printable_flags()
 pub unsafe fn window_printable_flags(wl: *mut winlink, escape: i32) -> *const u8 {
     static mut FLAGS: [u8; 32] = [0; 32];
 
@@ -969,6 +1019,7 @@ pub unsafe fn window_printable_flags(wl: *mut winlink, escape: i32) -> *const u8
     }
 }
 
+// vendor/tmux/window.c:1053  window_pane_find_by_id_str()
 pub unsafe fn window_pane_find_by_id_str(s: &str) -> *mut window_pane {
     unsafe {
         if !s.starts_with('%') {
@@ -982,6 +1033,7 @@ pub unsafe fn window_pane_find_by_id_str(s: &str) -> *mut window_pane {
     }
 }
 
+// vendor/tmux/window.c:1068  window_pane_find_by_id()
 pub unsafe fn window_pane_find_by_id(id: u32) -> *mut window_pane {
     unsafe {
         let mut wp: window_pane = zeroed();
@@ -990,6 +1042,7 @@ pub unsafe fn window_pane_find_by_id(id: u32) -> *mut window_pane {
     }
 }
 
+// vendor/tmux/window.c:1077  window_pane_create()
 pub unsafe fn window_pane_create(
     w: *mut window,
     sx: u32,
@@ -1040,6 +1093,7 @@ pub unsafe fn window_pane_create(
     }
 }
 
+// vendor/tmux/window.c:1205  window_pane_destroy()
 unsafe fn window_pane_destroy(wp: *mut window_pane) {
     unsafe {
         window_pane_reset_mode_all(wp);
@@ -1085,6 +1139,7 @@ unsafe fn window_pane_destroy(wp: *mut window_pane) {
     }
 }
 
+// vendor/tmux/window.c:1256  window_pane_read_callback()
 unsafe extern "C-unwind" fn window_pane_read_callback(_bufev: *mut bufferevent, data: *mut c_void) {
     unsafe {
         let wp: *mut window_pane = data as _;
@@ -1112,6 +1167,7 @@ unsafe extern "C-unwind" fn window_pane_read_callback(_bufev: *mut bufferevent, 
     }
 }
 
+// vendor/tmux/window.c:1284  window_pane_error_callback()
 unsafe extern "C-unwind" fn window_pane_error_callback(
     _bufev: *mut bufferevent,
     _what: c_short,
@@ -1128,6 +1184,7 @@ unsafe extern "C-unwind" fn window_pane_error_callback(
     }
 }
 
+// vendor/tmux/window.c:1297  window_pane_set_event()
 pub unsafe fn window_pane_set_event(wp: *mut window_pane) {
     unsafe {
         setblocking((*wp).fd, 0);
@@ -1148,6 +1205,7 @@ pub unsafe fn window_pane_set_event(wp: *mut window_pane) {
     }
 }
 
+// vendor/tmux/window.c:1325  window_pane_resize()
 pub unsafe fn window_pane_resize(wp: *mut window_pane, sx: u32, sy: u32) {
     unsafe {
         if sx == (*wp).sx && sy == (*wp).sy {
@@ -1186,6 +1244,7 @@ pub unsafe fn window_pane_resize(wp: *mut window_pane, sx: u32, sy: u32) {
     }
 }
 
+// vendor/tmux/window.c:1354  window_pane_set_mode()
 pub unsafe fn window_pane_set_mode(
     wp: *mut window_pane,
     swp: *mut window_pane,
@@ -1230,6 +1289,7 @@ pub unsafe fn window_pane_set_mode(
     }
 }
 
+// vendor/tmux/window.c:1394  window_pane_reset_mode()
 pub unsafe fn window_pane_reset_mode(wp: *mut window_pane) {
     let func = "window_pane_reset_mode";
     unsafe {
@@ -1259,6 +1319,7 @@ pub unsafe fn window_pane_reset_mode(wp: *mut window_pane) {
     }
 }
 
+// vendor/tmux/window.c:1434  window_pane_reset_mode_all()
 pub unsafe fn window_pane_reset_mode_all(wp: *mut window_pane) {
     unsafe {
         while !tailq_empty(&raw mut (*wp).modes) {
@@ -1267,6 +1328,7 @@ pub unsafe fn window_pane_reset_mode_all(wp: *mut window_pane) {
     }
 }
 
+// vendor/tmux/window.c:1618  window_pane_copy_key()
 unsafe fn window_pane_copy_key(wp: *mut window_pane, key: key_code) {
     unsafe {
         for loop_ in
@@ -1285,6 +1347,7 @@ unsafe fn window_pane_copy_key(wp: *mut window_pane, key: key_code) {
     }
 }
 
+// vendor/tmux/window.c:1653  window_pane_key()
 pub unsafe fn window_pane_key(
     wp: *mut window_pane,
     c: *mut client,
@@ -1334,10 +1397,12 @@ pub unsafe fn window_pane_visible(wp: *const window_pane) -> bool {
     }
 }
 
+// vendor/tmux/window.c:1698  window_pane_exited()
 pub unsafe fn window_pane_exited(wp: *mut window_pane) -> bool {
     unsafe { (*wp).fd == -1 || (*wp).flags.intersects(window_pane_flags::PANE_EXITED) }
 }
 
+// vendor/tmux/window.c:1704  window_pane_search()
 pub unsafe fn window_pane_search(
     wp: *mut window_pane,
     term: *const u8,
@@ -1404,6 +1469,7 @@ pub unsafe fn window_pane_search(
 }
 
 /// Get MRU pane from a list.
+// vendor/tmux/window.c:1753  window_pane_choose_best()
 unsafe fn window_pane_choose_best(list: *mut *mut window_pane, size: u32) -> *mut window_pane {
     if size == 0 {
         return null_mut();
@@ -1422,6 +1488,7 @@ unsafe fn window_pane_choose_best(list: *mut *mut window_pane, size: u32) -> *mu
 }
 
 /// Find the pane directly above another. We build a list of those adjacent to top edge and then choose the best.
+// vendor/tmux/window.c:1801  window_pane_find_up()
 pub unsafe fn window_pane_find_up(wp: *mut window_pane) -> *mut window_pane {
     unsafe {
         if wp.is_null() {
@@ -1490,6 +1557,7 @@ pub unsafe fn window_pane_find_up(wp: *mut window_pane) -> *mut window_pane {
 }
 
 /// Find the pane directly below another.
+// vendor/tmux/window.c:1862  window_pane_find_down()
 pub unsafe fn window_pane_find_down(wp: *mut window_pane) -> *mut window_pane {
     unsafe {
         if wp.is_null() {
@@ -1558,6 +1626,7 @@ pub unsafe fn window_pane_find_down(wp: *mut window_pane) -> *mut window_pane {
 }
 
 /// Find the pane directly to the left of another.
+// vendor/tmux/window.c:1923  window_pane_find_left()
 pub unsafe fn window_pane_find_left(wp: *mut window_pane) -> *mut window_pane {
     if wp.is_null() {
         return null_mut();
@@ -1609,6 +1678,7 @@ pub unsafe fn window_pane_find_left(wp: *mut window_pane) -> *mut window_pane {
 }
 
 /// Find the pane directly to the right of another.
+// vendor/tmux/window.c:1975  window_pane_find_right()
 pub unsafe fn window_pane_find_right(wp: *mut window_pane) -> *mut window_pane {
     if wp.is_null() {
         return null_mut();
@@ -1659,6 +1729,7 @@ pub unsafe fn window_pane_find_right(wp: *mut window_pane) -> *mut window_pane {
     }
 }
 
+// vendor/tmux/window.c:2027  window_pane_stack_push()
 pub unsafe fn window_pane_stack_push(stack: *mut window_panes, wp: *mut window_pane) {
     unsafe {
         if !wp.is_null() {
@@ -1669,6 +1740,7 @@ pub unsafe fn window_pane_stack_push(stack: *mut window_panes, wp: *mut window_p
     }
 }
 
+// vendor/tmux/window.c:2038  window_pane_stack_remove()
 pub unsafe fn window_pane_stack_remove(stack: *mut window_panes, wp: *mut window_pane) {
     unsafe {
         if !wp.is_null() && (*wp).flags.intersects(window_pane_flags::PANE_VISITED) {
@@ -1679,6 +1751,7 @@ pub unsafe fn window_pane_stack_remove(stack: *mut window_panes, wp: *mut window
 }
 
 /// Clear alert flags for a winlink
+// vendor/tmux/window.c:2048  winlink_clear_flags()
 pub unsafe fn winlink_clear_flags(wl: *mut winlink) {
     unsafe {
         (*(*wl).window).flags &= !WINDOW_ALERTFLAGS;
@@ -1694,6 +1767,7 @@ pub unsafe fn winlink_clear_flags(wl: *mut winlink) {
 }
 
 /// Shuffle window indexes up.
+// vendor/tmux/window.c:2063  winlink_shuffle_up()
 pub unsafe fn winlink_shuffle_up(s: *mut session, mut wl: *mut winlink, before: bool) -> i32 {
     if wl.is_null() {
         return -1;
@@ -1726,6 +1800,7 @@ pub unsafe fn winlink_shuffle_up(s: *mut session, mut wl: *mut winlink, before: 
     }
 }
 
+// vendor/tmux/window.c:2094  window_pane_input_callback()
 unsafe fn window_pane_input_callback(
     c: *mut client,
     _path: *mut u8,
@@ -1757,6 +1832,7 @@ unsafe fn window_pane_input_callback(
     }
 }
 
+// vendor/tmux/window.c:2119  window_pane_start_input()
 pub unsafe fn window_pane_start_input(
     wp: *mut window_pane,
     item: *mut cmdq_item,
@@ -1791,6 +1867,7 @@ pub unsafe fn window_pane_start_input(
     }
 }
 
+// vendor/tmux/window.c:2144  window_pane_get_new_data()
 pub unsafe fn window_pane_get_new_data(
     wp: *mut window_pane,
     wpo: *mut window_pane_offset,
@@ -1804,6 +1881,7 @@ pub unsafe fn window_pane_get_new_data(
     }
 }
 
+// vendor/tmux/window.c:2154  window_pane_update_used_data()
 pub unsafe fn window_pane_update_used_data(
     wp: *mut window_pane,
     wpo: *mut window_pane_offset,
@@ -1819,6 +1897,7 @@ pub unsafe fn window_pane_update_used_data(
     }
 }
 
+// vendor/tmux/window.c:2165  window_set_fill_character()
 pub unsafe fn window_set_fill_character(w: NonNull<window>) {
     let w = w.as_ptr();
     unsafe {
@@ -1835,6 +1914,7 @@ pub unsafe fn window_set_fill_character(w: NonNull<window>) {
     }
 }
 
+// vendor/tmux/window.c:2184  window_pane_default_cursor()
 pub unsafe fn window_pane_default_cursor(wp: *mut window_pane) {
     unsafe {
         let s = (*wp).screen;
@@ -1852,6 +1932,7 @@ pub unsafe fn window_pane_default_cursor(wp: *mut window_pane) {
     }
 }
 
+// vendor/tmux/window.c:2190  window_pane_mode()
 pub unsafe fn window_pane_mode(wp: *mut window_pane) -> i32 {
     unsafe {
         if !tailq_first(&raw mut (*wp).modes).is_null() {

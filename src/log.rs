@@ -33,18 +33,22 @@ static LOG_LEVEL: AtomicI32 = AtomicI32::new(0);
 
 const DEFAULT_ORDERING: Ordering = Ordering::SeqCst;
 
+// vendor/tmux/log.c:34  log_event_cb()
 unsafe extern "C-unwind" fn log_event_cb(_severity: c_int, msg: *const u8) {
     unsafe { log_debug!("{}", _s(msg)) }
 }
 
+// vendor/tmux/log.c:41  log_add_level()
 pub fn log_add_level() {
     LOG_LEVEL.fetch_add(1, DEFAULT_ORDERING);
 }
 
+// vendor/tmux/log.c:48  log_get_level()
 pub fn log_get_level() -> i32 {
     LOG_LEVEL.load(DEFAULT_ORDERING)
 }
 
+// vendor/tmux/log.c:55  log_open()
 pub fn log_open(name: &CStr) {
     if LOG_LEVEL.load(DEFAULT_ORDERING) == 0 {
         return;
@@ -65,6 +69,7 @@ pub fn log_open(name: &CStr) {
     unsafe { event_set_log_callback(Some(log_event_cb)) };
 }
 
+// vendor/tmux/log.c:75  log_toggle()
 pub fn log_toggle(name: &CStr) {
     if LOG_LEVEL.fetch_xor(1, DEFAULT_ORDERING) == 0 {
         log_open(name);
@@ -75,6 +80,7 @@ pub fn log_toggle(name: &CStr) {
     }
 }
 
+// vendor/tmux/log.c:90  log_close()
 pub fn log_close() {
     // If we drop the file when it's already closed it will panic in debug mode.
     // Because of this and our use of fork, extra care has to be made when closing the file.
@@ -153,6 +159,7 @@ fn log_vwrite_rs(args: std::fmt::Arguments, prefix: &str) {
     }
 }
 
+// vendor/tmux/log.c:140  fatal()
 pub fn fatal(msg: &str) -> ! {
     let os_error = std::io::Error::last_os_error();
     let error_msg = os_error.to_string();
@@ -176,6 +183,7 @@ pub fn fatalx_c(args: std::fmt::Arguments) -> ! {
 }
 
 #[track_caller]
+// vendor/tmux/log.c:157  fatalx()
 pub fn fatalx(msg: &str) -> ! {
     let location = std::panic::Location::caller();
     let file = location.file();

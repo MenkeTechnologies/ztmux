@@ -47,6 +47,7 @@ pub static CMD_SEND_PREFIX_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-send-keys.c:61  cmd_send_keys_inject_key()
 pub unsafe fn cmd_send_keys_inject_key(
     item: *mut cmdq_item,
     mut after: *mut cmdq_item,
@@ -94,6 +95,7 @@ pub unsafe fn cmd_send_keys_inject_key(
     }
 }
 
+// vendor/tmux/cmd-send-keys.c:112  cmd_send_keys_inject_string()
 pub unsafe fn cmd_send_keys_inject_string(
     item: *mut cmdq_item,
     mut after: *mut cmdq_item,
@@ -149,6 +151,7 @@ pub unsafe fn cmd_send_keys_inject_string(
     }
 }
 
+// vendor/tmux/cmd-send-keys.c:161  cmd_send_keys_exec()
 pub unsafe fn cmd_send_keys_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

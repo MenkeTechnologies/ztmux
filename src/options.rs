@@ -25,6 +25,7 @@ pub struct options_array_item {
     pub entry: rb_entry<options_array_item>,
 }
 
+// vendor/tmux/options.c:40  options_array_cmp()
 fn options_array_cmp(a1: &options_array_item, a2: &options_array_item) -> cmp::Ordering {
     a1.index.cmp(&a2.index)
 }
@@ -94,10 +95,12 @@ unsafe fn OPTIONS_IS_ARRAY(o: *const options_entry) -> bool {
 
 RB_GENERATE!(options_tree, options_entry, entry, discr_entry, options_cmp);
 
+// vendor/tmux/options.c:93  options_cmp()
 fn options_cmp(lhs: &options_entry, rhs: &options_entry) -> cmp::Ordering {
     lhs.name.cmp(&rhs.name)
 }
 
+// vendor/tmux/options.c:99  options_map_name()
 fn options_map_name(name: &str) -> Option<&'static str> {
     for &options_name_map { from, to} in &OPTIONS_OTHER_NAMES {
         if from == name {
@@ -116,6 +119,7 @@ fn options_map_name_str(name: &str) -> &str {
     name
 }
 
+// vendor/tmux/options.c:111  options_parent_table_entry()
 unsafe fn options_parent_table_entry(
     oo: *mut options,
     s: &str,
@@ -134,6 +138,7 @@ unsafe fn options_parent_table_entry(
     }
 }
 
+// vendor/tmux/options.c:124  options_value_free()
 unsafe fn options_value_free(o: *const options_entry, ov: *mut options_value) {
     unsafe {
         if OPTIONS_IS_STRING(o) {
@@ -145,6 +150,7 @@ unsafe fn options_value_free(o: *const options_entry, ov: *mut options_value) {
     }
 }
 
+// vendor/tmux/options.c:133  options_value_to_string()
 unsafe fn options_value_to_string(
     o: *mut options_entry,
     ov: *mut options_value,
@@ -199,6 +205,7 @@ unsafe fn options_value_to_string(
     }
 }
 
+// vendor/tmux/options.c:171  options_create()
 pub unsafe fn options_create(parent: *mut options) -> *mut options {
     unsafe {
         let oo = xcalloc1::<options>() as *mut options;
@@ -208,6 +215,7 @@ pub unsafe fn options_create(parent: *mut options) -> *mut options {
     }
 }
 
+// vendor/tmux/options.c:182  options_free()
 pub unsafe fn options_free(oo: *mut options) {
     unsafe {
         for o in rb_foreach(&raw mut (*oo).tree) {
@@ -217,22 +225,27 @@ pub unsafe fn options_free(oo: *mut options) {
     }
 }
 
+// vendor/tmux/options.c:192  options_get_parent()
 pub unsafe fn options_get_parent(oo: *mut options) -> *mut options {
     unsafe { (*oo).parent }
 }
 
+// vendor/tmux/options.c:198  options_set_parent()
 pub fn options_set_parent(oo: &mut options, parent: *mut options) {
     oo.parent = parent;
 }
 
+// vendor/tmux/options.c:204  options_first()
 pub unsafe fn options_first(oo: *mut options) -> *mut options_entry {
     unsafe { rb_min(&raw mut (*oo).tree) }
 }
 
+// vendor/tmux/options.c:210  options_next()
 pub unsafe fn options_next(o: *mut options_entry) -> *mut options_entry {
     unsafe { rb_next(o) }
 }
 
+// vendor/tmux/options.c:216  options_get_only()
 pub unsafe fn options_get_only(oo: *mut options, name: &str) -> *mut options_entry {
     unsafe {
         let name = std::mem::transmute::<&str, &'static str>(name);
@@ -280,6 +293,7 @@ pub unsafe fn options_get_only_const(oo: *const options, name: &str) -> *const o
     }
 }
 
+// vendor/tmux/options.c:229  options_get()
 pub fn options_get(oo: &mut options, name: &str) -> *mut options_entry {
     #[expect(clippy::shadow_same)]
     let mut oo: *mut options = oo;
@@ -313,6 +327,7 @@ unsafe fn options_get_const(mut oo: *const options, name: &str) -> *const option
     }
 }
 
+// vendor/tmux/options.c:244  options_empty()
 pub unsafe fn options_empty(
     oo: *mut options,
     oe: *const options_table_entry,
@@ -328,6 +343,7 @@ pub unsafe fn options_empty(
     }
 }
 
+// vendor/tmux/options.c:258  options_default()
 pub unsafe fn options_default(
     oo: *mut options,
     oe: *const options_table_entry,
@@ -366,6 +382,7 @@ pub unsafe fn options_default(
     }
 }
 
+// vendor/tmux/options.c:301  options_default_to_string()
 pub unsafe fn options_default_to_string(oe: *const options_table_entry) -> NonNull<u8> {
     unsafe {
         match (*oe).type_ {
@@ -398,6 +415,7 @@ pub unsafe fn options_default_to_string(oe: *const options_table_entry) -> NonNu
     }
 }
 
+// vendor/tmux/options.c:332  options_add()
 unsafe fn options_add(oo: *mut options, name: &str) -> *mut options_entry {
     unsafe {
         let mut o = options_get_only(oo, name);
@@ -422,6 +440,7 @@ unsafe fn options_add(oo: *mut options, name: &str) -> *mut options_entry {
     }
 }
 
+// vendor/tmux/options.c:349  options_remove()
 unsafe fn options_remove(o: *mut options_entry) {
     unsafe {
         let oo = (*o).owner;
@@ -437,18 +456,22 @@ unsafe fn options_remove(o: *mut options_entry) {
     }
 }
 
+// vendor/tmux/options.c:363  options_name()
 pub unsafe fn options_name<'a>(o: *mut options_entry) -> &'a str {
     unsafe { &(*o).name }
 }
 
+// vendor/tmux/options.c:369  options_owner()
 pub unsafe fn options_owner(o: *mut options_entry) -> *mut options {
     unsafe { (*o).owner }
 }
 
+// vendor/tmux/options.c:375  options_table_entry()
 pub unsafe fn options_table_entry(o: *mut options_entry) -> *const options_table_entry {
     unsafe { (*o).tableentry }
 }
 
+// vendor/tmux/options.c:381  options_array_item()
 unsafe fn options_array_item(o: *mut options_entry, idx: c_uint) -> *mut options_array_item {
     unsafe {
         let mut a = options_array_item {
@@ -459,6 +482,7 @@ unsafe fn options_array_item(o: *mut options_entry, idx: c_uint) -> *mut options
     }
 }
 
+// vendor/tmux/options.c:390  options_array_new()
 unsafe fn options_array_new(o: *mut options_entry, idx: c_uint) -> *mut options_array_item {
     unsafe {
         let a = xcalloc1::<options_array_item>() as *mut options_array_item;
@@ -468,6 +492,7 @@ unsafe fn options_array_new(o: *mut options_entry, idx: c_uint) -> *mut options_
     }
 }
 
+// vendor/tmux/options.c:401  options_array_free()
 unsafe fn options_array_free(o: *mut options_entry, a: *mut options_array_item) {
     unsafe {
         options_value_free(o, &mut (*a).value);
@@ -476,6 +501,7 @@ unsafe fn options_array_free(o: *mut options_entry, a: *mut options_array_item) 
     }
 }
 
+// vendor/tmux/options.c:409  options_array_clear()
 pub unsafe fn options_array_clear(o: *mut options_entry) {
     unsafe {
         if !options_is_array(o) {
@@ -491,6 +517,7 @@ pub unsafe fn options_array_clear(o: *mut options_entry) {
     }
 }
 
+// vendor/tmux/options.c:421  options_array_get()
 pub unsafe fn options_array_get(o: *mut options_entry, idx: u32) -> *mut options_value {
     unsafe {
         if !options_is_array(o) {
@@ -504,6 +531,7 @@ pub unsafe fn options_array_get(o: *mut options_entry, idx: u32) -> *mut options
     }
 }
 
+// vendor/tmux/options.c:434  options_array_set()
 pub unsafe fn options_array_set(
     o: *mut options_entry,
     idx: u32,
@@ -580,6 +608,7 @@ pub unsafe fn options_array_set(
 }
 
 // note one difference was that this function previously could avoid allocation on error
+// vendor/tmux/options.c:511  options_array_assign()
 pub unsafe fn options_array_assign(o: *mut options_entry, s: &str) -> Result<(), CString> {
     unsafe {
         let mut separator = (*(*o).tableentry).separator;
@@ -630,6 +659,7 @@ pub unsafe fn options_array_assign(o: *mut options_entry, s: &str) -> Result<(),
     }
 }
 
+// vendor/tmux/options.c:552  options_array_first()
 pub unsafe fn options_array_first(o: *mut options_entry) -> *mut options_array_item {
     unsafe {
         if !OPTIONS_IS_ARRAY(o) {
@@ -639,26 +669,32 @@ pub unsafe fn options_array_first(o: *mut options_entry) -> *mut options_array_i
     }
 }
 
+// vendor/tmux/options.c:560  options_array_next()
 pub unsafe fn options_array_next(a: *mut options_array_item) -> *mut options_array_item {
     unsafe { rb_next(a) }
 }
 
+// vendor/tmux/options.c:566  options_array_item_index()
 pub unsafe fn options_array_item_index(a: *mut options_array_item) -> u32 {
     unsafe { (*a).index }
 }
 
+// vendor/tmux/options.c:572  options_array_item_value()
 pub unsafe fn options_array_item_value(a: *mut options_array_item) -> *mut options_value {
     unsafe { &raw mut (*a).value }
 }
 
+// vendor/tmux/options.c:578  options_is_array()
 pub unsafe fn options_is_array(o: *mut options_entry) -> bool {
     unsafe { OPTIONS_IS_ARRAY(o) }
 }
 
+// vendor/tmux/options.c:584  options_is_string()
 pub unsafe fn options_is_string(o: *mut options_entry) -> bool {
     unsafe { OPTIONS_IS_STRING(o) }
 }
 
+// vendor/tmux/options.c:590  options_to_string()
 pub unsafe fn options_to_string(o: *mut options_entry, idx: i32, numeric: i32) -> *mut u8 {
     unsafe {
         if OPTIONS_IS_ARRAY(o) {
@@ -704,6 +740,7 @@ pub unsafe fn options_to_string(o: *mut options_entry, idx: i32, numeric: i32) -
     }
 }
 
+// vendor/tmux/options.c:624  options_parse()
 pub fn options_parse(name: &str) -> Option<(String, i32)> {
     if name.is_empty() {
         return None;
@@ -729,6 +766,7 @@ pub fn options_parse(name: &str) -> Option<(String, i32)> {
     Some((copy, parsed_idx))
 }
 
+// vendor/tmux/options.c:649  options_parse_get()
 pub unsafe fn options_parse_get(
     oo: *mut options,
     s: &str,
@@ -749,6 +787,7 @@ pub unsafe fn options_parse_get(
     }
 }
 
+// vendor/tmux/options.c:678  options_match()
 pub unsafe fn options_match(s: &str, idx: *mut i32, ambiguous: *mut i32) -> Option<String> {
     unsafe {
         let (parsed, idx_value) = options_parse(s)?;
@@ -787,6 +826,7 @@ pub unsafe fn options_match(s: &str, idx: *mut i32, ambiguous: *mut i32) -> Opti
 }
 
 #[expect(dead_code)]
+// vendor/tmux/options.c:720  options_match_get()
 unsafe fn options_match_get(
     oo: *mut options,
     s: &str,
@@ -808,6 +848,7 @@ unsafe fn options_match_get(
     }
 }
 
+// vendor/tmux/options.c:739  options_get_string()
 pub unsafe fn options_get_string(oo: *mut options, name: &str) -> *const u8 {
     unsafe {
         let o = options_get(&mut *oo, name);
@@ -834,6 +875,7 @@ pub unsafe fn options_get_string_(oo: *const options, name: &str) -> *const u8 {
     }
 }
 
+// vendor/tmux/options.c:752  options_get_number()
 unsafe fn options_get_number(oo: *mut options, name: &str) -> i64 {
     unsafe {
         let o = options_get(&mut *oo, name);
@@ -933,6 +975,7 @@ pub unsafe fn options_set_string_(
     }
 }
 
+// vendor/tmux/options.c:818  options_set_number()
 pub unsafe fn options_set_number(
     oo: *mut options,
     name: &str,
@@ -959,6 +1002,7 @@ pub unsafe fn options_set_number(
     }
 }
 
+// vendor/tmux/options.c:863  options_scope_from_name()
 pub unsafe fn options_scope_from_name(
     args: *mut args,
     window: i32,
@@ -1046,6 +1090,7 @@ pub unsafe fn options_scope_from_name(
     }
 }
 
+// vendor/tmux/options.c:934  options_scope_from_flags()
 pub unsafe fn options_scope_from_flags(
     args: *mut args,
     window: i32,
@@ -1109,6 +1154,7 @@ pub unsafe fn options_scope_from_flags(
     }
 }
 
+// vendor/tmux/options.c:989  options_string_to_style()
 pub unsafe fn options_string_to_style(
     oo: *mut options,
     name: &str,
@@ -1144,6 +1190,7 @@ pub unsafe fn options_string_to_style(
     }
 }
 
+// vendor/tmux/options.c:1033  options_from_string_check()
 unsafe fn options_from_string_check(
     oe: *const options_table_entry,
     value: *const u8,
@@ -1170,6 +1217,7 @@ unsafe fn options_from_string_check(
     }
 }
 
+// vendor/tmux/options.c:1064  options_from_string_flag()
 unsafe fn options_from_string_flag(
     oo: *mut options,
     name: &str,
@@ -1190,6 +1238,7 @@ unsafe fn options_from_string_flag(
     }
 }
 
+// vendor/tmux/options.c:1088  options_find_choice()
 pub unsafe fn options_find_choice(
     oe: *const options_table_entry,
     value: *const u8,
@@ -1202,6 +1251,7 @@ pub unsafe fn options_find_choice(
     }
 }
 
+// vendor/tmux/options.c:1107  options_from_string_choice()
 unsafe fn options_from_string_choice(
     oe: *const options_table_entry,
     oo: *mut options,
@@ -1224,6 +1274,7 @@ unsafe fn options_from_string_choice(
     }
 }
 
+// vendor/tmux/options.c:1126  options_from_string()
 pub unsafe fn options_from_string(
     oo: *mut options,
     oe: *const options_table_entry,
@@ -1316,6 +1367,7 @@ pub unsafe fn options_from_string(
     }
 }
 
+// vendor/tmux/options.c:1208  options_push_changes()
 pub unsafe fn options_push_changes(name: &str) {
     let __func__ = c!("options_push_changes");
     unsafe {
@@ -1405,6 +1457,7 @@ pub unsafe fn options_push_changes(name: &str) {
 }
 
 // note one difference was that this function previously could avoid allocation on error
+// vendor/tmux/options.c:1328  options_remove_or_default()
 pub unsafe fn options_remove_or_default(o: *mut options_entry, idx: i32) -> Result<(), CString> {
     unsafe {
         let oo = (*o).owner;

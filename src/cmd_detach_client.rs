@@ -45,6 +45,7 @@ pub static CMD_SUSPEND_CLIENT_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-detach-client.c:58  cmd_detach_client_exec()
 pub unsafe fn cmd_detach_client_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

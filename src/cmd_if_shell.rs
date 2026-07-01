@@ -42,6 +42,7 @@ pub struct cmd_if_shell_data<'a> {
     pub item: *mut cmdq_item,
 }
 
+// vendor/tmux/cmd-if-shell.c:64  cmd_if_shell_args_parse()
 fn cmd_if_shell_args_parse(_: *mut args, idx: u32, _: *mut *mut u8) -> args_parse_type {
     if idx == 1 || idx == 2 {
         args_parse_type::ARGS_PARSE_COMMANDS_OR_STRING
@@ -50,6 +51,7 @@ fn cmd_if_shell_args_parse(_: *mut args, idx: u32, _: *mut *mut u8) -> args_pars
     }
 }
 
+// vendor/tmux/cmd-if-shell.c:73  cmd_if_shell_exec()
 unsafe fn cmd_if_shell_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -126,6 +128,7 @@ unsafe fn cmd_if_shell_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval
     }
 }
 
+// vendor/tmux/cmd-if-shell.c:138  cmd_if_shell_callback()
 unsafe fn cmd_if_shell_callback(job: *mut job) {
     unsafe {
         let cdata = job_get_data(job) as *mut cmd_if_shell_data;
@@ -171,6 +174,7 @@ unsafe fn cmd_if_shell_callback(job: *mut job) {
     }
 }
 
+// vendor/tmux/cmd-if-shell.c:178  cmd_if_shell_free()
 unsafe fn cmd_if_shell_free(data: *mut c_void) {
     unsafe {
         let cdata = data as *mut cmd_if_shell_data;

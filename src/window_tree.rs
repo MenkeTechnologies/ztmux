@@ -135,6 +135,7 @@ struct window_tree_modedata {
     each: u32,
 }
 
+// vendor/tmux/window-tree.c:220  window_tree_pull_item()
 unsafe fn window_tree_pull_item(
     item: NonNull<window_tree_itemdata>,
     sp: *mut Option<NonNull<session>>,
@@ -189,6 +190,7 @@ unsafe fn window_tree_pull_item(
     }
 }
 
+// vendor/tmux/window-tree.c:255  window_tree_add_item()
 unsafe fn window_tree_add_item(data: NonNull<window_tree_modedata>) -> *mut window_tree_itemdata {
     unsafe {
         let data = data.as_ptr();
@@ -201,12 +203,14 @@ unsafe fn window_tree_add_item(data: NonNull<window_tree_modedata>) -> *mut wind
     }
 }
 
+// vendor/tmux/window-tree.c:266  window_tree_free_item()
 unsafe fn window_tree_free_item(item: *mut window_tree_itemdata) {
     unsafe {
         free_(item);
     }
 }
 
+// vendor/tmux/window-tree.c:272  window_tree_build_pane()
 unsafe fn window_tree_build_pane(
     s: *mut session,
     wl: *mut winlink,
@@ -244,6 +248,7 @@ unsafe fn window_tree_build_pane(
     }
 }
 
+// vendor/tmux/window-tree.c:304  window_tree_filter_pane()
 unsafe fn window_tree_filter_pane(
     s: *mut session,
     wl: *mut winlink,
@@ -263,6 +268,7 @@ unsafe fn window_tree_filter_pane(
     }
 }
 
+// vendor/tmux/window-tree.c:321  window_tree_build_window()
 unsafe fn window_tree_build_window(
     s: *mut session,
     wl: *mut winlink,
@@ -378,6 +384,7 @@ unsafe fn window_tree_build_window(
     }
 }
 
+// vendor/tmux/window-tree.c:383  window_tree_build_session()
 unsafe fn window_tree_build_session(
     s: *mut session,
     modedata: NonNull<c_void>,
@@ -466,6 +473,7 @@ unsafe fn window_tree_build_session(
     }
 }
 
+// vendor/tmux/window-tree.c:429  window_tree_build()
 unsafe fn window_tree_build(
     modedata: NonNull<c_void>,
     sort_crit: *mut mode_tree_sort_criteria,
@@ -550,6 +558,7 @@ unsafe fn window_tree_build(
     }
 }
 
+// vendor/tmux/window-tree.c:478  window_tree_draw_label()
 unsafe fn window_tree_draw_label(
     ctx: *mut screen_write_ctx,
     px: u32,
@@ -583,6 +592,7 @@ unsafe fn window_tree_draw_label(
     }
 }
 
+// vendor/tmux/window-tree.c:516  window_tree_draw_session()
 unsafe fn window_tree_draw_session(
     data: *mut window_tree_modedata,
     s: *mut session,
@@ -745,6 +755,7 @@ unsafe fn window_tree_draw_session(
     }
 }
 
+// vendor/tmux/window-tree.c:657  window_tree_draw_window()
 unsafe fn window_tree_draw_window(
     data: *mut window_tree_modedata,
     s: *mut session,
@@ -897,6 +908,7 @@ unsafe fn window_tree_draw_window(
     }
 }
 
+// vendor/tmux/window-tree.c:880  window_tree_draw()
 unsafe fn window_tree_draw(
     modedata: *mut c_void,
     itemdata: Option<NonNull<c_void>>,
@@ -935,6 +947,7 @@ unsafe fn window_tree_draw(
     }
 }
 
+// vendor/tmux/window-tree.c:915  window_tree_search()
 unsafe fn window_tree_search(
     _modedata: *mut c_void,
     itemdata: NonNull<c_void>,
@@ -978,6 +991,7 @@ unsafe fn window_tree_search(
     }
 }
 
+// vendor/tmux/window-tree.c:961  window_tree_menu()
 unsafe fn window_tree_menu(modedata: NonNull<c_void>, c: *mut client, key: key_code) {
     unsafe {
         let data: NonNull<window_tree_modedata> = modedata.cast();
@@ -990,6 +1004,7 @@ unsafe fn window_tree_menu(modedata: NonNull<c_void>, c: *mut client, key: key_c
     }
 }
 
+// vendor/tmux/window-tree.c:974  window_tree_get_key()
 unsafe fn window_tree_get_key(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -1023,6 +1038,7 @@ unsafe fn window_tree_get_key(
     }
 }
 
+// vendor/tmux/window-tree.c:1100  window_tree_init()
 unsafe fn window_tree_init(
     wme: NonNull<window_mode_entry>,
     fs: *mut cmd_find_state,
@@ -1090,6 +1106,7 @@ unsafe fn window_tree_init(
     }
 }
 
+// vendor/tmux/window-tree.c:1152  window_tree_destroy()
 unsafe fn window_tree_destroy(data: NonNull<window_tree_modedata>) {
     unsafe {
         let data = data.as_ptr();
@@ -1111,6 +1128,7 @@ unsafe fn window_tree_destroy(data: NonNull<window_tree_modedata>) {
     }
 }
 
+// vendor/tmux/window-tree.c:1171  window_tree_free()
 unsafe fn window_tree_free(wme: NonNull<window_mode_entry>) {
     unsafe {
         if let Some(data) = NonNull::new((*wme.as_ptr()).data.cast::<window_tree_modedata>()) {
@@ -1121,6 +1139,7 @@ unsafe fn window_tree_free(wme: NonNull<window_mode_entry>) {
     }
 }
 
+// vendor/tmux/window-tree.c:1184  window_tree_resize()
 unsafe fn window_tree_resize(wme: NonNull<window_mode_entry>, sx: u32, sy: u32) {
     unsafe {
         let data: *mut window_tree_modedata = (*wme.as_ptr()).data.cast();
@@ -1128,6 +1147,7 @@ unsafe fn window_tree_resize(wme: NonNull<window_mode_entry>, sx: u32, sy: u32) 
     }
 }
 
+// vendor/tmux/window-tree.c:1192  window_tree_update()
 unsafe fn window_tree_update(wme: NonNull<window_mode_entry>) {
     unsafe {
         let data: *mut window_tree_modedata = (*wme.as_ptr()).data.cast();
@@ -1138,6 +1158,7 @@ unsafe fn window_tree_update(wme: NonNull<window_mode_entry>) {
     }
 }
 
+// vendor/tmux/window-tree.c:1202  window_tree_get_target()
 unsafe fn window_tree_get_target(
     item: NonNull<window_tree_itemdata>,
     fs: *mut cmd_find_state,
@@ -1189,6 +1210,7 @@ unsafe fn window_tree_get_target(
     }
 }
 
+// vendor/tmux/window-tree.c:1240  window_tree_command_each()
 unsafe fn window_tree_command_each(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -1206,6 +1228,7 @@ unsafe fn window_tree_command_each(
     }
 }
 
+// vendor/tmux/window-tree.c:1255  window_tree_command_done()
 unsafe fn window_tree_command_done(_: *mut cmdq_item, modedata: *mut c_void) -> cmd_retval {
     unsafe {
         let data: NonNull<window_tree_modedata> = NonNull::new(modedata.cast()).unwrap();
@@ -1221,6 +1244,7 @@ unsafe fn window_tree_command_done(_: *mut cmdq_item, modedata: *mut c_void) -> 
     }
 }
 
+// vendor/tmux/window-tree.c:1269  window_tree_command_callback()
 unsafe fn window_tree_command_callback(
     c: *mut client,
     data: NonNull<window_tree_modedata>,
@@ -1253,12 +1277,14 @@ unsafe fn window_tree_command_callback(
     }
 }
 
+// vendor/tmux/window-tree.c:1289  window_tree_command_free()
 unsafe fn window_tree_command_free(modedata: NonNull<window_tree_modedata>) {
     unsafe {
         window_tree_destroy(modedata);
     }
 }
 
+// vendor/tmux/window-tree.c:1297  window_tree_kill_each()
 unsafe fn window_tree_kill_each(
     _: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -1295,6 +1321,7 @@ unsafe fn window_tree_kill_each(
     }
 }
 
+// vendor/tmux/window-tree.c:1328  window_tree_kill_current_callback()
 unsafe fn window_tree_kill_current_callback(
     c: *mut client,
     data: NonNull<window_tree_modedata>,
@@ -1324,6 +1351,7 @@ unsafe fn window_tree_kill_current_callback(
     }
 }
 
+// vendor/tmux/window-tree.c:1349  window_tree_kill_tagged_callback()
 unsafe fn window_tree_kill_tagged_callback(
     c: *mut client,
     data: NonNull<window_tree_modedata>,
@@ -1358,6 +1386,7 @@ unsafe fn window_tree_kill_tagged_callback(
     }
 }
 
+// vendor/tmux/window-tree.c:1370  window_tree_mouse()
 unsafe fn window_tree_mouse(
     data: *mut window_tree_modedata,
     key: key_code,
@@ -1434,6 +1463,7 @@ unsafe fn window_tree_mouse(
     }
 }
 
+// vendor/tmux/window-tree.c:1431  window_tree_key()
 unsafe fn window_tree_key(
     wme: NonNull<window_mode_entry>,
     c: *mut client,

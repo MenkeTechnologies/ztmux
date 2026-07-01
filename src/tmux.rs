@@ -42,6 +42,7 @@ pub static mut PTM_FD: c_int = -1;
 
 pub static mut SHELL_COMMAND: *mut u8 = null_mut();
 
+// vendor/tmux/tmux.c:53  usage()
 pub fn usage() -> ! {
     eprintln!(
         "usage: ztmux [-2CDlNuVv] [-c shell-command] [-f file] [-L socket-name]\n             [-S socket-path] [-T features] [command [flags]]\n"
@@ -49,6 +50,7 @@ pub fn usage() -> ! {
     std::process::exit(1)
 }
 
+// vendor/tmux/tmux.c:63  getshell()
 unsafe fn getshell() -> Cow<'static, CStr> {
     unsafe {
         if let Ok(shell) = std::env::var("SHELL")
@@ -69,6 +71,7 @@ unsafe fn getshell() -> Cow<'static, CStr> {
     }
 }
 
+// vendor/tmux/tmux.c:80  checkshell()
 pub unsafe fn checkshell(shell: Option<&CStr>) -> bool {
     unsafe {
         let Some(shell) = shell else {
@@ -105,6 +108,7 @@ pub unsafe fn checkshell_(shell: *const u8) -> bool {
     true
 }
 
+// vendor/tmux/tmux.c:92  areshell()
 unsafe fn areshell(shell: &CStr) -> bool {
     unsafe {
         let ptr = strrchr(shell.as_ptr().cast(), b'/' as c_int);
@@ -121,6 +125,7 @@ unsafe fn areshell(shell: &CStr) -> bool {
     }
 }
 
+// vendor/tmux/tmux.c:109  expand_path()
 unsafe fn expand_path(path: *const u8, home: Option<&CStr>) -> Option<CString> {
     unsafe {
         if strncmp(path, c!("~/"), 2) == 0 {
@@ -155,6 +160,7 @@ unsafe fn expand_path(path: *const u8, home: Option<&CStr>) -> Option<CString> {
     }
 }
 
+// vendor/tmux/tmux.c:142  expand_paths()
 unsafe fn expand_paths(s: &str, paths: &mut Vec<CString>, ignore_errors: i32) {
     unsafe {
         let home = find_home();
@@ -207,6 +213,7 @@ unsafe fn expand_paths(s: &str, paths: &mut Vec<CString>, ignore_errors: i32) {
     }
 }
 
+// vendor/tmux/tmux.c:187  make_label()
 unsafe fn make_label(mut label: *const u8, cause: *mut *mut u8) -> *const u8 {
     let mut paths: Vec<CString> = Vec::new();
     let base: *mut u8;
@@ -265,6 +272,7 @@ unsafe fn make_label(mut label: *const u8, cause: *mut *mut u8) -> *const u8 {
     }
 }
 
+// vendor/tmux/tmux.c:239  shell_argv0()
 pub unsafe fn shell_argv0(shell: *const u8, is_login: c_int) -> *mut u8 {
     unsafe {
         let slash = strrchr(shell, b'/' as _);
@@ -282,6 +290,7 @@ pub unsafe fn shell_argv0(shell: *const u8, is_login: c_int) -> *mut u8 {
     }
 }
 
+// vendor/tmux/tmux.c:257  setblocking()
 pub unsafe fn setblocking(fd: c_int, state: c_int) {
     unsafe {
         let mut mode = fcntl(fd, F_GETFL);
@@ -297,6 +306,7 @@ pub unsafe fn setblocking(fd: c_int, state: c_int) {
     }
 }
 
+// vendor/tmux/tmux.c:271  get_timer()
 pub unsafe fn get_timer() -> u64 {
     unsafe {
         let mut ts: timespec = zeroed();
@@ -309,6 +319,7 @@ pub unsafe fn get_timer() -> u64 {
     }
 }
 
+// vendor/tmux/tmux.c:323  find_cwd()
 pub fn find_cwd() -> Option<PathBuf> {
     let cwd = std::env::current_dir().ok()?;
 
@@ -335,6 +346,7 @@ pub fn find_cwd() -> Option<PathBuf> {
     Some(pwd)
 }
 
+// vendor/tmux/tmux.c:348  find_home()
 pub fn find_home() -> Option<&'static CStr> {
     unsafe {
         static HOME: OnceLock<Option<CString>> = OnceLock::new();
@@ -347,6 +359,7 @@ pub fn find_home() -> Option<&'static CStr> {
     }
 }
 
+// vendor/tmux/tmux.c:369  getversion()
 pub fn getversion() -> &'static str {
     crate::TMUX_VERSION
 }

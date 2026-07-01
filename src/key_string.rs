@@ -224,6 +224,7 @@ static KEY_STRING_TABLE: [key_string_table_entry; 469] = const {
 };
 
 /// Find key string in table.
+// vendor/tmux/key-string.c:196  key_string_search_table()
 pub unsafe fn key_string_search_table(string: *const u8) -> key_code {
     unsafe {
         for key_string in &KEY_STRING_TABLE {
@@ -243,6 +244,7 @@ pub unsafe fn key_string_search_table(string: *const u8) -> key_code {
 }
 
 /// Find modifiers.
+// vendor/tmux/key-string.c:213  key_string_get_modifiers()
 pub unsafe fn key_string_get_modifiers(string: *mut *const u8) -> key_code {
     unsafe {
         let mut modifiers: key_code = 0;
@@ -274,6 +276,7 @@ pub unsafe fn key_string_get_modifiers(string: *mut *const u8) -> key_code {
 const MB_LEN_MAX: usize = 16;
 
 /// Lookup a string and convert to a key value.
+// vendor/tmux/key-string.c:243  key_string_lookup_string()
 pub unsafe fn key_string_lookup_string(mut string: *const u8) -> key_code {
     unsafe {
         let mut key: key_code;
@@ -374,6 +377,7 @@ pub unsafe fn key_string_lookup_string(mut string: *const u8) -> key_code {
 }
 
 /// Convert a key code into string format, with prefix if necessary.
+// vendor/tmux/key-string.c:327  key_string_lookup_key()
 pub unsafe fn key_string_lookup_key(mut key: key_code, with_flags: i32) -> *const u8 {
     let sizeof_out: usize = 64;
     static mut OUT: [u8; 64] = [0; 64];

@@ -39,6 +39,7 @@ pub static CMD_START_SERVER_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-kill-server.c:55  cmd_kill_server_exec()
 unsafe fn cmd_kill_server_exec(self_: *mut cmd, _: *mut cmdq_item) -> cmd_retval {
     unsafe {
         if std::ptr::eq(cmd_get_entry(self_), &CMD_KILL_SERVER_ENTRY) {

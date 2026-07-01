@@ -27,6 +27,7 @@ pub struct notify_entry {
     pub pbname: *mut u8,
 }
 
+// vendor/tmux/notify.c:39  notify_insert_one_hook()
 pub unsafe fn notify_insert_one_hook(
     item: *mut cmdq_item,
     ne: *mut notify_entry,
@@ -52,6 +53,7 @@ pub unsafe fn notify_insert_one_hook(
     }
 }
 
+// vendor/tmux/notify.c:57  notify_insert_hook()
 pub unsafe fn notify_insert_hook(mut item: *mut cmdq_item, ne: *mut notify_entry) {
     let __func__ = "notify_insert_hook";
     unsafe {
@@ -125,6 +127,7 @@ pub unsafe fn notify_insert_hook(mut item: *mut cmdq_item, ne: *mut notify_entry
 // notify_callback
 // notify_add
 
+// vendor/tmux/notify.c:123  notify_callback()
 pub unsafe fn notify_callback(item: *mut cmdq_item, data: *mut c_void) -> cmd_retval {
     let __func__ = c!("notify_callback");
     unsafe {
@@ -200,6 +203,7 @@ pub unsafe fn notify_callback(item: *mut cmdq_item, data: *mut c_void) -> cmd_re
     cmd_retval::CMD_RETURN_NORMAL
 }
 
+// vendor/tmux/notify.c:179  notify_add()
 pub unsafe fn notify_add(
     name: &'static CStr,
     fs: *mut cmd_find_state,
@@ -270,6 +274,7 @@ pub unsafe fn notify_add(
     }
 }
 
+// vendor/tmux/notify.c:234  notify_hook()
 pub unsafe fn notify_hook(item: *mut cmdq_item, name: *mut u8) {
     let __func__ = c!("notify_hook");
     unsafe {
@@ -297,6 +302,7 @@ pub unsafe fn notify_hook(item: *mut cmdq_item, name: *mut u8) {
     }
 }
 
+// vendor/tmux/notify.c:258  notify_client()
 pub unsafe fn notify_client(name: &'static CStr, c: *mut client) {
     unsafe {
         let mut fs: cmd_find_state = zeroed(); // TODO use uninit
@@ -314,6 +320,7 @@ pub unsafe fn notify_client(name: &'static CStr, c: *mut client) {
     }
 }
 
+// vendor/tmux/notify.c:267  notify_session()
 pub unsafe fn notify_session(name: &'static CStr, s: *mut session) {
     unsafe {
         let mut fs = zeroed(); // TODO use uninit
@@ -335,6 +342,7 @@ pub unsafe fn notify_session(name: &'static CStr, s: *mut session) {
     }
 }
 
+// vendor/tmux/notify.c:279  notify_winlink()
 pub unsafe fn notify_winlink(name: &'static CStr, wl: *mut winlink) {
     unsafe {
         let mut fs: cmd_find_state = zeroed();
@@ -352,6 +360,7 @@ pub unsafe fn notify_winlink(name: &'static CStr, wl: *mut winlink) {
     }
 }
 
+// vendor/tmux/notify.c:288  notify_session_window()
 pub unsafe fn notify_session_window(name: &'static CStr, s: *mut session, w: *mut window) {
     unsafe {
         let mut fs: cmd_find_state = zeroed();
@@ -361,6 +370,7 @@ pub unsafe fn notify_session_window(name: &'static CStr, s: *mut session, w: *mu
     }
 }
 
+// vendor/tmux/notify.c:297  notify_window()
 pub unsafe fn notify_window(name: &'static CStr, w: *mut window) {
     unsafe {
         let mut fs: cmd_find_state = zeroed();
@@ -378,6 +388,7 @@ pub unsafe fn notify_window(name: &'static CStr, w: *mut window) {
     }
 }
 
+// vendor/tmux/notify.c:306  notify_pane()
 pub unsafe fn notify_pane(name: &'static CStr, wp: *mut window_pane) {
     unsafe {
         let mut fs: cmd_find_state = zeroed();
@@ -395,6 +406,7 @@ pub unsafe fn notify_pane(name: &'static CStr, wp: *mut window_pane) {
     }
 }
 
+// vendor/tmux/notify.c:315  notify_paste_buffer()
 pub unsafe fn notify_paste_buffer(pbname: &str, deleted: bool) {
     unsafe {
         let mut fs: cmd_find_state = zeroed();

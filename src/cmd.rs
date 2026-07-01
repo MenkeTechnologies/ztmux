@@ -366,6 +366,7 @@ pub unsafe fn cmd_log_argv_(argc: i32, argv: *mut *mut u8, args: std::fmt::Argum
     }
 }
 
+// vendor/tmux/cmd.c:272  cmd_append_argv()
 pub unsafe fn cmd_append_argv(argc: *mut c_int, argv: *mut *mut *mut u8, arg: *const u8) {
     unsafe {
         *argv = xreallocarray_::<*mut u8>(*argv, (*argc) as usize + 1).as_ptr();
@@ -374,6 +375,7 @@ pub unsafe fn cmd_append_argv(argc: *mut c_int, argv: *mut *mut *mut u8, arg: *c
     }
 }
 
+// vendor/tmux/cmd.c:280  cmd_pack_argv()
 pub unsafe fn cmd_pack_argv(
     argc: c_int,
     argv: *mut *mut u8,
@@ -401,6 +403,7 @@ pub unsafe fn cmd_pack_argv(
     }
 }
 
+// vendor/tmux/cmd.c:303  cmd_unpack_argv()
 pub unsafe fn cmd_unpack_argv(
     mut buf: *mut u8,
     mut len: usize,
@@ -432,6 +435,7 @@ pub unsafe fn cmd_unpack_argv(
     }
 }
 
+// vendor/tmux/cmd.c:334  cmd_copy_argv()
 pub unsafe fn cmd_copy_argv(argc: c_int, argv: *const *mut u8) -> *mut *mut u8 {
     unsafe {
         if argc == 0 {
@@ -449,6 +453,7 @@ pub unsafe fn cmd_copy_argv(argc: c_int, argv: *const *mut u8) -> *mut *mut u8 {
     }
 }
 
+// vendor/tmux/cmd.c:351  cmd_free_argv()
 pub unsafe fn cmd_free_argv(argc: c_int, argv: *mut *mut u8) {
     unsafe {
         if argc == 0 {
@@ -461,6 +466,7 @@ pub unsafe fn cmd_free_argv(argc: c_int, argv: *mut *mut u8) {
     }
 }
 
+// vendor/tmux/cmd.c:364  cmd_stringify_argv()
 pub unsafe fn cmd_stringify_argv(argc: c_int, argv: *mut *mut u8) -> String {
     unsafe {
         if argc == 0 {
@@ -489,18 +495,22 @@ pub unsafe fn cmd_stringify_argv(argc: c_int, argv: *mut *mut u8) -> String {
     }
 }
 
+// vendor/tmux/cmd.c:393  cmd_get_entry()
 pub unsafe fn cmd_get_entry(cmd: *const cmd) -> &'static cmd_entry {
     unsafe { (*cmd).entry }
 }
 
+// vendor/tmux/cmd.c:400  cmd_get_args()
 pub unsafe fn cmd_get_args(cmd: *mut cmd) -> *mut args {
     unsafe { (*cmd).args }
 }
 
+// vendor/tmux/cmd.c:407  cmd_get_group()
 pub unsafe fn cmd_get_group(cmd: *const cmd) -> c_uint {
     unsafe { (*cmd).group }
 }
 
+// vendor/tmux/cmd.c:414  cmd_get_source()
 pub unsafe fn cmd_get_source(cmd: *mut cmd, file: *mut *const u8, line: &AtomicU32) {
     unsafe {
         if !file.is_null() {
@@ -510,6 +520,7 @@ pub unsafe fn cmd_get_source(cmd: *mut cmd, file: *mut *const u8, line: &AtomicU
     }
 }
 
+// vendor/tmux/cmd.c:431  cmd_get_alias()
 pub unsafe fn cmd_get_alias(name: *const u8) -> *mut u8 {
     unsafe {
         let o = options_get_only(GLOBAL_OPTIONS, "command-alias");
@@ -536,6 +547,7 @@ pub unsafe fn cmd_get_alias(name: *const u8) -> *mut u8 {
     }
 }
 
+// vendor/tmux/cmd.c:462  cmd_find()
 pub fn cmd_find(name: &str) -> Result<&'static cmd_entry, String> {
     let mut found = None;
     let mut ambiguous: bool = false;
@@ -585,6 +597,7 @@ pub fn cmd_find(name: &str) -> Result<&'static cmd_entry, String> {
     }
 }
 
+// vendor/tmux/cmd.c:512  cmd_parse()
 pub unsafe fn cmd_parse(
     values: *mut args_value,
     count: c_uint,
@@ -632,6 +645,7 @@ pub unsafe fn cmd_parse(
     }
 }
 
+// vendor/tmux/cmd.c:553  cmd_free()
 pub unsafe fn cmd_free(cmd: *mut cmd) {
     unsafe {
         free((*cmd).file as _);
@@ -641,6 +655,7 @@ pub unsafe fn cmd_free(cmd: *mut cmd) {
     }
 }
 
+// vendor/tmux/cmd.c:563  cmd_copy()
 pub unsafe fn cmd_copy(cmd: *mut cmd, argc: c_int, argv: *mut *mut u8) -> *mut cmd {
     unsafe {
         let new_cmd: *mut cmd = Box::leak(Box::new(cmd {
@@ -664,6 +679,7 @@ pub unsafe fn cmd_copy(cmd: *mut cmd, argc: c_int, argv: *mut *mut u8) -> *mut c
     }
 }
 
+// vendor/tmux/cmd.c:580  cmd_print()
 pub unsafe fn cmd_print(cmd: *mut cmd) -> *mut u8 {
     unsafe {
         let s = args_print((*cmd).args);
@@ -678,6 +694,7 @@ pub unsafe fn cmd_print(cmd: *mut cmd) -> *mut u8 {
     }
 }
 
+// vendor/tmux/cmd.c:596  cmd_list_new()
 pub fn cmd_list_new<'a>() -> &'a mut cmd_list {
     let group = CMD_LIST_NEXT_GROUP.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
@@ -694,6 +711,7 @@ pub fn cmd_list_new<'a>() -> &'a mut cmd_list {
     }))
 }
 
+// vendor/tmux/cmd.c:610  cmd_list_append()
 pub unsafe fn cmd_list_append(cmdlist: *mut cmd_list, cmd: *mut cmd) {
     unsafe {
         (*cmd).group = (*cmdlist).group;
@@ -701,6 +719,7 @@ pub unsafe fn cmd_list_append(cmdlist: *mut cmd_list, cmd: *mut cmd) {
     }
 }
 
+// vendor/tmux/cmd.c:618  cmd_list_append_all()
 pub unsafe fn cmd_list_append_all(cmdlist: *mut cmd_list, from: *mut cmd_list) {
     unsafe {
         for cmd in tailq_foreach::<_, qentry>((*from).list).map(NonNull::as_ptr) {
@@ -710,6 +729,7 @@ pub unsafe fn cmd_list_append_all(cmdlist: *mut cmd_list, from: *mut cmd_list) {
     }
 }
 
+// vendor/tmux/cmd.c:629  cmd_list_move()
 pub unsafe fn cmd_list_move(cmdlist: *mut cmd_list, from: *mut cmd_list) {
     unsafe {
         tailq_concat::<_, qentry>((*cmdlist).list, (*from).list);
@@ -717,6 +737,7 @@ pub unsafe fn cmd_list_move(cmdlist: *mut cmd_list, from: *mut cmd_list) {
     }
 }
 
+// vendor/tmux/cmd.c:637  cmd_list_free()
 pub unsafe fn cmd_list_free(cmdlist: *mut cmd_list) {
     unsafe {
         (*cmdlist).references -= 1;
@@ -733,6 +754,7 @@ pub unsafe fn cmd_list_free(cmdlist: *mut cmd_list) {
     }
 }
 
+// vendor/tmux/cmd.c:654  cmd_list_copy()
 pub unsafe fn cmd_list_copy(
     cmdlist: &cmd_list,
     argc: c_int,
@@ -763,6 +785,7 @@ pub unsafe fn cmd_list_copy(
     }
 }
 
+// vendor/tmux/cmd.c:685  cmd_list_print()
 pub fn cmd_list_print(cmdlist: &cmd_list, escaped: c_int) -> *mut u8 {
     unsafe {
         let mut len = 1;
@@ -800,26 +823,31 @@ pub fn cmd_list_print(cmdlist: &cmd_list, escaped: c_int) -> *mut u8 {
     }
 }
 
+// vendor/tmux/cmd.c:724  cmd_list_first()
 pub unsafe fn cmd_list_first(cmdlist: *mut cmd_list) -> *mut cmd {
     unsafe { tailq_first((*cmdlist).list) }
 }
 
+// vendor/tmux/cmd.c:731  cmd_list_next()
 pub unsafe fn cmd_list_next(cmd: *mut cmd) -> *mut cmd {
     unsafe { tailq_next::<_, _, qentry>(cmd) }
 }
 
+// vendor/tmux/cmd.c:738  cmd_list_all_have()
 pub unsafe fn cmd_list_all_have(cmdlist: *mut cmd_list, flag: cmd_flag) -> bool {
     unsafe {
         tailq_foreach((*cmdlist).list).all(|cmd| (*cmd.as_ptr()).entry.flags.intersects(flag))
     }
 }
 
+// vendor/tmux/cmd.c:751  cmd_list_any_have()
 pub unsafe fn cmd_list_any_have(cmdlist: *mut cmd_list, flag: cmd_flag) -> bool {
     unsafe {
         tailq_foreach((*cmdlist).list).any(|cmd| (*cmd.as_ptr()).entry.flags.intersects(flag))
     }
 }
 
+// vendor/tmux/cmd.c:764  cmd_mouse_at()
 pub unsafe fn cmd_mouse_at(
     wp: *mut window_pane,
     m: *mut mouse_event,
@@ -868,6 +896,7 @@ pub unsafe fn cmd_mouse_at(
     }
 }
 
+// vendor/tmux/cmd.c:795  cmd_mouse_window()
 pub unsafe fn cmd_mouse_window(
     m: *mut mouse_event,
     sp: *mut *mut session,
@@ -902,6 +931,7 @@ pub unsafe fn cmd_mouse_window(
     }
 }
 
+// vendor/tmux/cmd.c:819  cmd_mouse_pane()
 pub unsafe fn cmd_mouse_pane(
     m: *mut mouse_event,
     sp: *mut *mut session,
@@ -928,6 +958,7 @@ pub unsafe fn cmd_mouse_pane(
 }
 
 /// Replace the first %% or %idx in template by s.
+// vendor/tmux/cmd.c:843  cmd_template_replace()
 pub unsafe fn cmd_template_replace(template: *const u8, s: Option<&str>, idx: c_int) -> *mut u8 {
     unsafe {
         let quote = c!("\"\\$;~");

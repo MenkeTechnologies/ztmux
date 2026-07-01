@@ -17,6 +17,7 @@ static mut ALL_IMAGES: images = TAILQ_HEAD_INITIALIZER!(ALL_IMAGES);
 
 static mut ALL_IMAGES_COUNT: u32 = 0;
 
+// vendor/tmux/image.c:54  image_free()
 unsafe fn image_free(im: NonNull<image>) {
     unsafe {
         let im = im.as_ptr();
@@ -32,6 +33,7 @@ unsafe fn image_free(im: NonNull<image>) {
     }
 }
 
+// vendor/tmux/image.c:68  image_free_all()
 pub unsafe fn image_free_all(s: *mut screen) -> bool {
     unsafe {
         let redraw = !tailq_empty(&raw mut (*s).images);
@@ -44,6 +46,7 @@ pub unsafe fn image_free_all(s: *mut screen) -> bool {
 }
 
 /// Create text placeholder for an image.
+// vendor/tmux/image.c:82  image_fallback()
 pub fn image_fallback(sx: u32, sy: u32) -> CString {
     let sx = sx as usize;
     let sy = sy as usize;
@@ -76,6 +79,7 @@ pub fn image_fallback(sx: u32, sy: u32) -> CString {
     CString::new(buf).unwrap()
 }
 
+// vendor/tmux/image.c:123  image_store()
 pub unsafe fn image_store(s: *mut screen, si: *mut sixel_image) -> *mut image {
     unsafe {
         let mut im = Box::new(image {
@@ -105,6 +109,7 @@ pub unsafe fn image_store(s: *mut screen, si: *mut sixel_image) -> *mut image {
     }
 }
 
+// vendor/tmux/image.c:149  image_check_line()
 pub unsafe fn image_check_line(s: *mut screen, py: u32, ny: u32) -> bool {
     unsafe {
         let mut redraw = false;
@@ -119,6 +124,7 @@ pub unsafe fn image_check_line(s: *mut screen, py: u32, ny: u32) -> bool {
     }
 }
 
+// vendor/tmux/image.c:166  image_check_area()
 pub unsafe fn image_check_area(s: *mut screen, px: u32, py: u32, nx: u32, ny: u32) -> bool {
     unsafe {
         let mut redraw = false;
@@ -137,6 +143,7 @@ pub unsafe fn image_check_area(s: *mut screen, px: u32, py: u32, nx: u32, ny: u3
     }
 }
 
+// vendor/tmux/image.c:186  image_scroll_up()
 pub unsafe fn image_scroll_up(s: *mut screen, lines: u32) -> bool {
     unsafe {
         let mut redraw = false;

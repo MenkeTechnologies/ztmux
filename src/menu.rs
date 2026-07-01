@@ -50,6 +50,7 @@ pub struct menu_data {
     pub data: *mut c_void,
 }
 
+// vendor/tmux/menu.c:54  menu_add_items()
 pub unsafe fn menu_add_items(
     menu: *mut menu,
     items: &[menu_item],
@@ -64,6 +65,7 @@ pub unsafe fn menu_add_items(
     }
 }
 
+// vendor/tmux/menu.c:64  menu_add_item()
 pub unsafe fn menu_add_item(
     menu: *mut menu,
     item: Option<&menu_item>,
@@ -162,6 +164,7 @@ pub unsafe fn menu_add_item(
     }
 }
 
+// vendor/tmux/menu.c:149  menu_create()
 pub fn menu_create(title: &str) -> Box<menu> {
     Box::new(menu {
         title: title.to_string(),
@@ -170,6 +173,7 @@ pub fn menu_create(title: &str) -> Box<menu> {
     })
 }
 
+// vendor/tmux/menu.c:161  menu_free()
 pub unsafe fn menu_free(menu: *mut menu) {
     unsafe {
         for item in (*menu).items.drain(..) {
@@ -182,6 +186,7 @@ pub unsafe fn menu_free(menu: *mut menu) {
     }
 }
 
+// vendor/tmux/menu.c:179  menu_mode_cb()
 pub unsafe fn menu_mode_cb(
     _c: *mut client,
     data: *mut c_void,
@@ -202,6 +207,7 @@ pub unsafe fn menu_mode_cb(
     }
 }
 
+// vendor/tmux/menu.c:194  menu_check_cb()
 pub unsafe fn menu_check_cb(
     _c: *mut client,
     data: *mut c_void,
@@ -227,6 +233,7 @@ pub unsafe fn menu_check_cb(
     }
 }
 
+// vendor/tmux/menu.c:260  menu_draw_cb()
 pub unsafe fn menu_draw_cb(c: *mut client, data: *mut c_void, _rctx: *mut screen_redraw_ctx) {
     unsafe {
         let md = data as *mut menu_data;
@@ -280,6 +287,7 @@ pub unsafe fn menu_draw_cb(c: *mut client, data: *mut c_void, _rctx: *mut screen
     }
 }
 
+// vendor/tmux/menu.c:288  menu_free_cb()
 pub unsafe fn menu_free_cb(_c: *mut client, data: *mut c_void) {
     unsafe {
         let md = data as *mut menu_data;
@@ -298,6 +306,7 @@ pub unsafe fn menu_free_cb(_c: *mut client, data: *mut c_void) {
     }
 }
 
+// vendor/tmux/menu.c:309  menu_key_cb()
 pub unsafe fn menu_key_cb(c: *mut client, data: *mut c_void, mut event: *mut key_event) -> i32 {
     unsafe {
         let md = data as *mut menu_data;
@@ -570,6 +579,7 @@ pub unsafe fn menu_set_style(
     }
 }
 
+// vendor/tmux/menu.c:543  menu_prepare()
 pub unsafe fn menu_prepare(
     menu: *mut menu,
     flags: menu_flags,
@@ -689,6 +699,7 @@ pub unsafe fn menu_prepare(
     }
 }
 
+// vendor/tmux/menu.c:626  menu_display()
 pub unsafe fn menu_display(
     menu: *mut menu,
     flags: menu_flags,

@@ -11,6 +11,7 @@ unsafe fn __bswap_32(mut __bsx: __uint32_t) -> __uint32_t {
         | (__bsx & 0xff as libc::c_uint) << 24 as libc::c_int;
 }
 
+// vendor/tmux/compat/ntohll.c:23  ntohll()
 pub unsafe fn ntohll(mut v: uint64_t) -> uint64_t {
     let mut b: uint32_t = 0;
     let mut t: uint32_t = 0;

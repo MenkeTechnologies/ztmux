@@ -85,14 +85,17 @@ RB_GENERATE!(
 RB_GENERATE!(key_tables, key_table, entry, discr_entry, key_table_cmp);
 static mut KEY_TABLES: key_tables = rb_initializer();
 
+// vendor/tmux/key-bindings.c:81  key_table_cmp()
 pub fn key_table_cmp(table1: &key_table, table2: &key_table) -> cmp::Ordering {
     unsafe { i32_to_ordering(strcmp(table1.name, table2.name)) }
 }
 
+// vendor/tmux/key-bindings.c:87  key_bindings_cmp()
 pub fn key_bindings_cmp(bd1: &key_binding, bd2: &key_binding) -> cmp::Ordering {
     bd1.key.cmp(&bd2.key)
 }
 
+// vendor/tmux/key-bindings.c:97  key_bindings_free()
 pub unsafe fn key_bindings_free(bd: *mut key_binding) {
     unsafe {
         cmd_list_free((*bd).cmdlist);
@@ -101,6 +104,7 @@ pub unsafe fn key_bindings_free(bd: *mut key_binding) {
     }
 }
 
+// vendor/tmux/key-bindings.c:105  key_bindings_get_table()
 pub unsafe fn key_bindings_get_table(name: *const u8, create: bool) -> *mut key_table {
     unsafe {
         let mut table_find = MaybeUninit::<key_table>::uninit();
@@ -129,14 +133,17 @@ pub unsafe fn key_bindings_get_table(name: *const u8, create: bool) -> *mut key_
     }
 }
 
+// vendor/tmux/key-bindings.c:126  key_bindings_first_table()
 pub unsafe fn key_bindings_first_table() -> *mut key_table {
     unsafe { rb_min(&raw mut KEY_TABLES) }
 }
 
+// vendor/tmux/key-bindings.c:132  key_bindings_next_table()
 pub unsafe fn key_bindings_next_table(table: *mut key_table) -> *mut key_table {
     unsafe { rb_next(table) }
 }
 
+// vendor/tmux/key-bindings.c:138  key_bindings_unref_table()
 pub unsafe fn key_bindings_unref_table(table: *mut key_table) {
     unsafe {
         (*table).references -= 1;
@@ -158,6 +165,7 @@ pub unsafe fn key_bindings_unref_table(table: *mut key_table) {
     }
 }
 
+// vendor/tmux/key-bindings.c:160  key_bindings_get()
 pub unsafe fn key_bindings_get(table: NonNull<key_table>, key: key_code) -> *mut key_binding {
     unsafe {
         let mut bd = MaybeUninit::<key_binding>::uninit();
@@ -168,6 +176,7 @@ pub unsafe fn key_bindings_get(table: NonNull<key_table>, key: key_code) -> *mut
     }
 }
 
+// vendor/tmux/key-bindings.c:169  key_bindings_get_default()
 pub unsafe fn key_bindings_get_default(table: *mut key_table, key: key_code) -> *mut key_binding {
     unsafe {
         let mut bd = MaybeUninit::<key_binding>::uninit();
@@ -178,14 +187,17 @@ pub unsafe fn key_bindings_get_default(table: *mut key_table, key: key_code) -> 
     }
 }
 
+// vendor/tmux/key-bindings.c:178  key_bindings_first()
 pub unsafe fn key_bindings_first(table: *mut key_table) -> *mut key_binding {
     unsafe { rb_min(&raw mut (*table).key_bindings) }
 }
 
+// vendor/tmux/key-bindings.c:184  key_bindings_next()
 pub unsafe fn key_bindings_next(_table: *mut key_table, bd: *mut key_binding) -> *mut key_binding {
     unsafe { rb_next(bd) }
 }
 
+// vendor/tmux/key-bindings.c:190  key_bindings_add()
 pub unsafe fn key_bindings_add(
     name: *const u8,
     key: key_code,
@@ -237,6 +249,7 @@ pub unsafe fn key_bindings_add(
     }
 }
 
+// vendor/tmux/key-bindings.c:234  key_bindings_remove()
 pub unsafe fn key_bindings_remove(name: *const u8, key: key_code) {
     unsafe {
         let Some(table) = NonNull::new(key_bindings_get_table(name, false)) else {
@@ -267,6 +280,7 @@ pub unsafe fn key_bindings_remove(name: *const u8, key: key_code) {
     }
 }
 
+// vendor/tmux/key-bindings.c:261  key_bindings_reset()
 pub unsafe fn key_bindings_reset(name: *const u8, key: key_code) {
     unsafe {
         let Some(table) = NonNull::new(key_bindings_get_table(name, false)) else {
@@ -298,6 +312,7 @@ pub unsafe fn key_bindings_reset(name: *const u8, key: key_code) {
     }
 }
 
+// vendor/tmux/key-bindings.c:293  key_bindings_remove_table()
 pub unsafe fn key_bindings_remove_table(name: *const u8) {
     unsafe {
         let table = key_bindings_get_table(name, false);
@@ -314,6 +329,7 @@ pub unsafe fn key_bindings_remove_table(name: *const u8) {
 }
 
 #[expect(dead_code)]
+// vendor/tmux/key-bindings.c:310  key_bindings_reset_table()
 unsafe fn key_bindings_reset_table(name: *const u8) {
     unsafe {
         let table = key_bindings_get_table(name, false);
@@ -330,6 +346,7 @@ unsafe fn key_bindings_reset_table(name: *const u8) {
     }
 }
 
+// vendor/tmux/key-bindings.c:327  key_bindings_init_done()
 unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     unsafe {
         for table in rb_foreach(&raw mut KEY_TABLES).map(NonNull::as_ptr) {
@@ -350,6 +367,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
     cmd_retval::CMD_RETURN_NORMAL
 }
 
+// vendor/tmux/key-bindings.c:349  key_bindings_init()
 pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
     static DEFAULTS: [&str; 262] = [
@@ -654,6 +672,7 @@ pub unsafe fn key_bindings_init() {
     }
 }
 
+// vendor/tmux/key-bindings.c:691  key_bindings_read_only()
 pub unsafe fn key_bindings_read_only(item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     unsafe {
         cmdq_error!(item, "client is read-only");
@@ -661,6 +680,7 @@ pub unsafe fn key_bindings_read_only(item: *mut cmdq_item, _data: *mut c_void) -
     cmd_retval::CMD_RETURN_ERROR
 }
 
+// vendor/tmux/key-bindings.c:698  key_bindings_dispatch()
 pub unsafe fn key_bindings_dispatch(
     bd: *mut key_binding,
     item: *mut cmdq_item,

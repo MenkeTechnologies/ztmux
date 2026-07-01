@@ -849,6 +849,7 @@ static INPUT_STATE_CONSUME_ST_TABLE: [input_transition; 7] = concat_array(
     ],
 );
 
+// vendor/tmux/input.c:771  input_table_compare()
 unsafe fn input_table_compare(
     ictx: *const input_ctx,
     entry: &input_table_entry,
@@ -891,6 +892,7 @@ unsafe fn input_start_timer(ictx: *mut input_ctx) {
 }
 
 /// Reset cell state to default.
+// vendor/tmux/input.c:820  input_reset_cell()
 unsafe fn input_reset_cell(ictx: *mut input_ctx) {
     unsafe {
         memcpy__(&raw mut (*ictx).cell.cell, &raw const GRID_DEFAULT_CELL);
@@ -905,6 +907,7 @@ unsafe fn input_reset_cell(ictx: *mut input_ctx) {
 }
 
 /// Save screen state.
+// vendor/tmux/input.c:833  input_save_state()
 unsafe fn input_save_state(ictx: *mut input_ctx) {
     unsafe {
         let sctx: *mut screen_write_ctx = &raw mut (*ictx).ctx;
@@ -918,6 +921,7 @@ unsafe fn input_save_state(ictx: *mut input_ctx) {
 }
 
 /// Restore screen state.
+// vendor/tmux/input.c:846  input_restore_state()
 unsafe fn input_restore_state(ictx: *mut input_ctx) {
     unsafe {
         let sctx: *mut screen_write_ctx = &raw mut (*ictx).ctx;
@@ -933,6 +937,7 @@ unsafe fn input_restore_state(ictx: *mut input_ctx) {
 }
 
 /// Initialise input parser.
+// vendor/tmux/input.c:860  input_init()
 pub unsafe fn input_init(
     wp: *mut window_pane,
     bev: *mut bufferevent,
@@ -965,6 +970,7 @@ pub unsafe fn input_init(
 }
 
 /// Destroy input parser.
+// vendor/tmux/input.c:888  input_free()
 pub unsafe fn input_free(ictx: *mut input_ctx) {
     unsafe {
         for i in 0..(*ictx).param_list_len {
@@ -984,6 +990,7 @@ pub unsafe fn input_free(ictx: *mut input_ctx) {
 
 // Reset input state and clear screen.
 
+// vendor/tmux/input.c:913  input_reset()
 pub unsafe fn input_reset(ictx: *mut input_ctx, clear: i32) {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
@@ -1009,10 +1016,12 @@ pub unsafe fn input_reset(ictx: *mut input_ctx, clear: i32) {
 }
 
 /// Return pending data.
+// vendor/tmux/input.c:937  input_pending()
 pub unsafe fn input_pending(ictx: *mut input_ctx) -> *mut evbuffer {
     unsafe { (*ictx).since_ground }
 }
 
+// vendor/tmux/input.c:944  input_set_state()
 pub unsafe fn input_set_state(ictx: *mut input_ctx, itr: *const input_transition) {
     unsafe {
         if let Some(exit) = (*(*ictx).state).exit {
@@ -1028,6 +1037,7 @@ pub unsafe fn input_set_state(ictx: *mut input_ctx, itr: *const input_transition
 }
 
 /// Parse data.
+// vendor/tmux/input.c:955  input_parse()
 fn input_parse(ictx: *mut input_ctx, buf: *mut u8, len: usize) {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
@@ -1090,6 +1100,7 @@ fn input_parse(ictx: *mut input_ctx, buf: *mut u8, len: usize) {
 }
 
 /// Parse input from pane.
+// vendor/tmux/input.c:1014  input_parse_pane()
 pub unsafe fn input_parse_pane(wp: *mut window_pane) {
     unsafe {
         let mut new_size: usize = 0;
@@ -1100,6 +1111,7 @@ pub unsafe fn input_parse_pane(wp: *mut window_pane) {
 }
 
 /// Parse given input.
+// vendor/tmux/input.c:1026  input_parse_buffer()
 pub unsafe fn input_parse_buffer(wp: *mut window_pane, buf: *mut u8, len: usize) {
     unsafe {
         let ictx = (*wp).ictx;
@@ -1131,6 +1143,7 @@ pub unsafe fn input_parse_buffer(wp: *mut window_pane, buf: *mut u8, len: usize)
 }
 
 /// Parse given input for screen.
+// vendor/tmux/input.c:1056  input_parse_screen()
 pub unsafe fn input_parse_screen(
     ictx: *mut input_ctx,
     s: *mut screen,
@@ -1153,6 +1166,7 @@ pub unsafe fn input_parse_screen(
 }
 
 /// Split the parameter list (if any).
+// vendor/tmux/input.c:1071  input_split()
 unsafe fn input_split(ictx: *mut input_ctx) -> i32 {
     unsafe {
         // const char *errstr;
@@ -1219,6 +1233,7 @@ unsafe fn input_split(ictx: *mut input_ctx) -> i32 {
 }
 
 /// Get an argument or return default value.
+// vendor/tmux/input.c:1123  input_get()
 pub unsafe fn input_get(ictx: *mut input_ctx, validx: u32, minval: i32, defval: i32) -> i32 {
     unsafe {
         if validx >= (*ictx).param_list_len {
@@ -1255,6 +1270,7 @@ unsafe fn input_reply_(ictx: *mut input_ctx, args: std::fmt::Arguments) {
 }
 
 /// Clear saved state.
+// vendor/tmux/input.c:1174  input_clear()
 unsafe fn input_clear(ictx: *mut input_ctx) {
     unsafe {
         event_del(&raw mut (*ictx).timer);
@@ -1275,6 +1291,7 @@ unsafe fn input_clear(ictx: *mut input_ctx) {
 }
 
 /// Reset for ground state.
+// vendor/tmux/input.c:1194  input_ground()
 unsafe fn input_ground(ictx: *mut input_ctx) {
     unsafe {
         event_del(&raw mut (*ictx).timer);
@@ -1288,6 +1305,7 @@ unsafe fn input_ground(ictx: *mut input_ctx) {
 }
 
 /// Output this character to the screen.
+// vendor/tmux/input.c:1207  input_print()
 unsafe fn input_print(ictx: *mut input_ctx) -> i32 {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
@@ -1318,6 +1336,7 @@ unsafe fn input_print(ictx: *mut input_ctx) -> i32 {
 }
 
 /// Collect intermediate string.
+// vendor/tmux/input.c:1232  input_intermediate()
 unsafe fn input_intermediate(ictx: *mut input_ctx) -> i32 {
     let sizeof_interm_buf = 4;
     unsafe {
@@ -1333,6 +1352,7 @@ unsafe fn input_intermediate(ictx: *mut input_ctx) -> i32 {
 }
 
 /// Collect parameter string.
+// vendor/tmux/input.c:1246  input_parameter()
 unsafe fn input_parameter(ictx: *mut input_ctx) -> i32 {
     let sizeof_param_buf = 64;
     unsafe {
@@ -1349,6 +1369,7 @@ unsafe fn input_parameter(ictx: *mut input_ctx) -> i32 {
 }
 
 /// Collect input string.
+// vendor/tmux/input.c:1260  input_input()
 unsafe fn input_input(ictx: *mut input_ctx) -> i32 {
     unsafe {
         let mut available: usize = (*ictx).input_space;
@@ -1370,6 +1391,7 @@ unsafe fn input_input(ictx: *mut input_ctx) -> i32 {
 }
 
 /// Execute C0 control sequence.
+// vendor/tmux/input.c:1282  input_c0_dispatch()
 unsafe fn input_c0_dispatch(ictx: *mut input_ctx) -> i32 {
     let func = "input_c0_dispatch";
     unsafe {
@@ -1430,6 +1452,7 @@ unsafe fn input_c0_dispatch(ictx: *mut input_ctx) -> i32 {
 }
 
 /// Execute escape sequence.
+// vendor/tmux/input.c:1364  input_esc_dispatch()
 unsafe fn input_esc_dispatch(ictx: *mut input_ctx) -> i32 {
     let __func__ = "input_esc_dispatch";
     unsafe {
@@ -1499,6 +1522,7 @@ unsafe fn input_esc_dispatch(ictx: *mut input_ctx) -> i32 {
 }
 
 /// Execute control sequence.
+// vendor/tmux/input.c:1440  input_csi_dispatch()
 unsafe fn input_csi_dispatch(ictx: *mut input_ctx) -> i32 {
     let __func__ = "input_csi_dispatch";
     unsafe {
@@ -1793,6 +1817,7 @@ unsafe fn input_csi_dispatch(ictx: *mut input_ctx) -> i32 {
 }
 
 /// Handle CSI RM.
+// vendor/tmux/input.c:1876  input_csi_dispatch_rm()
 unsafe fn input_csi_dispatch_rm(ictx: *mut input_ctx) {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
@@ -1812,6 +1837,7 @@ unsafe fn input_csi_dispatch_rm(ictx: *mut input_ctx) {
 }
 
 /// Handle CSI private RM.
+// vendor/tmux/input.c:1900  input_csi_dispatch_rm_private()
 unsafe fn input_csi_dispatch_rm_private(ictx: *mut input_ctx) {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
@@ -1856,6 +1882,7 @@ unsafe fn input_csi_dispatch_rm_private(ictx: *mut input_ctx) {
 }
 
 /// Handle CSI SM.
+// vendor/tmux/input.c:1973  input_csi_dispatch_sm()
 unsafe fn input_csi_dispatch_sm(ictx: *mut input_ctx) {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
@@ -1876,6 +1903,7 @@ unsafe fn input_csi_dispatch_sm(ictx: *mut input_ctx) {
 }
 
 /// Handle CSI private SM.
+// vendor/tmux/input.c:1997  input_csi_dispatch_sm_private()
 unsafe fn input_csi_dispatch_sm_private(ictx: *mut input_ctx) {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
@@ -1930,6 +1958,7 @@ unsafe fn input_csi_dispatch_sm_private(ictx: *mut input_ctx) {
 }
 
 /// Handle CSI graphics SM.
+// vendor/tmux/input.c:2078  input_csi_dispatch_sm_graphics()
 unsafe fn input_csi_dispatch_sm_graphics(ictx: *mut input_ctx) {
     #[cfg(feature = "sixel")]
     unsafe {
@@ -1951,6 +1980,7 @@ unsafe fn input_csi_dispatch_sm_graphics(ictx: *mut input_ctx) {
 }
 
 /// Handle CSI window operations.
+// vendor/tmux/input.c:2099  input_csi_dispatch_winops()
 unsafe fn input_csi_dispatch_winops(ictx: *mut input_ctx) {
     unsafe {
         let sctx = &(*ictx).ctx;
@@ -2041,6 +2071,7 @@ unsafe fn input_csi_dispatch_winops(ictx: *mut input_ctx) {
 }
 
 /// Helper for 256 colour SGR.
+// vendor/tmux/input.c:2199  input_csi_dispatch_sgr_256_do()
 unsafe fn input_csi_dispatch_sgr_256_do(ictx: *mut input_ctx, fgbg: i32, c: i32) -> i32 {
     unsafe {
         let gc = &raw mut (*ictx).cell.cell;
@@ -2065,6 +2096,7 @@ unsafe fn input_csi_dispatch_sgr_256_do(ictx: *mut input_ctx, fgbg: i32, c: i32)
 }
 
 /// Handle CSI SGR for 256 colours.
+// vendor/tmux/input.c:2221  input_csi_dispatch_sgr_256()
 unsafe fn input_csi_dispatch_sgr_256(ictx: *mut input_ctx, fgbg: i32, i: *mut u32) {
     unsafe {
         let c = input_get(ictx, (*i) + 1, 0, -1);
@@ -2075,6 +2107,7 @@ unsafe fn input_csi_dispatch_sgr_256(ictx: *mut input_ctx, fgbg: i32, i: *mut u3
 }
 
 /// Helper for RGB colour SGR.
+// vendor/tmux/input.c:2232  input_csi_dispatch_sgr_rgb_do()
 unsafe fn input_csi_dispatch_sgr_rgb_do(
     ictx: *mut input_ctx,
     fgbg: i32,
@@ -2101,6 +2134,7 @@ unsafe fn input_csi_dispatch_sgr_rgb_do(
 }
 
 /// Handle CSI SGR for RGB colours.
+// vendor/tmux/input.c:2255  input_csi_dispatch_sgr_rgb()
 unsafe fn input_csi_dispatch_sgr_rgb(ictx: *mut input_ctx, fgbg: i32, i: *mut u32) {
     unsafe {
         let r = input_get(ictx, (*i) + 1, 0, -1);
@@ -2113,6 +2147,7 @@ unsafe fn input_csi_dispatch_sgr_rgb(ictx: *mut input_ctx, fgbg: i32, i: *mut u3
 }
 
 /// Handle CSI SGR with a ISO parameter.
+// vendor/tmux/input.c:2268  input_csi_dispatch_sgr_colon()
 unsafe fn input_csi_dispatch_sgr_colon(ictx: *mut input_ctx, mut i: u32) {
     let __func__ = "input_csi_dispatch_sgr_colon";
     unsafe {
@@ -2222,6 +2257,7 @@ unsafe fn input_csi_dispatch_sgr_colon(ictx: *mut input_ctx, mut i: u32) {
 }
 
 /// Handle CSI SGR.
+// vendor/tmux/input.c:2356  input_csi_dispatch_sgr()
 unsafe fn input_csi_dispatch_sgr(ictx: *mut input_ctx) {
     unsafe {
         let gc = &raw mut (*ictx).cell.cell;
@@ -2300,6 +2336,7 @@ unsafe fn input_csi_dispatch_sgr(ictx: *mut input_ctx) {
 }
 
 /// End of input with BEL.
+// vendor/tmux/input.c:2507  input_end_bel()
 unsafe fn input_end_bel(ictx: *mut input_ctx) -> i32 {
     log_debug!("input_end_bel");
 
@@ -2311,6 +2348,7 @@ unsafe fn input_end_bel(ictx: *mut input_ctx) -> i32 {
 }
 
 /// DCS string started.
+// vendor/tmux/input.c:2518  input_enter_dcs()
 unsafe fn input_enter_dcs(ictx: *mut input_ctx) {
     unsafe {
         log_debug!("input_enter_dcs");
@@ -2322,6 +2360,7 @@ unsafe fn input_enter_dcs(ictx: *mut input_ctx) {
 }
 
 /// DCS terminator (ST) received.
+// vendor/tmux/input.c:2595  input_dcs_dispatch()
 unsafe fn input_dcs_dispatch(ictx: *mut input_ctx) -> i32 {
     unsafe {
         let func = "input_dcs_dispatch";
@@ -2378,6 +2417,7 @@ unsafe fn input_dcs_dispatch(ictx: *mut input_ctx) -> i32 {
 }
 
 /// OSC string started.
+// vendor/tmux/input.c:2663  input_enter_osc()
 unsafe fn input_enter_osc(ictx: *mut input_ctx) {
     unsafe {
         log_debug!("input_enter_osc");
@@ -2389,6 +2429,7 @@ unsafe fn input_enter_osc(ictx: *mut input_ctx) {
 }
 
 /// OSC terminator (ST) received.
+// vendor/tmux/input.c:2674  input_exit_osc()
 unsafe fn input_exit_osc(ictx: *mut input_ctx) {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
@@ -2462,6 +2503,7 @@ unsafe fn input_exit_osc(ictx: *mut input_ctx) {
 }
 
 /// APC string started.
+// vendor/tmux/input.c:2758  input_enter_apc()
 unsafe fn input_enter_apc(ictx: *mut input_ctx) {
     unsafe {
         log_debug!("input_enter_apc");
@@ -2473,6 +2515,7 @@ unsafe fn input_enter_apc(ictx: *mut input_ctx) {
 }
 
 /// APC terminator (ST) received.
+// vendor/tmux/input.c:2769  input_exit_apc()
 unsafe fn input_exit_apc(ictx: *mut input_ctx) {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
@@ -2492,6 +2535,7 @@ unsafe fn input_exit_apc(ictx: *mut input_ctx) {
 }
 
 /// Rename string started.
+// vendor/tmux/input.c:2789  input_enter_rename()
 unsafe fn input_enter_rename(ictx: *mut input_ctx) {
     unsafe {
         log_debug!("input_enter_rename");
@@ -2503,6 +2547,7 @@ unsafe fn input_enter_rename(ictx: *mut input_ctx) {
 }
 
 /// Rename terminator (ST) received.
+// vendor/tmux/input.c:2800  input_exit_rename()
 unsafe fn input_exit_rename(ictx: *mut input_ctx) {
     unsafe {
         let wp = (*ictx).wp;
@@ -2544,6 +2589,7 @@ unsafe fn input_exit_rename(ictx: *mut input_ctx) {
 }
 
 /// Open UTF-8 character.
+// vendor/tmux/input.c:2834  input_top_bit_set()
 unsafe fn input_top_bit_set(ictx: *mut input_ctx) -> i32 {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
@@ -2582,6 +2628,7 @@ unsafe fn input_top_bit_set(ictx: *mut input_ctx) -> i32 {
 }
 
 /// Reply to a colour request.
+// vendor/tmux/input.c:2873  input_osc_colour_reply()
 unsafe fn input_osc_colour_reply(ictx: *mut input_ctx, n: u32, mut c: i32) {
     unsafe {
         if c != -1 {
@@ -2614,6 +2661,7 @@ unsafe fn input_osc_colour_reply(ictx: *mut input_ctx, n: u32, mut c: i32) {
 }
 
 /// Handle the OSC 4 sequence for setting (multiple) palette entries.
+// vendor/tmux/input.c:2903  input_osc_4()
 unsafe fn input_osc_4(ictx: *mut input_ctx, p: *const u8) {
     unsafe {
         // char *copy, *s, *next = NULL;
@@ -2669,6 +2717,7 @@ unsafe fn input_osc_4(ictx: *mut input_ctx, p: *const u8) {
 }
 
 /// Handle the OSC 8 sequence for embedding hyperlinks.
+// vendor/tmux/input.c:2952  input_osc_8()
 unsafe fn input_osc_8(ictx: *mut input_ctx, p: *const u8) {
     unsafe {
         let hl: *mut hyperlinks = (*(*ictx).ctx.s).hyperlinks;
@@ -2799,6 +2848,7 @@ unsafe fn input_get_fg_control_client(wp: *mut window_pane) -> i32 {
 }
 
 /// Handle the OSC 10 sequence for setting and querying foreground colour.
+// vendor/tmux/input.c:3045  input_osc_10()
 unsafe fn input_osc_10(ictx: *mut input_ctx, p: *const u8) {
     unsafe {
         let wp = (*ictx).wp;
@@ -2838,6 +2888,7 @@ unsafe fn input_osc_10(ictx: *mut input_ctx, p: *const u8) {
 }
 
 /// Handle the OSC 110 sequence for resetting foreground colour.
+// vendor/tmux/input.c:3080  input_osc_110()
 unsafe fn input_osc_110(ictx: *mut input_ctx, p: *const u8) {
     unsafe {
         let wp = (*ictx).wp;
@@ -2857,6 +2908,7 @@ unsafe fn input_osc_110(ictx: *mut input_ctx, p: *const u8) {
 }
 
 /// Handle the OSC 11 sequence for setting and querying background colour.
+// vendor/tmux/input.c:3096  input_osc_11()
 unsafe fn input_osc_11(ictx: *mut input_ctx, p: *const u8) {
     unsafe {
         let wp = (*ictx).wp;
@@ -2897,6 +2949,7 @@ unsafe fn input_osc_11(ictx: *mut input_ctx, p: *const u8) {
 }
 
 /// Handle the OSC 111 sequence for resetting background colour.
+// vendor/tmux/input.c:3123  input_osc_111()
 unsafe fn input_osc_111(ictx: *mut input_ctx, p: *const u8) {
     unsafe {
         let wp = (*ictx).wp;
@@ -2915,6 +2968,7 @@ unsafe fn input_osc_111(ictx: *mut input_ctx, p: *const u8) {
 }
 
 /// Handle the OSC 12 sequence for setting and querying cursor colour.
+// vendor/tmux/input.c:3139  input_osc_12()
 unsafe fn input_osc_12(ictx: *mut input_ctx, p: *const u8) {
     unsafe {
         let wp = (*ictx).wp;
@@ -2941,6 +2995,7 @@ unsafe fn input_osc_12(ictx: *mut input_ctx, p: *const u8) {
 }
 
 /// Handle the OSC 112 sequence for resetting cursor colour.
+// vendor/tmux/input.c:3163  input_osc_112()
 unsafe fn input_osc_112(ictx: *mut input_ctx, p: *const u8) {
     unsafe {
         if *p == b'\0' {
@@ -2951,6 +3006,7 @@ unsafe fn input_osc_112(ictx: *mut input_ctx, p: *const u8) {
 }
 
 /// Handle the OSC 133 sequence.
+// vendor/tmux/input.c:3171  input_osc_133()
 unsafe fn input_osc_133(ictx: *mut input_ctx, p: *const u8) {
     unsafe {
         let gd = (*(*ictx).ctx.s).grid;
@@ -2970,6 +3026,7 @@ unsafe fn input_osc_133(ictx: *mut input_ctx, p: *const u8) {
 }
 
 /// Handle the OSC 52 sequence for setting the clipboard.
+// vendor/tmux/input.c:3268  input_osc_52()
 unsafe fn input_osc_52(ictx: *mut input_ctx, p: *const u8) {
     let __func__ = "input_osc_52";
 
@@ -3053,6 +3110,7 @@ unsafe fn input_osc_52(ictx: *mut input_ctx, p: *const u8) {
 }
 
 /// Handle the OSC 104 sequence for unsetting (multiple) palette entries.
+// vendor/tmux/input.c:3299  input_osc_104()
 unsafe fn input_osc_104(ictx: *mut input_ctx, p: *const u8) {
     unsafe {
         let mut bad = false;
@@ -3093,6 +3151,7 @@ unsafe fn input_osc_104(ictx: *mut input_ctx, p: *const u8) {
     }
 }
 
+// vendor/tmux/input.c:3336  input_reply_clipboard()
 pub unsafe fn input_reply_clipboard(
     bev: *mut bufferevent,
     buf: *const u8,

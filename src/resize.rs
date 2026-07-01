@@ -15,6 +15,7 @@ use crate::libc::sscanf;
 use crate::*;
 use crate::options_::*;
 
+// vendor/tmux/resize.c:26  resize_window()
 pub unsafe fn resize_window(w: *mut window, mut sx: u32, mut sy: u32, xpixel: i32, ypixel: i32) {
     unsafe {
         // Check size limits.
@@ -61,6 +62,7 @@ pub unsafe fn resize_window(w: *mut window, mut sx: u32, mut sy: u32, xpixel: i3
     }
 }
 
+// vendor/tmux/resize.c:69  ignore_client_size()
 pub unsafe fn ignore_client_size(c: *mut client) -> i32 {
     unsafe {
         if (*c).session.is_null() {
@@ -94,6 +96,7 @@ pub unsafe fn ignore_client_size(c: *mut client) -> i32 {
     }
 }
 
+// vendor/tmux/resize.c:99  clients_with_window()
 pub unsafe fn clients_with_window(w: *mut window) -> u32 {
     let mut n = 0u32;
     unsafe {
@@ -110,6 +113,7 @@ pub unsafe fn clients_with_window(w: *mut window) -> u32 {
     n
 }
 
+// vendor/tmux/resize.c:114  clients_calculate_size()
 pub unsafe fn clients_calculate_size(
     type_: window_size_option,
     current: bool,
@@ -301,6 +305,7 @@ pub unsafe fn clients_calculate_size(
     }
 }
 
+// vendor/tmux/resize.c:267  default_window_size_skip_client()
 pub unsafe fn default_window_size_skip_client(
     loop_: *mut client,
     type_: window_size_option,
@@ -326,6 +331,7 @@ pub unsafe fn default_window_size_skip_client(
 }
 
 #[expect(clippy::too_many_arguments)]
+// vendor/tmux/resize.c:278  default_window_size()
 pub unsafe fn default_window_size(
     mut c: *mut client,
     s: *mut session,
@@ -399,6 +405,7 @@ pub unsafe fn default_window_size(
     }
 }
 
+// vendor/tmux/resize.c:337  recalculate_size_skip_client()
 pub unsafe fn recalculate_size_skip_client(
     loop_: *mut client,
     _type_: window_size_option,
@@ -421,6 +428,7 @@ pub unsafe fn recalculate_size_skip_client(
     }
 }
 
+// vendor/tmux/resize.c:353  recalculate_size()
 pub unsafe fn recalculate_size(w: *mut window, now: i32) {
     let __func__ = "recalculate_size";
 
@@ -497,12 +505,14 @@ pub unsafe fn recalculate_size(w: *mut window, now: i32) {
     }
 }
 
+// vendor/tmux/resize.c:420  recalculate_sizes()
 pub unsafe fn recalculate_sizes() {
     unsafe {
         recalculate_sizes_now(0);
     }
 }
 
+// vendor/tmux/resize.c:426  recalculate_sizes_now()
 pub unsafe fn recalculate_sizes_now(now: i32) {
     unsafe {
         // struct session *s;

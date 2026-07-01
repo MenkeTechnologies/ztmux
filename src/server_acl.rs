@@ -31,6 +31,7 @@ pub struct server_acl_user {
     pub entry: rb_entry<server_acl_user>,
 }
 
+// vendor/tmux/server-acl.c:42  server_acl_cmp()
 pub fn server_acl_cmp(user1: &server_acl_user, user2: &server_acl_user) -> cmp::Ordering {
     user1.uid.cmp(&user2.uid)
 }
@@ -46,6 +47,7 @@ RB_GENERATE!(
     server_acl_cmp
 );
 
+// vendor/tmux/server-acl.c:112  server_acl_init()
 pub unsafe fn server_acl_init() {
     unsafe {
         rb_init(&raw mut SERVER_ACL_ENTRIES);
@@ -65,6 +67,7 @@ pub unsafe fn server_acl_user_find(uid: uid_t) -> *mut server_acl_user {
     }
 }
 
+// vendor/tmux/server-acl.c:130  server_acl_display()
 pub unsafe fn server_acl_display(item: *mut cmdq_item) {
     unsafe {
         // server_acl_entries
@@ -144,6 +147,7 @@ pub unsafe fn server_acl_user_deny_write(mut uid: uid_t) {
     }
 }
 
+// vendor/tmux/server-acl.c:222  server_acl_join()
 pub unsafe fn server_acl_join(c: *mut client) -> c_int {
     unsafe {
         let uid = proc_get_peer_uid((*c).peer);

@@ -42,6 +42,7 @@ pub static CMD_LIST_COMMANDS_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-list-keys.c:70  cmd_list_keys_get_width()
 unsafe fn cmd_list_keys_get_width(tablename: *const u8, only: key_code) -> u32 {
     unsafe {
         let mut keywidth = 0u32;
@@ -123,6 +124,7 @@ unsafe fn cmd_list_keys_print_notes(
     }
 }
 
+// vendor/tmux/cmd-list-keys.c:56  cmd_list_keys_get_prefix()
 unsafe fn cmd_list_keys_get_prefix(args: *mut args, prefix: *mut key_code) -> NonNull<u8> {
     unsafe {
         *prefix = options_get_number___::<i64>(&*GLOBAL_S_OPTIONS, "prefix") as _;
@@ -139,6 +141,7 @@ unsafe fn cmd_list_keys_get_prefix(args: *mut args, prefix: *mut key_code) -> No
     }
 }
 
+// vendor/tmux/cmd-list-keys.c:167  cmd_list_keys_exec()
 unsafe fn cmd_list_keys_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

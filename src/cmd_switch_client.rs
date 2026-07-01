@@ -27,6 +27,7 @@ pub static CMD_SWITCH_CLIENT_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-switch-client.c:49  cmd_switch_client_exec()
 unsafe fn cmd_switch_client_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -32,6 +32,7 @@ pub static CMD_LIST_PANES_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-list-panes.c:52  cmd_list_panes_exec()
 unsafe fn cmd_list_panes_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -51,6 +52,7 @@ unsafe fn cmd_list_panes_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retv
     }
 }
 
+// vendor/tmux/cmd-list-panes.c:77  cmd_list_panes_server()
 unsafe fn cmd_list_panes_server(self_: *mut cmd, item: *mut cmdq_item) {
     unsafe {
         for s in rb_foreach(&raw mut SESSIONS).map(NonNull::as_ptr) {
@@ -59,6 +61,7 @@ unsafe fn cmd_list_panes_server(self_: *mut cmd, item: *mut cmdq_item) {
     }
 }
 
+// vendor/tmux/cmd-list-panes.c:86  cmd_list_panes_session()
 unsafe fn cmd_list_panes_session(
     self_: *mut cmd,
     s: *mut session,
@@ -72,6 +75,7 @@ unsafe fn cmd_list_panes_session(
     }
 }
 
+// vendor/tmux/cmd-list-panes.c:96  cmd_list_panes_window()
 fn cmd_list_panes_window(
     self_: *mut cmd,
     s: *mut session,

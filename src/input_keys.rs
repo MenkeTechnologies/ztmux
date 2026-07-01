@@ -34,6 +34,7 @@ impl input_key_entry {
 }
 
 /// Input key comparison function.
+// vendor/tmux/input-keys.c:331  input_key_cmp()
 pub fn input_key_cmp(ike1: &input_key_entry, ike2: &input_key_entry) -> cmp::Ordering {
     ike1.key.cmp(&ike2.key)
 }
@@ -153,6 +154,7 @@ static INPUT_KEY_MODIFIERS: [key_code; 9] = [
 ];
 
 /// Look for key in tree.
+// vendor/tmux/input-keys.c:342  input_key_get()
 pub unsafe fn input_key_get(key: key_code) -> *mut input_key_entry {
     unsafe {
         let mut entry = MaybeUninit::<input_key_entry>::uninit();
@@ -161,6 +163,7 @@ pub unsafe fn input_key_get(key: key_code) -> *mut input_key_entry {
     }
 }
 
+// vendor/tmux/input-keys.c:351  input_key_split2()
 pub unsafe fn input_key_split2(c: u32, dst: *mut u8) -> usize {
     unsafe {
         if c > 0x7f {
@@ -178,6 +181,7 @@ pub unsafe fn input_key_split2(c: u32, dst: *mut u8) -> usize {
 
 #[expect(clippy::needless_range_loop)]
 /// Build input key tree.
+// vendor/tmux/input-keys.c:364  input_key_build()
 pub unsafe extern "C-unwind" fn input_key_build() {
     unsafe {
         for i in 0..INPUT_KEY_DEFAULTS_LEN {
@@ -215,6 +219,7 @@ pub unsafe extern "C-unwind" fn input_key_build() {
 }
 
 /// Translate a key code into an output key sequence for a pane.
+// vendor/tmux/input-keys.c:398  input_key_pane()
 pub unsafe fn input_key_pane(wp: *mut window_pane, key: key_code, m: *mut mouse_event) -> i32 {
     unsafe {
         if log_get_level() != 0 {
@@ -236,6 +241,7 @@ pub unsafe fn input_key_pane(wp: *mut window_pane, key: key_code, m: *mut mouse_
     }
 }
 
+// vendor/tmux/input-keys.c:414  input_key_write()
 pub unsafe fn input_key_write(
     from: *const u8,
     bev: *mut bufferevent,
@@ -248,6 +254,7 @@ pub unsafe fn input_key_write(
     }
 }
 
+// vendor/tmux/input-keys.c:426  input_key_extended()
 pub unsafe fn input_key_extended(bev: *mut bufferevent, mut key: key_code) -> i32 {
     let __func__ = c!("input_key_extended");
     unsafe {
@@ -322,6 +329,7 @@ static STANDARD_MAP: [SyncCharPtr; 2] = [
 /// Outputs the key in the "standard" mode. This is by far the most
 /// complicated output mode, with a lot of remapping in order to
 /// emulate quirks of terminals that today can be only found in museums.
+// vendor/tmux/input-keys.c:482  input_key_vt10x()
 pub unsafe fn input_key_vt10x(bev: *mut bufferevent, mut key: key_code) -> i32 {
     let __func__ = c!("input_key_vt10x");
     unsafe {
@@ -383,6 +391,7 @@ pub unsafe fn input_key_vt10x(bev: *mut bufferevent, mut key: key_code) -> i32 {
 }
 
 /// Pick keys that are reported as vt10x keys in modifyOtherKeys=1 mode.
+// vendor/tmux/input-keys.c:545  input_key_mode1()
 pub unsafe fn input_key_mode1(bev: *mut bufferevent, key: key_code) -> i32 {
     unsafe {
         log_debug!("{}: key in {}", "input_key_mode1", key);
@@ -410,6 +419,7 @@ pub unsafe fn input_key_mode1(bev: *mut bufferevent, key: key_code) -> i32 {
 }
 
 /// Translate a key code into an output key sequence.
+// vendor/tmux/input-keys.c:574  input_key()
 pub unsafe fn input_key(s: *mut screen, bev: *mut bufferevent, mut key: key_code) -> i32 {
     let __func__ = c!("input_key");
     unsafe {
@@ -552,6 +562,7 @@ pub unsafe fn input_key(s: *mut screen, bev: *mut bufferevent, mut key: key_code
 
 #[expect(static_mut_refs, reason = "FIXME")]
 /// Get mouse event string.
+// vendor/tmux/input-keys.c:713  input_key_get_mouse()
 pub unsafe fn input_key_get_mouse(
     s: *mut screen,
     m: *mut mouse_event,
@@ -661,6 +672,7 @@ pub unsafe fn input_key_get_mouse(
 }
 
 /// Translate mouse and output.
+// vendor/tmux/input-keys.c:797  input_key_mouse()
 pub unsafe fn input_key_mouse(wp: *mut window_pane, m: *mut mouse_event) {
     let __func__ = c!("input_key_mouse");
     unsafe {

@@ -55,6 +55,7 @@ pub static CMD_HAS_SESSION_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-new-session.c:68  cmd_new_session_exec()
 unsafe fn cmd_new_session_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     let __func__ = c!("cmd_new_session_exec");
 

@@ -67,6 +67,7 @@ impl ListEntry<job, ()> for job {
 type joblist = list_head<job>;
 static mut ALL_JOBS: joblist = list_head_initializer();
 
+// vendor/tmux/job.c:72  job_run()
 pub unsafe fn job_run(
     cmd: *const u8,
     argc: c_int,
@@ -288,6 +289,7 @@ pub unsafe fn job_run(
     }
 }
 
+// vendor/tmux/job.c:243  job_transfer()
 pub unsafe fn job_transfer(job: *mut job, pid: *mut pid_t, tty: *mut u8, ttylen: usize) -> c_int {
     unsafe {
         let fd = (*job).fd;
@@ -319,6 +321,7 @@ pub unsafe fn job_transfer(job: *mut job, pid: *mut pid_t, tty: *mut u8, ttylen:
     }
 }
 
+// vendor/tmux/job.c:269  job_free()
 pub unsafe fn job_free(job: *mut job) {
     unsafe {
         log_debug!("free job {:p}: {}", job, _s((*job).cmd));
@@ -344,6 +347,7 @@ pub unsafe fn job_free(job: *mut job) {
     }
 }
 
+// vendor/tmux/job.c:291  job_resize()
 pub unsafe fn job_resize(job: *mut job, sx: c_uint, sy: c_uint) {
     let mut ws = MaybeUninit::<winsize>::uninit();
 
@@ -362,6 +366,7 @@ pub unsafe fn job_resize(job: *mut job, sx: c_uint, sy: c_uint) {
     }
 }
 
+// vendor/tmux/job.c:309  job_read_callback()
 unsafe extern "C-unwind" fn job_read_callback(_bufev: *mut bufferevent, data: *mut c_void) {
     let job = data as *mut job;
 
@@ -371,6 +376,7 @@ unsafe extern "C-unwind" fn job_read_callback(_bufev: *mut bufferevent, data: *m
         }
     }
 }
+// vendor/tmux/job.c:323  job_write_callback()
 unsafe extern "C-unwind" fn job_write_callback(_bufev: *mut bufferevent, data: *mut c_void) {
     unsafe {
         let job = data as *mut job;
@@ -391,6 +397,7 @@ unsafe extern "C-unwind" fn job_write_callback(_bufev: *mut bufferevent, data: *
     }
 }
 
+// vendor/tmux/job.c:339  job_error_callback()
 unsafe extern "C-unwind" fn job_error_callback(
     _bufev: *mut bufferevent,
     _events: libc::c_short,
@@ -417,6 +424,7 @@ unsafe extern "C-unwind" fn job_error_callback(
     }
 }
 
+// vendor/tmux/job.c:358  job_check_died()
 pub unsafe fn job_check_died(pid: pid_t, status: i32) {
     unsafe {
         let Some(job) = list_foreach(&raw mut ALL_JOBS).find(|job| pid == (*job.as_ptr()).pid)
@@ -453,18 +461,22 @@ pub unsafe fn job_check_died(pid: pid_t, status: i32) {
     }
 }
 
+// vendor/tmux/job.c:390  job_get_status()
 pub unsafe fn job_get_status(job: *mut job) -> i32 {
     unsafe { (*job).status }
 }
 
+// vendor/tmux/job.c:397  job_get_data()
 pub unsafe fn job_get_data(job: *mut job) -> *mut c_void {
     unsafe { (*job).data }
 }
 
+// vendor/tmux/job.c:404  job_get_event()
 pub unsafe fn job_get_event(job: *mut job) -> *mut bufferevent {
     unsafe { (*job).event }
 }
 
+// vendor/tmux/job.c:411  job_kill_all()
 pub unsafe fn job_kill_all() {
     unsafe {
         for job in list_foreach(&raw mut ALL_JOBS).map(NonNull::as_ptr) {
@@ -475,6 +487,7 @@ pub unsafe fn job_kill_all() {
     }
 }
 
+// vendor/tmux/job.c:423  job_still_running()
 pub unsafe fn job_still_running() -> bool {
     unsafe {
         list_foreach(&raw mut ALL_JOBS)
@@ -486,6 +499,7 @@ pub unsafe fn job_still_running() -> bool {
     }
 }
 
+// vendor/tmux/job.c:436  job_print_summary()
 pub unsafe fn job_print_summary(item: *mut cmdq_item, mut blank: i32) {
     unsafe {
         for (n, job) in list_foreach(&raw mut ALL_JOBS)

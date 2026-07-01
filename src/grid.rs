@@ -60,6 +60,7 @@ pub static GRID_CLEARED_ENTRY: grid_cell_entry = grid_cell_entry {
 };
 
 /// Store cell in entry.
+// vendor/tmux/grid.c:120  grid_store_cell()
 unsafe fn grid_store_cell(gce: *mut grid_cell_entry, gc: *const grid_cell, c: u8) {
     unsafe {
         (*gce).flags = (*gc).flags & !grid_flag::CLEARED;
@@ -80,6 +81,7 @@ unsafe fn grid_store_cell(gce: *mut grid_cell_entry, gc: *const grid_cell, c: u8
 }
 
 /// Check if a cell should be an extended cell.
+// vendor/tmux/grid.c:139  grid_need_extended_cell()
 unsafe fn grid_need_extended_cell(gce: *const grid_cell_entry, gc: *const grid_cell) -> bool {
     unsafe {
         if (*gce).flags.contains(grid_flag::EXTENDED) {
@@ -106,6 +108,7 @@ unsafe fn grid_need_extended_cell(gce: *const grid_cell_entry, gc: *const grid_c
 }
 
 /// Get an extended cell.
+// vendor/tmux/grid.c:162  grid_get_extended_cell()
 unsafe fn grid_get_extended_cell(
     gl: *mut grid_line,
     gce: *mut grid_cell_entry,
@@ -123,6 +126,7 @@ unsafe fn grid_get_extended_cell(
 }
 
 /// Set cell as extended.
+// vendor/tmux/grid.c:176  grid_extended_cell()
 unsafe fn grid_extended_cell(
     gl: *mut grid_line,
     gce: *mut grid_cell_entry,
@@ -155,6 +159,7 @@ unsafe fn grid_extended_cell(
 }
 
 /// Free up unused extended cells.
+// vendor/tmux/grid.c:209  grid_compact_line()
 unsafe fn grid_compact_line(gl: *mut grid_line) {
     unsafe {
         let mut new_extdsize = 0u32;
@@ -204,11 +209,13 @@ unsafe fn grid_compact_line(gl: *mut grid_line) {
 }
 
 /// Get line data.
+// vendor/tmux/grid.c:251  grid_get_line()
 pub unsafe fn grid_get_line(gd: *mut grid, line: c_uint) -> *mut grid_line {
     unsafe { (*gd).linedata.add(line as usize) }
 }
 
 /// Adjust number of lines.
+// vendor/tmux/grid.c:258  grid_adjust_lines()
 pub unsafe fn grid_adjust_lines(gd: *mut grid, lines: c_uint) {
     unsafe {
         (*gd).linedata = xreallocarray_((*gd).linedata, lines as usize).as_ptr();
@@ -216,6 +223,7 @@ pub unsafe fn grid_adjust_lines(gd: *mut grid, lines: c_uint) {
 }
 
 /// Copy default into a cell.
+// vendor/tmux/grid.c:265  grid_clear_cell()
 unsafe fn grid_clear_cell(gd: *mut grid, px: c_uint, py: c_uint, bg: c_uint) {
     unsafe {
         let gl = (*gd).linedata.add(py as usize);
@@ -237,6 +245,7 @@ unsafe fn grid_clear_cell(gd: *mut grid, px: c_uint, py: c_uint, bg: c_uint) {
 }
 
 /// Check grid y position.
+// vendor/tmux/grid.c:295  grid_check_y()
 unsafe fn grid_check_y(gd: *mut grid, from: *const u8, py: c_uint) -> c_int {
     unsafe {
         if py >= (*gd).hsize as c_uint + (*gd).sy as c_uint {
@@ -248,6 +257,7 @@ unsafe fn grid_check_y(gd: *mut grid, from: *const u8, py: c_uint) -> c_int {
 }
 
 /// Check if two styles are (visibly) the same.
+// vendor/tmux/grid.c:306  grid_cells_look_equal()
 pub unsafe fn grid_cells_look_equal(gc1: *const grid_cell, gc2: *const grid_cell) -> c_int {
     unsafe {
         if (*gc1).fg != (*gc2).fg || (*gc1).bg != (*gc2).bg {
@@ -264,6 +274,7 @@ pub unsafe fn grid_cells_look_equal(gc1: *const grid_cell, gc2: *const grid_cell
 }
 
 /// Compare grid cells. Return 1 if equal, 0 if not.
+// vendor/tmux/grid.c:323  grid_cells_equal()
 pub unsafe fn grid_cells_equal(gc1: *const grid_cell, gc2: *const grid_cell) -> bool {
     unsafe {
         if grid_cells_look_equal(gc1, gc2) == 0 {
@@ -284,6 +295,7 @@ pub unsafe fn grid_cells_equal(gc1: *const grid_cell, gc2: *const grid_cell) -> 
 }
 
 /// Free one line.
+// vendor/tmux/grid.c:347  grid_free_line()
 unsafe fn grid_free_line(gd: *mut grid, py: c_uint) {
     unsafe {
         free_((*(*gd).linedata.add(py as usize)).celldata);
@@ -294,6 +306,7 @@ unsafe fn grid_free_line(gd: *mut grid, py: c_uint) {
 }
 
 /// Free several lines.
+// vendor/tmux/grid.c:364  grid_free_lines()
 unsafe fn grid_free_lines(gd: *mut grid, py: c_uint, ny: c_uint) {
     unsafe {
         for yy in py..(py + ny) {
@@ -303,6 +316,7 @@ unsafe fn grid_free_lines(gd: *mut grid, py: c_uint, ny: c_uint) {
 }
 
 /// Create a new grid.
+// vendor/tmux/grid.c:374  grid_create()
 pub fn grid_create(sx: u32, sy: u32, hlimit: u32) -> *mut grid {
     Box::leak(Box::new(grid {
         sx,
@@ -320,6 +334,7 @@ pub fn grid_create(sx: u32, sy: u32, hlimit: u32) -> *mut grid {
 }
 
 /// Destroy grid.
+// vendor/tmux/grid.c:395  grid_destroy()
 pub unsafe fn grid_destroy(gd: *mut grid) {
     unsafe {
         grid_free_lines(gd, 0, (*gd).hsize + (*gd).sy);
@@ -329,6 +344,7 @@ pub unsafe fn grid_destroy(gd: *mut grid) {
 }
 
 /// Compare grids.
+// vendor/tmux/grid.c:404  grid_compare()
 pub unsafe fn grid_compare(ga: *mut grid, gb: *mut grid) -> c_int {
     unsafe {
         if (*ga).sx != (*gb).sx || (*ga).sy != (*gb).sy {
@@ -377,6 +393,7 @@ pub unsafe fn grid_compare(ga: *mut grid, gb: *mut grid) -> c_int {
 }
 
 /// Trim lines from the history.
+// vendor/tmux/grid.c:431  grid_trim_history()
 unsafe fn grid_trim_history(gd: *mut grid, ny: c_uint) {
     unsafe {
         grid_free_lines(gd, 0, ny);
@@ -389,6 +406,7 @@ unsafe fn grid_trim_history(gd: *mut grid, ny: c_uint) {
 }
 
 /// Collect lines from the history if at the limit. Free the top (oldest) 10% and shift up.
+// vendor/tmux/grid.c:447  grid_collect_history()
 pub unsafe fn grid_collect_history(gd: *mut grid) {
     unsafe {
         if (*gd).hsize == 0 || (*gd).hsize < (*gd).hlimit {
@@ -414,6 +432,7 @@ pub unsafe fn grid_collect_history(gd: *mut grid) {
 }
 
 /// Remove lines from the bottom of the history.
+// vendor/tmux/grid.c:477  grid_remove_history()
 pub unsafe fn grid_remove_history(gd: *mut grid, ny: c_uint) {
     unsafe {
         if ny > (*gd).hsize {
@@ -428,6 +447,7 @@ pub unsafe fn grid_remove_history(gd: *mut grid, ny: c_uint) {
 
 /// Scroll the entire visible screen, moving one line into the history. Just
 /// allocate a new line at the bottom and move the history size indicator.
+// vendor/tmux/grid.c:495  grid_scroll_history()
 pub unsafe fn grid_scroll_history(gd: *mut grid, bg: c_uint) {
     unsafe {
         let yy = (*gd).hsize + (*gd).sy;
@@ -443,6 +463,7 @@ pub unsafe fn grid_scroll_history(gd: *mut grid, bg: c_uint) {
 }
 
 /// Clear the history.
+// vendor/tmux/grid.c:515  grid_clear_history()
 pub unsafe fn grid_clear_history(gd: *mut grid) {
     unsafe {
         grid_trim_history(gd, (*gd).hsize);
@@ -455,6 +476,7 @@ pub unsafe fn grid_clear_history(gd: *mut grid) {
 }
 
 /// Scroll a region up, moving the top line into the history.
+// vendor/tmux/grid.c:529  grid_scroll_history_region()
 pub unsafe fn grid_scroll_history_region(
     gd: *mut grid,
     mut upper: c_uint,
@@ -491,6 +513,7 @@ pub unsafe fn grid_scroll_history_region(
 }
 
 /// Expand line to fit to cell.
+// vendor/tmux/grid.c:566  grid_expand_line()
 unsafe fn grid_expand_line(gd: *mut grid, py: c_uint, mut sx: c_uint, bg: c_uint) {
     unsafe {
         let gl = (*gd).linedata.add(py as usize);
@@ -516,6 +539,7 @@ unsafe fn grid_expand_line(gd: *mut grid, py: c_uint, mut sx: c_uint, bg: c_uint
 }
 
 /// Empty a line and set background colour if needed.
+// vendor/tmux/grid.c:595  grid_empty_line()
 pub unsafe fn grid_empty_line(gd: *mut grid, py: c_uint, bg: c_uint) {
     unsafe {
         (*gd).linedata.add(py as usize).write(zeroed());
@@ -526,6 +550,7 @@ pub unsafe fn grid_empty_line(gd: *mut grid, py: c_uint, bg: c_uint) {
 }
 
 /// Peek at grid line.
+// vendor/tmux/grid.c:604  grid_peek_line()
 pub unsafe fn grid_peek_line(gd: *mut grid, py: c_uint) -> *mut grid_line {
     unsafe {
         if grid_check_y(gd, c!("grid_peek_line"), py) != 0 {
@@ -536,6 +561,7 @@ pub unsafe fn grid_peek_line(gd: *mut grid, py: c_uint) -> *mut grid_line {
 }
 
 /// Get cell from line.
+// vendor/tmux/grid.c:613  grid_get_cell1()
 unsafe fn grid_get_cell1(gl: *mut grid_line, px: c_uint, gc: *mut grid_cell) {
     unsafe {
         let gce = (*gl).celldata.add(px as usize);
@@ -573,6 +599,7 @@ unsafe fn grid_get_cell1(gl: *mut grid_line, px: c_uint, gc: *mut grid_cell) {
 }
 
 /// Get cell for reading.
+// vendor/tmux/grid.c:653  grid_get_cell()
 pub unsafe fn grid_get_cell(gd: *mut grid, px: c_uint, py: c_uint, gc: *mut grid_cell) {
     unsafe {
         if grid_check_y(gd, c!("grid_get_cell"), py) != 0
@@ -586,6 +613,7 @@ pub unsafe fn grid_get_cell(gd: *mut grid, px: c_uint, py: c_uint, gc: *mut grid
 }
 
 /// Set cell at position.
+// vendor/tmux/grid.c:664  grid_set_cell()
 pub unsafe fn grid_set_cell(gd: *mut grid, px: c_uint, py: c_uint, gc: *const grid_cell) {
     unsafe {
         if grid_check_y(gd, c!("grid_set_cell"), py) != 0 {
@@ -609,6 +637,7 @@ pub unsafe fn grid_set_cell(gd: *mut grid, px: c_uint, py: c_uint, gc: *const gr
 }
 
 /// Set padding at position.
+// vendor/tmux/grid.c:687  grid_set_padding()
 pub unsafe fn grid_set_padding(gd: *mut grid, px: c_uint, py: c_uint) {
     unsafe {
         grid_set_cell(gd, px, py, &GRID_PADDING_CELL);
@@ -616,6 +645,7 @@ pub unsafe fn grid_set_padding(gd: *mut grid, px: c_uint, py: c_uint) {
 }
 
 /// Set cells at position.
+// vendor/tmux/grid.c:694  grid_set_cells()
 pub unsafe fn grid_set_cells(
     gd: *mut grid,
     px: u32,
@@ -649,6 +679,7 @@ pub unsafe fn grid_set_cells(
 }
 
 /// Clear area.
+// vendor/tmux/grid.c:723  grid_clear()
 pub unsafe fn grid_clear(
     gd: *mut grid,
     px: c_uint,
@@ -700,6 +731,7 @@ pub unsafe fn grid_clear(
 }
 
 /// Clear lines. This just frees and truncates the lines.
+// vendor/tmux/grid.c:763  grid_clear_lines()
 pub unsafe fn grid_clear_lines(gd: *mut grid, py: c_uint, ny: c_uint, bg: c_uint) {
     unsafe {
         if ny == 0 {
@@ -724,6 +756,7 @@ pub unsafe fn grid_clear_lines(gd: *mut grid, py: c_uint, ny: c_uint, bg: c_uint
 }
 
 /// Move a group of lines.
+// vendor/tmux/grid.c:785  grid_move_lines()
 pub unsafe fn grid_move_lines(gd: *mut grid, dy: c_uint, py: c_uint, ny: c_uint, bg: c_uint) {
     unsafe {
         if ny == 0 || py == dy {
@@ -772,6 +805,7 @@ pub unsafe fn grid_move_lines(gd: *mut grid, dy: c_uint, py: c_uint, ny: c_uint,
 }
 
 /// Move a group of cells.
+// vendor/tmux/grid.c:829  grid_move_cells()
 pub unsafe fn grid_move_cells(
     gd: *mut grid,
     dx: c_uint,
@@ -812,6 +846,7 @@ pub unsafe fn grid_move_cells(
 }
 
 /// Get ANSI foreground sequence.
+// vendor/tmux/grid.c:859  grid_string_cells_fg()
 unsafe fn grid_string_cells_fg(gc: *const grid_cell, values: *mut c_int) -> usize {
     unsafe {
         let mut n: usize = 0;
@@ -857,6 +892,7 @@ unsafe fn grid_string_cells_fg(gc: *const grid_cell, values: *mut c_int) -> usiz
 }
 
 /// Get ANSI background sequence.
+// vendor/tmux/grid.c:915  grid_string_cells_bg()
 unsafe fn grid_string_cells_bg(gc: *const grid_cell, values: *mut c_int) -> usize {
     unsafe {
         let mut n: usize = 0;
@@ -902,6 +938,7 @@ unsafe fn grid_string_cells_bg(gc: *const grid_cell, values: *mut c_int) -> usiz
 }
 
 /// Get underscore colour sequence.
+// vendor/tmux/grid.c:971  grid_string_cells_us()
 unsafe fn grid_string_cells_us(gc: *const grid_cell, values: *mut c_int) -> usize {
     unsafe {
         let mut n: usize = 0;
@@ -930,6 +967,7 @@ unsafe fn grid_string_cells_us(gc: *const grid_cell, values: *mut c_int) -> usiz
 }
 
 /// Add on SGR code.
+// vendor/tmux/grid.c:1004  grid_string_cells_add_code()
 unsafe fn grid_string_cells_add_code(
     buf: *mut u8,
     len: usize,
@@ -980,6 +1018,7 @@ unsafe fn grid_string_cells_add_code(
     }
 }
 
+// vendor/tmux/grid.c:1035  grid_string_cells_add_hyperlink()
 unsafe fn grid_string_cells_add_hyperlink(
     buf: *mut u8,
     len: usize,
@@ -1019,6 +1058,7 @@ unsafe fn grid_string_cells_add_hyperlink(
 }
 
 /// Returns ANSI code to set particular attributes (colour, bold and so on) given a current state.
+// vendor/tmux/grid.c:1066  grid_string_cells_code()
 unsafe fn grid_string_cells_code(
     lastgc: *const grid_cell,
     gc: *const grid_cell,
@@ -1191,6 +1231,7 @@ unsafe fn grid_string_cells_code(
 }
 
 /// Convert cells into a string.
+// vendor/tmux/grid.c:1180  grid_string_cells()
 pub unsafe fn grid_string_cells(
     gd: *mut grid,
     px: c_uint,
@@ -1295,6 +1336,7 @@ pub unsafe fn grid_string_cells(
 }
 
 /// Duplicate a set of lines between two grids. Both source and destination should be big enough.
+// vendor/tmux/grid.c:1278  grid_duplicate_lines()
 pub unsafe fn grid_duplicate_lines(
     dst: *mut grid,
     mut dy: c_uint,
@@ -1349,6 +1391,7 @@ pub unsafe fn grid_duplicate_lines(
 }
 
 /// Mark line as dead.
+// vendor/tmux/grid.c:1320  grid_reflow_dead()
 unsafe fn grid_reflow_dead(gl: *mut grid_line) {
     unsafe {
         std::ptr::write_bytes(gl as *mut u8, 0, std::mem::size_of::<grid_line>());
@@ -1357,6 +1400,7 @@ unsafe fn grid_reflow_dead(gl: *mut grid_line) {
 }
 
 /// Add lines, return the first new one.
+// vendor/tmux/grid.c:1328  grid_reflow_add()
 unsafe fn grid_reflow_add(gd: *mut grid, n: c_uint) -> *mut grid_line {
     unsafe {
         let sy = (*gd).sy + n;
@@ -1374,6 +1418,7 @@ unsafe fn grid_reflow_add(gd: *mut grid, n: c_uint) -> *mut grid_line {
 }
 
 /// Move a line across.
+// vendor/tmux/grid.c:1342  grid_reflow_move()
 unsafe fn grid_reflow_move(gd: *mut grid, from: *mut grid_line) -> *mut grid_line {
     unsafe {
         let to = grid_reflow_add(gd, 1);
@@ -1384,6 +1429,7 @@ unsafe fn grid_reflow_move(gd: *mut grid, from: *mut grid_line) -> *mut grid_lin
 }
 
 /// Join line below onto this one.
+// vendor/tmux/grid.c:1354  grid_reflow_join()
 unsafe fn grid_reflow_join(
     target: *mut grid,
     gd: *mut grid,
@@ -1498,6 +1544,7 @@ unsafe fn grid_reflow_join(
 }
 
 /// Split this line into several new ones
+// vendor/tmux/grid.c:1462  grid_reflow_split()
 unsafe fn grid_reflow_split(target: *mut grid, gd: *mut grid, sx: u32, yy: u32, at: u32) {
     unsafe {
         let gl = (*gd).linedata.add(yy as usize);
@@ -1567,6 +1614,7 @@ unsafe fn grid_reflow_split(target: *mut grid, gd: *mut grid, sx: u32, yy: u32, 
 }
 
 /// Reflow lines on grid to new width
+// vendor/tmux/grid.c:1530  grid_reflow()
 pub unsafe fn grid_reflow(gd: *mut grid, sx: u32) {
     unsafe {
         // Create destination grid - just used as container for line data
@@ -1637,6 +1685,7 @@ pub unsafe fn grid_reflow(gd: *mut grid, sx: u32) {
 }
 
 /// Convert to position based on wrapped lines
+// vendor/tmux/grid.c:1618  grid_wrap_position()
 pub unsafe fn grid_wrap_position(gd: *mut grid, px: u32, py: u32, wx: *mut u32, wy: *mut u32) {
     unsafe {
         let mut ax = 0;
@@ -1665,6 +1714,7 @@ pub unsafe fn grid_wrap_position(gd: *mut grid, px: u32, py: u32, wx: *mut u32, 
 }
 
 /// Convert position based on wrapped lines back
+// vendor/tmux/grid.c:1640  grid_unwrap_position()
 pub unsafe fn grid_unwrap_position(
     gd: *mut grid,
     px: *mut u32,
@@ -1717,6 +1767,7 @@ pub unsafe fn grid_unwrap_position(
 }
 
 /// Get length of line
+// vendor/tmux/grid.c:1673  grid_line_length()
 pub unsafe fn grid_line_length(gd: *mut grid, py: u32) -> u32 {
     unsafe {
         let mut gc = zeroed();

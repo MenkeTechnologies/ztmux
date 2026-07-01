@@ -35,6 +35,7 @@ pub struct cmd_load_buffer_data {
     pub name: *mut u8,
 }
 
+// vendor/tmux/cmd-load-buffer.c:54  cmd_load_buffer_done()
 unsafe fn cmd_load_buffer_done(
     _c: *mut client,
     path: *mut u8,
@@ -87,6 +88,7 @@ unsafe fn cmd_load_buffer_done(
     }
 }
 
+// vendor/tmux/cmd-load-buffer.c:91  cmd_load_buffer_exec()
 unsafe fn cmd_load_buffer_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

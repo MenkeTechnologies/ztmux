@@ -16,18 +16,21 @@ use crate::libc::{WEXITSTATUS, WIFEXITED, close, gettimeofday};
 use crate::*;
 use crate::options_::*;
 
+// vendor/tmux/server-fn.c:34  server_redraw_client()
 pub unsafe fn server_redraw_client(c: *mut client) {
     unsafe {
         (*c).flags |= CLIENT_ALLREDRAWFLAGS;
     }
 }
 
+// vendor/tmux/server-fn.c:40  server_status_client()
 pub unsafe fn server_status_client(c: *mut client) {
     unsafe {
         (*c).flags |= client_flag::REDRAWSTATUS;
     }
 }
 
+// vendor/tmux/server-fn.c:46  server_redraw_session()
 pub unsafe fn server_redraw_session(s: *mut session) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -38,6 +41,7 @@ pub unsafe fn server_redraw_session(s: *mut session) {
     }
 }
 
+// vendor/tmux/server-fn.c:57  server_redraw_session_group()
 pub unsafe fn server_redraw_session_group(s: *mut session) {
     unsafe {
         let sg = session_group_contains(s);
@@ -51,6 +55,7 @@ pub unsafe fn server_redraw_session_group(s: *mut session) {
     }
 }
 
+// vendor/tmux/server-fn.c:70  server_status_session()
 pub unsafe fn server_status_session(s: *mut session) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -61,6 +66,7 @@ pub unsafe fn server_status_session(s: *mut session) {
     }
 }
 
+// vendor/tmux/server-fn.c:81  server_status_session_group()
 pub unsafe fn server_status_session_group(s: *mut session) {
     unsafe {
         let sg = session_group_contains(s);
@@ -74,6 +80,7 @@ pub unsafe fn server_status_session_group(s: *mut session) {
     }
 }
 
+// vendor/tmux/server-fn.c:94  server_redraw_window()
 pub unsafe fn server_redraw_window(w: *mut window) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -84,6 +91,7 @@ pub unsafe fn server_redraw_window(w: *mut window) {
     }
 }
 
+// vendor/tmux/server-fn.c:107  server_redraw_window_borders()
 pub unsafe fn server_redraw_window_borders(w: *mut window) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -94,6 +102,7 @@ pub unsafe fn server_redraw_window_borders(w: *mut window) {
     }
 }
 
+// vendor/tmux/server-fn.c:120  server_status_window()
 pub unsafe fn server_status_window(w: *mut window) {
     unsafe {
         // This is slightly different. We want to redraw the status line of any
@@ -108,6 +117,7 @@ pub unsafe fn server_status_window(w: *mut window) {
     }
 }
 
+// vendor/tmux/server-fn.c:137  server_lock()
 pub unsafe fn server_lock() {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -118,6 +128,7 @@ pub unsafe fn server_lock() {
     }
 }
 
+// vendor/tmux/server-fn.c:148  server_lock_session()
 pub unsafe fn server_lock_session(s: *mut session) {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
@@ -128,6 +139,7 @@ pub unsafe fn server_lock_session(s: *mut session) {
     }
 }
 
+// vendor/tmux/server-fn.c:159  server_lock_client()
 pub unsafe fn server_lock_client(c: *mut client) {
     unsafe {
         if (*c).flags.intersects(client_flag::CONTROL) {
@@ -168,6 +180,7 @@ pub unsafe fn server_lock_client(c: *mut client) {
     }
 }
 
+// vendor/tmux/server-fn.c:183  server_kill_pane()
 pub unsafe fn server_kill_pane(wp: *mut window_pane) {
     unsafe {
         let w = (*wp).window;
@@ -185,6 +198,7 @@ pub unsafe fn server_kill_pane(wp: *mut window_pane) {
     }
 }
 
+// vendor/tmux/server-fn.c:200  server_kill_window()
 pub unsafe fn server_kill_window(w: *mut window, renumber: i32) {
     unsafe {
         for s in rb_foreach(&raw mut SESSIONS).map(NonNull::as_ptr) {
@@ -210,6 +224,7 @@ pub unsafe fn server_kill_window(w: *mut window, renumber: i32) {
     }
 }
 
+// vendor/tmux/server-fn.c:225  server_renumber_session()
 pub unsafe fn server_renumber_session(s: *mut session) {
     unsafe {
         if options_get_number_((*s).options, "renumber-windows") != 0 {
@@ -225,6 +240,7 @@ pub unsafe fn server_renumber_session(s: *mut session) {
     }
 }
 
+// vendor/tmux/server-fn.c:239  server_renumber_all()
 pub unsafe fn server_renumber_all() {
     unsafe {
         for s in rb_foreach(&raw mut SESSIONS) {
@@ -233,6 +249,7 @@ pub unsafe fn server_renumber_all() {
     }
 }
 
+// vendor/tmux/server-fn.c:248  server_link_window()
 pub unsafe fn server_link_window(
     src: *mut session,
     srcwl: *mut winlink,
@@ -293,6 +310,7 @@ pub unsafe fn server_link_window(
     }
 }
 
+// vendor/tmux/server-fn.c:305  server_unlink_window()
 pub unsafe fn server_unlink_window(s: *mut session, wl: *mut winlink) {
     unsafe {
         if session_detach(s, wl) != 0 {
@@ -303,6 +321,7 @@ pub unsafe fn server_unlink_window(s: *mut session, wl: *mut winlink) {
     }
 }
 
+// vendor/tmux/server-fn.c:314  server_destroy_pane()
 pub unsafe fn server_destroy_pane(wp: *mut window_pane, notify: i32) {
     unsafe {
         let w = (*wp).window;
@@ -391,6 +410,7 @@ pub unsafe fn server_destroy_pane(wp: *mut window_pane, notify: i32) {
     }
 }
 
+// vendor/tmux/server-fn.c:391  server_destroy_session_group()
 pub unsafe fn server_destroy_session_group(sess: *mut session) {
     unsafe {
         let sg = session_group_contains(sess);
@@ -406,6 +426,7 @@ pub unsafe fn server_destroy_session_group(sess: *mut session) {
     }
 }
 
+// vendor/tmux/server-fn.c:408  server_find_session()
 pub unsafe fn server_find_session(
     s: *mut session,
     f: unsafe fn(*mut session, *mut session) -> i32,
@@ -421,6 +442,7 @@ pub unsafe fn server_find_session(
     }
 }
 
+// vendor/tmux/server-fn.c:421  server_newer_session()
 pub unsafe fn server_newer_session(s_loop: *mut session, s_out: *mut session) -> i32 {
     unsafe {
         (timer::new(&raw const (*s_loop).activity_time)
@@ -428,6 +450,7 @@ pub unsafe fn server_newer_session(s_loop: *mut session, s_out: *mut session) ->
     }
 }
 
+// vendor/tmux/server-fn.c:429  server_newer_detached_session()
 pub unsafe fn server_newer_detached_session(s_loop: *mut session, s_out: *mut session) -> i32 {
     unsafe {
         if (*s_loop).attached != 0 {
@@ -437,6 +460,7 @@ pub unsafe fn server_newer_detached_session(s_loop: *mut session, s_out: *mut se
     }
 }
 
+// vendor/tmux/server-fn.c:437  server_destroy_session()
 pub unsafe fn server_destroy_session(s: *mut session) {
     unsafe {
         let detach_on_destroy = options_get_number_((*s).options, "detach-on-destroy");
@@ -471,6 +495,7 @@ pub unsafe fn server_destroy_session(s: *mut session) {
     }
 }
 
+// vendor/tmux/server-fn.c:478  server_check_unattached()
 pub unsafe fn server_check_unattached() {
     unsafe {
         for s in rb_foreach(&raw mut SESSIONS).map(NonNull::as_ptr) {
@@ -501,6 +526,7 @@ pub unsafe fn server_check_unattached() {
     }
 }
 
+// vendor/tmux/server-fn.c:511  server_unzoom_window()
 pub unsafe fn server_unzoom_window(w: *mut window) {
     unsafe {
         if window_unzoom(w, 1) == 0 {

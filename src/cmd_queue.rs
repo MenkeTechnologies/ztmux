@@ -94,6 +94,7 @@ pub struct cmdq_list {
     pub list: cmdq_item_list,
 }
 
+// vendor/tmux/cmd-queue.c:96  cmdq_name()
 pub unsafe fn cmdq_name(c: *const client) -> *const u8 {
     static mut BUF: [u8; 256] = [0; 256];
     let s = &raw mut BUF as *mut u8;
@@ -113,6 +114,7 @@ pub unsafe fn cmdq_name(c: *const client) -> *const u8 {
     s
 }
 
+// vendor/tmux/cmd-queue.c:111  cmdq_get()
 pub unsafe fn cmdq_get(c: *mut client) -> *mut cmdq_list {
     static mut GLOBAL_QUEUE: *mut cmdq_list = null_mut();
 
@@ -128,6 +130,7 @@ pub unsafe fn cmdq_get(c: *mut client) -> *mut cmdq_list {
     }
 }
 
+// vendor/tmux/cmd-queue.c:125  cmdq_new()
 pub fn cmdq_new() -> NonNull<cmdq_list> {
     let mut queue = Box::new(cmdq_list {
         item: null_mut(),
@@ -140,6 +143,7 @@ pub fn cmdq_new() -> NonNull<cmdq_list> {
     NonNull::new(Box::leak(queue)).unwrap()
 }
 
+// vendor/tmux/cmd-queue.c:136  cmdq_free()
 pub unsafe fn cmdq_free(queue: *mut cmdq_list) {
     unsafe {
         if !tailq_empty(&raw mut (*queue).list) {
@@ -149,42 +153,52 @@ pub unsafe fn cmdq_free(queue: *mut cmdq_list) {
     }
 }
 
+// vendor/tmux/cmd-queue.c:145  cmdq_get_name()
 pub unsafe fn cmdq_get_name(item: *mut cmdq_item) -> *mut u8 {
     unsafe { (*item).name }
 }
 
+// vendor/tmux/cmd-queue.c:152  cmdq_get_client()
 pub unsafe fn cmdq_get_client(item: *mut cmdq_item) -> *mut client {
     unsafe { (*item).client }
 }
 
+// vendor/tmux/cmd-queue.c:159  cmdq_get_target_client()
 pub unsafe fn cmdq_get_target_client(item: *mut cmdq_item) -> *mut client {
     unsafe { (*item).target_client }
 }
 
+// vendor/tmux/cmd-queue.c:166  cmdq_get_state()
 pub unsafe fn cmdq_get_state(item: *mut cmdq_item) -> *mut cmdq_state {
     unsafe { (*item).state }
 }
 
+// vendor/tmux/cmd-queue.c:173  cmdq_get_target()
 pub unsafe fn cmdq_get_target(item: *mut cmdq_item) -> *mut cmd_find_state {
     unsafe { &raw mut (*item).target }
 }
 
+// vendor/tmux/cmd-queue.c:180  cmdq_get_source()
 pub unsafe fn cmdq_get_source(item: *mut cmdq_item) -> *mut cmd_find_state {
     unsafe { &raw mut (*item).source }
 }
 
+// vendor/tmux/cmd-queue.c:187  cmdq_get_event()
 pub unsafe fn cmdq_get_event(item: *mut cmdq_item) -> *mut key_event {
     unsafe { &raw mut (*(*item).state).event }
 }
 
+// vendor/tmux/cmd-queue.c:194  cmdq_get_current()
 pub unsafe fn cmdq_get_current(item: *mut cmdq_item) -> *mut cmd_find_state {
     unsafe { &raw mut (*(*item).state).current }
 }
 
+// vendor/tmux/cmd-queue.c:201  cmdq_get_flags()
 pub unsafe fn cmdq_get_flags(item: *const cmdq_item) -> cmdq_state_flags {
     unsafe { (*(*item).state).flags }
 }
 
+// vendor/tmux/cmd-queue.c:208  cmdq_new_state()
 pub unsafe fn cmdq_new_state(
     current: *const cmd_find_state,
     event: *const key_event,
@@ -210,6 +224,7 @@ pub unsafe fn cmdq_new_state(
     }
 }
 
+// vendor/tmux/cmd-queue.c:231  cmdq_link_state()
 pub unsafe fn cmdq_link_state(state: *mut cmdq_state) -> *mut cmdq_state {
     unsafe {
         (*state).references += 1;
@@ -217,6 +232,7 @@ pub unsafe fn cmdq_link_state(state: *mut cmdq_state) -> *mut cmdq_state {
     state
 }
 
+// vendor/tmux/cmd-queue.c:239  cmdq_copy_state()
 pub unsafe fn cmdq_copy_state(
     state: *mut cmdq_state,
     current: *mut cmd_find_state,
@@ -234,6 +250,7 @@ pub unsafe fn cmdq_copy_state(
     }
 }
 
+// vendor/tmux/cmd-queue.c:248  cmdq_free_state()
 pub unsafe fn cmdq_free_state(state: *mut cmdq_state) {
     unsafe {
         (*state).references -= 1;
@@ -267,6 +284,7 @@ pub unsafe fn cmdq_add_format_(state: *mut cmdq_state, key: *const u8, args: std
     }
 }
 
+// vendor/tmux/cmd-queue.c:278  cmdq_add_formats()
 pub unsafe fn cmdq_add_formats(state: *mut cmdq_state, ft: *mut format_tree) {
     unsafe {
         if (*state).formats.is_null() {
@@ -277,6 +295,7 @@ pub unsafe fn cmdq_add_formats(state: *mut cmdq_state, ft: *mut format_tree) {
     }
 }
 
+// vendor/tmux/cmd-queue.c:287  cmdq_merge_formats()
 pub unsafe fn cmdq_merge_formats(item: *mut cmdq_item, ft: *mut format_tree) {
     unsafe {
         if !(*item).cmd.is_null() {
@@ -290,6 +309,7 @@ pub unsafe fn cmdq_merge_formats(item: *mut cmdq_item, ft: *mut format_tree) {
     }
 }
 
+// vendor/tmux/cmd-queue.c:301  cmdq_append()
 pub unsafe fn cmdq_append(c: *mut client, mut item: *mut cmdq_item) -> *mut cmdq_item {
     let __func__ = "cmdq_append";
 
@@ -321,6 +341,7 @@ pub unsafe fn cmdq_append(c: *mut client, mut item: *mut cmdq_item) -> *mut cmdq
 
 // TODO crashes with this one
 
+// vendor/tmux/cmd-queue.c:325  cmdq_insert_after()
 pub unsafe fn cmdq_insert_after(
     mut after: *mut cmdq_item,
     mut item: *mut cmdq_item,
@@ -460,12 +481,14 @@ pub unsafe fn cmdq_insert_hook_(
     }
 }
 
+// vendor/tmux/cmd-queue.c:447  cmdq_continue()
 pub unsafe fn cmdq_continue(item: *mut cmdq_item) {
     unsafe {
         (*item).flags &= !CMDQ_WAITING;
     }
 }
 
+// vendor/tmux/cmd-queue.c:454  cmdq_remove()
 pub unsafe fn cmdq_remove(item: *mut cmdq_item) {
     unsafe {
         if !(*item).client.is_null() {
@@ -483,6 +506,7 @@ pub unsafe fn cmdq_remove(item: *mut cmdq_item) {
     }
 }
 
+// vendor/tmux/cmd-queue.c:470  cmdq_remove_group()
 pub unsafe fn cmdq_remove_group(item: *mut cmdq_item) {
     unsafe {
         if (*item).group == 0 {
@@ -499,10 +523,12 @@ pub unsafe fn cmdq_remove_group(item: *mut cmdq_item) {
     }
 }
 
+// vendor/tmux/cmd-queue.c:487  cmdq_empty_command()
 pub unsafe fn cmdq_empty_command(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     cmd_retval::CMD_RETURN_NORMAL
 }
 
+// vendor/tmux/cmd-queue.c:494  cmdq_get_command()
 pub unsafe fn cmdq_get_command(
     cmdlist: *mut cmd_list,
     mut state: *mut cmdq_state,
@@ -556,6 +582,7 @@ pub unsafe fn cmdq_get_command(
     }
 }
 
+// vendor/tmux/cmd-queue.c:541  cmdq_find_flag()
 pub unsafe fn cmdq_find_flag(
     item: *mut cmdq_item,
     fs: *mut cmd_find_state,
@@ -577,6 +604,7 @@ pub unsafe fn cmdq_find_flag(
     }
 }
 
+// vendor/tmux/cmd-queue.c:561  cmdq_add_message()
 pub unsafe fn cmdq_add_message(item: *mut cmdq_item) {
     unsafe {
         let c = (*item).client;
@@ -610,6 +638,7 @@ pub unsafe fn cmdq_add_message(item: *mut cmdq_item) {
     }
 }
 
+// vendor/tmux/cmd-queue.c:597  cmdq_fire_command()
 pub unsafe fn cmdq_fire_command(item: *mut cmdq_item) -> cmd_retval {
     let __func__ = "cmdq_fire_command";
 
@@ -724,6 +753,7 @@ pub unsafe fn cmdq_fire_command(item: *mut cmdq_item) -> cmd_retval {
     }
 }
 
+// vendor/tmux/cmd-queue.c:685  cmdq_get_callback1()
 pub unsafe fn cmdq_get_callback1(name: &str, cb: cmdq_cb, data: *mut u8) -> NonNull<cmdq_item> {
     let item = xcalloc_::<cmdq_item>(1).as_ptr();
 
@@ -741,6 +771,7 @@ pub unsafe fn cmdq_get_callback1(name: &str, cb: cmdq_cb, data: *mut u8) -> NonN
     }
 }
 
+// vendor/tmux/cmd-queue.c:704  cmdq_error_callback()
 pub unsafe fn cmdq_error_callback(item: *mut cmdq_item, data: *mut c_void) -> cmd_retval {
     let error = data as *mut u8;
 
@@ -752,14 +783,17 @@ pub unsafe fn cmdq_error_callback(item: *mut cmdq_item, data: *mut c_void) -> cm
     cmd_retval::CMD_RETURN_NORMAL
 }
 
+// vendor/tmux/cmd-queue.c:716  cmdq_get_error()
 pub unsafe fn cmdq_get_error(error: *const u8) -> NonNull<cmdq_item> {
     unsafe { cmdq_get_callback!(cmdq_error_callback, xstrdup(error).as_ptr()) }
 }
 
+// vendor/tmux/cmd-queue.c:723  cmdq_fire_callback()
 pub unsafe fn cmdq_fire_callback(item: *mut cmdq_item) -> cmd_retval {
     unsafe { ((*item).cb.unwrap())(item, (*item).data) }
 }
 
+// vendor/tmux/cmd-queue.c:730  cmdq_next()
 pub unsafe fn cmdq_next(c: *mut client) -> u32 {
     let __func__ = "cmdq_next";
     static mut NUMBER: u32 = 0;
@@ -837,6 +871,7 @@ pub unsafe fn cmdq_next(c: *mut client) -> u32 {
     }
 }
 
+// vendor/tmux/cmd-queue.c:812  cmdq_running()
 pub unsafe fn cmdq_running(c: *mut client) -> *mut cmdq_item {
     unsafe {
         let queue = cmdq_get(c);
@@ -851,6 +886,7 @@ pub unsafe fn cmdq_running(c: *mut client) -> *mut cmdq_item {
     }
 }
 
+// vendor/tmux/cmd-queue.c:825  cmdq_guard()
 pub unsafe fn cmdq_guard(item: *mut cmdq_item, guard: *const u8, flags: bool) {
     unsafe {
         let c = (*item).client;
@@ -863,6 +899,7 @@ pub unsafe fn cmdq_guard(item: *mut cmdq_item, guard: *const u8, flags: bool) {
     }
 }
 
+// vendor/tmux/cmd-queue.c:837  cmdq_print_data()
 pub unsafe fn cmdq_print_data(item: *mut cmdq_item, parse: i32, evb: *mut evbuffer) {
     unsafe {
         server_client_print((*item).client, parse, evb);

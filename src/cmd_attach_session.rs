@@ -28,6 +28,7 @@ pub static CMD_ATTACH_SESSION_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-attach-session.c:51  cmd_attach_session()
 pub unsafe fn cmd_attach_session(
     item: *mut cmdq_item,
     tflag: Option<&str>,
@@ -172,6 +173,7 @@ pub unsafe fn cmd_attach_session(
     }
 }
 
+// vendor/tmux/cmd-attach-session.c:177  cmd_attach_session_exec()
 unsafe fn cmd_attach_session_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -28,6 +28,7 @@ pub static CMD_SERVER_ACCESS_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-server-access.c:49  cmd_server_access_deny()
 unsafe fn cmd_server_access_deny(item: *mut cmdq_item, pw: *mut libc::passwd) -> cmd_retval {
     unsafe {
         let user = server_acl_user_find((*pw).pw_uid);
@@ -48,6 +49,7 @@ unsafe fn cmd_server_access_deny(item: *mut cmdq_item, pw: *mut libc::passwd) ->
     }
 }
 
+// vendor/tmux/cmd-server-access.c:61  cmd_server_access_exec()
 unsafe fn cmd_server_access_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

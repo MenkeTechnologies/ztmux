@@ -46,6 +46,7 @@ pub struct screen_write_cline {
 pub static mut SCREEN_WRITE_CITEM_FREELIST: tailq_head<screen_write_citem> =
     TAILQ_HEAD_INITIALIZER!(SCREEN_WRITE_CITEM_FREELIST);
 
+// vendor/tmux/screen-write.c:63  screen_write_get_citem()
 unsafe fn screen_write_get_citem() -> NonNull<screen_write_citem> {
     unsafe {
         if let Some(ci) = NonNull::new(tailq_first(&raw mut SCREEN_WRITE_CITEM_FREELIST)) {
@@ -57,12 +58,14 @@ unsafe fn screen_write_get_citem() -> NonNull<screen_write_citem> {
     }
 }
 
+// vendor/tmux/screen-write.c:77  screen_write_free_citem()
 unsafe fn screen_write_free_citem(ci: *mut screen_write_citem) {
     unsafe {
         tailq_insert_tail(&raw mut SCREEN_WRITE_CITEM_FREELIST, ci);
     }
 }
 
+// vendor/tmux/screen-write.c:83  screen_write_offset_timer()
 unsafe extern "C-unwind" fn screen_write_offset_timer(_fd: i32, _events: i16, w: NonNull<window>) {
     unsafe {
         tty_update_window_offset(w.as_ptr());
@@ -70,6 +73,7 @@ unsafe extern "C-unwind" fn screen_write_offset_timer(_fd: i32, _events: i16, w:
 }
 
 /// Set cursor position.
+// vendor/tmux/screen-write.c:92  screen_write_set_cursor()
 unsafe fn screen_write_set_cursor(ctx: *mut screen_write_ctx, mut cx: i32, mut cy: i32) {
     unsafe {
         let wp = (*ctx).wp;
@@ -115,6 +119,7 @@ unsafe fn screen_write_set_cursor(ctx: *mut screen_write_ctx, mut cx: i32, mut c
 }
 
 /// Do a full redraw.
+// vendor/tmux/screen-write.c:125  screen_write_redraw_cb()
 unsafe fn screen_write_redraw_cb(ttyctx: *const tty_ctx) {
     unsafe {
         let wp: *mut window_pane = (*ttyctx).arg.cast();
@@ -126,6 +131,7 @@ unsafe fn screen_write_redraw_cb(ttyctx: *const tty_ctx) {
 }
 
 /// Update context for client.
+// vendor/tmux/screen-write.c:135  screen_write_set_client_cb()
 unsafe fn screen_write_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i32 {
     unsafe {
         let wp: *mut window_pane = (*ttyctx).arg.cast();
@@ -181,6 +187,7 @@ unsafe fn screen_write_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i3
 }
 
 /// Set up context for TTY command.
+// vendor/tmux/screen-write.c:262  screen_write_initctx()
 unsafe fn screen_write_initctx(ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx, sync: i32) {
     unsafe {
         let s = (*ctx).s;
@@ -238,6 +245,7 @@ unsafe fn screen_write_initctx(ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx,
 }
 
 /// Make write list.
+// vendor/tmux/screen-write.c:328  screen_write_make_list()
 pub unsafe fn screen_write_make_list(s: *mut screen) {
     unsafe {
         (*s).write_list = xcalloc_(screen_size_y(s) as usize).as_ptr();
@@ -248,6 +256,7 @@ pub unsafe fn screen_write_make_list(s: *mut screen) {
 }
 
 /// Free write list.
+// vendor/tmux/screen-write.c:339  screen_write_free_list()
 pub unsafe fn screen_write_free_list(s: *mut screen) {
     unsafe {
         for y in 0..screen_size_y(s) {
@@ -258,6 +267,7 @@ pub unsafe fn screen_write_free_list(s: *mut screen) {
 }
 
 /// Set up for writing.
+// vendor/tmux/screen-write.c:350  screen_write_init()
 unsafe fn screen_write_init(ctx: *mut screen_write_ctx, s: *mut screen) {
     unsafe {
         memset0(ctx);
@@ -275,6 +285,7 @@ unsafe fn screen_write_init(ctx: *mut screen_write_ctx, s: *mut screen) {
 }
 
 /// Initialize writing with a pane.
+// vendor/tmux/screen-write.c:366  screen_write_start_pane()
 pub unsafe fn screen_write_start_pane(
     ctx: *mut screen_write_ctx,
     wp: *mut window_pane,
@@ -294,6 +305,7 @@ pub unsafe fn screen_write_start_pane(
 }
 
 /// Initialize writing with a callback.
+// vendor/tmux/screen-write.c:383  screen_write_start_callback()
 pub unsafe fn screen_write_start_callback(
     ctx: *mut screen_write_ctx,
     s: *mut screen,
@@ -313,6 +325,7 @@ pub unsafe fn screen_write_start_callback(
 }
 
 /// Initialize writing.
+// vendor/tmux/screen-write.c:399  screen_write_start()
 pub unsafe fn screen_write_start(ctx: *mut screen_write_ctx, s: *mut screen) {
     unsafe {
         screen_write_init(ctx, s);
@@ -324,6 +337,7 @@ pub unsafe fn screen_write_start(ctx: *mut screen_write_ctx, s: *mut screen) {
 }
 
 /// Finish writing.
+// vendor/tmux/screen-write.c:411  screen_write_stop()
 pub unsafe fn screen_write_stop(ctx: *mut screen_write_ctx) {
     unsafe {
         screen_write_collect_end(ctx);
@@ -334,6 +348,7 @@ pub unsafe fn screen_write_stop(ctx: *mut screen_write_ctx) {
 }
 
 /// Reset screen state.
+// vendor/tmux/screen-write.c:421  screen_write_reset()
 pub unsafe fn screen_write_reset(ctx: *mut screen_write_ctx) {
     unsafe {
         let s = (*ctx).s;
@@ -353,6 +368,7 @@ pub unsafe fn screen_write_reset(ctx: *mut screen_write_ctx) {
 }
 
 /// Write character.
+// vendor/tmux/screen-write.c:439  screen_write_putc()
 pub unsafe fn screen_write_putc(ctx: *mut screen_write_ctx, gcp: *const grid_cell, ch: u8) {
     unsafe {
         let mut gc: grid_cell = zeroed();
@@ -608,6 +624,7 @@ pub(crate) unsafe fn screen_write_vnputs_(
 
 /// Copy from another screen but without the selection stuff. Assumes the target
 /// region is already big enough.
+// vendor/tmux/screen-write.c:666  screen_write_fast_copy()
 pub unsafe fn screen_write_fast_copy(
     ctx: *mut screen_write_ctx,
     src: *mut screen,
@@ -648,6 +665,7 @@ pub unsafe fn screen_write_fast_copy(
 }
 
 /// Select character set for drawing border lines.
+// vendor/tmux/screen-write.c:722  screen_write_box_border_set()
 unsafe fn screen_write_box_border_set(lines: box_lines, cell_type: cell_type, gc: *mut grid_cell) {
     unsafe {
         match lines {
@@ -681,6 +699,7 @@ unsafe fn screen_write_box_border_set(lines: box_lines, cell_type: cell_type, gc
 }
 
 /// Draw a horizontal line on screen.
+// vendor/tmux/screen-write.c:758  screen_write_hline()
 pub unsafe fn screen_write_hline(
     ctx: *mut screen_write_ctx,
     nx: u32,
@@ -728,6 +747,7 @@ pub unsafe fn screen_write_hline(
 }
 
 /// Draw a vertical line on screen.
+// vendor/tmux/screen-write.c:795  screen_write_vline()
 pub unsafe fn screen_write_vline(ctx: *mut screen_write_ctx, ny: u32, top: i32, bottom: i32) {
     unsafe {
         let s = (*ctx).s;
@@ -753,6 +773,7 @@ pub unsafe fn screen_write_vline(ctx: *mut screen_write_ctx, ny: u32, top: i32, 
 }
 
 /// Draw a menu on screen.
+// vendor/tmux/screen-write.c:824  screen_write_menu()
 pub unsafe fn screen_write_menu(
     ctx: *mut screen_write_ctx,
     menu: *mut menu,
@@ -819,6 +840,7 @@ pub unsafe fn screen_write_menu(
 }
 
 /// Draw a box on screen.
+// vendor/tmux/screen-write.c:875  screen_write_box()
 pub unsafe fn screen_write_box(
     ctx: *mut screen_write_ctx,
     nx: u32,
@@ -886,6 +908,7 @@ pub unsafe fn screen_write_box(
 }
 
 /// Write a preview version of a window. Assumes target area is big enough and already cleared.
+// vendor/tmux/screen-write.c:937  screen_write_preview()
 pub unsafe fn screen_write_preview(ctx: *mut screen_write_ctx, src: *mut screen, nx: u32, ny: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -946,6 +969,7 @@ pub unsafe fn screen_write_preview(ctx: *mut screen_write_ctx, src: *mut screen,
 }
 
 /// Set a mode.
+// vendor/tmux/screen-write.c:992  screen_write_mode_set()
 pub unsafe fn screen_write_mode_set(ctx: *mut screen_write_ctx, mode: mode_flag) {
     unsafe {
         let s = (*ctx).s;
@@ -959,6 +983,7 @@ pub unsafe fn screen_write_mode_set(ctx: *mut screen_write_ctx, mode: mode_flag)
 }
 
 /// Clear a mode.
+// vendor/tmux/screen-write.c:1004  screen_write_mode_clear()
 pub unsafe fn screen_write_mode_clear(ctx: *mut screen_write_ctx, mode: mode_flag) {
     unsafe {
         let s = (*ctx).s;
@@ -972,6 +997,7 @@ pub unsafe fn screen_write_mode_clear(ctx: *mut screen_write_ctx, mode: mode_fla
 }
 
 /// Cursor up by ny.
+// vendor/tmux/screen-write.c:1064  screen_write_cursorup()
 pub unsafe fn screen_write_cursorup(ctx: *mut screen_write_ctx, mut ny: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1004,6 +1030,7 @@ pub unsafe fn screen_write_cursorup(ctx: *mut screen_write_ctx, mut ny: u32) {
 }
 
 /// Cursor down by ny.
+// vendor/tmux/screen-write.c:1091  screen_write_cursordown()
 pub unsafe fn screen_write_cursordown(ctx: *mut screen_write_ctx, mut ny: u32) {
     unsafe {
         let s: *mut screen = (*ctx).s;
@@ -1038,6 +1065,7 @@ pub unsafe fn screen_write_cursordown(ctx: *mut screen_write_ctx, mut ny: u32) {
 }
 
 /// Cursor right by nx.
+// vendor/tmux/screen-write.c:1120  screen_write_cursorright()
 pub unsafe fn screen_write_cursorright(ctx: *mut screen_write_ctx, mut nx: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1062,6 +1090,7 @@ pub unsafe fn screen_write_cursorright(ctx: *mut screen_write_ctx, mut nx: u32) 
 }
 
 /// Cursor left by nx.
+// vendor/tmux/screen-write.c:1140  screen_write_cursorleft()
 pub unsafe fn screen_write_cursorleft(ctx: *mut screen_write_ctx, mut nx: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1086,6 +1115,7 @@ pub unsafe fn screen_write_cursorleft(ctx: *mut screen_write_ctx, mut nx: u32) {
 }
 
 /// Backspace; cursor left unless at start of wrapped line when can move up.
+// vendor/tmux/screen-write.c:1160  screen_write_backspace()
 pub unsafe fn screen_write_backspace(ctx: *mut screen_write_ctx) {
     unsafe {
         let s = (*ctx).s;
@@ -1110,6 +1140,7 @@ pub unsafe fn screen_write_backspace(ctx: *mut screen_write_ctx) {
 }
 
 /// VT100 alignment test.
+// vendor/tmux/screen-write.c:1301  screen_write_alignmenttest()
 pub unsafe fn screen_write_alignmenttest(ctx: *mut screen_write_ctx) {
     unsafe {
         let s = (*ctx).s;
@@ -1145,6 +1176,7 @@ pub unsafe fn screen_write_alignmenttest(ctx: *mut screen_write_ctx) {
 }
 
 /// Insert nx characters.
+// vendor/tmux/screen-write.c:1342  screen_write_insertcharacter()
 pub unsafe fn screen_write_insertcharacter(ctx: *mut screen_write_ctx, mut nx: u32, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1184,6 +1216,7 @@ pub unsafe fn screen_write_insertcharacter(ctx: *mut screen_write_ctx, mut nx: u
 }
 
 /// Delete nx characters.
+// vendor/tmux/screen-write.c:1383  screen_write_deletecharacter()
 pub unsafe fn screen_write_deletecharacter(ctx: *mut screen_write_ctx, mut nx: u32, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1223,6 +1256,7 @@ pub unsafe fn screen_write_deletecharacter(ctx: *mut screen_write_ctx, mut nx: u
 }
 
 /// Clear nx characters.
+// vendor/tmux/screen-write.c:1424  screen_write_clearcharacter()
 pub unsafe fn screen_write_clearcharacter(ctx: *mut screen_write_ctx, mut nx: u32, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1262,6 +1296,7 @@ pub unsafe fn screen_write_clearcharacter(ctx: *mut screen_write_ctx, mut nx: u3
 }
 
 /// Insert ny lines.
+// vendor/tmux/screen-write.c:1465  screen_write_insertline()
 pub unsafe fn screen_write_insertline(ctx: *mut screen_write_ctx, mut ny: u32, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1323,6 +1358,7 @@ pub unsafe fn screen_write_insertline(ctx: *mut screen_write_ctx, mut ny: u32, b
 }
 
 /// Delete ny lines.
+// vendor/tmux/screen-write.c:1533  screen_write_deleteline()
 pub unsafe fn screen_write_deleteline(ctx: *mut screen_write_ctx, mut ny: u32, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1383,6 +1419,7 @@ pub unsafe fn screen_write_deleteline(ctx: *mut screen_write_ctx, mut ny: u32, b
 }
 
 /// Clear line at cursor.
+// vendor/tmux/screen-write.c:1603  screen_write_clearline()
 pub unsafe fn screen_write_clearline(ctx: *mut screen_write_ctx, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1417,6 +1454,7 @@ pub unsafe fn screen_write_clearline(ctx: *mut screen_write_ctx, bg: u32) {
 }
 
 /// Clear to end of line from cursor.
+// vendor/tmux/screen-write.c:1636  screen_write_clearendofline()
 pub unsafe fn screen_write_clearendofline(ctx: *mut screen_write_ctx, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1460,6 +1498,7 @@ pub unsafe fn screen_write_clearendofline(ctx: *mut screen_write_ctx, bg: u32) {
 }
 
 /// Clear to start of line from cursor.
+// vendor/tmux/screen-write.c:1668  screen_write_clearstartofline()
 pub unsafe fn screen_write_clearstartofline(ctx: *mut screen_write_ctx, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1502,6 +1541,7 @@ pub unsafe fn screen_write_clearstartofline(ctx: *mut screen_write_ctx, bg: u32)
 }
 
 /// Move cursor to px,py.
+// vendor/tmux/screen-write.c:1698  screen_write_cursormove()
 pub unsafe fn screen_write_cursormove(
     ctx: *mut screen_write_ctx,
     mut px: i32,
@@ -1532,6 +1572,7 @@ pub unsafe fn screen_write_cursormove(
 }
 
 /// Reverse index (up with scroll).
+// vendor/tmux/screen-write.c:1721  screen_write_reverseindex()
 pub unsafe fn screen_write_reverseindex(ctx: *mut screen_write_ctx, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1559,6 +1600,7 @@ pub unsafe fn screen_write_reverseindex(ctx: *mut screen_write_ctx, bg: u32) {
 }
 
 /// Set scroll region.
+// vendor/tmux/screen-write.c:1757  screen_write_scrollregion()
 pub unsafe fn screen_write_scrollregion(
     ctx: *mut screen_write_ctx,
     mut rupper: u32,
@@ -1588,6 +1630,7 @@ pub unsafe fn screen_write_scrollregion(
 }
 
 /// Line feed.
+// vendor/tmux/screen-write.c:1780  screen_write_linefeed()
 pub unsafe fn screen_write_linefeed(ctx: *mut screen_write_ctx, wrapped: bool, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1636,6 +1679,7 @@ pub unsafe fn screen_write_linefeed(ctx: *mut screen_write_ctx, wrapped: bool, b
 }
 
 /// Scroll up.
+// vendor/tmux/screen-write.c:1824  screen_write_scrollup()
 pub unsafe fn screen_write_scrollup(ctx: *mut screen_write_ctx, mut lines: u32, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1668,6 +1712,7 @@ pub unsafe fn screen_write_scrollup(ctx: *mut screen_write_ctx, mut lines: u32, 
 }
 
 /// Scroll down.
+// vendor/tmux/screen-write.c:1854  screen_write_scrolldown()
 pub unsafe fn screen_write_scrolldown(ctx: *mut screen_write_ctx, mut lines: u32, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1701,6 +1746,7 @@ pub unsafe fn screen_write_scrolldown(ctx: *mut screen_write_ctx, mut lines: u32
 }
 
 /// Carriage return (cursor to start of line).
+// vendor/tmux/screen-write.c:1893  screen_write_carriagereturn()
 pub unsafe fn screen_write_carriagereturn(ctx: *mut screen_write_ctx) {
     unsafe {
         screen_write_set_cursor(ctx, 0, -1);
@@ -1708,6 +1754,7 @@ pub unsafe fn screen_write_carriagereturn(ctx: *mut screen_write_ctx) {
 }
 
 /// Clear to end of screen from cursor.
+// vendor/tmux/screen-write.c:1900  screen_write_clearendofscreen()
 pub unsafe fn screen_write_clearendofscreen(ctx: *mut screen_write_ctx, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1748,6 +1795,7 @@ pub unsafe fn screen_write_clearendofscreen(ctx: *mut screen_write_ctx, bg: u32)
 }
 
 /// Clear to start of screen.
+// vendor/tmux/screen-write.c:1982  screen_write_clearstartofscreen()
 pub unsafe fn screen_write_clearstartofscreen(ctx: *mut screen_write_ctx, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1780,6 +1828,7 @@ pub unsafe fn screen_write_clearstartofscreen(ctx: *mut screen_write_ctx, bg: u3
 }
 
 /// Clear entire screen.
+// vendor/tmux/screen-write.c:2055  screen_write_clearscreen()
 pub unsafe fn screen_write_clearscreen(ctx: *mut screen_write_ctx, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1813,6 +1862,7 @@ pub unsafe fn screen_write_clearscreen(ctx: *mut screen_write_ctx, bg: u32) {
 }
 
 /// Clear entire history.
+// vendor/tmux/screen-write.c:2117  screen_write_clearhistory()
 pub unsafe fn screen_write_clearhistory(ctx: *mut screen_write_ctx) {
     unsafe {
         grid_clear_history((*(*ctx).s).grid);
@@ -1820,6 +1870,7 @@ pub unsafe fn screen_write_clearhistory(ctx: *mut screen_write_ctx) {
 }
 
 /// Force a full redraw.
+// vendor/tmux/screen-write.c:2124  screen_write_fullredraw()
 pub unsafe fn screen_write_fullredraw(ctx: *mut screen_write_ctx) {
     unsafe {
         let mut ttyctx: tty_ctx = zeroed();
@@ -1834,6 +1885,7 @@ pub unsafe fn screen_write_fullredraw(ctx: *mut screen_write_ctx) {
 }
 
 /// Trim collected items.
+// vendor/tmux/screen-write.c:2137  screen_write_collect_trim()
 pub unsafe fn screen_write_collect_trim(
     ctx: *mut screen_write_ctx,
     y: u32,
@@ -1916,6 +1968,7 @@ pub unsafe fn screen_write_collect_trim(
 }
 
 /// Clear collected lines.
+// vendor/tmux/screen-write.c:2223  screen_write_collect_clear()
 pub unsafe fn screen_write_collect_clear(ctx: *mut screen_write_ctx, y: u32, n: u32) {
     unsafe {
         for i in y..(y + n) {
@@ -1926,6 +1979,7 @@ pub unsafe fn screen_write_collect_clear(ctx: *mut screen_write_ctx, y: u32, n: 
 }
 
 /// Scroll collected lines up.
+// vendor/tmux/screen-write.c:2236  screen_write_collect_scroll()
 pub unsafe fn screen_write_collect_scroll(ctx: *mut screen_write_ctx, bg: u32) {
     unsafe {
         let s = (*ctx).s;
@@ -1956,6 +2010,7 @@ pub unsafe fn screen_write_collect_scroll(ctx: *mut screen_write_ctx, bg: u32) {
 }
 
 /// Flush collected lines.
+// vendor/tmux/screen-write.c:2392  screen_write_collect_flush()
 pub unsafe fn screen_write_collect_flush(ctx: *mut screen_write_ctx, scroll_only: u32, from: &str) {
     unsafe {
         let s = (*ctx).s;
@@ -2018,6 +2073,7 @@ pub unsafe fn screen_write_collect_flush(ctx: *mut screen_write_ctx, scroll_only
 }
 
 /// Finish and store collected cells.
+// vendor/tmux/screen-write.c:2478  screen_write_collect_end()
 pub unsafe fn screen_write_collect_end(ctx: *mut screen_write_ctx) {
     unsafe {
         let s = (*ctx).s;
@@ -2087,6 +2143,7 @@ pub unsafe fn screen_write_collect_end(ctx: *mut screen_write_ctx) {
 }
 
 /// Write cell data, collecting if necessary.
+// vendor/tmux/screen-write.c:2560  screen_write_collect_add()
 pub unsafe fn screen_write_collect_add(ctx: *mut screen_write_ctx, gc: *const grid_cell) {
     unsafe {
         let s = (*ctx).s;
@@ -2138,6 +2195,7 @@ pub unsafe fn screen_write_collect_add(ctx: *mut screen_write_ctx, gc: *const gr
 }
 
 /// Write cell data.
+// vendor/tmux/screen-write.c:2614  screen_write_cell()
 pub unsafe fn screen_write_cell(ctx: *mut screen_write_ctx, gc: *const grid_cell) {
     unsafe {
         let s = (*ctx).s;
@@ -2282,6 +2340,7 @@ pub unsafe fn screen_write_cell(ctx: *mut screen_write_ctx, gc: *const grid_cell
 }
 
 /// Combine a UTF-8 zero-width character onto the previous if necessary.
+// vendor/tmux/screen-write.c:2798  screen_write_combine()
 pub unsafe fn screen_write_combine(ctx: *mut screen_write_ctx, gc: *const grid_cell) -> i32 {
     unsafe {
         let s = (*ctx).s;
@@ -2395,6 +2454,7 @@ pub unsafe fn screen_write_combine(ctx: *mut screen_write_ctx, gc: *const grid_c
 // character, it is necessary to also overwrite any other cells which covered
 // by the same character.
 
+// vendor/tmux/screen-write.c:2943  screen_write_overwrite()
 pub unsafe fn screen_write_overwrite(
     ctx: *mut screen_write_ctx,
     gc: *mut grid_cell,
@@ -2453,6 +2513,7 @@ pub unsafe fn screen_write_overwrite(
 }
 
 /// Set external clipboard.
+// vendor/tmux/screen-write.c:3007  screen_write_setselection()
 pub unsafe fn screen_write_setselection(
     ctx: *mut screen_write_ctx,
     flags: *const u8,
@@ -2472,6 +2533,7 @@ pub unsafe fn screen_write_setselection(
 }
 
 /// Write unmodified string.
+// vendor/tmux/screen-write.c:3022  screen_write_rawstring()
 pub unsafe fn screen_write_rawstring(
     ctx: *mut screen_write_ctx,
     str: *mut u8,
@@ -2492,6 +2554,7 @@ pub unsafe fn screen_write_rawstring(
 
 /// Write a SIXEL image.
 #[cfg(feature = "sixel")]
+// vendor/tmux/screen-write.c:3039  screen_write_sixelimage()
 pub(crate) unsafe fn screen_write_sixelimage(
     ctx: *mut screen_write_ctx,
     mut si: *mut sixel_image,
@@ -2570,6 +2633,7 @@ pub(crate) unsafe fn screen_write_sixelimage(
 }
 
 /// Turn alternate screen on.
+// vendor/tmux/screen-write.c:3098  screen_write_alternateon()
 pub unsafe fn screen_write_alternateon(
     ctx: *mut screen_write_ctx,
     gc: *mut grid_cell,
@@ -2594,6 +2658,7 @@ pub unsafe fn screen_write_alternateon(
 }
 
 /// Turn alternate screen off.
+// vendor/tmux/screen-write.c:3124  screen_write_alternateoff()
 pub unsafe fn screen_write_alternateoff(
     ctx: *mut screen_write_ctx,
     gc: *mut grid_cell,

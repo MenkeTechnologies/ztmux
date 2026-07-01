@@ -38,6 +38,7 @@ pub struct sixel_image {
     lines: *mut sixel_line,
 }
 
+// vendor/tmux/image-sixel.c:70  sixel_parse_expand_lines()
 unsafe fn sixel_parse_expand_lines(si: *mut sixel_image, y: u32) -> bool {
     unsafe {
         if y <= (*si).y {
@@ -52,6 +53,7 @@ unsafe fn sixel_parse_expand_lines(si: *mut sixel_image, y: u32) -> bool {
     }
 }
 
+// vendor/tmux/image-sixel.c:82  sixel_parse_expand_line()
 unsafe fn sixel_parse_expand_line(si: *mut sixel_image, sl: *mut sixel_line, x: u32) -> bool {
     unsafe {
         if x <= (*sl).x {
@@ -69,6 +71,7 @@ unsafe fn sixel_parse_expand_line(si: *mut sixel_image, sl: *mut sixel_line, x: 
     }
 }
 
+// vendor/tmux/image-sixel.c:96  sixel_get_pixel()
 unsafe fn sixel_get_pixel(si: *mut sixel_image, x: u32, y: u32) -> u32 {
     unsafe {
         if y >= (*si).y {
@@ -82,6 +85,7 @@ unsafe fn sixel_get_pixel(si: *mut sixel_image, x: u32, y: u32) -> u32 {
     }
 }
 
+// vendor/tmux/image-sixel.c:109  sixel_set_pixel()
 unsafe fn sixel_set_pixel(si: *mut sixel_image, x: u32, y: u32, c: u32) -> bool {
     unsafe {
         if sixel_parse_expand_lines(si, y + 1) {
@@ -97,6 +101,7 @@ unsafe fn sixel_set_pixel(si: *mut sixel_image, x: u32, y: u32, c: u32) -> bool 
     }
 }
 
+// vendor/tmux/image-sixel.c:123  sixel_parse_write()
 unsafe fn sixel_parse_write(si: *mut sixel_image, ch: u32) -> bool {
     unsafe {
         if sixel_parse_expand_lines(si, (*si).dy + 6) {
@@ -117,6 +122,7 @@ unsafe fn sixel_parse_write(si: *mut sixel_image, ch: u32) -> bool {
     }
 }
 
+// vendor/tmux/image-sixel.c:137  sixel_parse_attributes()
 unsafe fn sixel_parse_attributes(si: *mut sixel_image, cp: *const u8, end: *const u8) -> *const u8 {
     unsafe {
         let mut endptr: *mut u8 = null_mut();
@@ -167,6 +173,7 @@ unsafe fn sixel_parse_attributes(si: *mut sixel_image, cp: *const u8, end: *cons
     }
 }
 
+// vendor/tmux/image-sixel.c:190  sixel_parse_colour()
 unsafe fn sixel_parse_colour(si: *mut sixel_image, cp: *const u8, end: *const u8) -> *const u8 {
     unsafe {
         let mut endptr: *mut u8 = null_mut();
@@ -223,6 +230,7 @@ unsafe fn sixel_parse_colour(si: *mut sixel_image, cp: *const u8, end: *const u8
     }
 }
 
+// vendor/tmux/image-sixel.c:253  sixel_parse_repeat()
 unsafe fn sixel_parse_repeat(si: *mut sixel_image, cp: *const u8, end: *const u8) -> *const u8 {
     unsafe {
         const SIZE_OF_TMP: usize = 32;
@@ -268,6 +276,7 @@ unsafe fn sixel_parse_repeat(si: *mut sixel_image, cp: *const u8, end: *const u8
     }
 }
 
+// vendor/tmux/image-sixel.c:294  sixel_parse()
 pub unsafe fn sixel_parse(
     buf: *const u8,
     len: usize,
@@ -343,6 +352,7 @@ pub unsafe fn sixel_parse(
     }
 }
 
+// vendor/tmux/image-sixel.c:359  sixel_free()
 pub unsafe fn sixel_free(si: *mut sixel_image) {
     unsafe {
         for y in 0..(*si).y {
@@ -356,6 +366,7 @@ pub unsafe fn sixel_free(si: *mut sixel_image) {
 }
 
 #[expect(dead_code)]
+// vendor/tmux/image-sixel.c:372  sixel_log()
 unsafe fn sixel_log(si: *mut sixel_image) {
     unsafe {
         let mut s: [u8; SIXEL_WIDTH_LIMIT as usize + 1] = [0; SIXEL_WIDTH_LIMIT as usize + 1];
@@ -385,10 +396,12 @@ unsafe fn sixel_log(si: *mut sixel_image) {
     }
 }
 
+// vendor/tmux/image-sixel.c:398  sixel_size_in_cells()
 pub fn sixel_size_in_cells(si: &sixel_image) -> (u32, u32) {
     (si.x.div_ceil(si.xpixel), si.y.div_ceil(si.ypixel))
 }
 
+// vendor/tmux/image-sixel.c:411  sixel_scale()
 pub unsafe fn sixel_scale(
     si: *mut sixel_image,
     mut xpixel: u32,
@@ -455,6 +468,7 @@ pub unsafe fn sixel_scale(
 
 #[inline]
 #[track_caller]
+// vendor/tmux/image-sixel.c:481  sixel_print_add()
 pub(crate) unsafe fn sixel_print_add(
     buf: *mut *mut u8,
     len: *mut usize,
@@ -474,6 +488,7 @@ pub(crate) unsafe fn sixel_print_add(
     log_debug!("sixel_print_add end");
 }
 
+// vendor/tmux/image-sixel.c:493  sixel_print_repeat()
 unsafe fn sixel_print_repeat(
     buf: *mut *mut u8,
     len: *mut usize,
@@ -499,6 +514,7 @@ unsafe fn sixel_print_repeat(
     }
 }
 
+// vendor/tmux/image-sixel.c:566  sixel_print()
 pub(crate) unsafe fn sixel_print(
     si: *mut sixel_image,
     map: *mut sixel_image,
@@ -638,6 +654,7 @@ pub(crate) unsafe fn sixel_print(
 }
 
 #[expect(dead_code)]
+// vendor/tmux/image-sixel.c:653  sixel_to_screen()
 unsafe fn sixel_to_screen(si: *mut sixel_image) -> *mut screen {
     unsafe {
         let mut ctx: screen_write_ctx = zeroed();

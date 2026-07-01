@@ -29,6 +29,7 @@ pub static CMD_SHOW_MESSAGES_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-show-messages.c:49  cmd_show_messages_terminals()
 unsafe fn cmd_show_messages_terminals(
     self_: *mut cmd,
     item: *mut cmdq_item,
@@ -68,6 +69,7 @@ unsafe fn cmd_show_messages_terminals(
     }
 }
 
+// vendor/tmux/cmd-show-messages.c:74  cmd_show_messages_exec()
 unsafe fn cmd_show_messages_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -34,6 +34,7 @@ pub static mut MESSAGE_NEXT: c_uint = 0;
 pub static mut MESSAGE_LOG: message_list = unsafe { zeroed() };
 pub static mut CURRENT_TIME: time_t = unsafe { zeroed() };
 
+// vendor/tmux/server.c:68  server_set_marked()
 pub unsafe fn server_set_marked(s: *mut session, wl: *mut winlink, wp: *mut window_pane) {
     unsafe {
         cmd_find_clear_state(&raw mut MARKED_PANE, cmd_find_flags::empty());
@@ -44,12 +45,14 @@ pub unsafe fn server_set_marked(s: *mut session, wl: *mut winlink, wp: *mut wind
     }
 }
 
+// vendor/tmux/server.c:80  server_clear_marked()
 pub unsafe fn server_clear_marked() {
     unsafe {
         cmd_find_clear_state(&raw mut MARKED_PANE, cmd_find_flags::empty());
     }
 }
 
+// vendor/tmux/server.c:87  server_is_marked()
 pub unsafe fn server_is_marked(s: *mut session, wl: *mut winlink, wp: *mut window_pane) -> bool {
     if s.is_null() || wl.is_null() || wp.is_null() {
         return false;
@@ -66,10 +69,12 @@ pub unsafe fn server_is_marked(s: *mut session, wl: *mut winlink, wp: *mut windo
     }
 }
 
+// vendor/tmux/server.c:100  server_check_marked()
 pub unsafe fn server_check_marked() -> bool {
     unsafe { cmd_find_valid_state(&raw mut MARKED_PANE) }
 }
 
+// vendor/tmux/server.c:107  server_create_socket()
 pub unsafe fn server_create_socket(flags: client_flag, cause: *mut *mut u8) -> c_int {
     unsafe {
         'fail: {
@@ -130,6 +135,7 @@ pub unsafe fn server_create_socket(flags: client_flag, cause: *mut *mut u8) -> c
 }
 
 /// Tidy up every hour.
+// vendor/tmux/server.c:158  server_tidy_event()
 unsafe extern "C-unwind" fn server_tidy_event(_fd: i32, _events: i16, _data: *mut c_void) {
     let tv = timeval {
         tv_sec: 3600,
@@ -154,6 +160,7 @@ unsafe extern "C-unwind" fn server_tidy_event(_fd: i32, _events: i16, _data: *mu
     }
 }
 
+// vendor/tmux/server.c:176  server_start()
 pub unsafe fn server_start(
     client: *mut tmuxproc,
     flags: client_flag,
@@ -290,6 +297,7 @@ pub unsafe fn server_start(
     }
 }
 
+// vendor/tmux/server.c:264  server_loop()
 pub unsafe fn server_loop() -> i32 {
     unsafe {
         CURRENT_TIME = libc::time(null_mut());
@@ -340,6 +348,7 @@ pub unsafe fn server_loop() -> i32 {
     }
 }
 
+// vendor/tmux/server.c:310  server_send_exit()
 unsafe fn server_send_exit() {
     unsafe {
         cmd_wait_for_flush();
@@ -360,6 +369,7 @@ unsafe fn server_send_exit() {
     }
 }
 
+// vendor/tmux/server.c:333  server_update_socket()
 pub unsafe fn server_update_socket() {
     static mut LAST: c_int = -1;
     unsafe {
@@ -398,6 +408,7 @@ pub unsafe fn server_update_socket() {
     }
 }
 
+// vendor/tmux/server.c:369  server_accept()
 unsafe extern "C-unwind" fn server_accept(fd: i32, events: i16, _data: *mut c_void) {
     unsafe {
         let mut sa: sockaddr_storage = zeroed(); // TODO remove this init
@@ -433,6 +444,7 @@ unsafe extern "C-unwind" fn server_accept(fd: i32, events: i16, _data: *mut c_vo
     }
 }
 
+// vendor/tmux/server.c:408  server_add_accept()
 pub unsafe fn server_add_accept(timeout: c_int) {
     unsafe {
         let mut tv = timeval {
@@ -471,6 +483,7 @@ pub unsafe fn server_add_accept(timeout: c_int) {
 }
 
 /// Signal handler.
+// vendor/tmux/server.c:431  server_signal()
 unsafe fn server_signal(sig: i32) {
     unsafe {
         log_debug!("{}: {}", "server_signal", _s(strsignal(sig).cast::<u8>()));
@@ -500,6 +513,7 @@ unsafe fn server_signal(sig: i32) {
 
 // handle SIGCHLD
 
+// vendor/tmux/server.c:463  server_child_signal()
 unsafe fn server_child_signal() {
     let mut status = 0i32;
     unsafe {
@@ -529,6 +543,7 @@ unsafe fn server_child_signal() {
     }
 }
 
+// vendor/tmux/server.c:486  server_child_exited()
 unsafe fn server_child_exited(pid: pid_t, status: i32) {
     unsafe {
         for w in rb_foreach(&raw mut WINDOWS).map(NonNull::as_ptr) {
@@ -551,6 +566,7 @@ unsafe fn server_child_exited(pid: pid_t, status: i32) {
     }
 }
 
+// vendor/tmux/server.c:514  server_child_stopped()
 unsafe fn server_child_stopped(pid: pid_t, status: i32) {
     unsafe {
         if WSTOPSIG(status) == SIGTTIN || WSTOPSIG(status) == SIGTTOU {

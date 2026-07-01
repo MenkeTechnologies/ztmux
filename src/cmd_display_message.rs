@@ -38,12 +38,14 @@ pub static CMD_DISPLAY_MESSAGE_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-display-message.c:53  cmd_display_message_each()
 unsafe fn cmd_display_message_each(key: &str, value: &str, item: *mut cmdq_item) {
     unsafe {
         cmdq_print!(item, "{}={}", key, value);
     }
 }
 
+// vendor/tmux/cmd-display-message.c:61  cmd_display_message_exec()
 unsafe fn cmd_display_message_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -27,6 +27,7 @@ pub static CMD_UNBIND_KEY_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-unbind-key.c:43  cmd_unbind_key_exec()
 unsafe fn cmd_unbind_key_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -28,6 +28,7 @@ type format_ranges = tailq_head<format_range>;
 impl_tailq_entry!(format_range, entry, tailq_entry<format_range>);
 
 /// Does this range match this style?
+// vendor/tmux/format-draw.c:44  format_is_type()
 fn format_is_type(fr: &format_range, sy: &style) -> bool {
     if fr.type_ != sy.range_type {
         return false;
@@ -50,6 +51,7 @@ fn format_is_type(fr: &format_range, sy: &style) -> bool {
 }
 
 /// Free a range.
+// vendor/tmux/format-draw.c:66  format_free_range()
 unsafe fn format_free_range(frs: *mut format_ranges, fr: *mut format_range) {
     unsafe {
         tailq_remove(frs, fr);
@@ -58,6 +60,7 @@ unsafe fn format_free_range(frs: *mut format_ranges, fr: *mut format_range) {
 }
 
 /// Fix range positions.
+// vendor/tmux/format-draw.c:74  format_update_ranges()
 unsafe fn format_update_ranges(
     frs: *mut format_ranges,
     s: *mut screen,
@@ -101,6 +104,7 @@ unsafe fn format_update_ranges(
 }
 
 /// Draw a part of the format.
+// vendor/tmux/format-draw.c:110  format_draw_put()
 unsafe fn format_draw_put(
     octx: *mut screen_write_ctx,
     ocx: u32,
@@ -121,6 +125,7 @@ unsafe fn format_draw_put(
 }
 
 /// Draw list part of format.
+// vendor/tmux/format-draw.c:125  format_draw_put_list()
 unsafe fn format_draw_put_list(
     octx: *mut screen_write_ctx,
     ocx: u32,
@@ -173,6 +178,7 @@ unsafe fn format_draw_put_list(
 }
 
 /// Draw format with no list.
+// vendor/tmux/format-draw.c:169  format_draw_none()
 unsafe fn format_draw_none(
     octx: *mut screen_write_ctx,
     available: u32,
@@ -249,6 +255,7 @@ unsafe fn format_draw_none(
 }
 
 /// Draw format with list on the left.
+// vendor/tmux/format-draw.c:228  format_draw_left()
 unsafe fn format_draw_left(
     octx: *mut screen_write_ctx,
     available: u32,
@@ -388,6 +395,7 @@ unsafe fn format_draw_left(
 }
 
 /// Draw format with list in the centre.
+// vendor/tmux/format-draw.c:331  format_draw_centre()
 unsafe fn format_draw_centre(
     octx: *mut screen_write_ctx,
     available: u32,
@@ -528,6 +536,7 @@ unsafe fn format_draw_centre(
 }
 
 /// Draw format with list on the right.
+// vendor/tmux/format-draw.c:439  format_draw_right()
 unsafe fn format_draw_right(
     octx: *mut screen_write_ctx,
     available: u32,
@@ -666,6 +675,7 @@ unsafe fn format_draw_right(
     }
 }
 
+// vendor/tmux/format-draw.c:545  format_draw_absolute_centre()
 unsafe fn format_draw_absolute_centre(
     octx: *mut screen_write_ctx,
     available: u32,
@@ -801,6 +811,7 @@ unsafe fn format_draw_absolute_centre(
 }
 
 /// Get width and count of any leading #s.
+// vendor/tmux/format-draw.c:648  format_leading_hashes()
 unsafe fn format_leading_hashes(cp: *const u8, n: *mut u32, width: *mut u32) -> *const u8 {
     unsafe {
         *n = 0;
@@ -832,6 +843,7 @@ unsafe fn format_leading_hashes(cp: *const u8, n: *mut u32, width: *mut u32) -> 
 }
 
 /// Draw multiple characters.
+// vendor/tmux/format-draw.c:678  format_draw_many()
 unsafe fn format_draw_many(ctx: *mut screen_write_ctx, sy: *mut style, ch: u8, n: u32) {
     unsafe {
         utf8_set(&raw mut (*sy).gc.data, ch);
@@ -842,6 +854,7 @@ unsafe fn format_draw_many(ctx: *mut screen_write_ctx, sy: *mut style, ch: u8, n
 }
 
 /// Draw a format to a screen.
+// vendor/tmux/format-draw.c:690  format_draw()
 pub unsafe fn format_draw(
     octx: *mut screen_write_ctx,
     base: *const grid_cell,
@@ -1367,6 +1380,7 @@ pub unsafe fn format_draw(
 }
 
 /// Get width, taking #[] into account.
+// vendor/tmux/format-draw.c:1100  format_width()
 pub unsafe fn format_width(expanded: &str) -> u32 {
     unsafe {
         let expanded = CString::new(expanded).unwrap(); // TODO FIXME extra allocation to
@@ -1422,6 +1436,7 @@ pub unsafe fn format_width(expanded: &str) -> u32 {
 ///
 /// Note, we copy the whole set of unescaped #s, but only add their escaped size to width.
 /// This is because the `format_draw` function will actually do the escaping when it runs
+// vendor/tmux/format-draw.c:1139  format_trim_left()
 pub unsafe fn format_trim_left(expanded: *const u8, limit: u32) -> *mut u8 {
     unsafe {
         let mut cp = expanded;
@@ -1500,6 +1515,7 @@ pub unsafe fn format_trim_left(expanded: *const u8, limit: u32) -> *mut u8 {
 }
 
 /// Trim on the right, taking #[] into account.
+// vendor/tmux/format-draw.c:1200  format_trim_right()
 pub unsafe fn format_trim_right(expanded: *const u8, limit: u32) -> *mut u8 {
     unsafe {
         let mut ud: utf8_data = std::mem::zeroed();

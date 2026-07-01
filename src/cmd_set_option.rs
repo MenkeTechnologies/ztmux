@@ -69,6 +69,7 @@ pub static CMD_SET_HOOK_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-set-option.c:75  cmd_set_option_args_parse()
 pub fn cmd_set_option_args_parse(
     _args: *mut args,
     idx: u32,
@@ -80,6 +81,7 @@ pub fn cmd_set_option_args_parse(
     }
 }
 
+// vendor/tmux/cmd-set-option.c:84  cmd_set_option_exec()
 pub unsafe fn cmd_set_option_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

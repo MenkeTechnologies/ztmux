@@ -14,11 +14,13 @@
 
 #[cfg(target_os = "linux")]
 unsafe extern "C" {
+    // vendor/tmux/compat/closefrom.c:90  closefrom()
     pub fn closefrom(__lowfd: i32);
 }
 
 #[cfg(target_os = "macos")]
 /// Closes all file descriptors >= `start_fd`.
+// vendor/tmux/compat/closefrom.c:90  closefrom()
 pub fn closefrom(start_fd: i32) {
     unsafe {
         let max_fd = libc::getdtablesize();

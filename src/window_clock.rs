@@ -137,6 +137,7 @@ pub static WINDOW_CLOCK_TABLE: [[[u8; 5]; 5]; 14] = [
     ],
 ];
 
+// vendor/tmux/window-clock.c:147  window_clock_timer_callback()
 pub unsafe extern "C-unwind" fn window_clock_timer_callback(
     _fd: i32,
     _events: i16,
@@ -173,6 +174,7 @@ pub unsafe extern "C-unwind" fn window_clock_timer_callback(
     }
 }
 
+// vendor/tmux/window-clock.c:171  window_clock_init()
 pub unsafe fn window_clock_init(
     wme: NonNull<window_mode_entry>,
     _fs: *mut cmd_find_state,
@@ -210,6 +212,7 @@ pub unsafe fn window_clock_init(
     }
 }
 
+// vendor/tmux/window-clock.c:194  window_clock_free()
 pub unsafe fn window_clock_free(wme: NonNull<window_mode_entry>) {
     unsafe {
         let data = (*wme.as_ptr()).data as *mut window_clock_mode_data;
@@ -220,6 +223,7 @@ pub unsafe fn window_clock_free(wme: NonNull<window_mode_entry>) {
     }
 }
 
+// vendor/tmux/window-clock.c:204  window_clock_resize()
 pub unsafe fn window_clock_resize(wme: NonNull<window_mode_entry>, sx: u32, sy: u32) {
     unsafe {
         let data = (*wme.as_ptr()).data as *mut window_clock_mode_data;
@@ -230,6 +234,7 @@ pub unsafe fn window_clock_resize(wme: NonNull<window_mode_entry>, sx: u32, sy: 
     }
 }
 
+// vendor/tmux/window-clock.c:214  window_clock_key()
 pub unsafe fn window_clock_key(
     wme: NonNull<window_mode_entry>,
     _c: *mut client,
@@ -243,6 +248,7 @@ pub unsafe fn window_clock_key(
     }
 }
 
+// vendor/tmux/window-clock.c:222  window_clock_draw_screen()
 pub unsafe fn window_clock_draw_screen(wme: NonNull<window_mode_entry>) {
     unsafe {
         let wp = (*wme.as_ptr()).wp;

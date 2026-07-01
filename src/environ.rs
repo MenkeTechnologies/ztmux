@@ -17,6 +17,7 @@ use crate::options_::*;
 pub type environ = rb_head<environ_entry>;
 RB_GENERATE!(environ, environ_entry, entry, discr_entry, environ_cmp);
 
+// vendor/tmux/environ.c:37  environ_cmp()
 pub fn environ_cmp(envent1: &environ_entry, envent2: &environ_entry) -> std::cmp::Ordering {
     unsafe {
         i32_to_ordering(libc::strcmp(
@@ -26,6 +27,7 @@ pub fn environ_cmp(envent1: &environ_entry, envent2: &environ_entry) -> std::cmp
     }
 }
 
+// vendor/tmux/environ.c:44  environ_create()
 pub fn environ_create() -> NonNull<environ> {
     unsafe {
         let env = xcalloc1::<environ>();
@@ -34,6 +36,7 @@ pub fn environ_create() -> NonNull<environ> {
     }
 }
 
+// vendor/tmux/environ.c:56  environ_free()
 pub unsafe fn environ_free(env: *mut environ) {
     unsafe {
         for envent in rb_foreach(env).map(NonNull::as_ptr) {
@@ -46,14 +49,17 @@ pub unsafe fn environ_free(env: *mut environ) {
     }
 }
 
+// vendor/tmux/environ.c:73  environ_first()
 pub unsafe fn environ_first(env: *mut environ) -> *mut environ_entry {
     unsafe { rb_min(env) }
 }
 
+// vendor/tmux/environ.c:79  environ_next()
 pub unsafe fn environ_next(envent: *mut environ_entry) -> *mut environ_entry {
     unsafe { rb_next(envent) }
 }
 
+// vendor/tmux/environ.c:86  environ_copy()
 pub unsafe fn environ_copy(srcenv: *mut environ, dstenv: *mut environ) {
     unsafe {
         for envent in rb_foreach(srcenv).map(NonNull::as_ptr) {
@@ -72,6 +78,7 @@ pub unsafe fn environ_copy(srcenv: *mut environ, dstenv: *mut environ) {
     }
 }
 
+// vendor/tmux/environ.c:102  environ_find()
 pub unsafe fn environ_find(env: *mut environ, name: *const u8) -> *mut environ_entry {
     let mut envent: MaybeUninit<environ_entry> = MaybeUninit::uninit();
     let envent = envent.as_mut_ptr();
@@ -118,6 +125,7 @@ pub unsafe fn environ_set_(
     }
 }
 
+// vendor/tmux/environ.c:135  environ_clear()
 pub unsafe fn environ_clear(env: *mut environ, name: *const u8) {
     unsafe {
         let mut envent = environ_find(env, name);
@@ -136,6 +144,7 @@ pub unsafe fn environ_clear(env: *mut environ, name: *const u8) {
     }
 }
 
+// vendor/tmux/environ.c:153  environ_put()
 pub unsafe fn environ_put(env: *mut environ, var: *const u8, flags: environ_flags) {
     unsafe {
         let mut value = libc::strchr(var, b'=' as c_int);
@@ -152,6 +161,7 @@ pub unsafe fn environ_put(env: *mut environ, var: *const u8, flags: environ_flag
     }
 }
 
+// vendor/tmux/environ.c:172  environ_unset()
 pub unsafe fn environ_unset(env: *mut environ, name: *const u8) {
     unsafe {
         let envent = environ_find(env, name);
@@ -165,6 +175,7 @@ pub unsafe fn environ_unset(env: *mut environ, name: *const u8) {
     }
 }
 
+// vendor/tmux/environ.c:186  environ_update()
 pub unsafe fn environ_update(oo: *mut options, src: *mut environ, dst: *mut environ) {
     unsafe {
         let mut found;
@@ -197,6 +208,7 @@ pub unsafe fn environ_update(oo: *mut options, src: *mut environ, dst: *mut envi
     }
 }
 
+// vendor/tmux/environ.c:216  environ_push()
 pub unsafe fn environ_push(env: *mut environ) {
     unsafe {
         environ = xcalloc_::<*mut u8>(1).as_ptr();
@@ -238,6 +250,7 @@ pub unsafe fn environ_log_(env: *mut environ, args: std::fmt::Arguments) {
     }
 }
 
+// vendor/tmux/environ.c:253  environ_for_session()
 pub unsafe fn environ_for_session(s: *mut session, no_term: c_int) -> *mut environ {
     let env: *mut environ = environ_create().as_ptr();
 

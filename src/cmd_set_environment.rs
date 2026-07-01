@@ -31,6 +31,7 @@ pub static CMD_SET_ENVIRONMENT_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-set-environment.c:47  cmd_set_environment_exec()
 unsafe fn cmd_set_environment_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -132,6 +132,7 @@ static MODE_TREE_MENU_ITEMS: [menu_item; 4] = [
     menu_item::new("Cancel", 'q' as u64, null_mut()),
 ];
 
+// vendor/tmux/mode-tree.c:241  mode_tree_find_item()
 unsafe fn mode_tree_find_item(mtl: *mut mode_tree_list, tag: u64) -> *mut mode_tree_item {
     unsafe {
         for mti in tailq_foreach(mtl).map(NonNull::as_ptr) {
@@ -147,6 +148,7 @@ unsafe fn mode_tree_find_item(mtl: *mut mode_tree_list, tag: u64) -> *mut mode_t
     }
 }
 
+// vendor/tmux/mode-tree.c:256  mode_tree_free_item()
 unsafe fn mode_tree_free_item(mti: *mut mode_tree_item) {
     unsafe {
         mode_tree_free_items(&raw mut (*mti).children);
@@ -159,6 +161,7 @@ unsafe fn mode_tree_free_item(mti: *mut mode_tree_item) {
     }
 }
 
+// vendor/tmux/mode-tree.c:268  mode_tree_free_items()
 unsafe fn mode_tree_free_items(mtl: *mut mode_tree_list) {
     unsafe {
         for mti in tailq_foreach(mtl).map(NonNull::as_ptr) {
@@ -168,6 +171,7 @@ unsafe fn mode_tree_free_items(mtl: *mut mode_tree_list) {
     }
 }
 
+// vendor/tmux/mode-tree.c:279  mode_tree_check_selected()
 unsafe fn mode_tree_check_selected(mtd: *mut mode_tree_data) {
     unsafe {
         // If the current line would now be off screen reset the offset to the
@@ -178,12 +182,14 @@ unsafe fn mode_tree_check_selected(mtd: *mut mode_tree_data) {
     }
 }
 
+// vendor/tmux/mode-tree.c:290  mode_tree_clear_lines()
 unsafe fn mode_tree_clear_lines(mtd: *mut mode_tree_data) {
     unsafe {
         (*mtd).line_list = Vec::new();
     }
 }
 
+// vendor/tmux/mode-tree.c:298  mode_tree_build_lines()
 unsafe fn mode_tree_build_lines(mtd: *mut mode_tree_data, mtl: *mut mode_tree_list, depth: u32) {
     unsafe {
         let mut flat = 1;
@@ -239,6 +245,7 @@ unsafe fn mode_tree_build_lines(mtd: *mut mode_tree_data, mtl: *mut mode_tree_li
     }
 }
 
+// vendor/tmux/mode-tree.c:354  mode_tree_clear_tagged()
 unsafe fn mode_tree_clear_tagged(mtl: *mut mode_tree_list) {
     unsafe {
         for mti in tailq_foreach(mtl).map(NonNull::as_ptr) {
@@ -248,6 +255,7 @@ unsafe fn mode_tree_clear_tagged(mtl: *mut mode_tree_list) {
     }
 }
 
+// vendor/tmux/mode-tree.c:365  mode_tree_up()
 pub unsafe fn mode_tree_up(mtd: *mut mode_tree_data, wrap: i32) {
     unsafe {
         if (*mtd).current == 0 {
@@ -266,6 +274,7 @@ pub unsafe fn mode_tree_up(mtd: *mut mode_tree_data, wrap: i32) {
     }
 }
 
+// vendor/tmux/mode-tree.c:383  mode_tree_down()
 pub unsafe fn mode_tree_down(mtd: *mut mode_tree_data, wrap: i32) -> bool {
     unsafe {
         if (*mtd).current == (*mtd).line_list.len() as u32 - 1 {
@@ -286,15 +295,18 @@ pub unsafe fn mode_tree_down(mtd: *mut mode_tree_data, wrap: i32) -> bool {
     }
 }
 
+// vendor/tmux/mode-tree.c:431  mode_tree_get_current()
 pub unsafe fn mode_tree_get_current(mtd: *mut mode_tree_data) -> NonNull<c_void> {
     NonNull::new(unsafe { (*(&mut (*mtd).line_list)[(*mtd).current as usize].item).itemdata })
         .unwrap()
 }
 
+// vendor/tmux/mode-tree.c:439  mode_tree_get_current_name()
 pub unsafe fn mode_tree_get_current_name(mtd: *mut mode_tree_data) -> *const u8 {
     unsafe { (*(&(*mtd).line_list)[(*mtd).current as usize].item).name }
 }
 
+// vendor/tmux/mode-tree.c:452  mode_tree_expand_current()
 pub unsafe fn mode_tree_expand_current(mtd: *mut mode_tree_data) {
     unsafe {
         if !(*(&(*mtd).line_list)[(*mtd).current as usize].item).expanded {
@@ -304,6 +316,7 @@ pub unsafe fn mode_tree_expand_current(mtd: *mut mode_tree_data) {
     }
 }
 
+// vendor/tmux/mode-tree.c:461  mode_tree_collapse_current()
 pub unsafe fn mode_tree_collapse_current(mtd: *mut mode_tree_data) {
     unsafe {
         if (*(&(*mtd).line_list)[(*mtd).current as usize].item).expanded {
@@ -313,6 +326,7 @@ pub unsafe fn mode_tree_collapse_current(mtd: *mut mode_tree_data) {
     }
 }
 
+// vendor/tmux/mode-tree.c:470  mode_tree_get_tag()
 pub unsafe fn mode_tree_get_tag(mtd: &mode_tree_data, tag: u64) -> Option<usize> {
     unsafe {
         mtd.line_list
@@ -321,6 +335,7 @@ pub unsafe fn mode_tree_get_tag(mtd: &mode_tree_data, tag: u64) -> Option<usize>
     }
 }
 
+// vendor/tmux/mode-tree.c:486  mode_tree_expand()
 pub unsafe fn mode_tree_expand(mtd: *mut mode_tree_data, tag: u64) {
     unsafe {
         let Some(found) = mode_tree_get_tag(&*mtd, tag) else {
@@ -333,6 +348,7 @@ pub unsafe fn mode_tree_expand(mtd: *mut mode_tree_data, tag: u64) {
     }
 }
 
+// vendor/tmux/mode-tree.c:499  mode_tree_set_current()
 pub unsafe fn mode_tree_set_current(mtd: *mut mode_tree_data, tag: u64) -> bool {
     unsafe {
         if let Some(found) = mode_tree_get_tag(&*mtd, tag) {
@@ -351,6 +367,7 @@ pub unsafe fn mode_tree_set_current(mtd: *mut mode_tree_data, tag: u64) -> bool 
     }
 }
 
+// vendor/tmux/mode-tree.c:524  mode_tree_count_tagged()
 pub unsafe fn mode_tree_count_tagged(mtd: *mut mode_tree_data) -> u32 {
     unsafe {
         (*mtd)
@@ -361,6 +378,7 @@ pub unsafe fn mode_tree_count_tagged(mtd: *mut mode_tree_data) -> u32 {
     }
 }
 
+// vendor/tmux/mode-tree.c:539  mode_tree_each_tagged()
 pub unsafe fn mode_tree_each_tagged(
     mtd: *mut mode_tree_data,
     cb: mode_tree_each_cb,
@@ -468,6 +486,7 @@ pub unsafe fn mode_tree_start(
     }
 }
 
+// vendor/tmux/mode-tree.c:615  mode_tree_zoom()
 pub unsafe fn mode_tree_zoom(mtd: *mut mode_tree_data, args: *mut args) {
     unsafe {
         let wp: *mut window_pane = (*mtd).wp;
@@ -483,6 +502,7 @@ pub unsafe fn mode_tree_zoom(mtd: *mut mode_tree_data, args: *mut args) {
     }
 }
 
+// vendor/tmux/mode-tree.c:628  mode_tree_set_height()
 pub unsafe fn mode_tree_set_height(mtd: *mut mode_tree_data) {
     unsafe {
         let s: *mut screen = &raw mut (*mtd).screen;
@@ -507,6 +527,7 @@ pub unsafe fn mode_tree_set_height(mtd: *mut mode_tree_data) {
     }
 }
 
+// vendor/tmux/mode-tree.c:658  mode_tree_build()
 pub unsafe fn mode_tree_build(mtd: *mut mode_tree_data) {
     unsafe {
         let s = &raw mut (*mtd).screen;
@@ -557,6 +578,7 @@ pub unsafe fn mode_tree_build(mtd: *mut mode_tree_data) {
     }
 }
 
+// vendor/tmux/mode-tree.c:698  mode_tree_remove_ref()
 pub unsafe fn mode_tree_remove_ref(mtd: *mut mode_tree_data) {
     unsafe {
         (*mtd).references -= 1;
@@ -566,6 +588,7 @@ pub unsafe fn mode_tree_remove_ref(mtd: *mut mode_tree_data) {
     }
 }
 
+// vendor/tmux/mode-tree.c:705  mode_tree_free()
 pub unsafe fn mode_tree_free(mtd: *mut mode_tree_data) {
     unsafe {
         let wp = (*mtd).wp;
@@ -586,6 +609,7 @@ pub unsafe fn mode_tree_free(mtd: *mut mode_tree_data) {
     }
 }
 
+// vendor/tmux/mode-tree.c:725  mode_tree_resize()
 pub unsafe fn mode_tree_resize(mtd: *mut mode_tree_data, sx: u32, sy: u32) {
     unsafe {
         let s: *mut screen = &raw mut (*mtd).screen;
@@ -599,6 +623,7 @@ pub unsafe fn mode_tree_resize(mtd: *mut mode_tree_data, sx: u32, sy: u32) {
     }
 }
 
+// vendor/tmux/mode-tree.c:738  mode_tree_add()
 pub unsafe fn mode_tree_add(
     mtd: *mut mode_tree_data,
     parent: *mut mode_tree_item,
@@ -643,18 +668,21 @@ pub unsafe fn mode_tree_add(
     }
 }
 
+// vendor/tmux/mode-tree.c:783  mode_tree_draw_as_parent()
 pub unsafe fn mode_tree_draw_as_parent(mti: *mut mode_tree_item) {
     unsafe {
         (*mti).draw_as_parent = 1;
     }
 }
 
+// vendor/tmux/mode-tree.c:789  mode_tree_no_tag()
 pub unsafe fn mode_tree_no_tag(mti: *mut mode_tree_item) {
     unsafe {
         (*mti).no_tag = 1;
     }
 }
 
+// vendor/tmux/mode-tree.c:805  mode_tree_remove()
 pub unsafe fn mode_tree_remove(mtd: *mut mode_tree_data, mti: *mut mode_tree_item) {
     unsafe {
         let parent: *mut mode_tree_item = (*mti).parent;
@@ -668,6 +696,7 @@ pub unsafe fn mode_tree_remove(mtd: *mut mode_tree_data, mti: *mut mode_tree_ite
     }
 }
 
+// vendor/tmux/mode-tree.c:817  mode_tree_draw()
 pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
     unsafe {
         let wp = mtd.wp;
@@ -893,6 +922,7 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
     }
 }
 
+// vendor/tmux/mode-tree.c:1175  mode_tree_search_backward()
 pub unsafe fn mode_tree_search_backward(mtd: *mut mode_tree_data) -> *mut mode_tree_item {
     unsafe {
         if (*mtd).search.is_null() {
@@ -945,6 +975,7 @@ pub unsafe fn mode_tree_search_backward(mtd: *mut mode_tree_data) -> *mut mode_t
     }
 }
 
+// vendor/tmux/mode-tree.c:1224  mode_tree_search_forward()
 pub unsafe fn mode_tree_search_forward(mtd: *mut mode_tree_data) -> *mut mode_tree_item {
     unsafe {
         if (*mtd).search.is_null() {
@@ -996,6 +1027,7 @@ pub unsafe fn mode_tree_search_forward(mtd: *mut mode_tree_data) -> *mut mode_tr
     }
 }
 
+// vendor/tmux/mode-tree.c:1269  mode_tree_search_set()
 pub unsafe fn mode_tree_search_set(mtd: *mut mode_tree_data) {
     unsafe {
         let mti = match (*mtd).search_dir {
@@ -1020,6 +1052,7 @@ pub unsafe fn mode_tree_search_set(mtd: *mut mode_tree_data) {
     }
 }
 
+// vendor/tmux/mode-tree.c:1295  mode_tree_search_callback()
 pub unsafe fn mode_tree_search_callback(
     _c: *mut client,
     mtd: NonNull<mode_tree_data>,
@@ -1051,6 +1084,7 @@ pub unsafe fn mode_tree_search_free(data: NonNull<mode_tree_data>) {
     }
 }
 
+// vendor/tmux/mode-tree.c:1318  mode_tree_filter_callback()
 pub unsafe fn mode_tree_filter_callback(
     _c: *mut client,
     data: NonNull<mode_tree_data>,
@@ -1087,6 +1121,7 @@ pub unsafe fn mode_tree_filter_free(data: NonNull<mode_tree_data>) {
     }
 }
 
+// vendor/tmux/mode-tree.c:1354  mode_tree_menu_callback()
 pub unsafe fn mode_tree_menu_callback(
     _menu: *mut menu,
     _idx: u32,
@@ -1114,6 +1149,7 @@ pub unsafe fn mode_tree_menu_callback(
     }
 }
 
+// vendor/tmux/mode-tree.c:1374  mode_tree_display_menu()
 pub unsafe fn mode_tree_display_menu(
     mtd: *mut mode_tree_data,
     c: *mut client,
@@ -1175,6 +1211,7 @@ pub unsafe fn mode_tree_display_menu(
     }
 }
 
+// vendor/tmux/mode-tree.c:1494  mode_tree_key()
 pub unsafe fn mode_tree_key(
     mtd: *mut mode_tree_data,
     c: *mut client,
@@ -1476,6 +1513,7 @@ pub unsafe fn mode_tree_key(
     }
 }
 
+// vendor/tmux/mode-tree.c:1812  mode_tree_run_command()
 pub unsafe fn mode_tree_run_command(
     c: *mut client,
     fs: *mut cmd_find_state,

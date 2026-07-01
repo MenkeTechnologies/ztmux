@@ -47,6 +47,7 @@ pub struct cmd_run_shell_data<'a> {
     pub flags: job_flag,
 }
 
+// vendor/tmux/cmd-run-shell.c:70  cmd_run_shell_args_parse()
 pub unsafe fn cmd_run_shell_args_parse(
     args: *mut args,
     _idx: u32,
@@ -61,6 +62,7 @@ pub unsafe fn cmd_run_shell_args_parse(
     args_parse_type::ARGS_PARSE_STRING
 }
 
+// vendor/tmux/cmd-run-shell.c:79  cmd_run_shell_print()
 pub unsafe fn cmd_run_shell_print(job: *mut job, msg: *const u8) {
     unsafe {
         let cdata: *mut cmd_run_shell_data = job_get_data(job) as *mut cmd_run_shell_data;
@@ -100,6 +102,7 @@ pub unsafe fn cmd_run_shell_print(job: *mut job, msg: *const u8) {
     }
 }
 
+// vendor/tmux/cmd-run-shell.c:108  cmd_run_shell_exec()
 pub unsafe fn cmd_run_shell_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     let __func__ = c!("cmd_run_shell_exec");
     unsafe {
@@ -183,6 +186,7 @@ pub unsafe fn cmd_run_shell_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
     cmd_retval::CMD_RETURN_WAIT
 }
 
+// vendor/tmux/cmd-run-shell.c:192  cmd_run_shell_timer()
 pub unsafe extern "C-unwind" fn cmd_run_shell_timer(
     _fd: i32,
     _events: i16,
@@ -249,6 +253,7 @@ pub unsafe extern "C-unwind" fn cmd_run_shell_timer(
     }
 }
 
+// vendor/tmux/cmd-run-shell.c:246  cmd_run_shell_callback()
 pub unsafe fn cmd_run_shell_callback(job: *mut job) {
     unsafe {
         let cdata = job_get_data(job) as *mut cmd_run_shell_data;
@@ -312,6 +317,7 @@ pub unsafe fn cmd_run_shell_callback(job: *mut job) {
     }
 }
 
+// vendor/tmux/cmd-run-shell.c:297  cmd_run_shell_free()
 pub unsafe fn cmd_run_shell_free(data: *mut c_void) {
     unsafe {
         let __func__ = c!("cmd_run_shell_free");

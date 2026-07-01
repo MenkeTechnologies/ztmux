@@ -47,6 +47,7 @@ struct cmd_command_prompt_cdata<'a> {
     argv: *mut *mut u8,
 }
 
+// vendor/tmux/cmd-command-prompt.c:76  cmd_command_prompt_args_parse()
 fn cmd_command_prompt_args_parse(
     _args: *mut args,
     _idx: u32,
@@ -55,6 +56,7 @@ fn cmd_command_prompt_args_parse(
     args_parse_type::ARGS_PARSE_COMMANDS_OR_STRING
 }
 
+// vendor/tmux/cmd-command-prompt.c:83  cmd_command_prompt_exec()
 unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -181,6 +183,7 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
     }
 }
 
+// vendor/tmux/cmd-command-prompt.c:198  cmd_command_prompt_callback()
 unsafe fn cmd_command_prompt_callback(
     c: *mut client,
     cdata: NonNull<cmd_command_prompt_cdata>,
@@ -250,6 +253,7 @@ unsafe fn cmd_command_prompt_callback(
     }
 }
 
+// vendor/tmux/cmd-command-prompt.c:268  cmd_command_prompt_free()
 unsafe fn cmd_command_prompt_free(cdata: NonNull<cmd_command_prompt_cdata>) {
     unsafe {
         for i in 0u32..(*cdata.as_ptr()).count {

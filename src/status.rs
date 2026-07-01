@@ -148,6 +148,7 @@ pub unsafe fn status_prompt_save_history() {
 }
 
 /// Status timer callback.
+// vendor/tmux/status.c:38  status_timer_callback()
 unsafe extern "C-unwind" fn status_timer_callback(_fd: i32, _events: i16, c: NonNull<client>) {
     unsafe {
         let c = c.as_ptr();
@@ -175,6 +176,7 @@ unsafe extern "C-unwind" fn status_timer_callback(_fd: i32, _events: i16, c: Non
 }
 
 /// Start status timer for client.
+// vendor/tmux/status.c:62  status_timer_start()
 pub unsafe fn status_timer_start(c: NonNull<client>) {
     unsafe {
         let s: *mut session = (*c.as_ptr()).session;
@@ -196,6 +198,7 @@ pub unsafe fn status_timer_start(c: NonNull<client>) {
 }
 
 /// Start status timer for all clients.
+// vendor/tmux/status.c:77  status_timer_start_all()
 pub unsafe fn status_timer_start_all() {
     unsafe {
         for c in tailq_foreach(&raw mut CLIENTS) {
@@ -205,6 +208,7 @@ pub unsafe fn status_timer_start_all() {
 }
 
 /// Update status cache.
+// vendor/tmux/status.c:87  status_update_cache()
 pub unsafe fn status_update_cache(s: *mut session) {
     unsafe {
         (*s).statuslines = options_get_number_((*s).options, "status") as u32;
@@ -219,6 +223,7 @@ pub unsafe fn status_update_cache(s: *mut session) {
 }
 
 /// Get screen line of status line. -1 means off.
+// vendor/tmux/status.c:100  status_at_line()
 pub unsafe fn status_at_line(c: *mut client) -> i32 {
     unsafe {
         let s: *mut session = (*c).session;
@@ -237,6 +242,7 @@ pub unsafe fn status_at_line(c: *mut client) -> i32 {
 }
 
 /// Get size of status line for client's session. 0 means off.
+// vendor/tmux/status.c:113  status_line_size()
 pub unsafe fn status_line_size(c: *mut client) -> u32 {
     unsafe {
         let s: *mut session = (*c).session;
@@ -255,6 +261,7 @@ pub unsafe fn status_line_size(c: *mut client) -> u32 {
 }
 
 /// Get the prompt line number for client's session. 1 means at the bottom.
+// vendor/tmux/status.c:126  status_prompt_line_at()
 unsafe fn status_prompt_line_at(c: *mut client) -> u32 {
     unsafe {
         let s = (*c).session;
@@ -270,6 +277,7 @@ unsafe fn status_prompt_line_at(c: *mut client) -> u32 {
 }
 
 /// Get window at window list position.
+// vendor/tmux/status.c:142  status_get_range()
 pub unsafe fn status_get_range(c: *mut client, x: u32, y: u32) -> *mut style_range {
     unsafe {
         let sl = &raw mut (*c).status;
@@ -297,6 +305,7 @@ unsafe fn status_free_ranges(srs: *mut style_ranges) {
 }
 
 /// Save old status line.
+// vendor/tmux/status.c:153  status_push_screen()
 unsafe fn status_push_screen(c: *mut client) {
     unsafe {
         let sl = &raw mut (*c).status;
@@ -310,6 +319,7 @@ unsafe fn status_push_screen(c: *mut client) {
 }
 
 /// Restore old status line.
+// vendor/tmux/status.c:166  status_pop_screen()
 unsafe fn status_pop_screen(c: *mut client) {
     unsafe {
         let sl = &raw mut (*c).status;
@@ -324,6 +334,7 @@ unsafe fn status_pop_screen(c: *mut client) {
 }
 
 /// Initialize status line.
+// vendor/tmux/status.c:179  status_init()
 pub unsafe fn status_init(c: *mut client) {
     unsafe {
         let sl = &raw mut (*c).status;
@@ -338,6 +349,7 @@ pub unsafe fn status_init(c: *mut client) {
 }
 
 /// Free status line.
+// vendor/tmux/status.c:193  status_free()
 pub unsafe fn status_free(c: *mut client) {
     unsafe {
         let sl = &raw mut (*c).status;
@@ -360,6 +372,7 @@ pub unsafe fn status_free(c: *mut client) {
 }
 
 /// Draw status line for client.
+// vendor/tmux/status.c:215  status_redraw()
 pub unsafe fn status_redraw(c: *mut client) -> i32 {
     unsafe {
         let sl = &raw mut (*c).status;
@@ -552,6 +565,7 @@ pub unsafe fn status_message_set_(
 }
 
 /// Clear status line message.
+// vendor/tmux/status.c:393  status_message_clear()
 pub unsafe fn status_message_clear(c: NonNull<client>) {
     unsafe {
         let c = c.as_ptr();
@@ -572,6 +586,7 @@ pub unsafe fn status_message_clear(c: NonNull<client>) {
 }
 
 /// Clear status line message after timer expires.
+// vendor/tmux/status.c:453  status_message_callback()
 unsafe extern "C-unwind" fn status_message_callback(_fd: i32, _event: i16, data: NonNull<client>) {
     unsafe {
         status_message_clear(data);
@@ -579,6 +594,7 @@ unsafe extern "C-unwind" fn status_message_callback(_fd: i32, _event: i16, data:
 }
 
 /// Draw client message on status line of present else on last line.
+// vendor/tmux/status.c:462  status_message_redraw()
 pub unsafe fn status_message_redraw(c: *mut client) -> i32 {
     unsafe {
         let sl = &raw mut (*c).status;
@@ -658,6 +674,7 @@ pub unsafe fn status_message_redraw(c: *mut client) -> i32 {
 }
 
 /// Enable status line prompt.
+// vendor/tmux/status.c:573  status_prompt_set()
 pub unsafe fn status_prompt_set<T>(
     c: *mut client,
     fs: *mut cmd_find_state,
@@ -737,6 +754,7 @@ pub unsafe fn status_prompt_set<T>(
 }
 
 /// Remove status line prompt.
+// vendor/tmux/status.c:616  status_prompt_clear()
 pub unsafe fn status_prompt_clear(c: *mut client) {
     unsafe {
         if (*c).prompt_string.is_null() {
@@ -769,6 +787,7 @@ pub unsafe fn status_prompt_clear(c: *mut client) {
 }
 
 /// Update status line prompt with a new prompt string.
+// vendor/tmux/status.c:632  status_prompt_update()
 pub unsafe fn status_prompt_update(c: *mut client, msg: *const u8, input: *const u8) {
     unsafe {
         let ft = format_create(c, null_mut(), FORMAT_NONE, format_flags::empty());
@@ -797,6 +816,7 @@ pub unsafe fn status_prompt_update(c: *mut client, msg: *const u8, input: *const
 }
 
 /// Draw client prompt on status line of present else on last line.
+// vendor/tmux/status.c:657  status_prompt_redraw()
 pub unsafe fn status_prompt_redraw(c: *mut client) -> i32 {
     unsafe {
         let sl = &raw mut (*c).status;
@@ -1406,6 +1426,7 @@ unsafe fn status_prompt_backward_word(c: *mut client, separators: *const u8) {
 }
 
 /// Handle keys in prompt.
+// vendor/tmux/status.c:710  status_prompt_key()
 pub unsafe fn status_prompt_key(c: *mut client, mut key: key_code) -> i32 {
     unsafe {
         let oo = (*(*c).session).options;

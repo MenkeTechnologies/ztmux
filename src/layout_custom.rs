@@ -14,6 +14,7 @@
 use crate::libc::sscanf;
 use crate::*;
 
+// vendor/tmux/layout-custom.c:37  layout_find_bottomright()
 pub unsafe fn layout_find_bottomright(mut lc: *mut layout_cell) -> *mut layout_cell {
     unsafe {
         if (*lc).type_ == layout_type::LAYOUT_WINDOWPANE {
@@ -24,6 +25,7 @@ pub unsafe fn layout_find_bottomright(mut lc: *mut layout_cell) -> *mut layout_c
     }
 }
 
+// vendor/tmux/layout-custom.c:47  layout_checksum()
 pub unsafe fn layout_checksum(mut layout: *const u8) -> u16 {
     unsafe {
         let mut csum = 0u16;
@@ -37,6 +39,7 @@ pub unsafe fn layout_checksum(mut layout: *const u8) -> u16 {
 }
 
 /// Dump layout as a string.
+// vendor/tmux/layout-custom.c:61  layout_dump()
 pub unsafe fn layout_dump(root: *mut layout_cell) -> Option<String> {
     unsafe {
         let mut layout: MaybeUninit<[u8; 8192]> = MaybeUninit::<[u8; 8192]>::uninit();
@@ -51,6 +54,7 @@ pub unsafe fn layout_dump(root: *mut layout_cell) -> Option<String> {
     }
 }
 
+// vendor/tmux/layout-custom.c:91  layout_append()
 pub unsafe fn layout_append(lc: *mut layout_cell, buf: *mut u8, len: usize) -> i32 {
     unsafe {
         let sizeof_tmp = 64;
@@ -121,6 +125,7 @@ pub unsafe fn layout_append(lc: *mut layout_cell, buf: *mut u8, len: usize) -> i
 }
 
 /// Check layout sizes fit.
+// vendor/tmux/layout-custom.c:138  layout_check()
 pub unsafe fn layout_check(lc: *mut layout_cell) -> bool {
     unsafe {
         let mut n = 0u32;
@@ -160,6 +165,7 @@ pub unsafe fn layout_check(lc: *mut layout_cell) -> bool {
     true
 }
 
+// vendor/tmux/layout-custom.c:174  layout_parse()
 pub unsafe fn layout_parse(w: *mut window, mut layout: *const u8, cause: *mut *mut u8) -> i32 {
     let __func__ = c!("layout_parse");
     unsafe {
@@ -270,6 +276,7 @@ pub unsafe fn layout_parse(w: *mut window, mut layout: *const u8, cause: *mut *m
 }
 
 /// Assign panes into cells.
+// vendor/tmux/layout-custom.c:300  layout_assign()
 unsafe fn layout_assign(wp: *mut *mut window_pane, lc: *mut layout_cell) {
     unsafe {
         match (*lc).type_ {
@@ -287,6 +294,7 @@ unsafe fn layout_assign(wp: *mut *mut window_pane, lc: *mut layout_cell) {
 }
 
 /// Construct a cell from all or part of a layout tree.
+// vendor/tmux/layout-custom.c:376  layout_construct()
 unsafe fn layout_construct(lcparent: *mut layout_cell, layout: *mut *const u8) -> *mut layout_cell {
     unsafe {
         let lc;

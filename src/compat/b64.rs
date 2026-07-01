@@ -2,6 +2,7 @@ use core::mem::MaybeUninit;
 
 // https://www.rfc-editor.org/rfc/rfc4648
 
+// vendor/tmux/compat/base64.c:126  b64_ntop()
 pub unsafe fn b64_ntop(src: *const u8, srclength: usize, target: *mut u8, targsize: usize) -> i32 {
     let src = unsafe { std::slice::from_raw_parts(src, srclength) };
     let dst = unsafe { std::slice::from_raw_parts_mut(target.cast::<MaybeUninit<u8>>(), targsize) };
@@ -16,6 +17,7 @@ pub unsafe fn b64_ntop(src: *const u8, srclength: usize, target: *mut u8, targsi
 /// converts characters, four at a time, starting at (or after)
 /// src from base - 64 numbers into three 8 bit bytes in the target area.
 /// it returns the number of data bytes stored at the target, or -1 on error.
+// vendor/tmux/compat/base64.c:187  b64_pton()
 pub unsafe fn b64_pton(src: *const u8, target: *mut u8, targsize: usize) -> i32 {
     let srclength: usize = unsafe { crate::libc::strlen(src) };
     let src = unsafe { std::slice::from_raw_parts(src.cast::<u8>(), srclength) };

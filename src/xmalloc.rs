@@ -21,6 +21,7 @@ use crate::{
     fatalx,
 };
 
+// vendor/tmux/xmalloc.c:27  xmalloc()
 pub fn xmalloc(size: usize) -> NonNull<c_void> {
     debug_assert_ne!(size, 0, "xmalloc: zero size");
 
@@ -33,6 +34,7 @@ pub fn xmalloc(size: usize) -> NonNull<c_void> {
         .cast()
 }
 
+// vendor/tmux/xmalloc.c:41  xcalloc()
 pub fn xcalloc(nmemb: usize, size: usize) -> NonNull<c_void> {
     debug_assert!(size != 0 && nmemb != 0, "xcalloc: zero size");
 
@@ -49,6 +51,7 @@ pub unsafe fn xcalloc1<'a, T>() -> &'a mut T {
     unsafe { ptr.as_mut() }
 }
 
+// vendor/tmux/xmalloc.c:55  xrealloc()
 pub unsafe fn xrealloc(ptr: *mut c_void, size: usize) -> NonNull<c_void> {
     unsafe { xrealloc_(ptr, size) }
 }
@@ -57,6 +60,7 @@ pub unsafe fn xrealloc_<T>(ptr: *mut T, size: usize) -> NonNull<T> {
     unsafe { xreallocarray_old(ptr, 1, size) }
 }
 
+// vendor/tmux/xmalloc.c:61  xreallocarray()
 pub unsafe fn xreallocarray(ptr: *mut c_void, nmemb: usize, size: usize) -> NonNull<c_void> {
     unsafe { xreallocarray_old(ptr, nmemb, size) }
 }
@@ -88,6 +92,7 @@ pub unsafe fn xreallocarray_<T>(ptr: *mut T, nmemb: usize) -> NonNull<T> {
     }
 }
 
+// vendor/tmux/xmalloc.c:75  xrecallocarray()
 pub unsafe fn xrecallocarray(
     ptr: *mut c_void,
     oldnmemb: usize,
@@ -123,6 +128,7 @@ pub unsafe fn xrecallocarray__<T>(ptr: *mut T, oldnmemb: usize, nmemb: usize) ->
         .cast()
 }
 
+// vendor/tmux/xmalloc.c:89  xstrdup()
 pub unsafe fn xstrdup(str: *const u8) -> NonNull<u8> {
     NonNull::new(unsafe { crate::libc::strdup(str) }).unwrap()
 }
@@ -143,6 +149,7 @@ pub fn xstrdup___(str: Option<&str>) -> *mut u8 {
     xstrdup__(str)
 }
 
+// vendor/tmux/xmalloc.c:99  xstrndup()
 pub unsafe fn xstrndup(str: *const u8, maxlen: usize) -> NonNull<u8> {
     NonNull::new(unsafe { crate::libc::strndup(str, maxlen) }).unwrap()
 }

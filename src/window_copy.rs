@@ -213,6 +213,7 @@ pub struct window_copy_mode_data {
     dragtimer: event,
 }
 
+// vendor/tmux/window-copy.c:359  window_copy_scroll_timer()
 pub unsafe extern "C-unwind" fn window_copy_scroll_timer(
     _fd: i32,
     _events: i16,
@@ -242,6 +243,7 @@ pub unsafe extern "C-unwind" fn window_copy_scroll_timer(
     }
 }
 
+// vendor/tmux/window-copy.c:383  window_copy_clone_screen()
 pub unsafe fn window_copy_clone_screen(
     src: *mut screen,
     hint: *mut screen,
@@ -306,6 +308,7 @@ pub unsafe fn window_copy_clone_screen(
     }
 }
 
+// vendor/tmux/window-copy.c:553  window_copy_common_init()
 pub unsafe fn window_copy_common_init(wme: *mut window_mode_entry) -> *mut window_copy_mode_data {
     unsafe {
         let wp = (*wme).wp;
@@ -355,6 +358,7 @@ pub unsafe fn window_copy_common_init(wme: *mut window_mode_entry) -> *mut windo
     }
 }
 
+// vendor/tmux/window-copy.c:592  window_copy_init()
 pub unsafe fn window_copy_init(
     wme: NonNull<window_mode_entry>,
     _fs: *mut cmd_find_state,
@@ -409,6 +413,7 @@ pub unsafe fn window_copy_init(
     }
 }
 
+// vendor/tmux/window-copy.c:643  window_copy_view_init()
 pub unsafe fn window_copy_view_init(
     wme: NonNull<window_mode_entry>,
     _fs: *mut cmd_find_state,
@@ -437,6 +442,7 @@ pub unsafe fn window_copy_view_init(
     }
 }
 
+// vendor/tmux/window-copy.c:666  window_copy_free()
 pub unsafe fn window_copy_free(wme: NonNull<window_mode_entry>) {
     unsafe {
         let wme = wme.as_ptr();
@@ -470,6 +476,7 @@ macro_rules! window_copy_add {
 }
 pub(crate) use window_copy_add;
 
+// vendor/tmux/window-copy.c:697  window_copy_init_ctx_cb()
 pub unsafe fn window_copy_init_ctx_cb(_ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx) {
     unsafe {
         memcpy__(&raw mut (*ttyctx).defaults, &raw const GRID_DEFAULT_CELL);
@@ -480,6 +487,7 @@ pub unsafe fn window_copy_init_ctx_cb(_ctx: *mut screen_write_ctx, ttyctx: *mut 
     }
 }
 
+// vendor/tmux/window-copy.c:703  window_copy_vadd()
 pub unsafe fn window_copy_vadd(wp: *mut window_pane, parse: i32, args: std::fmt::Arguments) {
     unsafe {
         let wme: *mut window_mode_entry = tailq_first(&raw mut (*wp).modes);
@@ -545,12 +553,14 @@ pub unsafe fn window_copy_vadd(wp: *mut window_pane, parse: i32, args: std::fmt:
     }
 }
 
+// vendor/tmux/window-copy.c:870  window_copy_pageup()
 pub unsafe fn window_copy_pageup(wp: *mut window_pane, half_page: i32) {
     unsafe {
         window_copy_pageup1(tailq_first(&raw mut (*wp).modes), half_page);
     }
 }
 
+// vendor/tmux/window-copy.c:876  window_copy_pageup1()
 pub unsafe fn window_copy_pageup1(wme: *mut window_mode_entry, half_page: i32) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -602,6 +612,7 @@ pub unsafe fn window_copy_pageup1(wme: *mut window_mode_entry, half_page: i32) {
     }
 }
 
+// vendor/tmux/window-copy.c:924  window_copy_pagedown()
 pub unsafe fn window_copy_pagedown(wp: *mut window_pane, half_page: i32, scroll_exit: bool) {
     unsafe {
         if window_copy_pagedown1(tailq_first(&raw mut (*wp).modes), half_page, scroll_exit) {
@@ -610,6 +621,7 @@ pub unsafe fn window_copy_pagedown(wp: *mut window_pane, half_page: i32, scroll_
     }
 }
 
+// vendor/tmux/window-copy.c:934  window_copy_pagedown1()
 pub unsafe fn window_copy_pagedown1(
     wme: *mut window_mode_entry,
     half_page: i32,
@@ -669,6 +681,7 @@ pub unsafe fn window_copy_pagedown1(
     }
 }
 
+// vendor/tmux/window-copy.c:986  window_copy_previous_paragraph()
 pub unsafe fn window_copy_previous_paragraph(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -687,6 +700,7 @@ pub unsafe fn window_copy_previous_paragraph(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:1003  window_copy_next_paragraph()
 pub unsafe fn window_copy_next_paragraph(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -708,6 +722,7 @@ pub unsafe fn window_copy_next_paragraph(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:1023  window_copy_get_word()
 pub unsafe fn window_copy_get_word(wp: *mut window_pane, x: u32, y: u32) -> String {
     unsafe {
         let wme: *mut window_mode_entry = tailq_first(&raw mut (*wp).modes);
@@ -718,6 +733,7 @@ pub unsafe fn window_copy_get_word(wp: *mut window_pane, x: u32, y: u32) -> Stri
     }
 }
 
+// vendor/tmux/window-copy.c:1033  window_copy_get_line()
 pub unsafe fn window_copy_get_line(wp: *mut window_pane, y: u32) -> String {
     unsafe {
         let wme: *mut window_mode_entry = tailq_first(&raw mut (*wp).modes);
@@ -728,6 +744,7 @@ pub unsafe fn window_copy_get_line(wp: *mut window_pane, y: u32) -> String {
     }
 }
 
+// vendor/tmux/window-copy.c:1053  window_copy_cursor_hyperlink_cb()
 pub unsafe fn window_copy_cursor_hyperlink_cb(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = format_get_pane(ft);
@@ -746,6 +763,7 @@ pub unsafe fn window_copy_cursor_hyperlink_cb(ft: *mut format_tree) -> format_ta
     }
 }
 
+// vendor/tmux/window-copy.c:1065  window_copy_cursor_word_cb()
 pub unsafe fn window_copy_cursor_word_cb(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp: *mut window_pane = format_get_pane(ft);
@@ -756,6 +774,7 @@ pub unsafe fn window_copy_cursor_word_cb(ft: *mut format_tree) -> format_table_t
     }
 }
 
+// vendor/tmux/window-copy.c:1075  window_copy_cursor_line_cb()
 pub unsafe fn window_copy_cursor_line_cb(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp: *mut window_pane = format_get_pane(ft);
@@ -766,6 +785,7 @@ pub unsafe fn window_copy_cursor_line_cb(ft: *mut format_tree) -> format_table_t
     }
 }
 
+// vendor/tmux/window-copy.c:1085  window_copy_search_match_cb()
 pub unsafe fn window_copy_search_match_cb(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp: *mut window_pane = format_get_pane(ft);
@@ -778,6 +798,7 @@ pub unsafe fn window_copy_search_match_cb(ft: *mut format_tree) -> format_table_
     }
 }
 
+// vendor/tmux/window-copy.c:1095  window_copy_formats()
 pub unsafe fn window_copy_formats(wme: *mut window_mode_entry, ft: *mut format_tree) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -831,6 +852,7 @@ pub unsafe fn window_copy_formats(wme: *mut window_mode_entry, ft: *mut format_t
     }
 }
 
+// vendor/tmux/window-copy.c:1174  window_copy_size_changed()
 pub unsafe fn window_copy_size_changed(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -854,6 +876,7 @@ pub unsafe fn window_copy_size_changed(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:1196  window_copy_resize()
 pub unsafe fn window_copy_resize(wme: NonNull<window_mode_entry>, sx: u32, sy: u32) {
     unsafe {
         let wme = wme.as_ptr();
@@ -890,6 +913,7 @@ pub unsafe fn window_copy_resize(wme: NonNull<window_mode_entry>, sx: u32, sy: u
     }
 }
 
+// vendor/tmux/window-copy.c:1230  window_copy_key_table()
 pub unsafe fn window_copy_key_table(wme: *mut window_mode_entry) -> *const u8 {
     unsafe {
         if matches!(
@@ -905,6 +929,7 @@ pub unsafe fn window_copy_key_table(wme: *mut window_mode_entry) -> *const u8 {
     }
 }
 
+// vendor/tmux/window-copy.c:1240  window_copy_expand_search_string()
 pub unsafe fn window_copy_expand_search_string(cs: *mut window_copy_cmd_state) -> bool {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -938,6 +963,7 @@ pub unsafe fn window_copy_expand_search_string(cs: *mut window_copy_cmd_state) -
     }
 }
 
+// vendor/tmux/window-copy.c:1266  window_copy_cmd_append_selection()
 pub unsafe fn window_copy_cmd_append_selection(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -953,6 +979,7 @@ pub unsafe fn window_copy_cmd_append_selection(
     }
 }
 
+// vendor/tmux/window-copy.c:1278  window_copy_cmd_append_selection_and_cancel()
 pub unsafe fn window_copy_cmd_append_selection_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -968,6 +995,7 @@ pub unsafe fn window_copy_cmd_append_selection_and_cancel(
     }
 }
 
+// vendor/tmux/window-copy.c:1290  window_copy_cmd_back_to_indentation()
 pub unsafe fn window_copy_cmd_back_to_indentation(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -977,6 +1005,7 @@ pub unsafe fn window_copy_cmd_back_to_indentation(
     }
 }
 
+// vendor/tmux/window-copy.c:1299  window_copy_cmd_begin_selection()
 pub unsafe fn window_copy_cmd_begin_selection(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -998,6 +1027,7 @@ pub unsafe fn window_copy_cmd_begin_selection(
     }
 }
 
+// vendor/tmux/window-copy.c:1318  window_copy_cmd_stop_selection()
 pub unsafe fn window_copy_cmd_stop_selection(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1012,6 +1042,7 @@ pub unsafe fn window_copy_cmd_stop_selection(
     }
 }
 
+// vendor/tmux/window-copy.c:1330  window_copy_cmd_bottom_line()
 pub unsafe fn window_copy_cmd_bottom_line(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1027,10 +1058,12 @@ pub unsafe fn window_copy_cmd_bottom_line(
     }
 }
 
+// vendor/tmux/window-copy.c:1343  window_copy_cmd_cancel()
 pub unsafe fn window_copy_cmd_cancel(_cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     window_copy_cmd_action::WINDOW_COPY_CMD_CANCEL
 }
 
+// vendor/tmux/window-copy.c:1349  window_copy_cmd_clear_selection()
 pub unsafe fn window_copy_cmd_clear_selection(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1042,6 +1075,7 @@ pub unsafe fn window_copy_cmd_clear_selection(
     }
 }
 
+// vendor/tmux/window-copy.c:1358  window_copy_do_copy_end_of_line()
 pub unsafe fn window_copy_do_copy_end_of_line(
     cs: *mut window_copy_cmd_state,
     pipe: i32,
@@ -1108,30 +1142,35 @@ pub unsafe fn window_copy_do_copy_end_of_line(
     }
 }
 
+// vendor/tmux/window-copy.c:1420  window_copy_cmd_copy_end_of_line()
 pub unsafe fn window_copy_cmd_copy_end_of_line(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
     unsafe { window_copy_do_copy_end_of_line(cs, 0, 0) }
 }
 
+// vendor/tmux/window-copy.c:1426  window_copy_cmd_copy_end_of_line_and_cancel()
 pub unsafe fn window_copy_cmd_copy_end_of_line_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
     unsafe { window_copy_do_copy_end_of_line(cs, 0, 1) }
 }
 
+// vendor/tmux/window-copy.c:1432  window_copy_cmd_copy_pipe_end_of_line()
 pub unsafe fn window_copy_cmd_copy_pipe_end_of_line(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
     unsafe { window_copy_do_copy_end_of_line(cs, 1, 0) }
 }
 
+// vendor/tmux/window-copy.c:1438  window_copy_cmd_copy_pipe_end_of_line_and_cancel()
 pub unsafe fn window_copy_cmd_copy_pipe_end_of_line_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
     unsafe { window_copy_do_copy_end_of_line(cs, 1, 1) }
 }
 
+// vendor/tmux/window-copy.c:1445  window_copy_do_copy_line()
 pub unsafe fn window_copy_do_copy_line(
     cs: *mut window_copy_cmd_state,
     pipe: i32,
@@ -1202,28 +1241,33 @@ pub unsafe fn window_copy_do_copy_line(
     }
 }
 
+// vendor/tmux/window-copy.c:1508  window_copy_cmd_copy_line()
 pub unsafe fn window_copy_cmd_copy_line(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe { window_copy_do_copy_line(cs, 0, 0) }
 }
 
+// vendor/tmux/window-copy.c:1514  window_copy_cmd_copy_line_and_cancel()
 pub unsafe fn window_copy_cmd_copy_line_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
     unsafe { window_copy_do_copy_line(cs, 0, 1) }
 }
 
+// vendor/tmux/window-copy.c:1520  window_copy_cmd_copy_pipe_line()
 pub unsafe fn window_copy_cmd_copy_pipe_line(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
     unsafe { window_copy_do_copy_line(cs, 1, 0) }
 }
 
+// vendor/tmux/window-copy.c:1526  window_copy_cmd_copy_pipe_line_and_cancel()
 pub unsafe fn window_copy_cmd_copy_pipe_line_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
     unsafe { window_copy_do_copy_line(cs, 1, 1) }
 }
 
+// vendor/tmux/window-copy.c:1532  window_copy_cmd_copy_selection_no_clear()
 pub unsafe fn window_copy_cmd_copy_selection_no_clear(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1249,6 +1293,7 @@ pub unsafe fn window_copy_cmd_copy_selection_no_clear(
     }
 }
 
+// vendor/tmux/window-copy.c:1555  window_copy_cmd_copy_selection()
 pub unsafe fn window_copy_cmd_copy_selection(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1261,6 +1306,7 @@ pub unsafe fn window_copy_cmd_copy_selection(
     }
 }
 
+// vendor/tmux/window-copy.c:1565  window_copy_cmd_copy_selection_and_cancel()
 pub unsafe fn window_copy_cmd_copy_selection_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1273,6 +1319,7 @@ pub unsafe fn window_copy_cmd_copy_selection_and_cancel(
     }
 }
 
+// vendor/tmux/window-copy.c:1575  window_copy_cmd_cursor_down()
 pub unsafe fn window_copy_cmd_cursor_down(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1288,6 +1335,7 @@ pub unsafe fn window_copy_cmd_cursor_down(
     }
 }
 
+// vendor/tmux/window-copy.c:1586  window_copy_cmd_cursor_down_and_cancel()
 pub unsafe fn window_copy_cmd_cursor_down_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1310,6 +1358,7 @@ pub unsafe fn window_copy_cmd_cursor_down_and_cancel(
     }
 }
 
+// vendor/tmux/window-copy.c:1601  window_copy_cmd_cursor_left()
 pub unsafe fn window_copy_cmd_cursor_left(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1325,6 +1374,7 @@ pub unsafe fn window_copy_cmd_cursor_left(
     }
 }
 
+// vendor/tmux/window-copy.c:1612  window_copy_cmd_cursor_right()
 pub unsafe fn window_copy_cmd_cursor_right(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1346,6 +1396,7 @@ pub unsafe fn window_copy_cmd_cursor_right(
 
 // Scroll line containing the cursor to the given position.
 
+// vendor/tmux/window-copy.c:1627  window_copy_cmd_scroll_to()
 pub unsafe fn window_copy_cmd_scroll_to(
     cs: *mut window_copy_cmd_state,
     to: u32,
@@ -1376,6 +1427,7 @@ pub unsafe fn window_copy_cmd_scroll_to(
 
 // Scroll line containing the cursor to the bottom.
 
+// vendor/tmux/window-copy.c:1656  window_copy_cmd_scroll_bottom()
 pub unsafe fn window_copy_cmd_scroll_bottom(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1389,6 +1441,7 @@ pub unsafe fn window_copy_cmd_scroll_bottom(
 
 // Scroll line containing the cursor to the middle.
 
+// vendor/tmux/window-copy.c:1667  window_copy_cmd_scroll_middle()
 pub unsafe fn window_copy_cmd_scroll_middle(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1401,10 +1454,12 @@ pub unsafe fn window_copy_cmd_scroll_middle(
 
 // Scroll line containing the cursor to the top.
 
+// vendor/tmux/window-copy.c:1695  window_copy_cmd_scroll_top()
 pub unsafe fn window_copy_cmd_scroll_top(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe { window_copy_cmd_scroll_to(cs, 0) }
 }
 
+// vendor/tmux/window-copy.c:1701  window_copy_cmd_cursor_up()
 pub unsafe fn window_copy_cmd_cursor_up(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -1418,6 +1473,7 @@ pub unsafe fn window_copy_cmd_cursor_up(cs: *mut window_copy_cmd_state) -> windo
     }
 }
 
+// vendor/tmux/window-copy.c:1734  window_copy_cmd_end_of_line()
 pub unsafe fn window_copy_cmd_end_of_line(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1429,6 +1485,7 @@ pub unsafe fn window_copy_cmd_end_of_line(
     }
 }
 
+// vendor/tmux/window-copy.c:1743  window_copy_cmd_halfpage_down()
 pub unsafe fn window_copy_cmd_halfpage_down(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1447,6 +1504,7 @@ pub unsafe fn window_copy_cmd_halfpage_down(
     }
 }
 
+// vendor/tmux/window-copy.c:1757  window_copy_cmd_halfpage_down_and_cancel()
 pub unsafe fn window_copy_cmd_halfpage_down_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1464,6 +1522,7 @@ pub unsafe fn window_copy_cmd_halfpage_down_and_cancel(
     }
 }
 
+// vendor/tmux/window-copy.c:1771  window_copy_cmd_halfpage_up()
 pub unsafe fn window_copy_cmd_halfpage_up(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1479,6 +1538,7 @@ pub unsafe fn window_copy_cmd_halfpage_up(
     }
 }
 
+// vendor/tmux/window-copy.c:1782  window_copy_cmd_toggle_position()
 pub unsafe fn window_copy_cmd_toggle_position(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1491,6 +1551,7 @@ pub unsafe fn window_copy_cmd_toggle_position(
     }
 }
 
+// vendor/tmux/window-copy.c:1792  window_copy_cmd_history_bottom()
 pub unsafe fn window_copy_cmd_history_bottom(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1516,6 +1577,7 @@ pub unsafe fn window_copy_cmd_history_bottom(
     }
 }
 
+// vendor/tmux/window-copy.c:1816  window_copy_cmd_history_top()
 pub unsafe fn window_copy_cmd_history_top(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1540,6 +1602,7 @@ pub unsafe fn window_copy_cmd_history_top(
     }
 }
 
+// vendor/tmux/window-copy.c:1839  window_copy_cmd_jump_again()
 pub unsafe fn window_copy_cmd_jump_again(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -1577,6 +1640,7 @@ pub unsafe fn window_copy_cmd_jump_again(cs: *mut window_copy_cmd_state) -> wind
     }
 }
 
+// vendor/tmux/window-copy.c:1867  window_copy_cmd_jump_reverse()
 pub unsafe fn window_copy_cmd_jump_reverse(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1616,6 +1680,7 @@ pub unsafe fn window_copy_cmd_jump_reverse(
     }
 }
 
+// vendor/tmux/window-copy.c:1895  window_copy_cmd_middle_line()
 pub unsafe fn window_copy_cmd_middle_line(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1631,6 +1696,7 @@ pub unsafe fn window_copy_cmd_middle_line(
     }
 }
 
+// vendor/tmux/window-copy.c:1908  window_copy_cmd_previous_matching_bracket()
 pub unsafe fn window_copy_cmd_previous_matching_bracket(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1732,6 +1798,7 @@ pub unsafe fn window_copy_cmd_previous_matching_bracket(
     }
 }
 
+// vendor/tmux/window-copy.c:1994  window_copy_cmd_next_matching_bracket()
 pub unsafe fn window_copy_cmd_next_matching_bracket(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1871,6 +1938,7 @@ pub unsafe fn window_copy_cmd_next_matching_bracket(
     }
 }
 
+// vendor/tmux/window-copy.c:2115  window_copy_cmd_next_paragraph()
 pub unsafe fn window_copy_cmd_next_paragraph(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1886,6 +1954,7 @@ pub unsafe fn window_copy_cmd_next_paragraph(
     }
 }
 
+// vendor/tmux/window-copy.c:2126  window_copy_cmd_next_space()
 pub unsafe fn window_copy_cmd_next_space(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -1899,6 +1968,7 @@ pub unsafe fn window_copy_cmd_next_space(cs: *mut window_copy_cmd_state) -> wind
     }
 }
 
+// vendor/tmux/window-copy.c:2137  window_copy_cmd_next_space_end()
 pub unsafe fn window_copy_cmd_next_space_end(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1914,6 +1984,7 @@ pub unsafe fn window_copy_cmd_next_space_end(
     }
 }
 
+// vendor/tmux/window-copy.c:2148  window_copy_cmd_next_word()
 pub unsafe fn window_copy_cmd_next_word(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -1929,6 +2000,7 @@ pub unsafe fn window_copy_cmd_next_word(cs: *mut window_copy_cmd_state) -> windo
     }
 }
 
+// vendor/tmux/window-copy.c:2162  window_copy_cmd_next_word_end()
 pub unsafe fn window_copy_cmd_next_word_end(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1946,6 +2018,7 @@ pub unsafe fn window_copy_cmd_next_word_end(
     }
 }
 
+// vendor/tmux/window-copy.c:2176  window_copy_cmd_other_end()
 pub unsafe fn window_copy_cmd_other_end(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -1960,6 +2033,7 @@ pub unsafe fn window_copy_cmd_other_end(cs: *mut window_copy_cmd_state) -> windo
     }
 }
 
+// vendor/tmux/window-copy.c:2207  window_copy_cmd_page_down()
 pub unsafe fn window_copy_cmd_page_down(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -1976,6 +2050,7 @@ pub unsafe fn window_copy_cmd_page_down(cs: *mut window_copy_cmd_state) -> windo
     }
 }
 
+// vendor/tmux/window-copy.c:2221  window_copy_cmd_page_down_and_cancel()
 pub unsafe fn window_copy_cmd_page_down_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -1993,6 +2068,7 @@ pub unsafe fn window_copy_cmd_page_down_and_cancel(
     }
 }
 
+// vendor/tmux/window-copy.c:2234  window_copy_cmd_page_up()
 pub unsafe fn window_copy_cmd_page_up(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -2006,6 +2082,7 @@ pub unsafe fn window_copy_cmd_page_up(cs: *mut window_copy_cmd_state) -> window_
     }
 }
 
+// vendor/tmux/window-copy.c:2245  window_copy_cmd_previous_paragraph()
 pub unsafe fn window_copy_cmd_previous_paragraph(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2021,6 +2098,7 @@ pub unsafe fn window_copy_cmd_previous_paragraph(
     }
 }
 
+// vendor/tmux/window-copy.c:2256  window_copy_cmd_previous_space()
 pub unsafe fn window_copy_cmd_previous_space(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2036,6 +2114,7 @@ pub unsafe fn window_copy_cmd_previous_space(
     }
 }
 
+// vendor/tmux/window-copy.c:2267  window_copy_cmd_previous_word()
 pub unsafe fn window_copy_cmd_previous_word(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2053,6 +2132,7 @@ pub unsafe fn window_copy_cmd_previous_word(
     }
 }
 
+// vendor/tmux/window-copy.c:2281  window_copy_cmd_rectangle_on()
 pub unsafe fn window_copy_cmd_rectangle_on(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2067,6 +2147,7 @@ pub unsafe fn window_copy_cmd_rectangle_on(
     }
 }
 
+// vendor/tmux/window-copy.c:2293  window_copy_cmd_rectangle_off()
 pub unsafe fn window_copy_cmd_rectangle_off(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2081,6 +2162,7 @@ pub unsafe fn window_copy_cmd_rectangle_off(
     }
 }
 
+// vendor/tmux/window-copy.c:2305  window_copy_cmd_rectangle_toggle()
 pub unsafe fn window_copy_cmd_rectangle_toggle(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2095,6 +2177,7 @@ pub unsafe fn window_copy_cmd_rectangle_toggle(
     }
 }
 
+// vendor/tmux/window-copy.c:2347  window_copy_cmd_scroll_down()
 pub unsafe fn window_copy_cmd_scroll_down(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2115,6 +2198,7 @@ pub unsafe fn window_copy_cmd_scroll_down(
     }
 }
 
+// vendor/tmux/window-copy.c:2361  window_copy_cmd_scroll_down_and_cancel()
 pub unsafe fn window_copy_cmd_scroll_down_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2135,6 +2219,7 @@ pub unsafe fn window_copy_cmd_scroll_down_and_cancel(
     }
 }
 
+// vendor/tmux/window-copy.c:2375  window_copy_cmd_scroll_up()
 pub unsafe fn window_copy_cmd_scroll_up(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -2148,6 +2233,7 @@ pub unsafe fn window_copy_cmd_scroll_up(cs: *mut window_copy_cmd_state) -> windo
     }
 }
 
+// vendor/tmux/window-copy.c:2386  window_copy_cmd_search_again()
 pub unsafe fn window_copy_cmd_search_again(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2171,6 +2257,7 @@ pub unsafe fn window_copy_cmd_search_again(
     }
 }
 
+// vendor/tmux/window-copy.c:2403  window_copy_cmd_search_reverse()
 pub unsafe fn window_copy_cmd_search_reverse(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2194,6 +2281,7 @@ pub unsafe fn window_copy_cmd_search_reverse(
     }
 }
 
+// vendor/tmux/window-copy.c:2420  window_copy_cmd_select_line()
 pub unsafe fn window_copy_cmd_select_line(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2226,6 +2314,7 @@ pub unsafe fn window_copy_cmd_select_line(
     }
 }
 
+// vendor/tmux/window-copy.c:2449  window_copy_cmd_select_word()
 pub unsafe fn window_copy_cmd_select_word(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2283,6 +2372,7 @@ pub unsafe fn window_copy_cmd_select_word(
     }
 }
 
+// vendor/tmux/window-copy.c:2498  window_copy_cmd_set_mark()
 pub unsafe fn window_copy_cmd_set_mark(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let data: *mut window_copy_mode_data = (*(*cs).wme).data.cast();
@@ -2294,6 +2384,7 @@ pub unsafe fn window_copy_cmd_set_mark(cs: *mut window_copy_cmd_state) -> window
     }
 }
 
+// vendor/tmux/window-copy.c:2509  window_copy_cmd_start_of_line()
 pub unsafe fn window_copy_cmd_start_of_line(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2303,6 +2394,7 @@ pub unsafe fn window_copy_cmd_start_of_line(
     }
 }
 
+// vendor/tmux/window-copy.c:2518  window_copy_cmd_top_line()
 pub unsafe fn window_copy_cmd_top_line(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -2316,6 +2408,7 @@ pub unsafe fn window_copy_cmd_top_line(cs: *mut window_copy_cmd_state) -> window
     }
 }
 
+// vendor/tmux/window-copy.c:2531  window_copy_cmd_copy_pipe_no_clear()
 pub unsafe fn window_copy_cmd_copy_pipe_no_clear(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2345,6 +2438,7 @@ pub unsafe fn window_copy_cmd_copy_pipe_no_clear(
     }
 }
 
+// vendor/tmux/window-copy.c:2558  window_copy_cmd_copy_pipe()
 pub unsafe fn window_copy_cmd_copy_pipe(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -2355,6 +2449,7 @@ pub unsafe fn window_copy_cmd_copy_pipe(cs: *mut window_copy_cmd_state) -> windo
     }
 }
 
+// vendor/tmux/window-copy.c:2568  window_copy_cmd_copy_pipe_and_cancel()
 pub unsafe fn window_copy_cmd_copy_pipe_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2367,6 +2462,7 @@ pub unsafe fn window_copy_cmd_copy_pipe_and_cancel(
     }
 }
 
+// vendor/tmux/window-copy.c:2578  window_copy_cmd_pipe_no_clear()
 pub unsafe fn window_copy_cmd_pipe_no_clear(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2389,6 +2485,7 @@ pub unsafe fn window_copy_cmd_pipe_no_clear(
     }
 }
 
+// vendor/tmux/window-copy.c:2597  window_copy_cmd_pipe()
 pub unsafe fn window_copy_cmd_pipe(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -2399,6 +2496,7 @@ pub unsafe fn window_copy_cmd_pipe(cs: *mut window_copy_cmd_state) -> window_cop
     }
 }
 
+// vendor/tmux/window-copy.c:2607  window_copy_cmd_pipe_and_cancel()
 pub unsafe fn window_copy_cmd_pipe_and_cancel(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2411,6 +2509,7 @@ pub unsafe fn window_copy_cmd_pipe_and_cancel(
     }
 }
 
+// vendor/tmux/window-copy.c:2617  window_copy_cmd_goto_line()
 pub unsafe fn window_copy_cmd_goto_line(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
@@ -2423,6 +2522,7 @@ pub unsafe fn window_copy_cmd_goto_line(cs: *mut window_copy_cmd_state) -> windo
     }
 }
 
+// vendor/tmux/window-copy.c:2628  window_copy_cmd_jump_backward()
 pub unsafe fn window_copy_cmd_jump_backward(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2445,6 +2545,7 @@ pub unsafe fn window_copy_cmd_jump_backward(
     }
 }
 
+// vendor/tmux/window-copy.c:2646  window_copy_cmd_jump_forward()
 pub unsafe fn window_copy_cmd_jump_forward(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2467,6 +2568,7 @@ pub unsafe fn window_copy_cmd_jump_forward(
     }
 }
 
+// vendor/tmux/window-copy.c:2664  window_copy_cmd_jump_to_backward()
 pub unsafe fn window_copy_cmd_jump_to_backward(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2489,6 +2591,7 @@ pub unsafe fn window_copy_cmd_jump_to_backward(
     }
 }
 
+// vendor/tmux/window-copy.c:2682  window_copy_cmd_jump_to_forward()
 pub unsafe fn window_copy_cmd_jump_to_forward(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2511,6 +2614,7 @@ pub unsafe fn window_copy_cmd_jump_to_forward(
     }
 }
 
+// vendor/tmux/window-copy.c:2700  window_copy_cmd_jump_to_mark()
 pub unsafe fn window_copy_cmd_jump_to_mark(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2522,6 +2626,7 @@ pub unsafe fn window_copy_cmd_jump_to_mark(
     }
 }
 
+// vendor/tmux/window-copy.c:2709  window_copy_cmd_next_prompt()
 pub unsafe fn window_copy_cmd_next_prompt(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2534,6 +2639,7 @@ pub unsafe fn window_copy_cmd_next_prompt(
     }
 }
 
+// vendor/tmux/window-copy.c:2718  window_copy_cmd_previous_prompt()
 pub unsafe fn window_copy_cmd_previous_prompt(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2546,6 +2652,7 @@ pub unsafe fn window_copy_cmd_previous_prompt(
     }
 }
 
+// vendor/tmux/window-copy.c:2727  window_copy_cmd_search_backward()
 pub unsafe fn window_copy_cmd_search_backward(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2571,6 +2678,7 @@ pub unsafe fn window_copy_cmd_search_backward(
     }
 }
 
+// vendor/tmux/window-copy.c:2747  window_copy_cmd_search_backward_text()
 pub unsafe fn window_copy_cmd_search_backward_text(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2596,6 +2704,7 @@ pub unsafe fn window_copy_cmd_search_backward_text(
     }
 }
 
+// vendor/tmux/window-copy.c:2767  window_copy_cmd_search_forward()
 pub unsafe fn window_copy_cmd_search_forward(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2621,6 +2730,7 @@ pub unsafe fn window_copy_cmd_search_forward(
     }
 }
 
+// vendor/tmux/window-copy.c:2787  window_copy_cmd_search_forward_text()
 pub unsafe fn window_copy_cmd_search_forward_text(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2646,6 +2756,7 @@ pub unsafe fn window_copy_cmd_search_forward_text(
     }
 }
 
+// vendor/tmux/window-copy.c:2807  window_copy_cmd_search_backward_incremental()
 pub unsafe fn window_copy_cmd_search_backward_incremental(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -2703,6 +2814,7 @@ pub unsafe fn window_copy_cmd_search_backward_incremental(
     }
 }
 
+// vendor/tmux/window-copy.c:2864  window_copy_cmd_search_forward_incremental()
 pub unsafe fn window_copy_cmd_search_forward_incremental(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
@@ -3394,6 +3506,7 @@ static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 85] = [
     },
 ];
 
+// vendor/tmux/window-copy.c:3689  window_copy_command()
 pub unsafe fn window_copy_command(
     wme: NonNull<window_mode_entry>,
     c: *mut client,
@@ -3469,6 +3582,7 @@ pub unsafe fn window_copy_command(
     }
 }
 
+// vendor/tmux/window-copy.c:3779  window_copy_scroll_to()
 pub unsafe fn window_copy_scroll_to(
     wme: *mut window_mode_entry,
     px: u32,
@@ -3509,6 +3623,7 @@ pub unsafe fn window_copy_scroll_to(
     }
 }
 
+// vendor/tmux/window-copy.c:3815  window_copy_search_compare()
 pub unsafe fn window_copy_search_compare(
     gd: *mut grid,
     px: u32,
@@ -3541,6 +3656,7 @@ pub unsafe fn window_copy_search_compare(
     }
 }
 
+// vendor/tmux/window-copy.c:3839  window_copy_search_lr()
 pub unsafe fn window_copy_search_lr(
     gd: *mut grid,
     sgd: *mut grid,
@@ -3587,6 +3703,7 @@ pub unsafe fn window_copy_search_lr(
     }
 }
 
+// vendor/tmux/window-copy.c:3883  window_copy_search_rl()
 pub unsafe fn window_copy_search_rl(
     gd: *mut grid,
     sgd: *mut grid,
@@ -3635,6 +3752,7 @@ pub unsafe fn window_copy_search_rl(
     }
 }
 
+// vendor/tmux/window-copy.c:3927  window_copy_search_lr_regex()
 pub unsafe fn window_copy_search_lr_regex(
     gd: *mut grid,
     ppx: *mut u32,
@@ -3721,6 +3839,7 @@ pub unsafe fn window_copy_search_lr_regex(
     }
 }
 
+// vendor/tmux/window-copy.c:3994  window_copy_search_rl_regex()
 pub unsafe fn window_copy_search_rl_regex(
     gd: *mut grid,
     ppx: *mut u32,
@@ -3768,6 +3887,7 @@ pub unsafe fn window_copy_search_rl_regex(
     }
 }
 
+// vendor/tmux/window-copy.c:4038  window_copy_cellstring()
 pub unsafe fn window_copy_cellstring(
     gl: *mut grid_line,
     px: u32,
@@ -3811,6 +3931,7 @@ pub unsafe fn window_copy_cellstring(
 }
 
 /// Find last match in given range.
+// vendor/tmux/window-copy.c:4084  window_copy_last_regex()
 pub unsafe fn window_copy_last_regex(
     gd: *mut grid,
     py: u32,
@@ -3885,6 +4006,7 @@ pub unsafe fn window_copy_last_regex(
 }
 
 /// Stringify line and append to input buffer. Caller frees.
+// vendor/tmux/window-copy.c:4135  window_copy_stringify()
 pub unsafe fn window_copy_stringify(
     gd: *mut grid,
     py: u32,
@@ -3933,6 +4055,7 @@ pub unsafe fn window_copy_stringify(
 }
 
 /// Map start of C string containing UTF-8 data to grid cell position.
+// vendor/tmux/window-copy.c:4178  window_copy_cstrtocellpos()
 pub unsafe fn window_copy_cstrtocellpos(
     gd: *mut grid,
     ncells: u32,
@@ -4026,6 +4149,7 @@ pub unsafe fn window_copy_cstrtocellpos(
     }
 }
 
+// vendor/tmux/window-copy.c:4272  window_copy_move_left()
 pub unsafe fn window_copy_move_left(s: *mut screen, fx: *mut u32, fy: *mut u32, wrapflag: i32) {
     unsafe {
         if *fx == 0 {
@@ -4046,6 +4170,7 @@ pub unsafe fn window_copy_move_left(s: *mut screen, fx: *mut u32, fy: *mut u32, 
     }
 }
 
+// vendor/tmux/window-copy.c:4289  window_copy_move_right()
 pub unsafe fn window_copy_move_right(s: *mut screen, fx: *mut u32, fy: *mut u32, wrapflag: i32) {
     unsafe {
         if *fx == screen_size_x(s) - 1 {
@@ -4066,6 +4191,7 @@ pub unsafe fn window_copy_move_right(s: *mut screen, fx: *mut u32, fy: *mut u32,
     }
 }
 
+// vendor/tmux/window-copy.c:4306  window_copy_is_lowercase()
 pub unsafe fn window_copy_is_lowercase(mut ptr: *const u8) -> bool {
     unsafe {
         while *ptr != b'\0' {
@@ -4081,6 +4207,7 @@ pub unsafe fn window_copy_is_lowercase(mut ptr: *const u8) -> bool {
 // Handle backward wrapped regex searches with overlapping matches. In this case
 // find the longest overlapping match from previous wrapped lines.
 
+// vendor/tmux/window-copy.c:4321  window_copy_search_back_overlap()
 pub unsafe fn window_copy_search_back_overlap(
     gd: *mut grid,
     preg: *mut libc::regex_t,
@@ -4143,6 +4270,7 @@ pub unsafe fn window_copy_search_back_overlap(
 // found, jump to it. If cis then ignore case. The direction is 0 for searching
 // up, down otherwise. If wrap then go to begin/end of grid and try again if
 // not found.
+// vendor/tmux/window-copy.c:4365  window_copy_search_jump()
 pub unsafe fn window_copy_search_jump(
     wme: *mut window_mode_entry,
     gd: *mut grid,
@@ -4264,6 +4392,7 @@ pub unsafe fn window_copy_search_jump(
     }
 }
 
+// vendor/tmux/window-copy.c:4437  window_copy_move_after_search_mark()
 pub unsafe fn window_copy_move_after_search_mark(
     data: *mut window_copy_mode_data,
     fx: *mut u32,
@@ -4297,6 +4426,7 @@ pub unsafe fn window_copy_move_after_search_mark(
 /// Search in for text searchstr.
 ///
 /// If direction is 0 then search up, otherwise down.
+// vendor/tmux/window-copy.c:4464  window_copy_search()
 pub unsafe fn window_copy_search(
     wme: *mut window_mode_entry,
     direction: i32,
@@ -4440,6 +4570,7 @@ pub unsafe fn window_copy_search(
     }
 }
 
+// vendor/tmux/window-copy.c:4606  window_copy_visible_lines()
 pub unsafe fn window_copy_visible_lines(
     data: *mut window_copy_mode_data,
     start: *mut u32,
@@ -4461,6 +4592,7 @@ pub unsafe fn window_copy_visible_lines(
     }
 }
 
+// vendor/tmux/window-copy.c:4621  window_copy_search_mark_at()
 pub unsafe fn window_copy_search_mark_at(
     data: *mut window_copy_mode_data,
     px: u32,
@@ -4480,6 +4612,7 @@ pub unsafe fn window_copy_search_mark_at(
     }
 }
 
+// vendor/tmux/window-copy.c:4673  window_copy_search_marks()
 pub unsafe fn window_copy_search_marks(
     wme: *mut window_mode_entry,
     mut ssp: *mut screen,
@@ -4667,6 +4800,7 @@ pub unsafe fn window_copy_search_marks(
     }
 }
 
+// vendor/tmux/window-copy.c:4801  window_copy_clear_marks()
 pub unsafe fn window_copy_clear_marks(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -4676,14 +4810,17 @@ pub unsafe fn window_copy_clear_marks(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:4813  window_copy_search_up()
 pub unsafe fn window_copy_search_up(wme: *mut window_mode_entry, regex: i32) -> bool {
     unsafe { window_copy_search(wme, 0, regex) }
 }
 
+// vendor/tmux/window-copy.c:4819  window_copy_search_down()
 pub unsafe fn window_copy_search_down(wme: *mut window_mode_entry, regex: i32) -> bool {
     unsafe { window_copy_search(wme, 1, regex) }
 }
 
+// vendor/tmux/window-copy.c:4825  window_copy_goto_line()
 pub unsafe fn window_copy_goto_line(wme: *mut window_mode_entry, linestr: *const u8) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -4701,6 +4838,7 @@ pub unsafe fn window_copy_goto_line(wme: *mut window_mode_entry, linestr: *const
     }
 }
 
+// vendor/tmux/window-copy.c:4856  window_copy_match_start_end()
 pub unsafe fn window_copy_match_start_end(
     data: *mut window_copy_mode_data,
     at: u32,
@@ -4729,6 +4867,7 @@ pub unsafe fn window_copy_match_start_end(
     }
 }
 
+// vendor/tmux/window-copy.c:4875  window_copy_match_at_cursor()
 pub unsafe fn window_copy_match_at_cursor(data: *mut window_copy_mode_data) -> Option<String> {
     unsafe {
         let gd: *mut grid = (*(*data).backing).grid;
@@ -4772,6 +4911,7 @@ pub unsafe fn window_copy_match_at_cursor(data: *mut window_copy_mode_data) -> O
     }
 }
 
+// vendor/tmux/window-copy.c:4924  window_copy_update_style()
 pub unsafe fn window_copy_update_style(
     wme: *mut window_mode_entry,
     fx: u32,
@@ -4855,6 +4995,7 @@ pub unsafe fn window_copy_update_style(
     }
 }
 
+// vendor/tmux/window-copy.c:4998  window_copy_write_one()
 pub unsafe fn window_copy_write_one(
     wme: *mut window_mode_entry,
     ctx: *mut screen_write_ctx,
@@ -4881,6 +5022,7 @@ pub unsafe fn window_copy_write_one(
     }
 }
 
+// vendor/tmux/window-copy.c:5143  window_copy_write_line()
 pub unsafe fn window_copy_write_line(
     wme: *mut window_mode_entry,
     ctx: *mut screen_write_ctx,
@@ -4999,6 +5141,7 @@ pub unsafe fn window_copy_write_line(
     }
 }
 
+// vendor/tmux/window-copy.c:5234  window_copy_write_lines()
 pub unsafe fn window_copy_write_lines(
     wme: *mut window_mode_entry,
     ctx: *mut screen_write_ctx,
@@ -5012,6 +5155,7 @@ pub unsafe fn window_copy_write_lines(
     }
 }
 
+// vendor/tmux/window-copy.c:5244  window_copy_redraw_selection()
 pub unsafe fn window_copy_redraw_selection(wme: *mut window_mode_entry, old_y: u32) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5033,6 +5177,7 @@ pub unsafe fn window_copy_redraw_selection(wme: *mut window_mode_entry, old_y: u
     }
 }
 
+// vendor/tmux/window-copy.c:5272  window_copy_redraw_lines()
 pub unsafe fn window_copy_redraw_lines(wme: *mut window_mode_entry, py: u32, ny: u32) {
     unsafe {
         let wp: *mut window_pane = (*wme).wp;
@@ -5048,6 +5193,7 @@ pub unsafe fn window_copy_redraw_lines(wme: *mut window_mode_entry, py: u32, ny:
     }
 }
 
+// vendor/tmux/window-copy.c:5307  window_copy_redraw_screen()
 pub unsafe fn window_copy_redraw_screen(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5056,6 +5202,7 @@ pub unsafe fn window_copy_redraw_screen(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:5325  window_copy_synchronize_cursor_end()
 pub unsafe fn window_copy_synchronize_cursor_end(
     wme: *mut window_mode_entry,
     mut begin: i32,
@@ -5138,6 +5285,7 @@ pub unsafe fn window_copy_synchronize_cursor_end(
     }
 }
 
+// vendor/tmux/window-copy.c:5396  window_copy_synchronize_cursor()
 pub unsafe fn window_copy_synchronize_cursor(wme: *mut window_mode_entry, no_reset: i32) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5150,6 +5298,7 @@ pub unsafe fn window_copy_synchronize_cursor(wme: *mut window_mode_entry, no_res
     }
 }
 
+// vendor/tmux/window-copy.c:5413  window_copy_update_cursor()
 pub unsafe fn window_copy_update_cursor(wme: *mut window_mode_entry, cx: u32, cy: u32) {
     unsafe {
         let wp: *mut window_pane = (*wme).wp;
@@ -5174,6 +5323,7 @@ pub unsafe fn window_copy_update_cursor(wme: *mut window_mode_entry, cx: u32, cy
     }
 }
 
+// vendor/tmux/window-copy.c:5474  window_copy_start_selection()
 pub unsafe fn window_copy_start_selection(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5190,6 +5340,7 @@ pub unsafe fn window_copy_start_selection(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:5490  window_copy_adjust_selection()
 unsafe fn window_copy_adjust_selection(
     wme: *mut window_mode_entry,
     selx: &mut u32,
@@ -5227,6 +5378,7 @@ unsafe fn window_copy_adjust_selection(
     }
 }
 
+// vendor/tmux/window-copy.c:5523  window_copy_update_selection()
 pub unsafe fn window_copy_update_selection(
     wme: *mut window_mode_entry,
     may_redraw: i32,
@@ -5243,6 +5395,7 @@ pub unsafe fn window_copy_update_selection(
     }
 }
 
+// vendor/tmux/window-copy.c:5535  window_copy_set_selection()
 pub unsafe fn window_copy_set_selection(
     wme: *mut window_mode_entry,
     may_redraw: i32,
@@ -5311,6 +5464,7 @@ pub unsafe fn window_copy_set_selection(
     }
 }
 
+// vendor/tmux/window-copy.c:5608  window_copy_get_selection()
 pub unsafe fn window_copy_get_selection(wme: *mut window_mode_entry, len: *mut usize) -> *mut u8 {
     unsafe {
         let wp: *mut window_pane = (*wme).wp;
@@ -5441,6 +5595,7 @@ pub unsafe fn window_copy_get_selection(wme: *mut window_mode_entry, len: *mut u
     }
 }
 
+// vendor/tmux/window-copy.c:5730  window_copy_copy_buffer()
 pub unsafe fn window_copy_copy_buffer(
     wme: *mut window_mode_entry,
     prefix: *const u8,
@@ -5462,6 +5617,7 @@ pub unsafe fn window_copy_copy_buffer(
     }
 }
 
+// vendor/tmux/window-copy.c:5759  window_copy_pipe_run()
 pub unsafe fn window_copy_pipe_run(
     wme: *mut window_mode_entry,
     s: *mut session,
@@ -5495,6 +5651,7 @@ pub unsafe fn window_copy_pipe_run(
     }
 }
 
+// vendor/tmux/window-copy.c:5778  window_copy_pipe()
 pub unsafe fn window_copy_pipe(wme: *mut window_mode_entry, s: *mut session, cmd: *const u8) {
     unsafe {
         let mut len: usize = 0;
@@ -5503,6 +5660,7 @@ pub unsafe fn window_copy_pipe(wme: *mut window_mode_entry, s: *mut session, cmd
     }
 }
 
+// vendor/tmux/window-copy.c:5789  window_copy_copy_pipe()
 pub unsafe fn window_copy_copy_pipe(
     wme: *mut window_mode_entry,
     s: *mut session,
@@ -5518,6 +5676,7 @@ pub unsafe fn window_copy_copy_pipe(
     }
 }
 
+// vendor/tmux/window-copy.c:5803  window_copy_copy_selection()
 pub unsafe fn window_copy_copy_selection(wme: *mut window_mode_entry, prefix: *const u8) {
     unsafe {
         let mut len: usize = 0;
@@ -5528,6 +5687,7 @@ pub unsafe fn window_copy_copy_selection(wme: *mut window_mode_entry, prefix: *c
     }
 }
 
+// vendor/tmux/window-copy.c:5817  window_copy_append_selection()
 pub unsafe fn window_copy_append_selection(wme: *mut window_mode_entry) {
     unsafe {
         let wp: *mut window_pane = (*wme).wp;
@@ -5561,6 +5721,7 @@ pub unsafe fn window_copy_append_selection(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:5851  window_copy_copy_line()
 pub unsafe fn window_copy_copy_line(
     wme: *mut window_mode_entry,
     buf: *mut *mut u8,
@@ -5636,6 +5797,7 @@ pub unsafe fn window_copy_copy_line(
     }
 }
 
+// vendor/tmux/window-copy.c:5914  window_copy_clear_selection()
 pub unsafe fn window_copy_clear_selection(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5654,6 +5816,7 @@ pub unsafe fn window_copy_clear_selection(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:5932  window_copy_in_set()
 pub unsafe fn window_copy_in_set(
     wme: *mut window_mode_entry,
     px: u32,
@@ -5672,6 +5835,7 @@ pub unsafe fn window_copy_in_set(
     }
 }
 
+// vendor/tmux/window-copy.c:5941  window_copy_find_length()
 pub unsafe fn window_copy_find_length(wme: *mut window_mode_entry, py: u32) -> u32 {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5680,6 +5844,7 @@ pub unsafe fn window_copy_find_length(wme: *mut window_mode_entry, py: u32) -> u
     }
 }
 
+// vendor/tmux/window-copy.c:5965  window_copy_cursor_start_of_line()
 pub unsafe fn window_copy_cursor_start_of_line(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5698,6 +5863,7 @@ pub unsafe fn window_copy_cursor_start_of_line(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:5984  window_copy_cursor_back_to_indentation()
 pub unsafe fn window_copy_cursor_back_to_indentation(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5716,6 +5882,7 @@ pub unsafe fn window_copy_cursor_back_to_indentation(wme: *mut window_mode_entry
     }
 }
 
+// vendor/tmux/window-copy.c:6003  window_copy_cursor_end_of_line()
 pub unsafe fn window_copy_cursor_end_of_line(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5747,6 +5914,7 @@ pub unsafe fn window_copy_cursor_end_of_line(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:6028  window_copy_other_end()
 pub unsafe fn window_copy_other_end(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5800,6 +5968,7 @@ pub unsafe fn window_copy_other_end(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:6083  window_copy_cursor_left()
 pub unsafe fn window_copy_cursor_left(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5818,6 +5987,7 @@ pub unsafe fn window_copy_cursor_left(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:6102  window_copy_cursor_right()
 pub unsafe fn window_copy_cursor_right(wme: *mut window_mode_entry, all: i32) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5845,6 +6015,7 @@ pub unsafe fn window_copy_cursor_right(wme: *mut window_mode_entry, all: i32) {
     }
 }
 
+// vendor/tmux/window-copy.c:6126  window_copy_cursor_up()
 pub unsafe fn window_copy_cursor_up(wme: *mut window_mode_entry, scroll_only: i32) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5922,6 +6093,7 @@ pub unsafe fn window_copy_cursor_up(wme: *mut window_mode_entry, scroll_only: i3
     }
 }
 
+// vendor/tmux/window-copy.c:6206  window_copy_cursor_down()
 pub unsafe fn window_copy_cursor_down(wme: *mut window_mode_entry, scroll_only: i32) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -5991,6 +6163,7 @@ pub unsafe fn window_copy_cursor_down(wme: *mut window_mode_entry, scroll_only: 
     }
 }
 
+// vendor/tmux/window-copy.c:6278  window_copy_cursor_jump()
 pub unsafe fn window_copy_cursor_jump(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -6019,6 +6192,7 @@ pub unsafe fn window_copy_cursor_jump(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:6299  window_copy_cursor_jump_back()
 pub unsafe fn window_copy_cursor_jump_back(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -6039,6 +6213,7 @@ pub unsafe fn window_copy_cursor_jump_back(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:6321  window_copy_cursor_jump_to()
 pub unsafe fn window_copy_cursor_jump_to(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -6068,6 +6243,7 @@ pub unsafe fn window_copy_cursor_jump_to(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:6343  window_copy_cursor_jump_to_back()
 pub unsafe fn window_copy_cursor_jump_to_back(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -6090,6 +6266,7 @@ pub unsafe fn window_copy_cursor_jump_to_back(wme: *mut window_mode_entry) {
     }
 }
 
+// vendor/tmux/window-copy.c:6370  window_copy_cursor_next_word()
 pub unsafe fn window_copy_cursor_next_word(wme: *mut window_mode_entry, separators: *const u8) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -6118,6 +6295,7 @@ pub unsafe fn window_copy_cursor_next_word(wme: *mut window_mode_entry, separato
 }
 
 /// Compute the next place where a word ends.
+// vendor/tmux/window-copy.c:6392  window_copy_cursor_next_word_end_pos()
 pub unsafe fn window_copy_cursor_next_word_end_pos(
     wme: *mut window_mode_entry,
     separators: *const u8,
@@ -6153,6 +6331,7 @@ pub unsafe fn window_copy_cursor_next_word_end_pos(
 }
 
 /// Move to the next place where a word ends.
+// vendor/tmux/window-copy.c:6421  window_copy_cursor_next_word_end()
 pub unsafe fn window_copy_cursor_next_word_end(
     wme: *mut window_mode_entry,
     separators: *const u8,
@@ -6196,6 +6375,7 @@ pub unsafe fn window_copy_cursor_next_word_end(
 }
 
 /// Compute the previous place where a word begins.
+// vendor/tmux/window-copy.c:6451  window_copy_cursor_previous_word_pos()
 pub unsafe fn window_copy_cursor_previous_word_pos(
     wme: *mut window_mode_entry,
     separators: *const u8,
@@ -6227,6 +6407,7 @@ pub unsafe fn window_copy_cursor_previous_word_pos(
 }
 
 /// Move to the previous place where a word begins.
+// vendor/tmux/window-copy.c:6472  window_copy_cursor_previous_word()
 pub unsafe fn window_copy_cursor_previous_word(
     wme: *mut window_mode_entry,
     separators: *const u8,
@@ -6252,6 +6433,7 @@ pub unsafe fn window_copy_cursor_previous_word(
     }
 }
 
+// vendor/tmux/window-copy.c:6499  window_copy_cursor_prompt()
 pub unsafe fn window_copy_cursor_prompt(
     wme: *mut window_mode_entry,
     direction: i32,
@@ -6309,6 +6491,7 @@ pub unsafe fn window_copy_cursor_prompt(
     }
 }
 
+// vendor/tmux/window-copy.c:6547  window_copy_scroll_up()
 pub unsafe fn window_copy_scroll_up(wme: *mut window_mode_entry, mut ny: u32) {
     unsafe {
         let wp: *mut window_pane = (*wme).wp;
@@ -6348,6 +6531,7 @@ pub unsafe fn window_copy_scroll_up(wme: *mut window_mode_entry, mut ny: u32) {
     }
 }
 
+// vendor/tmux/window-copy.c:6613  window_copy_scroll_down()
 pub unsafe fn window_copy_scroll_down(wme: *mut window_mode_entry, mut ny: u32) {
     unsafe {
         let wp: *mut window_pane = (*wme).wp;
@@ -6386,6 +6570,7 @@ pub unsafe fn window_copy_scroll_down(wme: *mut window_mode_entry, mut ny: u32) 
     }
 }
 
+// vendor/tmux/window-copy.c:6673  window_copy_rectangle_set()
 pub unsafe fn window_copy_rectangle_set(wme: *mut window_mode_entry, rectflag: bool) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -6403,6 +6588,7 @@ pub unsafe fn window_copy_rectangle_set(wme: *mut window_mode_entry, rectflag: b
     }
 }
 
+// vendor/tmux/window-copy.c:6690  window_copy_move_mouse()
 pub unsafe fn window_copy_move_mouse(m: *mut mouse_event) {
     unsafe {
         let Some(wp) = cmd_mouse_pane(m, null_mut(), null_mut()) else {
@@ -6426,6 +6612,7 @@ pub unsafe fn window_copy_move_mouse(m: *mut mouse_event) {
     }
 }
 
+// vendor/tmux/window-copy.c:6715  window_copy_start_drag()
 pub unsafe fn window_copy_start_drag(c: *mut client, m: *mut mouse_event) {
     unsafe {
         if c.is_null() {
@@ -6483,6 +6670,7 @@ pub unsafe fn window_copy_start_drag(c: *mut client, m: *mut mouse_event) {
     }
 }
 
+// vendor/tmux/window-copy.c:6769  window_copy_drag_update()
 pub unsafe fn window_copy_drag_update(c: *mut client, m: *mut mouse_event) {
     unsafe {
         let mut x: u32 = 0;
@@ -6533,6 +6721,7 @@ pub unsafe fn window_copy_drag_update(c: *mut client, m: *mut mouse_event) {
     }
 }
 
+// vendor/tmux/window-copy.c:6815  window_copy_drag_release()
 pub unsafe fn window_copy_drag_release(c: *mut client, m: *mut mouse_event) {
     unsafe {
         if c.is_null() {
@@ -6556,6 +6745,7 @@ pub unsafe fn window_copy_drag_release(c: *mut client, m: *mut mouse_event) {
     }
 }
 
+// vendor/tmux/window-copy.c:6840  window_copy_jump_to_mark()
 pub unsafe fn window_copy_jump_to_mark(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
@@ -6579,6 +6769,7 @@ pub unsafe fn window_copy_jump_to_mark(wme: *mut window_mode_entry) {
 }
 
 /// Scroll up if the cursor went off the visible screen.
+// vendor/tmux/window-copy.c:6864  window_copy_acquire_cursor_up()
 pub unsafe fn window_copy_acquire_cursor_up(
     wme: *mut window_mode_entry,
     hsize: u32,
@@ -6613,6 +6804,7 @@ pub unsafe fn window_copy_acquire_cursor_up(
 }
 
 /// Scroll down if the cursor went off the visible screen.
+// vendor/tmux/window-copy.c:6890  window_copy_acquire_cursor_down()
 unsafe fn window_copy_acquire_cursor_down(
     wme: *mut window_mode_entry,
     hsize: u32,

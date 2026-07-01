@@ -41,12 +41,14 @@ pub static mut STYLE_DEFAULT: style = style {
     default_type: style_default_type::STYLE_DEFAULT_BASE,
 };
 
+// vendor/tmux/style.c:58  style_set_range_string()
 pub unsafe fn style_set_range_string(sy: *mut style, s: *const u8) {
     unsafe {
         strlcpy(&raw mut (*sy).range_string as _, s, 16); // TODO use better sizeof
     }
 }
 
+// vendor/tmux/style.c:69  style_parse()
 pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *const u8) -> i32 {
     unsafe {
         let delimiters = c!(" ,\n");
@@ -266,6 +268,7 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
     }
 }
 
+// vendor/tmux/style.c:303  style_tostring()
 pub unsafe fn style_tostring(sy: *const style) -> *const u8 {
     type s_type = [i8; 256];
     static mut S_BUF: MaybeUninit<s_type> = MaybeUninit::<s_type>::uninit();
@@ -448,6 +451,7 @@ pub unsafe fn style_tostring(sy: *const style) -> *const u8 {
     }
 }
 
+// vendor/tmux/style.c:441  style_add()
 pub unsafe fn style_add(
     gc: *mut grid_cell,
     oo: *mut options,
@@ -483,6 +487,7 @@ pub unsafe fn style_add(
     }
 }
 
+// vendor/tmux/style.c:468  style_apply()
 pub unsafe fn style_apply(
     gc: *mut grid_cell,
     oo: *mut options,
@@ -495,6 +500,7 @@ pub unsafe fn style_apply(
     }
 }
 
+// vendor/tmux/style.c:500  style_set()
 pub unsafe fn style_set(sy: *mut style, gc: *const grid_cell) {
     unsafe {
         memcpy__(sy, &raw const STYLE_DEFAULT);
@@ -502,6 +508,7 @@ pub unsafe fn style_set(sy: *mut style, gc: *const grid_cell) {
     }
 }
 
+// vendor/tmux/style.c:508  style_copy()
 pub unsafe fn style_copy(dst: *mut style, src: *const style) {
     unsafe {
         memcpy__(dst, src);

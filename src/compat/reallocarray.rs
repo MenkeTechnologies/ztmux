@@ -13,6 +13,7 @@
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #[cfg(target_os = "macos")]
+// vendor/tmux/compat/reallocarray.c:32  reallocarray()
 pub unsafe fn reallocarray(
     optr: *mut core::ffi::c_void,
     nmemb: usize,

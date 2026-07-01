@@ -43,10 +43,12 @@ pub struct args_command_state<'a> {
 
 RB_GENERATE!(args_tree, args_entry, entry, discr_entry, args_cmp);
 
+// vendor/tmux/arguments.c:68  args_cmp()
 fn args_cmp(a1: &args_entry, a2: &args_entry) -> cmp::Ordering {
     a1.flag.cmp(&a2.flag)
 }
 
+// vendor/tmux/arguments.c:75  args_find()
 pub unsafe fn args_find(args: *mut args, flag: c_uchar) -> *mut args_entry {
     unsafe {
         let mut entry: args_entry = args_entry { flag, ..zeroed() };
@@ -55,6 +57,7 @@ pub unsafe fn args_find(args: *mut args, flag: c_uchar) -> *mut args_entry {
     }
 }
 
+// vendor/tmux/arguments.c:85  args_copy_value()
 pub unsafe fn args_copy_value(to: *mut args_value, from: *const args_value) {
     unsafe {
         (*to).type_ = (*from).type_;
@@ -71,6 +74,7 @@ pub unsafe fn args_copy_value(to: *mut args_value, from: *const args_value) {
     }
 }
 
+// vendor/tmux/arguments.c:103  args_type_to_string()
 pub fn args_type_to_string(type_: args_type) -> &'static str {
     match type_ {
         args_type::ARGS_NONE => "NONE",
@@ -79,6 +83,7 @@ pub fn args_type_to_string(type_: args_type) -> &'static str {
     }
 }
 
+// vendor/tmux/arguments.c:119  args_value_as_string()
 pub unsafe fn args_value_as_string(value: *mut args_value) -> *const u8 {
     unsafe {
         match (*value).type_ {
@@ -104,10 +109,12 @@ impl args {
     }
 }
 
+// vendor/tmux/arguments.c:136  args_create()
 pub fn args_create<'a>() -> &'a mut args {
     Box::leak(args::create())
 }
 
+// vendor/tmux/arguments.c:147  args_parse_flag_argument()
 pub unsafe fn args_parse_flag_argument(
     values: *const args_value,
     count: u32,
@@ -169,6 +176,7 @@ pub unsafe fn args_parse_flag_argument(
 }
 
 #[expect(clippy::needless_borrow, reason = "false positive")]
+// vendor/tmux/arguments.c:207  args_parse_flags()
 pub unsafe fn args_parse_flags(
     parse: *const args_parse,
     values: *const args_value,
@@ -238,6 +246,7 @@ pub unsafe fn args_parse_flags(
 }
 
 /// Parse arguments into a new argument set.
+// vendor/tmux/arguments.c:256  args_parse()
 pub unsafe fn args_parse(
     parse: *const args_parse,
     values: *mut args_value,
@@ -338,6 +347,7 @@ pub unsafe fn args_parse(
     }
 }
 
+// vendor/tmux/arguments.c:350  args_copy_copy_value()
 pub unsafe fn args_copy_copy_value(
     to: *mut args_value,
     from: *const args_value,
@@ -366,6 +376,7 @@ pub unsafe fn args_copy_copy_value(
 }
 
 /// Copy an arguments set.
+// vendor/tmux/arguments.c:377  args_copy()
 pub unsafe fn args_copy(args: *mut args, argc: i32, argv: *mut *mut u8) -> *mut args {
     let __func__ = "args_copy";
     unsafe {
@@ -399,6 +410,7 @@ pub unsafe fn args_copy(args: *mut args, argc: i32, argv: *mut *mut u8) -> *mut 
     }
 }
 
+// vendor/tmux/arguments.c:412  args_free_value()
 pub unsafe fn args_free_value(value: *mut args_value) {
     unsafe {
         match (*value).type_ {
@@ -410,6 +422,7 @@ pub unsafe fn args_free_value(value: *mut args_value) {
     }
 }
 
+// vendor/tmux/arguments.c:429  args_free_values()
 pub unsafe fn args_free_values(values: *mut args_value, count: u32) {
     unsafe {
         for i in 0..count {
@@ -418,6 +431,7 @@ pub unsafe fn args_free_values(values: *mut args_value, count: u32) {
     }
 }
 
+// vendor/tmux/arguments.c:439  args_free()
 pub unsafe fn args_free(args: *mut args) {
     unsafe {
         args_free_values((*args).values, (*args).count);
@@ -437,6 +451,7 @@ pub unsafe fn args_free(args: *mut args) {
     }
 }
 
+// vendor/tmux/arguments.c:464  args_to_vector()
 pub unsafe fn args_to_vector(args: *const args, argc: *mut i32, argv: *mut *mut *mut u8) {
     unsafe {
         *argc = 0;
@@ -459,6 +474,7 @@ pub unsafe fn args_to_vector(args: *const args, argc: *mut i32, argv: *mut *mut 
     }
 }
 
+// vendor/tmux/arguments.c:490  args_from_vector()
 pub unsafe fn args_from_vector(argc: i32, argv: *const *mut u8) -> *mut args_value {
     unsafe {
         let values: *mut args_value = xcalloc_(argc as usize).as_ptr();
@@ -487,6 +503,7 @@ pub unsafe fn args_print_add_(buf: *mut *mut u8, len: *mut usize, fmt: std::fmt:
     }
 }
 
+// vendor/tmux/arguments.c:524  args_print_add_value()
 pub unsafe fn args_print_add_value(buf: *mut *mut u8, len: *mut usize, value: *const args_value) {
     unsafe {
         if **buf != b'\0' {
@@ -509,6 +526,7 @@ pub unsafe fn args_print_add_value(buf: *mut *mut u8, len: *mut usize, value: *c
     }
 }
 
+// vendor/tmux/arguments.c:548  args_print()
 pub unsafe fn args_print(args: *mut args) -> *mut u8 {
     unsafe {
         let mut last: *mut args_entry = null_mut();
@@ -573,6 +591,7 @@ pub unsafe fn args_print(args: *mut args) -> *mut u8 {
 }
 
 /// Escape an argument.
+// vendor/tmux/arguments.c:606  args_escape()
 pub unsafe fn args_escape(s: *const u8) -> *mut u8 {
     unsafe {
         let dquoted: *const u8 = c!(" #';${}%");
@@ -634,6 +653,7 @@ pub unsafe fn args_has_count(args: *mut args, flag: u8) -> i32 {
     }
 }
 
+// vendor/tmux/arguments.c:653  args_has()
 pub unsafe fn args_has(args: *mut args, flag: char) -> bool {
     debug_assert!(flag.is_ascii());
 
@@ -647,6 +667,7 @@ pub unsafe fn args_has(args: *mut args, flag: char) -> bool {
     }
 }
 
+// vendor/tmux/arguments.c:665  args_set()
 pub unsafe fn args_set(args: *mut args, flag: c_uchar, value: *mut args_value, flags: i32) {
     unsafe {
         let mut entry: *mut args_entry = args_find(args, flag);
@@ -669,6 +690,7 @@ pub unsafe fn args_set(args: *mut args, flag: c_uchar, value: *mut args_value, f
     }
 }
 
+// vendor/tmux/arguments.c:687  args_get()
 pub unsafe fn args_get(args: *mut args, flag: u8) -> *const u8 {
     unsafe {
         let entry = args_find(args, flag);
@@ -683,6 +705,7 @@ pub unsafe fn args_get(args: *mut args, flag: u8) -> *const u8 {
     }
 }
 
+// vendor/tmux/arguments.c:700  args_first()
 pub unsafe fn args_first(args: *mut args, entry: *mut *mut args_entry) -> u8 {
     unsafe {
         *entry = rb_min(&raw mut (*args).tree);
@@ -694,6 +717,7 @@ pub unsafe fn args_first(args: *mut args, entry: *mut *mut args_entry) -> u8 {
 }
 
 /// Get next argument.
+// vendor/tmux/arguments.c:710  args_next()
 pub unsafe fn args_next(entry: *mut *mut args_entry) -> u8 {
     unsafe {
         *entry = rb_next(*entry);
@@ -705,16 +729,19 @@ pub unsafe fn args_next(entry: *mut *mut args_entry) -> u8 {
 }
 
 /// Get argument count.
+// vendor/tmux/arguments.c:720  args_count()
 pub unsafe fn args_count(args: *const args) -> u32 {
     unsafe { (*args).count }
 }
 
 /// Get argument values.
+// vendor/tmux/arguments.c:727  args_values()
 pub unsafe fn args_values(args: *mut args) -> *mut args_value {
     unsafe { (*args).values }
 }
 
 /// Get argument value.
+// vendor/tmux/arguments.c:734  args_value()
 pub unsafe fn args_value(args: *mut args, idx: u32) -> *mut args_value {
     unsafe {
         if idx >= (*args).count {
@@ -725,6 +752,7 @@ pub unsafe fn args_value(args: *mut args, idx: u32) -> *mut args_value {
 }
 
 /// Return argument as string.
+// vendor/tmux/arguments.c:743  args_string()
 pub unsafe fn args_string(args: *mut args, idx: u32) -> *const u8 {
     unsafe {
         if idx >= (*args).count {
@@ -735,6 +763,7 @@ pub unsafe fn args_string(args: *mut args, idx: u32) -> *const u8 {
 }
 
 /// Make a command now.
+// vendor/tmux/arguments.c:752  args_make_commands_now()
 pub unsafe fn args_make_commands_now(
     self_: *mut cmd,
     item: *mut cmdq_item,
@@ -757,6 +786,7 @@ pub unsafe fn args_make_commands_now(
 }
 
 /// Save bits to make a command later.
+// vendor/tmux/arguments.c:773  args_make_commands_prepare()
 pub unsafe fn args_make_commands_prepare<'a>(
     self_: *mut cmd,
     item: *mut cmdq_item,
@@ -814,6 +844,7 @@ pub unsafe fn args_make_commands_prepare<'a>(
 }
 
 /// Return argument as command.
+// vendor/tmux/arguments.c:822  args_make_commands()
 pub unsafe fn args_make_commands(
     state: *mut args_command_state,
     argc: i32,
@@ -864,6 +895,7 @@ pub unsafe fn args_make_commands(
     reason = "this usage is okay, getting pointer to call free"
 )]
 /// Free commands state.
+// vendor/tmux/arguments.c:860  args_make_commands_free()
 pub unsafe fn args_make_commands_free(state: *mut args_command_state) {
     unsafe {
         if !(*state).cmdlist.is_null() {
@@ -886,6 +918,7 @@ pub unsafe fn args_make_commands_free(state: *mut args_command_state) {
 }
 
 /// Get prepared command.
+// vendor/tmux/arguments.c:873  args_make_commands_get_command()
 pub unsafe fn args_make_commands_get_command(state: *mut args_command_state) -> *mut u8 {
     unsafe {
         if !(*state).cmdlist.is_null() {
@@ -901,6 +934,7 @@ pub unsafe fn args_make_commands_get_command(state: *mut args_command_state) -> 
 }
 
 /// Get first value in argument.
+// vendor/tmux/arguments.c:892  args_first_value()
 pub unsafe fn args_first_value(args: *mut args, flag: u8) -> *mut args_value {
     unsafe {
         let entry = args_find(args, flag);
@@ -912,11 +946,13 @@ pub unsafe fn args_first_value(args: *mut args, flag: u8) -> *mut args_value {
 }
 
 /// Get next value in argument.
+// vendor/tmux/arguments.c:903  args_next_value()
 pub unsafe fn args_next_value(value: *mut args_value) -> *mut args_value {
     unsafe { tailq_next(value) }
 }
 
 /// Convert an argument value to a number.
+// vendor/tmux/arguments.c:910  args_strtonum()
 pub unsafe fn args_strtonum(
     args: *mut args,
     flag: u8,
@@ -953,6 +989,7 @@ pub unsafe fn args_strtonum(
 }
 
 /// Convert an argument value to a number, and expand formats.
+// vendor/tmux/arguments.c:942  args_strtonum_and_expand()
 pub unsafe fn args_strtonum_and_expand(
     args: *mut args,
     flag: u8,
@@ -993,6 +1030,7 @@ pub unsafe fn args_strtonum_and_expand(
 }
 
 /// Convert an argument to a number which may be a percentage.
+// vendor/tmux/arguments.c:977  args_percentage()
 pub unsafe fn args_percentage(
     args: *mut args,
     flag: u8,
@@ -1017,6 +1055,7 @@ pub unsafe fn args_percentage(
 }
 
 /// Convert a string to a number which may be a percentage.
+// vendor/tmux/arguments.c:997  args_string_percentage()
 pub unsafe fn args_string_percentage(
     value: *const u8,
     minval: i64,
@@ -1071,6 +1110,7 @@ pub unsafe fn args_string_percentage(
 }
 
 /// Convert an argument to a number which may be a percentage, and expand formats.
+// vendor/tmux/arguments.c:1045  args_percentage_and_expand()
 pub unsafe fn args_percentage_and_expand(
     args: *mut args,
     flag: u8,
@@ -1096,6 +1136,7 @@ pub unsafe fn args_percentage_and_expand(
 }
 
 /// Convert a string to a number which may be a percentage, and expand formats.
+// vendor/tmux/arguments.c:1068  args_string_percentage_and_expand()
 pub unsafe fn args_string_percentage_and_expand(
     value: *const u8,
     minval: i64,

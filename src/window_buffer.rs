@@ -91,6 +91,7 @@ pub struct window_buffer_editdata {
     pub pb: *mut paste_buffer,
 }
 
+// vendor/tmux/window-buffer.c:118  window_buffer_add_item()
 unsafe fn window_buffer_add_item(data: *mut window_buffer_modedata) -> *mut window_buffer_itemdata {
     unsafe {
         (*data).item_list =
@@ -102,6 +103,7 @@ unsafe fn window_buffer_add_item(data: *mut window_buffer_modedata) -> *mut wind
     }
 }
 
+// vendor/tmux/window-buffer.c:129  window_buffer_free_item()
 unsafe fn window_buffer_free_item(item: *mut window_buffer_itemdata) {
     unsafe {
         (*item).name = String::new();
@@ -109,6 +111,7 @@ unsafe fn window_buffer_free_item(item: *mut window_buffer_itemdata) {
     }
 }
 
+// vendor/tmux/window-buffer.c:136  window_buffer_build()
 pub unsafe fn window_buffer_build(
     modedata: NonNull<c_void>,
     sort_crit: *mut mode_tree_sort_criteria,
@@ -217,6 +220,7 @@ pub unsafe fn window_buffer_build(
     }
 }
 
+// vendor/tmux/window-buffer.c:199  window_buffer_draw()
 pub unsafe fn window_buffer_draw(
     _modedata: *mut c_void,
     itemdata: Option<NonNull<c_void>>,
@@ -271,6 +275,7 @@ pub unsafe fn window_buffer_draw(
     }
 }
 
+// vendor/tmux/window-buffer.c:257  window_buffer_search()
 pub unsafe fn window_buffer_search(
     _modedata: *mut c_void,
     itemdata: NonNull<c_void>,
@@ -293,6 +298,7 @@ pub unsafe fn window_buffer_search(
     }
 }
 
+// vendor/tmux/window-buffer.c:283  window_buffer_menu()
 pub unsafe fn window_buffer_menu(modedata: NonNull<c_void>, c: *mut client, key: key_code) {
     unsafe {
         let data: NonNull<window_buffer_modedata> = modedata.cast();
@@ -306,6 +312,7 @@ pub unsafe fn window_buffer_menu(modedata: NonNull<c_void>, c: *mut client, key:
     }
 }
 
+// vendor/tmux/window-buffer.c:296  window_buffer_get_key()
 pub unsafe fn window_buffer_get_key(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -341,6 +348,7 @@ pub unsafe fn window_buffer_get_key(
     }
 }
 
+// vendor/tmux/window-buffer.c:365  window_buffer_init()
 pub unsafe fn window_buffer_init(
     wme: NonNull<window_mode_entry>,
     fs: *mut cmd_find_state,
@@ -393,6 +401,7 @@ pub unsafe fn window_buffer_init(
     }
 }
 
+// vendor/tmux/window-buffer.c:402  window_buffer_free()
 pub unsafe fn window_buffer_free(wme: NonNull<window_mode_entry>) {
     unsafe {
         let data = (*wme.as_ptr()).data as *mut window_buffer_modedata;
@@ -416,6 +425,7 @@ pub unsafe fn window_buffer_free(wme: NonNull<window_mode_entry>) {
     }
 }
 
+// vendor/tmux/window-buffer.c:429  window_buffer_resize()
 pub unsafe fn window_buffer_resize(wme: NonNull<window_mode_entry>, sx: u32, sy: u32) {
     unsafe {
         let data = (*wme.as_ptr()).data as *mut window_buffer_modedata;
@@ -423,6 +433,7 @@ pub unsafe fn window_buffer_resize(wme: NonNull<window_mode_entry>, sx: u32, sy:
     }
 }
 
+// vendor/tmux/window-buffer.c:437  window_buffer_update()
 pub unsafe fn window_buffer_update(wme: NonNull<window_mode_entry>) {
     unsafe {
         let data = (*wme.as_ptr()).data as *mut window_buffer_modedata;
@@ -433,6 +444,7 @@ pub unsafe fn window_buffer_update(wme: NonNull<window_mode_entry>) {
     }
 }
 
+// vendor/tmux/window-buffer.c:448  window_buffer_do_delete()
 pub unsafe fn window_buffer_do_delete(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -459,6 +471,7 @@ pub unsafe fn window_buffer_do_delete(
     }
 }
 
+// vendor/tmux/window-buffer.c:471  window_buffer_do_paste()
 pub unsafe fn window_buffer_do_paste(
     modedata: NonNull<c_void>,
     itemdata: NonNull<c_void>,
@@ -480,6 +493,7 @@ pub unsafe fn window_buffer_do_paste(
     }
 }
 
+// vendor/tmux/window-buffer.c:482  window_buffer_finish_edit()
 pub unsafe fn window_buffer_finish_edit(ed: *mut window_buffer_editdata) {
     unsafe {
         (*ed).name = String::new();
@@ -487,6 +501,7 @@ pub unsafe fn window_buffer_finish_edit(ed: *mut window_buffer_editdata) {
     }
 }
 
+// vendor/tmux/window-buffer.c:532  window_buffer_edit_close_cb()
 pub unsafe fn window_buffer_edit_close_cb(buf: *mut u8, mut len: usize, arg: *mut c_void) {
     unsafe {
         let ed = arg as *mut window_buffer_editdata;
@@ -526,6 +541,7 @@ pub unsafe fn window_buffer_edit_close_cb(buf: *mut u8, mut len: usize, arg: *mu
     }
 }
 
+// vendor/tmux/window-buffer.c:588  window_buffer_start_edit()
 unsafe fn window_buffer_start_edit(
     data: *mut window_buffer_modedata,
     item: *mut window_buffer_itemdata,
@@ -551,6 +567,7 @@ unsafe fn window_buffer_start_edit(
     }
 }
 
+// vendor/tmux/window-buffer.c:617  window_buffer_key()
 pub unsafe fn window_buffer_key(
     wme: NonNull<window_mode_entry>,
     c: *mut client,

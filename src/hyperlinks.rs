@@ -51,6 +51,7 @@ pub struct hyperlinks {
     pub references: u32,
 }
 
+// vendor/tmux/hyperlinks.c:76  hyperlinks_by_uri_cmp()
 fn hyperlinks_by_uri_cmp(left: &hyperlinks_uri, right: &hyperlinks_uri) -> cmp::Ordering {
     unsafe {
         if *left.internal_id == b'\0' || *right.internal_id == b'\0' {
@@ -76,6 +77,7 @@ RB_GENERATE!(
     hyperlinks_by_uri_cmp
 );
 
+// vendor/tmux/hyperlinks.c:104  hyperlinks_by_inner_cmp()
 fn hyperlinks_by_inner_cmp(left: &hyperlinks_uri, right: &hyperlinks_uri) -> cmp::Ordering {
     left.inner.cmp(&right.inner)
 }
@@ -88,6 +90,7 @@ RB_GENERATE!(
     hyperlinks_by_inner_cmp
 );
 
+// vendor/tmux/hyperlinks.c:116  hyperlinks_remove()
 unsafe fn hyperlinks_remove(hlu: *mut hyperlinks_uri) {
     unsafe {
         let hl = (*hlu).tree;
@@ -105,6 +108,7 @@ unsafe fn hyperlinks_remove(hlu: *mut hyperlinks_uri) {
     }
 }
 
+// vendor/tmux/hyperlinks.c:134  hyperlinks_put()
 pub unsafe fn hyperlinks_put(
     hl: *mut hyperlinks,
     uri_in: *const u8,
@@ -168,6 +172,7 @@ pub unsafe fn hyperlinks_put(
     }
 }
 
+// vendor/tmux/hyperlinks.c:186  hyperlinks_get()
 pub unsafe fn hyperlinks_get(
     hl: *mut hyperlinks,
     inner: u32,
@@ -195,6 +200,7 @@ pub unsafe fn hyperlinks_get(
     }
 }
 
+// vendor/tmux/hyperlinks.c:206  hyperlinks_init()
 pub unsafe fn hyperlinks_init() -> *mut hyperlinks {
     unsafe {
         let hl = xcalloc_::<hyperlinks>(1).as_ptr();
@@ -206,6 +212,7 @@ pub unsafe fn hyperlinks_init() -> *mut hyperlinks {
     }
 }
 
+// vendor/tmux/hyperlinks.c:220  hyperlinks_copy()
 pub unsafe fn hyperlinks_copy(hl: *mut hyperlinks) -> *mut hyperlinks {
     unsafe {
         (*hl).references += 1;
@@ -213,6 +220,7 @@ pub unsafe fn hyperlinks_copy(hl: *mut hyperlinks) -> *mut hyperlinks {
     hl
 }
 
+// vendor/tmux/hyperlinks.c:228  hyperlinks_reset()
 pub unsafe fn hyperlinks_reset(hl: *mut hyperlinks) {
     unsafe {
         for hlu in rb_foreach::<_, discr_by_inner_entry>(&raw mut (*hl).by_inner) {
@@ -221,6 +229,7 @@ pub unsafe fn hyperlinks_reset(hl: *mut hyperlinks) {
     }
 }
 
+// vendor/tmux/hyperlinks.c:238  hyperlinks_free()
 pub unsafe fn hyperlinks_free(hl: *mut hyperlinks) {
     unsafe {
         (*hl).references -= 1;

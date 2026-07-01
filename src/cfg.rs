@@ -26,6 +26,7 @@ pub static CFG_QUIET: AtomicBool = AtomicBool::new(true);
 
 pub static CFG_FILES: Mutex<Vec<CString>> = Mutex::new(Vec::new());
 
+// vendor/tmux/cfg.c:40  cfg_client_done()
 fn cfg_client_done(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     if !CFG_FINISHED.load(atomic::Ordering::Acquire) {
         cmd_retval::CMD_RETURN_WAIT
@@ -34,6 +35,7 @@ fn cfg_client_done(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     }
 }
 
+// vendor/tmux/cfg.c:48  cfg_done()
 unsafe fn cfg_done(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     unsafe {
         if CFG_FINISHED.load(atomic::Ordering::Acquire) {
@@ -53,6 +55,7 @@ unsafe fn cfg_done(_item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     }
 }
 
+// vendor/tmux/cfg.c:65  start_cfg()
 pub fn start_cfg() {
     // Configuration files are loaded without a client, so commands are run
     // in the global queue with item->client NULL.
@@ -95,6 +98,7 @@ pub fn start_cfg() {
     }
 }
 
+// vendor/tmux/cfg.c:96  load_cfg()
 pub unsafe fn load_cfg(
     path: &str,
     c: *mut client,
@@ -168,6 +172,7 @@ pub unsafe fn load_cfg(
     }
 }
 
+// vendor/tmux/cfg.c:155  load_cfg_from_buffer()
 pub unsafe fn load_cfg_from_buffer(
     buf: &[u8],
     path: &str,
@@ -242,6 +247,7 @@ pub fn cfg_add_cause_(args: std::fmt::Arguments) {
         .push(CString::new(args.to_string()).unwrap());
 }
 
+// vendor/tmux/cfg.c:222  cfg_print_causes()
 pub unsafe fn cfg_print_causes(item: *mut cmdq_item) {
     for cause in CFG_CAUSES.lock().unwrap().drain(..) {
         unsafe {
@@ -250,6 +256,7 @@ pub unsafe fn cfg_print_causes(item: *mut cmdq_item) {
     }
 }
 
+// vendor/tmux/cfg.c:241  cfg_show_causes()
 pub unsafe fn cfg_show_causes(mut s: *mut session) {
     unsafe {
         let c = tailq_first(&raw mut CLIENTS);

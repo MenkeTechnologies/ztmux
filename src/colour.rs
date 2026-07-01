@@ -20,10 +20,12 @@ use crate::options_::{options, options_array_first, options_array_item_index, op
 const COLOUR_FLAG_256: i32 = 0x01000000;
 const COLOUR_FLAG_RGB: i32 = 0x02000000;
 
+// vendor/tmux/colour.c:109  colour_dist_sq()
 fn colour_dist_sq(r1: i32, g1: i32, b1: i32, r2: i32, g2: i32, b2: i32) -> i32 {
     (r1 - r2) * (r1 - r2) + (g1 - g2) * (g1 - g2) + (b1 - b2) * (b1 - b2)
 }
 
+// vendor/tmux/colour.c:115  colour_to_6cube()
 fn colour_to_6cube(v: i32) -> i32 {
     if v < 48 {
         0
@@ -44,6 +46,7 @@ fn colour_to_6cube(v: i32) -> i32 {
 /// not evenly spread out), so our 6 levels are not evenly spread: 0x0, 0x5f
 /// (95), 0x87 (135), 0xaf (175), 0xd7 (215) and 0xff (255). Greys are more
 /// evenly spread (8, 18, 28 ... 238).
+// vendor/tmux/colour.c:137  colour_find_rgb()
 pub fn colour_find_rgb(r: u8, g: u8, b: u8) -> i32 {
     // convert to i32 to better match c's integer promotion rules
     let r = r as i32;
@@ -86,12 +89,14 @@ pub fn colour_find_rgb(r: u8, g: u8, b: u8) -> i32 {
 }
 
 /// Join RGB into a colour.
+// vendor/tmux/colour.c:171  colour_join_rgb()
 pub fn colour_join_rgb(r: u8, g: u8, b: u8) -> i32 {
     (((r as i32) << 16) | ((g as i32) << 8) | (b as i32)) | COLOUR_FLAG_RGB
 }
 
 /// Split colour into RGB.
 #[inline]
+// vendor/tmux/colour.c:180  colour_split_rgb()
 pub fn colour_split_rgb(c: i32) -> (u8 /* red */, u8 /* green */, u8 /* blue */) {
     (
         ((c >> 16) & 0xff) as u8,
@@ -101,6 +106,7 @@ pub fn colour_split_rgb(c: i32) -> (u8 /* red */, u8 /* green */, u8 /* blue */)
 }
 
 /// Force colour to RGB if not already.
+// vendor/tmux/colour.c:189  colour_force_rgb()
 pub fn colour_force_rgb(c: i32) -> i32 {
     if c & COLOUR_FLAG_RGB != 0 {
         c
@@ -114,6 +120,7 @@ pub fn colour_force_rgb(c: i32) -> i32 {
 }
 
 /// Convert colour to a string.
+// vendor/tmux/colour.c:226  colour_tostring()
 pub fn colour_tostring(c: i32) -> Cow<'static, str> {
     if c == -1 {
         return Cow::Borrowed("none");
@@ -152,6 +159,7 @@ pub fn colour_tostring(c: i32) -> Cow<'static, str> {
 }
 
 /// Convert colour from string.
+// vendor/tmux/colour.c:387  colour_fromstring()
 pub fn colour_fromstring(s: &str) -> i32 {
     if s.chars().next().is_some_and(|c| c == '#') && s.len() == 7 {
         let cp = s.trim_start_matches(|c: char| c.is_ascii_hexdigit());
@@ -272,6 +280,7 @@ fn colour_256_to_rgb(c: i32) -> i32 {
     TABLE[c as u8 as usize] | COLOUR_FLAG_RGB
 }
 
+// vendor/tmux/colour.c:540  colour_256to16()
 pub fn colour_256to16(c: i32) -> i32 {
     const TABLE: [u8; 256] = [
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0, 4, 4, 4, 12, 12, 2, 6, 4, 4, 12,
@@ -288,6 +297,7 @@ pub fn colour_256to16(c: i32) -> i32 {
     TABLE[c as u8 as usize] as i32
 }
 
+// vendor/tmux/colour.c:566  colour_byname()
 pub fn colour_byname(name: &str) -> i32 {
     const COLOURS: [(&str, i32); 578] = [
         ("AliceBlue", 0xf0f8ff),
@@ -908,6 +918,7 @@ pub(crate) struct colour_palette {
     pub(crate) default_palette: Option<Box<[i32]>>,
 }
 
+// vendor/tmux/colour.c:1217  colour_palette_init()
 pub fn colour_palette_init() -> colour_palette {
     colour_palette {
         fg: 8,
@@ -918,6 +929,7 @@ pub fn colour_palette_init() -> colour_palette {
 }
 
 /// Clear palette.
+// vendor/tmux/colour.c:1227  colour_palette_clear()
 pub fn colour_palette_clear(p: Option<&mut colour_palette>) {
     if let Some(p) = p {
         p.fg = 8;
@@ -927,6 +939,7 @@ pub fn colour_palette_clear(p: Option<&mut colour_palette>) {
 }
 
 /// Free a palette
+// vendor/tmux/colour.c:1239  colour_palette_free()
 pub fn colour_palette_free(p: Option<&mut colour_palette>) {
     if let Some(p) = p {
         p.palette.take();
@@ -935,6 +948,7 @@ pub fn colour_palette_free(p: Option<&mut colour_palette>) {
 }
 
 /// Get a colour from a palette.
+// vendor/tmux/colour.c:1251  colour_palette_get()
 pub fn colour_palette_get(p: Option<&colour_palette>, mut c: i32) -> i32 {
     let Some(p) = p else {
         return -1;
@@ -963,6 +977,7 @@ pub fn colour_palette_get(p: Option<&colour_palette>, mut c: i32) -> i32 {
     }
 }
 
+// vendor/tmux/colour.c:1272  colour_palette_set()
 pub fn colour_palette_set(p: Option<&mut colour_palette>, n: i32, c: i32) -> i32 {
     let Some(p) = p else {
         return 0;
@@ -983,6 +998,7 @@ pub fn colour_palette_set(p: Option<&mut colour_palette>, n: i32, c: i32) -> i32
     1
 }
 
+// vendor/tmux/colour.c:1293  colour_palette_from_option()
 pub unsafe fn colour_palette_from_option(p: Option<&mut colour_palette>, oo: *mut options) {
     unsafe {
         let Some(p) = p else {

@@ -16,6 +16,7 @@ use crate::libc::{gettimeofday, memcpy, strchr, strcmp, strcspn, strlen, strncmp
 use crate::*;
 use crate::options_::*;
 
+// vendor/tmux/names.c:34  name_time_callback()
 pub unsafe extern "C-unwind" fn name_time_callback(
     _fd: c_int,
     _events: c_short,
@@ -26,6 +27,7 @@ pub unsafe extern "C-unwind" fn name_time_callback(
     }
 }
 
+// vendor/tmux/names.c:43  name_time_expired()
 pub unsafe fn name_time_expired(w: *mut window, tv: *mut timeval) -> c_int {
     unsafe {
         let mut offset: MaybeUninit<timeval> = MaybeUninit::<timeval>::uninit();
@@ -41,6 +43,7 @@ pub unsafe fn name_time_expired(w: *mut window, tv: *mut timeval) -> c_int {
     }
 }
 
+// vendor/tmux/names.c:54  check_window_name()
 pub unsafe fn check_window_name(w: *mut window) {
     unsafe {
         let mut tv: timeval = zeroed();
@@ -108,6 +111,7 @@ pub unsafe fn check_window_name(w: *mut window) {
     }
 }
 
+// vendor/tmux/names.c:108  default_window_name()
 pub unsafe fn default_window_name(w: *mut window) -> String {
     unsafe {
         if (*w).active.is_null() {
@@ -124,6 +128,7 @@ pub unsafe fn default_window_name(w: *mut window) -> String {
     }
 }
 
+// vendor/tmux/names.c:124  format_window_name()
 unsafe fn format_window_name(w: *mut window) -> *const u8 {
     unsafe {
         let ft = format_create(
@@ -143,6 +148,7 @@ unsafe fn format_window_name(w: *mut window) -> *const u8 {
     }
 }
 
+// vendor/tmux/names.c:142  parse_window_name()
 pub unsafe fn parse_window_name(in_: *const u8) -> String {
     unsafe {
         let sizeof_exec: usize = 6; // sizeof "exec "

@@ -47,6 +47,7 @@ pub static CMD_LAST_PANE_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-select-pane.c:59  cmd_select_pane_redraw()
 pub unsafe fn cmd_select_pane_redraw(w: *mut window) {
     unsafe {
         // Redraw entire window if it is bigger than the client (the
@@ -70,6 +71,7 @@ pub unsafe fn cmd_select_pane_redraw(w: *mut window) {
     }
 }
 
+// vendor/tmux/cmd-select-pane.c:84  cmd_select_pane_exec()
 pub unsafe fn cmd_select_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

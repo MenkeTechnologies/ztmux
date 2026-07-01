@@ -109,6 +109,7 @@ static POPUP_INTERNAL_MENU_ITEMS: [menu_item; 4] = [
     menu_item::new("Centre", 'C' as u64, null_mut()),
 ];
 
+// vendor/tmux/popup.c:156  popup_redraw_cb()
 pub unsafe fn popup_redraw_cb(ttyctx: *const tty_ctx) {
     unsafe {
         let pd = (*ttyctx).arg.cast::<popup_data>();
@@ -116,6 +117,7 @@ pub unsafe fn popup_redraw_cb(ttyctx: *const tty_ctx) {
     }
 }
 
+// vendor/tmux/popup.c:164  popup_set_client_cb()
 pub unsafe fn popup_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i32 {
     unsafe {
         let pd = (*ttyctx).arg.cast::<popup_data>();
@@ -149,6 +151,7 @@ pub unsafe fn popup_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i32 {
     }
 }
 
+// vendor/tmux/popup.c:190  popup_init_ctx_cb()
 pub unsafe fn popup_init_ctx_cb(ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx) {
     unsafe {
         let pd = (*ctx).arg.cast::<popup_data>();
@@ -161,6 +164,7 @@ pub unsafe fn popup_init_ctx_cb(ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx
     }
 }
 
+// vendor/tmux/popup.c:204  popup_mode_cb()
 pub unsafe fn popup_mode_cb(
     c: *mut client,
     data: *mut c_void,
@@ -186,6 +190,7 @@ pub unsafe fn popup_mode_cb(
 }
 
 /// Return parts of the input range which are not obstructed by the popup.
+// vendor/tmux/popup.c:223  popup_check_cb()
 pub unsafe fn popup_check_cb(
     c: *mut client,
     data: *mut c_void,
@@ -244,6 +249,7 @@ pub unsafe fn popup_check_cb(
     }
 }
 
+// vendor/tmux/popup.c:276  popup_draw_cb()
 pub unsafe fn popup_draw_cb(c: *mut client, data: *mut c_void, rctx: *mut screen_redraw_ctx) {
     unsafe {
         let pd = data.cast::<popup_data>();
@@ -326,6 +332,7 @@ pub unsafe fn popup_draw_cb(c: *mut client, data: *mut c_void, rctx: *mut screen
     }
 }
 
+// vendor/tmux/popup.c:338  popup_free_cb()
 pub fn popup_free_cb(c: *mut client, data: *mut c_void) {
     unsafe {
         let pd = data as *mut popup_data;
@@ -361,6 +368,7 @@ pub fn popup_free_cb(c: *mut client, data: *mut c_void) {
     }
 }
 
+// vendor/tmux/popup.c:360  popup_resize_cb()
 pub fn popup_resize_cb(c: *mut client, data: *mut c_void) {
     unsafe {
         let pd = data as *mut popup_data;
@@ -405,6 +413,7 @@ pub fn popup_resize_cb(c: *mut client, data: *mut c_void) {
     }
 }
 
+// vendor/tmux/popup.c:401  popup_make_pane()
 pub fn popup_make_pane(pd: *mut popup_data, type_: layout_type) {
     unsafe {
         let c = (*pd).c;
@@ -447,6 +456,7 @@ pub fn popup_make_pane(pd: *mut popup_data, type_: layout_type) {
     }
 }
 
+// vendor/tmux/popup.c:445  popup_menu_done()
 pub fn popup_menu_done(_menu: *mut menu, _choice: u32, key: key_code, data: *mut c_void) {
     unsafe {
         let pd = data as *mut popup_data;
@@ -484,6 +494,7 @@ pub fn popup_menu_done(_menu: *mut menu, _choice: u32, key: key_code, data: *mut
     }
 }
 
+// vendor/tmux/popup.c:491  popup_handle_drag()
 pub unsafe fn popup_handle_drag(c: *mut client, pd: *mut popup_data, m: *mut mouse_event) {
     unsafe {
         let px: u32;
@@ -550,6 +561,7 @@ pub unsafe fn popup_handle_drag(c: *mut client, pd: *mut popup_data, m: *mut mou
     }
 }
 
+// vendor/tmux/popup.c:549  popup_key_cb()
 pub unsafe fn popup_key_cb(c: *mut client, data: *mut c_void, event: *mut key_event) -> i32 {
     unsafe {
         let pd = data as *mut popup_data;
@@ -706,6 +718,7 @@ pub unsafe fn popup_key_cb(c: *mut client, data: *mut c_void, event: *mut key_ev
     }
 }
 
+// vendor/tmux/popup.c:655  popup_job_update_cb()
 pub unsafe fn popup_job_update_cb(job: *mut job) {
     unsafe {
         let pd = job_get_data(job) as *mut popup_data;
@@ -741,6 +754,7 @@ pub unsafe fn popup_job_update_cb(job: *mut job) {
     }
 }
 
+// vendor/tmux/popup.c:682  popup_job_complete_cb()
 pub unsafe fn popup_job_complete_cb(job: *mut job) {
     unsafe {
         let pd = job_get_data(job) as *mut popup_data;
@@ -763,6 +777,7 @@ pub unsafe fn popup_job_complete_cb(job: *mut job) {
     }
 }
 
+// vendor/tmux/popup.c:757  popup_display()
 pub unsafe fn popup_display(
     flags: popup_flag,
     mut lines: box_lines,

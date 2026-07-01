@@ -34,6 +34,7 @@ unsafe impl GlobalAlloc for MyAlloc {
 
 // It could also be interesting to add in a histogram for viewing memory allocations
 
+// vendor/tmux/tmux.c:375  main()
 fn main() {
     let args = std::env::args().collect::<Vec<String>>();
     let args = args

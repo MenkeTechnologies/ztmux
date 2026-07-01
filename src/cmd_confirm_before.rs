@@ -34,10 +34,12 @@ pub struct cmd_confirm_before_data {
     default_yes: bool,
 }
 
+// vendor/tmux/cmd-confirm-before.c:60  cmd_confirm_before_args_parse()
 unsafe fn cmd_confirm_before_args_parse(_: *mut args, _: u32, _: *mut *mut u8) -> args_parse_type {
     args_parse_type::ARGS_PARSE_COMMANDS_OR_STRING
 }
 
+// vendor/tmux/cmd-confirm-before.c:67  cmd_confirm_before_exec()
 unsafe fn cmd_confirm_before_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -98,6 +100,7 @@ unsafe fn cmd_confirm_before_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
     }
 }
 
+// vendor/tmux/cmd-confirm-before.c:122  cmd_confirm_before_callback()
 unsafe fn cmd_confirm_before_callback(
     c: *mut client,
     cdata: NonNull<cmd_confirm_before_data>,
@@ -144,6 +147,7 @@ unsafe fn cmd_confirm_before_callback(
     }
 }
 
+// vendor/tmux/cmd-confirm-before.c:158  cmd_confirm_before_free()
 unsafe fn cmd_confirm_before_free(cdata: NonNull<cmd_confirm_before_data>) {
     unsafe {
         cmd_list_free((*cdata.as_ptr()).cmdlist);

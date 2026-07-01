@@ -32,6 +32,7 @@ pub static CMD_PIPE_PANE_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_pipe_pane_exec,
 };
 
+// vendor/tmux/cmd-pipe-pane.c:56  cmd_pipe_pane_exec()
 pub unsafe fn cmd_pipe_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -192,6 +193,7 @@ pub unsafe fn cmd_pipe_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
     }
 }
 
+// vendor/tmux/cmd-pipe-pane.c:194  cmd_pipe_pane_read_callback()
 pub unsafe extern "C-unwind" fn cmd_pipe_pane_read_callback(
     _bufev: *mut bufferevent,
     data: *mut c_void,
@@ -212,6 +214,7 @@ pub unsafe extern "C-unwind" fn cmd_pipe_pane_read_callback(
     }
 }
 
+// vendor/tmux/cmd-pipe-pane.c:211  cmd_pipe_pane_write_callback()
 pub unsafe extern "C-unwind" fn cmd_pipe_pane_write_callback(
     _bufev: *mut bufferevent,
     data: *mut c_void,
@@ -227,6 +230,7 @@ pub unsafe extern "C-unwind" fn cmd_pipe_pane_write_callback(
     }
 }
 
+// vendor/tmux/cmd-pipe-pane.c:222  cmd_pipe_pane_error_callback()
 pub unsafe extern "C-unwind" fn cmd_pipe_pane_error_callback(
     _bufev: *mut bufferevent,
     _what: i16,

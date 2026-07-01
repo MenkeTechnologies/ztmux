@@ -59,6 +59,7 @@ static mut CLIENT_EXECCMD: *mut u8 = null_mut();
 static mut CLIENT_ATTACHED: i32 = 0;
 static mut CLIENT_FILES: client_files = rb_initializer();
 
+// vendor/tmux/client.c:78  client_get_lock()
 pub unsafe fn client_get_lock(lockfile: *mut u8) -> i32 {
     unsafe {
         log_debug!("lock file is {}", _s(lockfile));
@@ -84,6 +85,7 @@ pub unsafe fn client_get_lock(lockfile: *mut u8) -> i32 {
     }
 }
 
+// vendor/tmux/client.c:105  client_connect()
 pub unsafe fn client_connect(base: *mut event_base, path: *const u8, flags: client_flag) -> i32 {
     unsafe {
         let mut sa: sockaddr_un = zeroed();
@@ -174,6 +176,7 @@ pub unsafe fn client_connect(base: *mut event_base, path: *const u8, flags: clie
     }
 }
 
+// vendor/tmux/client.c:185  client_exit_message()
 pub unsafe fn client_exit_message() -> Cow<'static, str> {
     match unsafe { CLIENT_EXITREASON } {
         client_exitreason::CLIENT_EXIT_DETACHED => {
@@ -205,6 +208,7 @@ pub unsafe fn client_exit_message() -> Cow<'static, str> {
     }
 }
 
+// vendor/tmux/client.c:224  client_exit()
 unsafe fn client_exit() {
     unsafe {
         if file_write_left(&raw mut CLIENT_FILES) == 0 {
@@ -214,6 +218,7 @@ unsafe fn client_exit() {
 }
 
 #[expect(clippy::deref_addrof)]
+// vendor/tmux/client.c:232  client_main()
 pub unsafe extern "C-unwind" fn client_main(
     base: *mut event_base,
     argc: i32,
@@ -271,6 +276,7 @@ pub unsafe extern "C-unwind" fn client_main(
         #[cfg(feature = "systemd")]
         {
             unsafe extern "C" {
+                // vendor/tmux/compat/systemd.c:39  systemd_activated()
                 fn systemd_activated() -> i32;
             }
             if systemd_activated() != 0 {
@@ -449,6 +455,7 @@ pub unsafe extern "C-unwind" fn client_main(
     }
 }
 
+// vendor/tmux/client.c:450  client_send_identify()
 unsafe fn client_send_identify(
     ttynam: *const u8,
     termname: &CStr,
@@ -558,6 +565,7 @@ unsafe fn client_send_identify(
 }
 
 #[expect(clippy::deref_addrof)]
+// vendor/tmux/client.c:499  client_exec()
 unsafe fn client_exec(shell: *mut u8, shellcmd: *mut u8) {
     unsafe {
         log_debug!("shell {}, command {}", _s(shell), _s(shellcmd));
@@ -587,6 +595,7 @@ unsafe fn client_exec(shell: *mut u8, shellcmd: *mut u8) {
     }
 }
 
+// vendor/tmux/client.c:520  client_signal()
 unsafe fn client_signal(sig: i32) {
     unsafe {
         let mut sigact: sigaction = zeroed();
@@ -645,6 +654,7 @@ unsafe fn client_signal(sig: i32) {
     }
 }
 
+// vendor/tmux/client.c:574  client_file_check_cb()
 unsafe fn client_file_check_cb(
     _c: *mut client,
     _path: *mut u8,
@@ -660,6 +670,7 @@ unsafe fn client_file_check_cb(
     }
 }
 
+// vendor/tmux/client.c:584  client_dispatch()
 unsafe fn client_dispatch(imsg: *mut imsg, _arg: *mut c_void) {
     unsafe {
         if imsg.is_null() {
@@ -679,6 +690,7 @@ unsafe fn client_dispatch(imsg: *mut imsg, _arg: *mut c_void) {
     }
 }
 
+// vendor/tmux/client.c:603  client_dispatch_exit_message()
 unsafe fn client_dispatch_exit_message(mut data: *const u8, mut datalen: usize) {
     unsafe {
         let mut retval = 0;
@@ -707,6 +719,7 @@ unsafe fn client_dispatch_exit_message(mut data: *const u8, mut datalen: usize) 
 }
 
 #[expect(clippy::deref_addrof)]
+// vendor/tmux/client.c:629  client_dispatch_wait()
 unsafe fn client_dispatch_wait(imsg: *mut imsg) {
     // static mut PLEDGE_APPLIED: i32 = 0;
 
@@ -813,6 +826,7 @@ unsafe fn client_dispatch_wait(imsg: *mut imsg) {
 }
 
 #[expect(clippy::deref_addrof)]
+// vendor/tmux/client.c:727  client_dispatch_attached()
 unsafe fn client_dispatch_attached(imsg: *mut imsg) {
     unsafe {
         let mut sigact: sigaction = zeroed();

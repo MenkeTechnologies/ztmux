@@ -27,6 +27,7 @@ pub static CMD_PASTE_BUFFER_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
+// vendor/tmux/cmd-paste-buffer.c:58  cmd_paste_buffer_exec()
 unsafe fn cmd_paste_buffer_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
