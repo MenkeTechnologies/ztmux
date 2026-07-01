@@ -290,13 +290,13 @@ pub unsafe fn window_clock_draw_screen(wme: NonNull<window_mode_entry>) {
         let tim_len = strlen(&raw const tim as _) as u32;
         if screen_size_x(s) < 6 * tim_len || screen_size_y(s) < 6 {
             if screen_size_x(s) >= tim_len && screen_size_y(s) != 0 {
-                x = (screen_size_x(s) / 2) - (tim_len / 2) as u32;
+                x = (screen_size_x(s) / 2) - (tim_len / 2);
                 y = screen_size_y(s) / 2;
                 screen_write_cursormove(&raw mut ctx, x as i32, y as i32, 0);
 
                 gc.write(GRID_DEFAULT_CELL);
                 (*gc.as_mut_ptr()).flags |= grid_flag::NOPALETTE;
-                (*gc.as_mut_ptr()).fg = colour as i32;
+                (*gc.as_mut_ptr()).fg = colour;
                 screen_write_puts!(
                     &raw mut ctx,
                     gc.as_mut_ptr(),
@@ -314,7 +314,7 @@ pub unsafe fn window_clock_draw_screen(wme: NonNull<window_mode_entry>) {
 
         gc.write(GRID_DEFAULT_CELL);
         (*gc.as_mut_ptr()).flags |= grid_flag::NOPALETTE;
-        (*gc.as_mut_ptr()).bg = colour as i32;
+        (*gc.as_mut_ptr()).bg = colour;
         let mut ptr = &raw mut tim as *mut u8;
         while *ptr != b'\0' {
             if *ptr >= b'0' && *ptr <= b'9' {

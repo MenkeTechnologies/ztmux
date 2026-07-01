@@ -912,7 +912,7 @@ unsafe fn yylex_(ps: &mut cmd_parse_state) -> Option<Tok> {
                 let yylval_token = yylex_get_word(ps, '%' as i32);
                 let mut cp = yylval_token;
                 while *cp != b'\0' {
-                    if *cp != b'%' && !(*cp as u8).is_ascii_digit() {
+                    if *cp != b'%' && !(*cp).is_ascii_digit() {
                         break;
                     }
                     cp = cp.add(1);

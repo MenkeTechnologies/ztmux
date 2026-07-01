@@ -144,13 +144,13 @@ unsafe fn cmd_resize_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
         }
 
         if args_has(args, 'L') {
-            layout_resize_pane(wp, layout_type::LAYOUT_LEFTRIGHT, -(adjust as i32), 1);
+            layout_resize_pane(wp, layout_type::LAYOUT_LEFTRIGHT, -adjust, 1);
         } else if args_has(args, 'R') {
-            layout_resize_pane(wp, layout_type::LAYOUT_LEFTRIGHT, adjust as i32, 1);
+            layout_resize_pane(wp, layout_type::LAYOUT_LEFTRIGHT, adjust, 1);
         } else if args_has(args, 'U') {
-            layout_resize_pane(wp, layout_type::LAYOUT_TOPBOTTOM, -(adjust as i32), 1);
+            layout_resize_pane(wp, layout_type::LAYOUT_TOPBOTTOM, -adjust, 1);
         } else if args_has(args, 'D') {
-            layout_resize_pane(wp, layout_type::LAYOUT_TOPBOTTOM, adjust as i32, 1);
+            layout_resize_pane(wp, layout_type::LAYOUT_TOPBOTTOM, adjust, 1);
         }
         server_redraw_window((*wl).window);
     }

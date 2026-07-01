@@ -175,8 +175,8 @@ pub unsafe fn parse_window_name(in_: *const u8) -> String {
         if *name != b'\0' {
             ptr = name.add(strlen(name) - 1);
             while ptr > name
-                && !(*ptr as u8).is_ascii_alphanumeric()
-                && !(*ptr as u8).is_ascii_punctuation()
+                && !(*ptr).is_ascii_alphanumeric()
+                && !(*ptr).is_ascii_punctuation()
             {
                 *ptr = b'\0';
                 ptr = ptr.wrapping_sub(1);

@@ -140,3 +140,10 @@ unnested_or_patterns                = "allow"
 unreadable_literal                  = "allow"
 used_underscore_items               = "allow"
 wildcard_imports                    = "allow"
+
+# Transpile-era C idioms carried over from the seed. The ports mirror tmux's C
+# control flow 1:1 (explicit index counters, `if d != 0 { n / d }` guards); the
+# rewrites clippy suggests would diverge from the C reference we validate
+# against. Revisit per-module as the code is brought to idiomatic Rust.
+explicit_counter_loop               = "allow" # match upstream C index-loop structure
+manual_checked_ops                  = "allow" # match upstream C manual bounds/division guards

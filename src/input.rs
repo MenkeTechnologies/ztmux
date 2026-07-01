@@ -2246,11 +2246,10 @@ unsafe fn input_csi_dispatch_sgr_colon(ictx: *mut input_ctx, mut i: u32) {
                     }
                 }
             }
-            5 => {
-                if n >= 3 {
+            5
+                if n >= 3 => {
                     input_csi_dispatch_sgr_256_do(ictx, p[0], p[2]);
                 }
-            }
             _ => (),
         }
     }

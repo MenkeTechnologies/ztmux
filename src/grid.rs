@@ -1325,7 +1325,7 @@ pub unsafe fn grid_string_cells(
         }
 
         if flags.intersects(grid_string_flags::GRID_STRING_TRIM_SPACES) {
-            while off > 0 && *buf.add(off - 1) as u8 == b' ' {
+            while off > 0 && *buf.add(off - 1) == b' ' {
                 off -= 1;
             }
         }

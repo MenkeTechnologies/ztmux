@@ -2787,7 +2787,7 @@ pub unsafe fn window_copy_cmd_search_backward_incremental(
             window_copy_clear_marks(wme);
             return window_copy_cmd_action::WINDOW_COPY_CMD_REDRAW;
         }
-        match prefix as u8 {
+        match prefix {
             b'=' | b'-' => {
                 (*data).searchtype = window_copy::WINDOW_COPY_SEARCHUP;
                 (*data).searchregex = 0;
@@ -2845,7 +2845,7 @@ pub unsafe fn window_copy_cmd_search_forward_incremental(
             window_copy_clear_marks(wme);
             return window_copy_cmd_action::WINDOW_COPY_CMD_REDRAW;
         }
-        match prefix as u8 {
+        match prefix {
             b'=' | b'+' => {
                 (*data).searchtype = window_copy::WINDOW_COPY_SEARCHDOWN;
                 (*data).searchregex = 0;
