@@ -688,7 +688,7 @@ mod lexer {
         type Item = Result<(Loc, Tok, Loc), LexicalError>;
 
         fn next(&mut self) -> Option<Result<(Loc, Tok, Loc), LexicalError>> {
-            unsafe { super::yylex_(&mut *self.ps.as_ptr()).map(|tok| Ok((0, tok, 0))) }
+            unsafe { super::yylex(&mut *self.ps.as_ptr()).map(|tok| Ok((0, tok, 0))) }
         }
     }
 }
@@ -824,7 +824,7 @@ unsafe fn yylex_get_word(ps: &mut cmd_parse_state, mut ch: i32) -> *mut u8 {
 
 use lexer::Tok;
 
-unsafe fn yylex_(ps: &mut cmd_parse_state) -> Option<Tok> {
+unsafe fn yylex(ps: &mut cmd_parse_state) -> Option<Tok> {
     unsafe {
         if ps.eol != 0 {
             ps.input

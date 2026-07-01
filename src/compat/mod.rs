@@ -24,7 +24,7 @@ mod vis;
 pub use closefrom::closefrom;
 pub use freezero::freezero;
 pub use getpeereid::getpeereid;
-pub use setproctitle::setproctitle_;
+pub use setproctitle::setproctitle;
 pub use strlcat::{strlcat, strlcat_};
 pub use strlcpy::strlcpy;
 pub use strtonum::{strtonum, strtonum_};

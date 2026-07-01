@@ -19,7 +19,7 @@ use crate::compat::{
     },
     imsg_buffer::msgbuf_write,
     queue::{tailq_foreach, tailq_init, tailq_insert_tail, tailq_remove},
-    setproctitle_,
+    setproctitle,
 };
 use crate::event_::{signal_add, signal_set};
 use crate::libc::{
@@ -200,7 +200,7 @@ pub fn proc_start(name: &CStr) -> *mut tmuxproc {
     unsafe {
         log_open(name);
         let name: *const u8 = name.as_ptr().cast();
-        setproctitle_(c"%s (%s)".as_ptr().cast(), name, SOCKET_PATH);
+        setproctitle(c"%s (%s)".as_ptr().cast(), name, SOCKET_PATH);
 
         let mut u = MaybeUninit::<utsname>::uninit();
         if uname(u.as_mut_ptr()) < 0 {

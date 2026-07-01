@@ -15,7 +15,7 @@
 // a custom version of setproctitle which just supports our usage:
 // setproctitle( c!("%s (%s)"), name, socket_path);
 #[cfg(target_os = "linux")]
-pub unsafe fn setproctitle_(_fmt: *const u8, name: *const u8, socket_path: *const u8) {
+pub unsafe fn setproctitle(_fmt: *const u8, name: *const u8, socket_path: *const u8) {
     use crate::libc;
 
     unsafe {
@@ -39,4 +39,4 @@ pub unsafe fn setproctitle_(_fmt: *const u8, name: *const u8, socket_path: *cons
 }
 
 #[cfg(target_os = "macos")]
-pub unsafe fn setproctitle_(_: *const u8, _: *const u8, _: *const u8) {}
+pub unsafe fn setproctitle(_: *const u8, _: *const u8, _: *const u8) {}
