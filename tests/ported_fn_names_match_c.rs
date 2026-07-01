@@ -192,9 +192,7 @@ fn collect_free_fns(src: &str) -> Vec<(String, usize)> {
             .unwrap_or_else(|| trimmed.strip_prefix("pub ").unwrap_or(trimmed));
         let stripped = stripped.strip_prefix("unsafe ").unwrap_or(stripped);
         let stripped = stripped.strip_prefix("async ").unwrap_or(stripped);
-        let stripped = stripped
-            .strip_prefix(r#"extern "C" "#)
-            .unwrap_or(stripped);
+        let stripped = stripped.strip_prefix(r#"extern "C" "#).unwrap_or(stripped);
         let stripped = stripped.strip_prefix("const ").unwrap_or(stripped);
 
         if let Some(rest) = stripped.strip_prefix("fn ") {
@@ -238,7 +236,8 @@ fn c_fn_names() -> HashSet<String> {
         let rel = f.strip_prefix(root()).unwrap_or(&f);
         let comps: Vec<_> = rel.components().collect();
         // vendor/tmux/<file>.c  OR  vendor/tmux/compat/<file>.c
-        let depth_ok = comps.len() == 3 || (comps.len() == 4 && rel.to_string_lossy().contains("/compat/"));
+        let depth_ok =
+            comps.len() == 3 || (comps.len() == 4 && rel.to_string_lossy().contains("/compat/"));
         if !depth_ok {
             continue;
         }
