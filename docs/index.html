@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="ztmux — a from-source Rust port of tmux (full server + client). Seeded from tmux-rs, ported forward against the upstream tmux C sources. Docs hub: engineering report and per-function C→Rust port coverage.">
+  <title>ztmux — a Rust port of tmux</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&amp;family=Share+Tech+Mono&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="hud-static.css">
+  <link rel="stylesheet" href="tutorial.css">
+  <style>
+    .docs-main { max-width: 68rem; margin: 0 auto; padding: 0 1.2rem 4rem; }
+    .hero { text-align: center; padding: 40px 0 8px; }
+    .hero pre { display: inline-block; text-align: left; color: var(--accent); font-family: 'Share Tech Mono', monospace; font-size: 13px; line-height: 1.15; margin: 0 0 14px; }
+    .hero .tagline { color: var(--text); font-size: 14px; letter-spacing: 1px; font-family: 'Orbitron', sans-serif; }
+    .hero .sub { color: var(--text-dim); font-size: 12.5px; margin-top: 8px; line-height: 1.7; }
+    .reg-h { font-family: 'Orbitron', sans-serif; color: var(--accent); font-size: 15px; letter-spacing: 1px; margin: 28px 0 10px; }
+    .note { color: var(--text-dim); font-size: 12.5px; line-height: 1.7; }
+    .note a { color: var(--cyan); }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 14px; margin: 12px 0; }
+    .card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); padding: 16px 18px; text-decoration: none; display: block; transition: border-color .15s; }
+    .card:hover { border-color: var(--accent); }
+    .card h3 { font-family: 'Orbitron', sans-serif; color: var(--cyan); font-size: 13px; letter-spacing: 1px; margin: 0 0 6px; }
+    .card p { color: var(--text-dim); font-size: 12px; line-height: 1.6; margin: 0; }
+    .card .arrow { color: var(--accent); }
+    code { color: var(--cyan); font-family: 'Share Tech Mono', monospace; }
+    .doc-footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11px; text-align: center; }
+    .doc-footer a { color: var(--cyan); }
+  </style>
+</head>
+<body>
+  <div class="app" id="docsApp">
+    <div class="crt-scanline" id="crtH" aria-hidden="true"></div>
+    <div class="crt-scanline-v" id="crtV" aria-hidden="true"></div>
+    <header class="docs-header">
+      <div class="docs-header-inner">
+        <div class="docs-title-block">
+          <h1>ZTMUX</h1>
+          <div class="docs-sub">// a Rust port of tmux — done right</div>
+        </div>
+        <div class="docs-header-actions">
+          <div class="docs-toolbar">
+            <a class="btn btn-secondary" href="report.html">Report</a>
+            <a class="btn btn-secondary" href="port_report.html">Port Report</a>
+            <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/ztmux" target="_blank" rel="noopener noreferrer">GitHub</a>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main class="docs-main">
+      <section class="hero">
+        <pre>     _
+ ___| |_ _ __ ___  _   ___  __
+|_  / __| '_ ` _ \| | | \ \/ /
+ / /| |_| | | | | | |_| |&gt;  &lt;
+/___|\__|_| |_| |_|\__,_/_/\_\</pre>
+        <div class="tagline">A RUST PORT OF TMUX</div>
+        <div class="sub">The full terminal multiplexer — server, client, grid, input parser, layouts, command language, formats, and terminal back end — reimplemented in Rust.<br>Not a wrapper around the <code>tmux</code> binary, not control mode: the program itself.</div>
+      </section>
+
+      <h2 class="reg-h">Docs</h2>
+      <div class="cards">
+        <a class="card" href="report.html"><h3>Engineering Report <span class="arrow">&rarr;</span></h3><p>How the port is built, the two vendored references (tmux C + tmux-rs), the "done right" plan, and build instructions.</p></a>
+        <a class="card" href="port_report.html"><h3>Port Report <span class="arrow">&rarr;</span></h3><p>Per-function C&rarr;Rust coverage: every function in <code>vendor/tmux</code> mapped to its counterpart in <code>src/</code>, with line counts and call-site wiring.</p></a>
+        <a class="card" href="https://github.com/MenkeTechnologies/ztmux"><h3>Source <span class="arrow">&rarr;</span></h3><p>The ztmux repository on GitHub — the living port plus the pinned <code>vendor/</code> references.</p></a>
+      </div>
+
+      <h2 class="reg-h">In one line</h2>
+      <p class="note">ztmux is seeded from <a href="https://github.com/richardscollin/tmux-rs">tmux-rs</a> (a largely-<code>unsafe</code> Rust transpile of tmux) and ported forward against the upstream <a href="https://github.com/tmux/tmux">tmux</a> C sources — both vendored, read-only, and pinned by SHA — with the goal of turning that working skeleton into safe, idiomatic Rust while keeping behavior verified against the C reference. Distinct from <a href="https://github.com/MenkeTechnologies/ztmux-core">ztmux-core</a>, which is a native tmux wire-protocol <em>client</em> engine; this repo is the multiplexer itself.</p>
+
+      <footer class="doc-footer">MenkeTechnologies &middot; ztmux &middot; <a href="https://github.com/MenkeTechnologies/ztmux">ztmux</a> &middot; <a href="https://github.com/MenkeTechnologies/MenkeTechnologiesMeta">MenkeTechnologiesMeta</a></footer>
+    </main>
+  </div>
+  <script src="hud-theme.js"></script>
+</body>
+</html>
