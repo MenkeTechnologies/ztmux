@@ -29,7 +29,9 @@ jobs:
           # --- macOS native ---
           - os: macos-latest
             target: aarch64-apple-darwin
-          - os: macos-latest
+          # x86_64 on the Intel runner (macos-latest is arm64; its Homebrew
+          # libevent is arm64-only, so a cross x86_64 link fails).
+          - os: macos-13
             target: x86_64-apple-darwin
           # --- Linux glibc native ---
           - os: ubuntu-latest
