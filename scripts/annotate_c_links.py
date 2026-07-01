@@ -1,106 +1,195 @@
 #!/usr/bin/env python3
-"""Insert C back-link comments above ported Rust functions.
+"""Annotate ported Rust functions with the C source location AND full C signature.
 
-Every Rust function in `src/**/*.rs` whose name matches a function in the tmux
-C sources (`vendor/tmux/**/*.c`) gets a one-line comment citing the C file and
-line where that function is defined, e.g.:
+Every Rust function in `src/**/*.rs` whose name matches a function in the tmux C
+sources (`vendor/tmux/**/*.c`) gets a one-line comment citing the C file, line,
+and the *full C signature* — return type, name, and parameter types **and
+names** — e.g.:
 
-    // vendor/tmux/grid.c:142  grid_create()
+    // vendor/tmux/grid.c:320  struct grid *grid_create(u_int sx, u_int sy, u_int hlimit)
     pub unsafe fn grid_create(sx: u32, sy: u32, hlimit: u32) -> *mut grid {
 
-This mirrors the per-function C citations in the zshrs port and makes the
-mapping navigable from the Rust side. The citation form `vendor/tmux/<f>.c:<n>`
-is exactly what `gen_port_report.py` recognizes (RE_C_PATH_CITATION), so these
-comments also feed the port report's "cited C paths" signal.
+The signature (not just the name) is the point: it lets a reviewer diff the Rust
+parameter names against the C parameter names and catch "fake" params — renamed,
+reordered, dropped, or invented arguments that a bare `grid_create()` citation
+would hide. This mirrors the zshrs port's `C signature: …` annotations.
 
-The C function index is reused verbatim from `gen_port_report.py` so citations
-stay consistent with the report. Which C location is cited, per Rust fn:
+The C index is built by the same heuristic as `gen_port_report.py` (a
+line-initial identifier followed by `(`, with a `{` within a few lines). Which C
+location is cited, per Rust fn:
 
   1. the C definition whose file stem matches the Rust file's stem
      (grid.rs -> grid.c, cmd_kill_pane.rs -> cmd-kill-pane.c); else
   2. if the name is defined in exactly one C file, that one; else
   3. skip (ambiguous cross-file name — better no citation than a wrong one).
 
-Plain `//` comments are used (not `///`) so nothing attaches as rustdoc and the
-strict clippy doc-lints stay quiet. The script is idempotent: a function that
-already has a `vendor/tmux/...` citation directly above it is left untouched, so
-re-running only fills in gaps (e.g. after new functions are ported).
+Plain `//` comments (not `///`) so nothing attaches as rustdoc under the strict
+clippy doc-lints. Idempotent and self-updating: a function that already has a
+`// vendor/tmux/…` citation directly above it has that line REPLACED with the
+current signature, so re-running refreshes stale citations and fills gaps.
 
 Usage:  python3 scripts/annotate_c_links.py [--check]
-        --check exits non-zero if any citation is missing (for CI), writing nothing.
+        --check exits non-zero if any citation is missing/outdated (writes nothing).
 """
 from __future__ import annotations
+import re
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import gen_port_report as g  # noqa: E402  (reuse the report's C index + Rust fn regex)
+import gen_port_report as g  # noqa: E402  (reuse ROOT / RS_DIRS / RE_RS_FN / C walk config)
 
-CITE = "vendor/tmux/"
+CITE_PREFIX = "vendor/tmux/"
+RE_EXISTING = re.compile(r"^\s*//\s*(?:vendor/tmux/|tmux/)\S+\.c:\d+\b")
+
+C_KEYWORDS = {
+    "if", "for", "while", "switch", "return", "else", "do", "sizeof", "static",
+    "extern", "struct", "union", "enum", "typedef", "const", "volatile", "inline",
+    "register", "auto", "goto", "break", "continue", "case", "default",
+}
+RE_C_NAME = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+
+
+def c_signature(lines: list[str], idx: int, name: str) -> str:
+    """Reconstruct `<return type> <name>(<params>)` for the C fn defined at
+    line index `idx` (0-based, the line that starts with `name(`)."""
+    # Parameters: accumulate from this line until the matching ')'.
+    buf = []
+    depth = 0
+    started = False
+    i = idx
+    while i < len(lines) and i < idx + 40:
+        for ch in lines[i]:
+            buf.append(ch)
+            if ch == "(":
+                depth += 1
+                started = True
+            elif ch == ")":
+                depth -= 1
+        if started and depth == 0:
+            break
+        buf.append(" ")
+        i += 1
+    name_and_params = " ".join("".join(buf).split())  # collapse whitespace
+
+    # Return type: the non-empty line(s) just above, if they look like a type
+    # (tmux puts the return type on its own line above the name).
+    rt = ""
+    j = idx - 1
+    while j >= 0:
+        prev = lines[j].strip()
+        if prev == "":
+            j -= 1
+            continue
+        if (
+            prev.startswith(("/", "*", "#"))
+            or prev.endswith((";", "{", "}", ":"))
+            or "(" in prev
+        ):
+            break
+        rt = prev
+        break
+
+    if not rt:
+        return name_and_params
+    # `struct grid *` + name -> `struct grid *grid_create`, not `* grid_create`.
+    sep = "" if rt.endswith("*") else " "
+    return f"{rt}{sep}{name_and_params}"
+
+
+def walk_c_sigs() -> dict[str, list[tuple[str, int, str]]]:
+    """name -> [(rel_path, 1-based line, full signature)]."""
+    idx: dict[str, list[tuple[str, int, str]]] = {}
+    for c in g.c_source_paths():
+        if c.stem in getattr(g, "C_EXCLUDE_STEMS", set()):
+            continue
+        rel = c.relative_to(g.ROOT).as_posix()
+        try:
+            lines = c.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        for i, line in enumerate(lines):
+            if not line or line[0].isspace() or line[0] in "/*#":
+                continue
+            m = RE_C_NAME.match(line)
+            if not m:
+                continue
+            name = m.group(1)
+            if name in C_KEYWORDS:
+                continue
+            tail = " ".join(lines[i:i + 7])
+            if "{" not in tail:
+                continue
+            if ";" in line and "{" not in line:
+                continue
+            idx.setdefault(name, []).append((rel, i + 1, c_signature(lines, i, name)))
+    return idx
 
 
 def c_stem_for(rust_path: Path) -> str:
-    """Rust file stem -> expected tmux C file stem (underscores back to dashes)."""
     return rust_path.stem.replace("_", "-")
 
 
-def choose_loc(name: str, want_stem: str, cidx: dict) -> tuple[str, int] | None:
+def choose(name: str, want_stem: str, cidx: dict) -> tuple[str, int, str] | None:
     locs = cidx.get(name)
     if not locs:
         return None
-    same = [(p, ln) for (p, ln) in locs if Path(p).stem == want_stem]
+    same = [t for t in locs if Path(t[0]).stem == want_stem]
     if same:
         return same[0]
     if len(locs) == 1:
         return locs[0]
-    return None  # ambiguous — skip
+    return None  # ambiguous
 
 
 def annotate_file(path: Path, cidx: dict, check: bool) -> tuple[int, int]:
-    """Returns (added, missing). In check mode nothing is written."""
     text = path.read_text()
-    lines = text.splitlines(keepends=False)
+    lines = text.splitlines()
     want_stem = c_stem_for(path)
     out: list[str] = []
-    added = missing = 0
+    changed = stale = 0
     for line in lines:
         m = g.RE_RS_FN.match(line)
         if m:
-            name = m.group(1)
-            loc = choose_loc(name, want_stem, cidx)
+            loc = choose(m.group(1), want_stem, cidx)
             if loc is not None:
-                prev = out[-1].strip() if out else ""
-                already = prev.startswith("//") and CITE in prev
-                if not already:
-                    if check:
-                        missing += 1
-                    else:
-                        indent = line[: len(line) - len(line.lstrip())]
-                        rel, ln = loc
-                        out.append(f"{indent}// {rel}:{ln}  {name}()")
-                        added += 1
+                rel, ln, sig = loc
+                indent = line[: len(line) - len(line.lstrip())]
+                want = f"{indent}// {rel}:{ln}  {sig}"
+                # Replace an existing citation directly above, else insert.
+                if out and RE_EXISTING.match(out[-1]):
+                    if out[-1] != want:
+                        stale += 1
+                        if not check:
+                            out[-1] = want
+                            changed += 1
+                else:
+                    stale += 1
+                    if not check:
+                        out.append(want)
+                        changed += 1
         out.append(line)
-    if added and not check:
+    if changed and not check:
         path.write_text("\n".join(out) + ("\n" if text.endswith("\n") else ""))
-    return added, missing
+    return changed, stale
 
 
 def main() -> int:
     check = "--check" in sys.argv[1:]
-    cidx = g.walk_c()
-    total_added = total_missing = files_touched = 0
+    cidx = walk_c_sigs()
+    total_changed = total_stale = files = 0
     for d in g.RS_DIRS:
         for f in sorted(d.rglob("*.rs")):
-            added, missing = annotate_file(f, cidx, check)
-            total_added += added
-            total_missing += missing
-            if added:
-                files_touched += 1
+            changed, stale = annotate_file(f, cidx, check)
+            total_changed += changed
+            total_stale += stale
+            if changed:
+                files += 1
     if check:
-        print(f"{total_missing} functions missing a C back-link citation")
-        return 1 if total_missing else 0
-    print(f"added {total_added} C back-link citations across {files_touched} files")
+        print(f"{total_stale} functions missing/outdated a C-signature citation")
+        return 1 if total_stale else 0
+    print(f"wrote {total_changed} C-signature citations across {files} files")
     return 0
 
 

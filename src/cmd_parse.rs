@@ -28,6 +28,7 @@ mod lalrpop {
 }
 use lalrpop::cmd_parse;
 
+// vendor/tmux/cmd-parse.c:1241  int yyparse ()
 fn yyparse(ps: &mut cmd_parse_state) -> Result<Option<&'static mut cmd_parse_commands>, ()> {
     let parser = cmd_parse::LinesParser::new();
 
@@ -107,6 +108,7 @@ pub struct cmd_parse_state<'a> {
     pub stack: tailq_head<cmd_parse_scope>,
 }
 
+// vendor/tmux/cmd-parse.c:2277  static char *cmd_parse_get_error(const char *file, u_int line, const char *error)
 pub unsafe fn cmd_parse_get_error(file: Option<&str>, line: u32, error: &str) -> CString {
     match file {
         None => CString::new(error).unwrap(),
@@ -114,6 +116,7 @@ pub unsafe fn cmd_parse_get_error(file: Option<&str>, line: u32, error: &str) ->
     }
 }
 
+// vendor/tmux/cmd-parse.c:2289  static void cmd_parse_print_commands(struct cmd_parse_input *pi, struct cmd_list *cmdlist)
 pub fn cmd_parse_print_commands(pi: &cmd_parse_input, cmdlist: &cmd_list) {
     if pi.item.is_null()
         || !pi
@@ -146,6 +149,7 @@ pub fn cmd_parse_print_commands(pi: &cmd_parse_input, cmdlist: &cmd_list) {
     }
 }
 
+// vendor/tmux/cmd-parse.c:2304  static void cmd_parse_free_argument(struct cmd_parse_argument *arg)
 pub unsafe fn cmd_parse_free_argument(arg: *mut cmd_parse_argument) {
     unsafe {
         match &mut (*arg).type_ {
@@ -157,6 +161,7 @@ pub unsafe fn cmd_parse_free_argument(arg: *mut cmd_parse_argument) {
     }
 }
 
+// vendor/tmux/cmd-parse.c:2321  static void cmd_parse_free_arguments(struct cmd_parse_arguments *args)
 pub unsafe fn cmd_parse_free_arguments(args: &mut cmd_parse_arguments) {
     unsafe {
         for arg in tailq_foreach(args).map(NonNull::as_ptr) {
@@ -166,6 +171,7 @@ pub unsafe fn cmd_parse_free_arguments(args: &mut cmd_parse_arguments) {
     }
 }
 
+// vendor/tmux/cmd-parse.c:2332  static void cmd_parse_free_command(struct cmd_parse_command *cmd)
 pub unsafe fn cmd_parse_free_command(cmd: *mut cmd_parse_command) {
     unsafe {
         cmd_parse_free_arguments(&mut (*cmd).arguments);
@@ -173,6 +179,7 @@ pub unsafe fn cmd_parse_free_command(cmd: *mut cmd_parse_command) {
     }
 }
 
+// vendor/tmux/cmd-parse.c:2339  static struct cmd_parse_commands *cmd_parse_new_commands(void)
 pub fn cmd_parse_new_commands() -> &'static mut cmd_parse_commands {
     unsafe {
         let cmds = Box::leak(Box::new(zeroed()));
@@ -181,6 +188,7 @@ pub fn cmd_parse_new_commands() -> &'static mut cmd_parse_commands {
     }
 }
 
+// vendor/tmux/cmd-parse.c:2349  static void cmd_parse_free_commands(struct cmd_parse_commands *cmds)
 pub unsafe fn cmd_parse_free_commands(cmds: *mut cmd_parse_commands) {
     unsafe {
         for cmd in tailq_foreach(cmds).map(NonNull::as_ptr) {
@@ -191,6 +199,7 @@ pub unsafe fn cmd_parse_free_commands(cmds: *mut cmd_parse_commands) {
     }
 }
 
+// vendor/tmux/cmd-parse.c:2361  static struct cmd_parse_commands *cmd_parse_run_parser(char **cause)
 pub unsafe fn cmd_parse_run_parser(
     ps: &mut cmd_parse_state,
 ) -> Result<&'static mut cmd_parse_commands, *mut u8> {
@@ -211,6 +220,7 @@ pub unsafe fn cmd_parse_run_parser(
     }
 }
 
+// vendor/tmux/cmd-parse.c:2386  static struct cmd_parse_commands *cmd_parse_do_file(FILE *f, struct cmd_parse_input *pi, char **cause)
 pub unsafe fn cmd_parse_do_file<'a>(
     f: &'a mut std::io::BufReader<std::fs::File>,
     pi: &'a cmd_parse_input<'a>,
@@ -223,6 +233,7 @@ pub unsafe fn cmd_parse_do_file<'a>(
     }
 }
 
+// vendor/tmux/cmd-parse.c:2397  static struct cmd_parse_commands *cmd_parse_do_buffer(const char *buf, size_t len, struct cmd_parse_input *pi, char **cause)
 pub unsafe fn cmd_parse_do_buffer<'a>(
     buf: &'a [u8],
     pi: &'a cmd_parse_input<'a>,
@@ -236,6 +247,7 @@ pub unsafe fn cmd_parse_do_buffer<'a>(
     }
 }
 
+// vendor/tmux/cmd-parse.c:2410  static void cmd_parse_log_commands(struct cmd_parse_commands *cmds, const char *prefix)
 pub unsafe fn cmd_parse_log_commands(cmds: *mut cmd_parse_commands, prefix: *const u8) {
     unsafe {
         for (i, cmd) in tailq_foreach(cmds).map(NonNull::as_ptr).enumerate() {
@@ -263,6 +275,7 @@ pub unsafe fn cmd_parse_log_commands(cmds: *mut cmd_parse_commands, prefix: *con
     }
 }
 
+// vendor/tmux/cmd-parse.c:2444  static int cmd_parse_expand_alias(struct cmd_parse_command *cmd, struct cmd_parse_input *pi, struct cmd_parse_result *pr)
 pub unsafe fn cmd_parse_expand_alias<'a>(
     cmd: *mut cmd_parse_command,
     pi: &'a cmd_parse_input<'a>,
@@ -335,6 +348,7 @@ pub unsafe fn cmd_parse_expand_alias<'a>(
     }
 }
 
+// vendor/tmux/cmd-parse.c:2497  static void cmd_parse_build_command(struct cmd_parse_command *cmd, struct cmd_parse_input *pi, struct cmd_parse_result *pr)
 pub unsafe fn cmd_parse_build_command(
     cmd: *mut cmd_parse_command,
     pi: &cmd_parse_input,
@@ -408,6 +422,7 @@ pub unsafe fn cmd_parse_build_command(
     }
 }
 
+// vendor/tmux/cmd-parse.c:2553  static void cmd_parse_build_commands(struct cmd_parse_commands *cmds, struct cmd_parse_input *pi, struct cmd_parse_result *pr)
 pub unsafe fn cmd_parse_build_commands(
     cmds: &mut cmd_parse_commands,
     pi: &cmd_parse_input,
@@ -478,6 +493,7 @@ pub unsafe fn cmd_parse_build_commands(
     }
 }
 
+// vendor/tmux/cmd-parse.c:2615  struct cmd_parse_result *cmd_parse_from_file(FILE *f, struct cmd_parse_input *pi)
 pub unsafe fn cmd_parse_from_file<'a>(
     f: &'a mut std::io::BufReader<std::fs::File>,
     pi: Option<&'a cmd_parse_input<'a>>,
@@ -494,6 +510,7 @@ pub unsafe fn cmd_parse_from_file<'a>(
     }
 }
 
+// vendor/tmux/cmd-parse.c:2641  struct cmd_parse_result *cmd_parse_from_string(const char *s, struct cmd_parse_input *pi)
 pub unsafe fn cmd_parse_from_string(s: &str, pi: Option<&cmd_parse_input>) -> cmd_parse_result {
     unsafe {
         let input: cmd_parse_input = cmd_parse_input::default();
@@ -504,6 +521,7 @@ pub unsafe fn cmd_parse_from_string(s: &str, pi: Option<&cmd_parse_input>) -> cm
     }
 }
 
+// vendor/tmux/cmd-parse.c:2684  enum cmd_parse_status cmd_parse_and_append(const char *s, struct cmd_parse_input *pi, struct client *c, struct cmdq_state *state, char **error)
 pub unsafe fn cmd_parse_and_append(
     s: &str,
     pi: Option<&cmd_parse_input>,
@@ -531,6 +549,7 @@ pub unsafe fn cmd_parse_and_append(
     }
 }
 
+// vendor/tmux/cmd-parse.c:2708  struct cmd_parse_result *cmd_parse_from_buffer(const void *buf, size_t len, struct cmd_parse_input *pi)
 pub unsafe fn cmd_parse_from_buffer(buf: &[u8], pi: Option<&cmd_parse_input>) -> cmd_parse_result {
     unsafe {
         let input: cmd_parse_input = zeroed();
@@ -553,6 +572,7 @@ pub unsafe fn cmd_parse_from_buffer(buf: &[u8], pi: Option<&cmd_parse_input>) ->
     }
 }
 
+// vendor/tmux/cmd-parse.c:2739  struct cmd_parse_result *cmd_parse_from_arguments(struct args_value *values, u_int count, struct cmd_parse_input *pi)
 pub unsafe fn cmd_parse_from_arguments(
     values: *mut args_value,
     count: u32,
@@ -716,6 +736,7 @@ unsafe fn yyerror_(ps: &mut cmd_parse_state, args: std::fmt::Arguments) -> i32 {
     }
 }
 
+// vendor/tmux/cmd-parse.c:2833  static int yylex_is_var(char ch, int first)
 fn yylex_is_var(ch: u8, first: bool) -> bool {
     if ch == b'=' || (first && ch.is_ascii_digit()) {
         false
@@ -724,6 +745,7 @@ fn yylex_is_var(ch: u8, first: bool) -> bool {
     }
 }
 
+// vendor/tmux/cmd-parse.c:2843  static void yylex_append(char **buf, size_t *len, const char *add, size_t addlen)
 fn yylex_append(buf: &mut Vec<u8>, add: &[u8]) {
     if add.len() > usize::MAX - 1 || buf.len() > usize::MAX - 1 - add.len() {
         fatalx("buffer is too big");
@@ -731,10 +753,12 @@ fn yylex_append(buf: &mut Vec<u8>, add: &[u8]) {
     buf.extend_from_slice(add);
 }
 
+// vendor/tmux/cmd-parse.c:2853  static void yylex_append1(char **buf, size_t *len, char add)
 fn yylex_append1(buf: &mut Vec<u8>, add: u8) {
     yylex_append(buf, &[add]);
 }
 
+// vendor/tmux/cmd-parse.c:2859  static int yylex_getc1(void)
 fn yylex_getc1(ps: &mut cmd_parse_state) -> i32 {
     let ch;
     if let Some(f) = ps.f.as_mut() {
@@ -765,6 +789,7 @@ fn yylex_getc1(ps: &mut cmd_parse_state) -> i32 {
     ch
 }
 
+// vendor/tmux/cmd-parse.c:2876  static void yylex_ungetc(int ch)
 fn yylex_ungetc(ps: &mut cmd_parse_state, ch: i32) {
     if let Some(_f) = ps.f.as_mut() {
         ps.unget_buf = Some(ch);
@@ -773,6 +798,7 @@ fn yylex_ungetc(ps: &mut cmd_parse_state, ch: i32) {
     }
 }
 
+// vendor/tmux/cmd-parse.c:2887  static int yylex_getc(void)
 fn yylex_getc(ps: &mut cmd_parse_state) -> i32 {
     if ps.escapes != 0 {
         ps.escapes -= 1;
@@ -803,6 +829,7 @@ fn yylex_getc(ps: &mut cmd_parse_state) -> i32 {
     }
 }
 
+// vendor/tmux/cmd-parse.c:2918  static char *yylex_get_word(int ch)
 unsafe fn yylex_get_word(ps: &mut cmd_parse_state, mut ch: i32) -> *mut u8 {
     unsafe {
         let mut buf = Vec::new();
@@ -824,6 +851,7 @@ unsafe fn yylex_get_word(ps: &mut cmd_parse_state, mut ch: i32) -> *mut u8 {
 
 use lexer::Tok;
 
+// vendor/tmux/cmd-parse.c:2937  static int yylex(void)
 unsafe fn yylex(ps: &mut cmd_parse_state) -> Option<Tok> {
     unsafe {
         if ps.eol != 0 {
@@ -971,6 +999,7 @@ unsafe fn yylex(ps: &mut cmd_parse_state) -> Option<Tok> {
     }
 }
 
+// vendor/tmux/cmd-parse.c:3077  static char *yylex_format(void)
 unsafe fn yylex_format(ps: &mut cmd_parse_state) -> Option<NonNull<u8>> {
     let mut brackets = 1;
     let mut buf = Vec::new();
@@ -1015,6 +1044,7 @@ unsafe fn yylex_format(ps: &mut cmd_parse_state) -> Option<NonNull<u8>> {
     None
 }
 
+// vendor/tmux/cmd-parse.c:3216  static int yylex_token_variable(char **buf, size_t *len)
 unsafe fn yylex_token_variable(ps: &mut cmd_parse_state, buf: &mut Vec<u8>) -> bool {
     unsafe {
         let mut namelen: usize = 0;
@@ -1072,6 +1102,7 @@ unsafe fn yylex_token_variable(ps: &mut cmd_parse_state, buf: &mut Vec<u8>) -> b
     }
 }
 
+// vendor/tmux/cmd-parse.c:3268  static int yylex_token_tilde(char **buf, size_t *len)
 unsafe fn yylex_token_tilde(ps: &mut cmd_parse_state, buf: &mut Vec<u8>) -> bool {
     unsafe {
         let mut home = null();
@@ -1115,6 +1146,7 @@ unsafe fn yylex_token_tilde(ps: &mut cmd_parse_state, buf: &mut Vec<u8>) -> bool
     }
 }
 
+// vendor/tmux/cmd-parse.c:3312  static char *yylex_token(int ch)
 unsafe fn yylex_token(ps: &mut cmd_parse_state, mut ch: i32) -> *mut u8 {
     unsafe {
         #[derive(Copy, Clone, Eq, PartialEq)]
@@ -1251,6 +1283,7 @@ unsafe fn yylex_token(ps: &mut cmd_parse_state, mut ch: i32) -> *mut u8 {
     }
 }
 
+// vendor/tmux/cmd-parse.c:3117  static int yylex_token_escape(char **buf, size_t *len)
 unsafe fn yylex_token_escape(ps: &mut cmd_parse_state, buf: &mut Vec<u8>) -> bool {
     unsafe {
         #[cfg(not(target_os = "macos"))]

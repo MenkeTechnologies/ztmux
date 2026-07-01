@@ -70,7 +70,7 @@ pub static CMD_SHOW_HOOKS_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-show-options.c:77  cmd_show_options_exec()
+// vendor/tmux/cmd-show-options.c:77  static enum cmd_retval cmd_show_options_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_show_options_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -157,7 +157,7 @@ unsafe fn cmd_show_options_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
     }
 }
 
-// vendor/tmux/cmd-show-options.c:148  cmd_show_options_print()
+// vendor/tmux/cmd-show-options.c:148  static void cmd_show_options_print(struct cmd *self, struct cmdq_item *item, struct options_entry *o, int idx, int parent)
 pub unsafe fn cmd_show_options_print(
     self_: *mut cmd,
     item: *mut cmdq_item,
@@ -211,7 +211,7 @@ pub unsafe fn cmd_show_options_print(
     }
 }
 
-// vendor/tmux/cmd-show-options.c:199  cmd_show_options_all()
+// vendor/tmux/cmd-show-options.c:199  static enum cmd_retval cmd_show_options_all(struct cmd *self, struct cmdq_item *item, int scope, struct options *oo)
 pub unsafe fn cmd_show_options_all(
     self_: *mut cmd,
     item: *mut cmdq_item,

@@ -2,7 +2,7 @@ use crate::libc;
 
 /// The `strlcat()` function appends the NUL-terminated string src to the end of dst.
 /// It will append at most size - strlen(dst) - 1 bytes, NUL-terminating the result.
-// vendor/tmux/compat/strlcat.c:32  strlcat()
+// vendor/tmux/compat/strlcat.c:32  size_t strlcat(char *dst, const char *src, size_t siz)
 pub unsafe fn strlcat(dst: *mut u8, src: *const u8, size: usize) -> usize {
     unsafe {
         let dst_strlen = libc::strnlen(dst, size);

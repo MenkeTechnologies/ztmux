@@ -27,7 +27,7 @@ pub static CMD_REFRESH_CLIENT_ENTRY: cmd_entry = cmd_entry {
     target: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-refresh-client.c:47  cmd_refresh_client_update_subscription()
+// vendor/tmux/cmd-refresh-client.c:47  static void cmd_refresh_client_update_subscription(struct client *tc, const char *value)
 pub unsafe fn cmd_refresh_client_update_subscription(tc: *mut client, value: *const u8) {
     unsafe {
         let subid = -1;
@@ -70,7 +70,7 @@ pub unsafe fn cmd_refresh_client_update_subscription(tc: *mut client, value: *co
     }
 }
 
-// vendor/tmux/cmd-refresh-client.c:82  cmd_refresh_client_control_client_size()
+// vendor/tmux/cmd-refresh-client.c:82  static enum cmd_retval cmd_refresh_client_control_client_size(struct cmd *self, struct cmdq_item *item)
 pub unsafe fn cmd_refresh_client_control_client_size(
     self_: *mut cmd,
     item: *mut cmdq_item,
@@ -150,7 +150,7 @@ pub unsafe fn cmd_refresh_client_control_client_size(
     cmd_retval::CMD_RETURN_NORMAL
 }
 
-// vendor/tmux/cmd-refresh-client.c:134  cmd_refresh_client_update_offset()
+// vendor/tmux/cmd-refresh-client.c:134  static void cmd_refresh_client_update_offset(struct client *tc, const char *value)
 pub unsafe fn cmd_refresh_client_update_offset(tc: *mut client, value: *const u8) {
     unsafe {
         let mut pane: u32 = 0;
@@ -237,7 +237,7 @@ pub unsafe fn cmd_refresh_client_clipboard(self_: *mut cmd, item: *mut cmdq_item
     cmd_retval::CMD_RETURN_NORMAL
 }
 
-// vendor/tmux/cmd-refresh-client.c:167  cmd_refresh_report()
+// vendor/tmux/cmd-refresh-client.c:167  static void cmd_refresh_report(struct tty *tty, const char *value)
 pub unsafe fn cmd_refresh_report(tty: *mut tty, value: *const u8) {
     unsafe {
         let pane: u32 = 0;
@@ -277,7 +277,7 @@ pub unsafe fn cmd_refresh_report(tty: *mut tty, value: *const u8) {
     }
 }
 
-// vendor/tmux/cmd-refresh-client.c:202  cmd_refresh_client_exec()
+// vendor/tmux/cmd-refresh-client.c:202  static enum cmd_retval cmd_refresh_client_exec(struct cmd *self, struct cmdq_item *item)
 pub unsafe fn cmd_refresh_client_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -39,7 +39,7 @@ pub static CMD_LIST_WINDOWS_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-list-windows.c:59  cmd_list_windows_exec()
+// vendor/tmux/cmd-list-windows.c:59  static enum cmd_retval cmd_list_windows_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_list_windows_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

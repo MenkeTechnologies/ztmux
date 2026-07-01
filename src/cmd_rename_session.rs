@@ -33,7 +33,7 @@ pub static CMD_RENAME_SESSION_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_rename_session_exec,
 };
 
-// vendor/tmux/cmd-rename-session.c:47  cmd_rename_session_exec()
+// vendor/tmux/cmd-rename-session.c:47  static enum cmd_retval cmd_rename_session_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_rename_session_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

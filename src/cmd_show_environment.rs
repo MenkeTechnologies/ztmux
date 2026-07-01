@@ -32,7 +32,7 @@ pub static CMD_SHOW_ENVIRONMENT_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-show-environment.c:51  cmd_show_environment_escape()
+// vendor/tmux/cmd-show-environment.c:51  static char *cmd_show_environment_escape(struct environ_entry *envent)
 unsafe fn cmd_show_environment_escape(envent: *const environ_entry) -> *mut u8 {
     unsafe {
         let mut value = transmute_ptr((*envent).value);
@@ -59,7 +59,7 @@ unsafe fn cmd_show_environment_escape(envent: *const environ_entry) -> *mut u8 {
     }
 }
 
-// vendor/tmux/cmd-show-environment.c:69  cmd_show_environment_print()
+// vendor/tmux/cmd-show-environment.c:69  static void cmd_show_environment_print(struct cmd *self, struct cmdq_item *item, struct environ_entry *envent)
 unsafe fn cmd_show_environment_print(
     self_: *mut cmd,
     item: *mut cmdq_item,
@@ -105,7 +105,7 @@ unsafe fn cmd_show_environment_print(
     }
 }
 
-// vendor/tmux/cmd-show-environment.c:98  cmd_show_environment_exec()
+// vendor/tmux/cmd-show-environment.c:98  static enum cmd_retval cmd_show_environment_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_show_environment_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

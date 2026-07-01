@@ -13,7 +13,7 @@
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 use core::ffi::c_void;
 
-// vendor/tmux/compat/freezero.c:25  freezero()
+// vendor/tmux/compat/freezero.c:25  void freezero(void *ptr, size_t size)
 pub unsafe fn freezero(ptr: *mut c_void, size: usize) {
     unsafe {
         if !ptr.is_null() {

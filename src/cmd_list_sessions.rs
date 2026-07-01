@@ -31,7 +31,7 @@ const LIST_SESSIONS_TEMPLATE: *const u8 = c!(
     "#{session_name}: #{session_windows} windows (created #{t:session_created})#{?session_grouped, (group ,}#{session_group}#{?session_grouped,),}#{?session_attached, (attached),}"
 );
 
-// vendor/tmux/cmd-list-sessions.c:53  cmd_list_sessions_exec()
+// vendor/tmux/cmd-list-sessions.c:53  static enum cmd_retval cmd_list_sessions_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_list_sessions_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

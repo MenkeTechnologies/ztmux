@@ -242,7 +242,7 @@ static TTY_FEATURES: [&tty_feature; 20] = [
     &TTY_FEATURE_USSTYLE,
 ];
 
-// vendor/tmux/tty-features.c:397  tty_add_features()
+// vendor/tmux/tty-features.c:397  void tty_add_features(int *feat, const char *s, const char *separators)
 pub unsafe fn tty_add_features(feat: *mut i32, s: &str, separators: *const u8) {
     unsafe {
         log_debug!("adding terminal features {}", s);
@@ -273,7 +273,7 @@ pub unsafe fn tty_add_features(feat: *mut i32, s: &str, separators: *const u8) {
     }
 }
 
-// vendor/tmux/tty-features.c:425  tty_get_features()
+// vendor/tmux/tty-features.c:425  const char *tty_get_features(int feat)
 pub unsafe fn tty_get_features(feat: i32) -> *const u8 {
     static mut S_BUF: [MaybeUninit<u8>; 512] = [MaybeUninit::uninit(); 512];
     unsafe {
@@ -297,7 +297,7 @@ pub unsafe fn tty_get_features(feat: i32) -> *const u8 {
     }
 }
 
-// vendor/tmux/tty-features.c:485  tty_apply_features()
+// vendor/tmux/tty-features.c:485  int tty_apply_features(struct tty_term *term, int feat)
 pub unsafe fn tty_apply_features(term: *mut tty_term, feat: i32) -> bool {
     if feat == 0 {
         return false;
@@ -327,7 +327,7 @@ pub unsafe fn tty_apply_features(term: *mut tty_term, feat: i32) -> bool {
     true
 }
 
-// vendor/tmux/tty-features.c:518  tty_default_features()
+// vendor/tmux/tty-features.c:518  void tty_default_features(int *feat, const char *name, u_int version)
 pub unsafe fn tty_default_features(feat: *mut i32, name: *const u8, version: u32) {
     struct entry {
         name: &'static CStr,

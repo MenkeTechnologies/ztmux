@@ -16,7 +16,7 @@ use crate::libc::{gettimeofday, memcpy, strchr, strcmp, strcspn, strlen, strncmp
 use crate::*;
 use crate::options_::*;
 
-// vendor/tmux/names.c:34  name_time_callback()
+// vendor/tmux/names.c:34  static void name_time_callback(__unused int fd, __unused short events, void *arg)
 pub unsafe extern "C-unwind" fn name_time_callback(
     _fd: c_int,
     _events: c_short,
@@ -27,7 +27,7 @@ pub unsafe extern "C-unwind" fn name_time_callback(
     }
 }
 
-// vendor/tmux/names.c:43  name_time_expired()
+// vendor/tmux/names.c:43  static int name_time_expired(struct window *w, struct timeval *tv)
 pub unsafe fn name_time_expired(w: *mut window, tv: *mut timeval) -> c_int {
     unsafe {
         let mut offset: MaybeUninit<timeval> = MaybeUninit::<timeval>::uninit();
@@ -43,7 +43,7 @@ pub unsafe fn name_time_expired(w: *mut window, tv: *mut timeval) -> c_int {
     }
 }
 
-// vendor/tmux/names.c:54  check_window_name()
+// vendor/tmux/names.c:54  void check_window_name(struct window *w)
 pub unsafe fn check_window_name(w: *mut window) {
     unsafe {
         let mut tv: timeval = zeroed();
@@ -111,7 +111,7 @@ pub unsafe fn check_window_name(w: *mut window) {
     }
 }
 
-// vendor/tmux/names.c:108  default_window_name()
+// vendor/tmux/names.c:108  char *default_window_name(struct window *w)
 pub unsafe fn default_window_name(w: *mut window) -> String {
     unsafe {
         if (*w).active.is_null() {
@@ -128,7 +128,7 @@ pub unsafe fn default_window_name(w: *mut window) -> String {
     }
 }
 
-// vendor/tmux/names.c:124  format_window_name()
+// vendor/tmux/names.c:124  static char *format_window_name(struct window *w)
 unsafe fn format_window_name(w: *mut window) -> *const u8 {
     unsafe {
         let ft = format_create(
@@ -148,7 +148,7 @@ unsafe fn format_window_name(w: *mut window) -> *const u8 {
     }
 }
 
-// vendor/tmux/names.c:142  parse_window_name()
+// vendor/tmux/names.c:142  char *parse_window_name(const char *in)
 pub unsafe fn parse_window_name(in_: *const u8) -> String {
     unsafe {
         let sizeof_exec: usize = 6; // sizeof "exec "

@@ -18,7 +18,7 @@ use xmalloc::xrealloc_;
 use crate::libc::{memcpy, regcomp, regex_t, regexec, regfree, regmatch_t, strlen};
 use crate::*;
 
-// vendor/tmux/regsub.c:27  regsub_copy()
+// vendor/tmux/regsub.c:27  static void regsub_copy(char **buf, ssize_t *len, const char *text, size_t start, size_t end)
 unsafe fn regsub_copy(
     buf: *mut *mut u8,
     len: *mut isize,
@@ -34,7 +34,7 @@ unsafe fn regsub_copy(
     }
 }
 
-// vendor/tmux/regsub.c:38  regsub_expand()
+// vendor/tmux/regsub.c:38  static void regsub_expand(char **buf, ssize_t *len, const char *with, const char *text, regmatch_t *m, u_int n)
 pub unsafe fn regsub_expand(
     buf: *mut *mut u8,
     len: *mut isize,
@@ -71,7 +71,7 @@ pub unsafe fn regsub_expand(
     }
 }
 
-// vendor/tmux/regsub.c:62  regsub()
+// vendor/tmux/regsub.c:62  char *regsub(const char *pattern, const char *with, const char *text, int flags)
 pub unsafe fn regsub(
     pattern: *const u8,
     with: *const u8,

@@ -23,7 +23,7 @@ use crate::utempter::utempter_add_record;
 use crate::*;
 use crate::options_::*;
 
-// vendor/tmux/spawn.c:54  spawn_log()
+// vendor/tmux/spawn.c:54  static void spawn_log(const char *from, struct spawn_context *sc)
 pub unsafe fn spawn_log(from: &str, sc: *mut spawn_context) {
     unsafe {
         let s = (*sc).s;
@@ -83,7 +83,7 @@ pub unsafe fn spawn_log(from: &str, sc: *mut spawn_context) {
     }
 }
 
-// vendor/tmux/spawn.c:75  spawn_window()
+// vendor/tmux/spawn.c:75  struct winlink *spawn_window(struct spawn_context *sc, char **cause)
 pub unsafe fn spawn_window(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut winlink {
     unsafe {
         let item = (*sc).item;
@@ -229,7 +229,7 @@ pub unsafe fn spawn_window(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut 
     }
 }
 
-// vendor/tmux/spawn.c:201  spawn_pane()
+// vendor/tmux/spawn.c:201  struct window_pane *spawn_pane(struct spawn_context *sc, char **cause)
 pub unsafe fn spawn_pane(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut window_pane {
     unsafe {
         let item = (*sc).item;

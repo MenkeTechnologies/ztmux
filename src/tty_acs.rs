@@ -167,28 +167,28 @@ static TTY_ACS_ROUNDED_BORDERS_LIST: [utf8_data; 13] = [
     utf8_data::new([0o302, 0o267, 0o000, 0o000], 0, 2, 1), // U+00B7
 ];
 
-// vendor/tmux/tty-acs.c:166  tty_acs_double_borders()
+// vendor/tmux/tty-acs.c:166  const struct utf8_data *tty_acs_double_borders(int cell_type)
 pub fn tty_acs_double_borders(cell_type: cell_type) -> &'static utf8_data {
     &TTY_ACS_DOUBLE_BORDERS_LIST[cell_type as usize]
 }
 
-// vendor/tmux/tty-acs.c:173  tty_acs_heavy_borders()
+// vendor/tmux/tty-acs.c:173  const struct utf8_data *tty_acs_heavy_borders(int cell_type)
 pub fn tty_acs_heavy_borders(cell_type: cell_type) -> &'static utf8_data {
     &TTY_ACS_HEAVY_BORDERS_LIST[cell_type as usize]
 }
 
 /// Get cell border character for rounded style.
-// vendor/tmux/tty-acs.c:180  tty_acs_rounded_borders()
+// vendor/tmux/tty-acs.c:180  const struct utf8_data *tty_acs_rounded_borders(int cell_type)
 pub fn tty_acs_rounded_borders(cell_type: cell_type) -> &'static utf8_data {
     &TTY_ACS_ROUNDED_BORDERS_LIST[cell_type as usize]
 }
 
-// vendor/tmux/tty-acs.c:186  tty_acs_cmp()
+// vendor/tmux/tty-acs.c:186  static int tty_acs_cmp(const void *key, const void *value)
 pub fn tty_acs_cmp(test: u8, entry: &tty_acs_entry) -> std::cmp::Ordering {
     test.cmp(&entry.key)
 }
 
-// vendor/tmux/tty-acs.c:195  tty_acs_reverse_cmp()
+// vendor/tmux/tty-acs.c:195  static int tty_acs_reverse_cmp(const void *key, const void *value)
 pub unsafe fn tty_acs_reverse_cmp(
     key: *const u8,
     entry: *const tty_acs_reverse_entry,
@@ -197,7 +197,7 @@ pub unsafe fn tty_acs_reverse_cmp(
 }
 
 /// Should this terminal use ACS instead of UTF-8 line drawing?
-// vendor/tmux/tty-acs.c:205  tty_acs_needed()
+// vendor/tmux/tty-acs.c:205  int tty_acs_needed(struct tty *tty)
 pub unsafe fn tty_acs_needed(tty: *const tty) -> bool {
     unsafe {
         if tty.is_null() {
@@ -218,7 +218,7 @@ pub unsafe fn tty_acs_needed(tty: *const tty) -> bool {
 }
 
 /// Retrieve ACS to output as UTF-8.
-// vendor/tmux/tty-acs.c:231  tty_acs_get()
+// vendor/tmux/tty-acs.c:231  const char *tty_acs_get(struct tty *tty, u_char ch)
 pub unsafe fn tty_acs_get(tty: *mut tty, ch: u8) -> *const u8 {
     unsafe {
         // Use the ACS set instead of UTF-8 if needed.
@@ -238,7 +238,7 @@ pub unsafe fn tty_acs_get(tty: *mut tty, ch: u8) -> *const u8 {
 }
 
 /// Reverse UTF-8 into ACS.
-// vendor/tmux/tty-acs.c:252  tty_acs_reverse_get()
+// vendor/tmux/tty-acs.c:252  int tty_acs_reverse_get(__unused struct tty *tty, const char *s, size_t slen)
 pub unsafe fn tty_acs_reverse_get(_tty: *const tty, s: *const u8, slen: usize) -> i32 {
     unsafe {
         let table = if slen == 2 {

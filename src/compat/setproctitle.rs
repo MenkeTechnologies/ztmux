@@ -15,6 +15,7 @@
 // a custom version of setproctitle which just supports our usage:
 // setproctitle( c!("%s (%s)"), name, socket_path);
 #[cfg(target_os = "linux")]
+// vendor/tmux/compat/setproctitle.c:30  void setproctitle(const char *fmt, ...)
 pub unsafe fn setproctitle(_fmt: *const u8, name: *const u8, socket_path: *const u8) {
     use crate::libc;
 
@@ -39,4 +40,5 @@ pub unsafe fn setproctitle(_fmt: *const u8, name: *const u8, socket_path: *const
 }
 
 #[cfg(target_os = "macos")]
+// vendor/tmux/compat/setproctitle.c:30  void setproctitle(const char *fmt, ...)
 pub unsafe fn setproctitle(_: *const u8, _: *const u8, _: *const u8) {}

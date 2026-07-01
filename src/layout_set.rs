@@ -38,7 +38,7 @@ static LAYOUT_SETS: [layout_sets_entry; LAYOUT_SETS_LEN] = [
     layout_sets_entry::new(c"tiled", layout_set_tiled),
 ];
 
-// vendor/tmux/layout-set.c:53  layout_set_lookup()
+// vendor/tmux/layout-set.c:53  int layout_set_lookup(const char *name)
 pub unsafe fn layout_set_lookup(name: *const u8) -> i32 {
     unsafe {
         let mut matched: i32 = -1;
@@ -63,7 +63,7 @@ pub unsafe fn layout_set_lookup(name: *const u8) -> i32 {
     }
 }
 
-// vendor/tmux/layout-set.c:74  layout_set_select()
+// vendor/tmux/layout-set.c:74  u_int layout_set_select(struct window *w, u_int layout)
 pub unsafe fn layout_set_select(w: *mut window, mut layout: u32) -> u32 {
     unsafe {
         if layout > LAYOUT_SETS_LEN as u32 - 1 {
@@ -79,7 +79,7 @@ pub unsafe fn layout_set_select(w: *mut window, mut layout: u32) -> u32 {
     }
 }
 
-// vendor/tmux/layout-set.c:87  layout_set_next()
+// vendor/tmux/layout-set.c:87  u_int layout_set_next(struct window *w)
 pub unsafe fn layout_set_next(w: *mut window) -> u32 {
     unsafe {
         let mut layout: u32;
@@ -101,7 +101,7 @@ pub unsafe fn layout_set_next(w: *mut window) -> u32 {
     }
 }
 
-// vendor/tmux/layout-set.c:106  layout_set_previous()
+// vendor/tmux/layout-set.c:106  u_int layout_set_previous(struct window *w)
 pub unsafe fn layout_set_previous(w: *mut window) -> u32 {
     unsafe {
         let mut layout: u32;
@@ -125,7 +125,7 @@ pub unsafe fn layout_set_previous(w: *mut window) -> u32 {
     }
 }
 
-// vendor/tmux/layout-set.c:139  layout_set_even()
+// vendor/tmux/layout-set.c:139  static void layout_set_even(struct window *w, enum layout_type type)
 pub unsafe fn layout_set_even(w: *mut window, type_: layout_type) {
     let __func__ = c!("layout_set_even");
     unsafe {
@@ -184,21 +184,21 @@ pub unsafe fn layout_set_even(w: *mut window, type_: layout_type) {
     }
 }
 
-// vendor/tmux/layout-set.c:191  layout_set_even_h()
+// vendor/tmux/layout-set.c:191  static void layout_set_even_h(struct window *w)
 unsafe fn layout_set_even_h(w: *mut window) {
     unsafe {
         layout_set_even(w, layout_type::LAYOUT_LEFTRIGHT);
     }
 }
 
-// vendor/tmux/layout-set.c:197  layout_set_even_v()
+// vendor/tmux/layout-set.c:197  static void layout_set_even_v(struct window *w)
 unsafe fn layout_set_even_v(w: *mut window) {
     unsafe {
         layout_set_even(w, layout_type::LAYOUT_TOPBOTTOM);
     }
 }
 
-// vendor/tmux/layout-set.c:203  layout_set_main_h()
+// vendor/tmux/layout-set.c:203  static void layout_set_main_h(struct window *w)
 pub unsafe fn layout_set_main_h(w: *mut window) {
     let __func__ = c!("layout_set_main_h");
     unsafe {
@@ -306,7 +306,7 @@ pub unsafe fn layout_set_main_h(w: *mut window) {
     }
 }
 
-// vendor/tmux/layout-set.c:300  layout_set_main_h_mirrored()
+// vendor/tmux/layout-set.c:300  static void layout_set_main_h_mirrored(struct window *w)
 pub unsafe fn layout_set_main_h_mirrored(w: *mut window) {
     let __func__ = c!("layout_set_main_h_mirrored");
     unsafe {
@@ -409,7 +409,7 @@ pub unsafe fn layout_set_main_h_mirrored(w: *mut window) {
     }
 }
 
-// vendor/tmux/layout-set.c:397  layout_set_main_v()
+// vendor/tmux/layout-set.c:397  static void layout_set_main_v(struct window *w)
 pub unsafe fn layout_set_main_v(w: *mut window) {
     let __func__ = c!("layout_set_main_v");
     let mut cause = null_mut();
@@ -513,7 +513,7 @@ pub unsafe fn layout_set_main_v(w: *mut window) {
     }
 }
 
-// vendor/tmux/layout-set.c:494  layout_set_main_v_mirrored()
+// vendor/tmux/layout-set.c:494  static void layout_set_main_v_mirrored(struct window *w)
 pub unsafe fn layout_set_main_v_mirrored(w: *mut window) {
     let __func__ = c!("layout_set_main_v_mirrored");
     unsafe {
@@ -616,7 +616,7 @@ pub unsafe fn layout_set_main_v_mirrored(w: *mut window) {
     }
 }
 
-// vendor/tmux/layout-set.c:592  layout_set_tiled()
+// vendor/tmux/layout-set.c:592  static void layout_set_tiled(struct window *w)
 pub unsafe fn layout_set_tiled(w: *mut window) {
     let __func__ = c!("layout_set_tiled");
 

@@ -20,28 +20,28 @@ unsafe fn grid_view_y(gd: *mut grid, y: u32) -> u32 {
     unsafe { (*gd).hsize + (y) }
 }
 
-// vendor/tmux/grid-view.c:35  grid_view_get_cell()
+// vendor/tmux/grid-view.c:35  void grid_view_get_cell(struct grid *gd, u_int px, u_int py, struct grid_cell *gc)
 pub unsafe fn grid_view_get_cell(gd: *mut grid, px: u32, py: u32, gc: *mut grid_cell) {
     unsafe {
         grid_get_cell(gd, grid_view_x(gd, px), grid_view_y(gd, py), gc);
     }
 }
 
-// vendor/tmux/grid-view.c:42  grid_view_set_cell()
+// vendor/tmux/grid-view.c:42  void grid_view_set_cell(struct grid *gd, u_int px, u_int py, const struct grid_cell *gc)
 pub unsafe fn grid_view_set_cell(gd: *mut grid, px: u32, py: u32, gc: *const grid_cell) {
     unsafe {
         grid_set_cell(gd, grid_view_x(gd, px), grid_view_y(gd, py), gc);
     }
 }
 
-// vendor/tmux/grid-view.c:50  grid_view_set_padding()
+// vendor/tmux/grid-view.c:50  void grid_view_set_padding(struct grid *gd, u_int px, u_int py)
 pub unsafe fn grid_view_set_padding(gd: *mut grid, px: u32, py: u32) {
     unsafe {
         grid_set_padding(gd, grid_view_x(gd, px), grid_view_y(gd, py));
     }
 }
 
-// vendor/tmux/grid-view.c:57  grid_view_set_cells()
+// vendor/tmux/grid-view.c:57  void grid_view_set_cells(struct grid *gd, u_int px, u_int py, const struct grid_cell *gc, const char *s, size_t slen)
 pub unsafe fn grid_view_set_cells(
     gd: *mut grid,
     px: u32,
@@ -55,7 +55,7 @@ pub unsafe fn grid_view_set_cells(
     }
 }
 
-// vendor/tmux/grid-view.c:66  grid_view_clear_history()
+// vendor/tmux/grid-view.c:66  void grid_view_clear_history(struct grid *gd, u_int bg)
 pub unsafe fn grid_view_clear_history(gd: *mut grid, bg: u32) {
     unsafe {
         let mut last = 0u32;
@@ -82,7 +82,7 @@ pub unsafe fn grid_view_clear_history(gd: *mut grid, bg: u32) {
     }
 }
 
-// vendor/tmux/grid-view.c:95  grid_view_clear()
+// vendor/tmux/grid-view.c:95  void grid_view_clear(struct grid *gd, u_int px, u_int py, u_int nx, u_int ny, u_int bg)
 pub unsafe fn grid_view_clear(gd: *mut grid, mut px: u32, mut py: u32, nx: u32, ny: u32, bg: u32) {
     unsafe {
         px = grid_view_x(gd, px);
@@ -92,7 +92,7 @@ pub unsafe fn grid_view_clear(gd: *mut grid, mut px: u32, mut py: u32, nx: u32, 
     }
 }
 
-// vendor/tmux/grid-view.c:106  grid_view_scroll_region_up()
+// vendor/tmux/grid-view.c:106  void grid_view_scroll_region_up(struct grid *gd, u_int rupper, u_int rlower, u_int bg)
 pub unsafe fn grid_view_scroll_region_up(gd: *mut grid, mut rupper: u32, mut rlower: u32, bg: u32) {
     unsafe {
         if (*gd).flags & GRID_HISTORY != 0 {
@@ -112,7 +112,7 @@ pub unsafe fn grid_view_scroll_region_up(gd: *mut grid, mut rupper: u32, mut rlo
     }
 }
 
-// vendor/tmux/grid-view.c:127  grid_view_scroll_region_down()
+// vendor/tmux/grid-view.c:127  void grid_view_scroll_region_down(struct grid *gd, u_int rupper, u_int rlower, u_int bg)
 pub unsafe fn grid_view_scroll_region_down(
     gd: *mut grid,
     mut rupper: u32,
@@ -127,7 +127,7 @@ pub unsafe fn grid_view_scroll_region_down(
     }
 }
 
-// vendor/tmux/grid-view.c:138  grid_view_insert_lines()
+// vendor/tmux/grid-view.c:138  void grid_view_insert_lines(struct grid *gd, u_int py, u_int ny, u_int bg)
 pub unsafe fn grid_view_insert_lines(gd: *mut grid, mut py: u32, ny: u32, bg: u32) {
     unsafe {
         py = grid_view_y(gd, py);
@@ -139,7 +139,7 @@ pub unsafe fn grid_view_insert_lines(gd: *mut grid, mut py: u32, ny: u32, bg: u3
 }
 
 /// Insert lines in region.
-// vendor/tmux/grid-view.c:151  grid_view_insert_lines_region()
+// vendor/tmux/grid-view.c:151  void grid_view_insert_lines_region(struct grid *gd, u_int rlower, u_int py, u_int ny, u_int bg)
 pub unsafe fn grid_view_insert_lines_region(
     gd: *mut grid,
     mut rlower: u32,
@@ -160,7 +160,7 @@ pub unsafe fn grid_view_insert_lines_region(
 }
 
 /// Delete lines.
-// vendor/tmux/grid-view.c:167  grid_view_delete_lines()
+// vendor/tmux/grid-view.c:167  void grid_view_delete_lines(struct grid *gd, u_int py, u_int ny, u_int bg)
 pub unsafe fn grid_view_delete_lines(gd: *mut grid, mut py: u32, ny: u32, bg: u32) {
     unsafe {
         py = grid_view_y(gd, py);
@@ -173,7 +173,7 @@ pub unsafe fn grid_view_delete_lines(gd: *mut grid, mut py: u32, ny: u32, bg: u3
 }
 
 /// Delete lines inside scroll region.
-// vendor/tmux/grid-view.c:181  grid_view_delete_lines_region()
+// vendor/tmux/grid-view.c:181  void grid_view_delete_lines_region(struct grid *gd, u_int rlower, u_int py, u_int ny, u_int bg)
 pub unsafe fn grid_view_delete_lines_region(
     gd: *mut grid,
     mut rlower: u32,
@@ -194,7 +194,7 @@ pub unsafe fn grid_view_delete_lines_region(
 }
 
 /// Insert characters.
-// vendor/tmux/grid-view.c:197  grid_view_insert_cells()
+// vendor/tmux/grid-view.c:197  void grid_view_insert_cells(struct grid *gd, u_int px, u_int py, u_int nx, u_int bg)
 pub unsafe fn grid_view_insert_cells(gd: *mut grid, mut px: u32, mut py: u32, nx: u32, bg: u32) {
     unsafe {
         px = grid_view_x(gd, px);
@@ -211,7 +211,7 @@ pub unsafe fn grid_view_insert_cells(gd: *mut grid, mut px: u32, mut py: u32, nx
 }
 
 /// Delete characters.
-// vendor/tmux/grid-view.c:214  grid_view_delete_cells()
+// vendor/tmux/grid-view.c:214  void grid_view_delete_cells(struct grid *gd, u_int px, u_int py, u_int nx, u_int bg)
 pub unsafe fn grid_view_delete_cells(gd: *mut grid, mut px: u32, mut py: u32, nx: u32, bg: u32) {
     unsafe {
         px = grid_view_x(gd, px);
@@ -225,7 +225,7 @@ pub unsafe fn grid_view_delete_cells(gd: *mut grid, mut px: u32, mut py: u32, nx
 }
 
 /// Convert cells into a string.
-// vendor/tmux/grid-view.c:229  grid_view_string_cells()
+// vendor/tmux/grid-view.c:229  char *grid_view_string_cells(struct grid *gd, u_int px, u_int py, u_int nx)
 pub unsafe fn grid_view_string_cells(gd: *mut grid, mut px: u32, mut py: u32, nx: u32) -> *mut u8 {
     unsafe {
         px = grid_view_x(gd, px);

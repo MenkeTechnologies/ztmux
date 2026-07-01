@@ -35,7 +35,7 @@ pub static mut OPTOPT: u8 = 0;
 pub static mut OPTRESET: i32 = 0;
 pub static mut OPTARG: *mut u8 = null_mut();
 
-// vendor/tmux/compat/getopt_long.c:535  getopt()
+// vendor/tmux/compat/getopt_long.c:535  int getopt(int nargc, char * const *nargv, const char *options)
 pub unsafe fn getopt(nargc: i32, nargv: *const *mut u8, ostr: *const u8) -> Option<u8> {
     unsafe {
         static mut PLACE: *const u8 = c"".as_ptr().cast();

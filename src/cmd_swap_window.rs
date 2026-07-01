@@ -37,7 +37,7 @@ pub static CMD_SWAP_WINDOW_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_swap_window_exec,
 };
 
-// vendor/tmux/cmd-swap-window.c:46  cmd_swap_window_exec()
+// vendor/tmux/cmd-swap-window.c:46  static enum cmd_retval cmd_swap_window_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_swap_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

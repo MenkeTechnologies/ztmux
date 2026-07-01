@@ -15,7 +15,7 @@
 use crate::*;
 use crate::options_::*;
 
-// vendor/tmux/layout.c:61  layout_create_cell()
+// vendor/tmux/layout.c:61  struct layout_cell *layout_create_cell(struct layout_cell *lcparent)
 pub unsafe fn layout_create_cell(lcparent: *mut layout_cell) -> *mut layout_cell {
     unsafe {
         let lc = Box::leak(Box::new(layout_cell {
@@ -38,7 +38,7 @@ pub unsafe fn layout_create_cell(lcparent: *mut layout_cell) -> *mut layout_cell
     }
 }
 
-// vendor/tmux/layout.c:91  layout_free_cell()
+// vendor/tmux/layout.c:91  void layout_free_cell(struct layout_cell *lc, int only_nodes)
 pub unsafe fn layout_free_cell(lc: *mut layout_cell) {
     unsafe {
         match (*lc).type_ {
@@ -60,7 +60,7 @@ pub unsafe fn layout_free_cell(lc: *mut layout_cell) {
     }
 }
 
-// vendor/tmux/layout.c:124  layout_print_cell()
+// vendor/tmux/layout.c:124  void layout_print_cell(struct layout_cell *lc, const char *hdr, u_int n)
 pub unsafe fn layout_print_cell(lc: *mut layout_cell, hdr: *const u8, n: u32) {
     unsafe {
         let type_str = match (*lc).type_ {
@@ -94,7 +94,7 @@ pub unsafe fn layout_print_cell(lc: *mut layout_cell, hdr: *const u8, n: u32) {
     }
 }
 
-// vendor/tmux/layout.c:162  layout_search_by_border()
+// vendor/tmux/layout.c:162  struct layout_cell *layout_search_by_border(struct layout_cell *lc, u_int x, u_int y)
 pub unsafe fn layout_search_by_border(lc: *mut layout_cell, x: u32, y: u32) -> *mut layout_cell {
     unsafe {
         let mut last: *mut layout_cell = null_mut();
@@ -137,7 +137,7 @@ pub unsafe fn layout_search_by_border(lc: *mut layout_cell, x: u32, y: u32) -> *
     }
 }
 
-// vendor/tmux/layout.c:203  layout_set_size()
+// vendor/tmux/layout.c:203  void layout_set_size(struct layout_cell *lc, u_int sx, u_int sy, int xoff, int yoff)
 pub unsafe fn layout_set_size(lc: *mut layout_cell, sx: u32, sy: u32, xoff: u32, yoff: u32) {
     unsafe {
         (*lc).sx = sx;
@@ -147,7 +147,7 @@ pub unsafe fn layout_set_size(lc: *mut layout_cell, sx: u32, sy: u32, xoff: u32,
     }
 }
 
-// vendor/tmux/layout.c:214  layout_make_leaf()
+// vendor/tmux/layout.c:214  void layout_make_leaf(struct layout_cell *lc, struct window_pane *wp)
 pub unsafe fn layout_make_leaf(lc: *mut layout_cell, wp: *mut window_pane) {
     unsafe {
         (*lc).type_ = layout_type::LAYOUT_WINDOWPANE;
@@ -157,7 +157,7 @@ pub unsafe fn layout_make_leaf(lc: *mut layout_cell, wp: *mut window_pane) {
     }
 }
 
-// vendor/tmux/layout.c:226  layout_make_node()
+// vendor/tmux/layout.c:226  void layout_make_node(struct layout_cell *lc, enum layout_type type)
 pub unsafe fn layout_make_node(lc: *mut layout_cell, type_: layout_type) {
     unsafe {
         if type_ == layout_type::LAYOUT_WINDOWPANE {
@@ -174,7 +174,7 @@ pub unsafe fn layout_make_node(lc: *mut layout_cell, type_: layout_type) {
 }
 
 /// Fix cell offsets for a child cell.
-// vendor/tmux/layout.c:328  layout_fix_offsets1()
+// vendor/tmux/layout.c:328  static void layout_fix_offsets1(struct layout_cell *lc)
 unsafe fn layout_fix_offsets1(lc: *mut layout_cell) {
     unsafe {
         if (*lc).type_ == layout_type::LAYOUT_LEFTRIGHT {
@@ -204,7 +204,7 @@ unsafe fn layout_fix_offsets1(lc: *mut layout_cell) {
 }
 
 /// Update cell offsets based on their sizes.
-// vendor/tmux/layout.c:362  layout_fix_offsets()
+// vendor/tmux/layout.c:362  void layout_fix_offsets(struct window *w)
 pub unsafe fn layout_fix_offsets(w: *mut window) {
     unsafe {
         let lc = (*w).layout_root;
@@ -215,7 +215,7 @@ pub unsafe fn layout_fix_offsets(w: *mut window) {
 }
 
 /// Is this a top cell?
-// vendor/tmux/layout.c:378  layout_cell_is_top()
+// vendor/tmux/layout.c:378  static int layout_cell_is_top(struct window *w, struct layout_cell *lc)
 unsafe fn layout_cell_is_top(w: *mut window, mut lc: *mut layout_cell) -> c_int {
     unsafe {
         while lc != (*w).layout_root {
@@ -232,7 +232,7 @@ unsafe fn layout_cell_is_top(w: *mut window, mut lc: *mut layout_cell) -> c_int 
 }
 
 /// Is this a bottom cell?
-// vendor/tmux/layout.c:396  layout_cell_is_bottom()
+// vendor/tmux/layout.c:396  static int layout_cell_is_bottom(struct window *w, struct layout_cell *lc)
 unsafe fn layout_cell_is_bottom(w: *mut window, mut lc: *mut layout_cell) -> c_int {
     unsafe {
         while lc != (*w).layout_root {
@@ -263,7 +263,7 @@ unsafe fn layout_add_border(w: *mut window, lc: *mut layout_cell, status: pane_s
 }
 
 /// Update pane offsets and sizes based on their cells.
-// vendor/tmux/layout.c:436  layout_fix_panes()
+// vendor/tmux/layout.c:436  void layout_fix_panes(struct window *w, struct window_pane *skip)
 pub unsafe fn layout_fix_panes(w: *mut window, skip: *mut window_pane) {
     unsafe {
         let status: pane_status =
@@ -293,7 +293,7 @@ pub unsafe fn layout_fix_panes(w: *mut window, skip: *mut window_pane) {
 }
 
 /// Count the number of available cells in a layout.
-// vendor/tmux/layout.c:505  layout_count_cells()
+// vendor/tmux/layout.c:505  u_int layout_count_cells(struct layout_cell *lc)
 pub unsafe fn layout_count_cells(lc: *mut layout_cell) -> u32 {
     unsafe {
         match (*lc).type_ {
@@ -310,7 +310,7 @@ pub unsafe fn layout_count_cells(lc: *mut layout_cell) -> u32 {
 }
 
 /// Calculate how much size is available to be removed from a cell.
-// vendor/tmux/layout.c:525  layout_resize_check()
+// vendor/tmux/layout.c:525  static u_int layout_resize_check(struct window *w, struct layout_cell *lc, enum layout_type type)
 pub unsafe fn layout_resize_check(w: *mut window, lc: *mut layout_cell, type_: layout_type) -> u32 {
     unsafe {
         let mut available: u32;
@@ -362,7 +362,7 @@ pub unsafe fn layout_resize_check(w: *mut window, lc: *mut layout_cell, type_: l
 
 /// Adjust cell size evenly, including altering its children. This function
 /// expects the change to have already been bounded to the space available.
-// vendor/tmux/layout.c:579  layout_resize_adjust()
+// vendor/tmux/layout.c:579  void layout_resize_adjust(struct window *w, struct layout_cell *lc, enum layout_type type, int change)
 pub unsafe fn layout_resize_adjust(
     w: *mut window,
     lc: *mut layout_cell,
@@ -412,7 +412,7 @@ pub unsafe fn layout_resize_adjust(
 }
 
 /// Destroy a cell and redistribute the space.
-// vendor/tmux/layout.c:695  layout_destroy_cell()
+// vendor/tmux/layout.c:695  void layout_destroy_cell(struct window *w, struct layout_cell *lc, struct layout_cell **lcroot)
 pub unsafe fn layout_destroy_cell(
     w: *mut window,
     lc: *mut layout_cell,
@@ -468,7 +468,7 @@ pub unsafe fn layout_destroy_cell(
     }
 }
 
-// vendor/tmux/layout.c:755  layout_init()
+// vendor/tmux/layout.c:755  void layout_init(struct window *w, struct window_pane *wp)
 pub unsafe fn layout_init(w: *mut window, wp: *mut window_pane) {
     unsafe {
         let lc = layout_create_cell(std::ptr::null_mut());
@@ -479,7 +479,7 @@ pub unsafe fn layout_init(w: *mut window, wp: *mut window_pane) {
     }
 }
 
-// vendor/tmux/layout.c:767  layout_free()
+// vendor/tmux/layout.c:767  void layout_free(struct window *w, int only_nodes)
 pub unsafe fn layout_free(w: *mut window) {
     unsafe {
         layout_free_cell((*w).layout_root);
@@ -487,7 +487,7 @@ pub unsafe fn layout_free(w: *mut window) {
 }
 
 /// Resize the entire layout after window resize.
-// vendor/tmux/layout.c:774  layout_resize()
+// vendor/tmux/layout.c:774  void layout_resize(struct window *w, u_int sx, u_int sy)
 pub unsafe fn layout_resize(w: *mut window, sx: c_uint, sy: c_uint) {
     unsafe {
         let lc = (*w).layout_root;
@@ -545,7 +545,7 @@ pub unsafe fn layout_resize(w: *mut window, sx: c_uint, sy: c_uint) {
 }
 
 /// Resize a pane to an absolute size.
-// vendor/tmux/layout.c:828  layout_resize_pane_to()
+// vendor/tmux/layout.c:828  void layout_resize_pane_to(struct window_pane *wp, enum layout_type type, u_int new_size)
 pub unsafe fn layout_resize_pane_to(wp: *mut window_pane, type_: layout_type, new_size: u32) {
     unsafe {
         let mut lc = (*wp).layout_cell;
@@ -579,7 +579,7 @@ pub unsafe fn layout_resize_pane_to(wp: *mut window_pane, type_: layout_type, ne
     }
 }
 
-// vendor/tmux/layout.c:932  layout_resize_layout()
+// vendor/tmux/layout.c:932  void layout_resize_layout(struct window *w, struct layout_cell *lc, enum layout_type type, int change, int opposite)
 pub unsafe fn layout_resize_layout(
     w: *mut window,
     lc: *mut layout_cell,
@@ -614,7 +614,7 @@ pub unsafe fn layout_resize_layout(
     }
 }
 
-// vendor/tmux/layout.c:961  layout_resize_pane()
+// vendor/tmux/layout.c:961  void layout_resize_pane(struct window_pane *wp, enum layout_type type, int change, int opposite)
 pub unsafe fn layout_resize_pane(
     wp: *mut window_pane,
     type_: layout_type,
@@ -645,7 +645,7 @@ pub unsafe fn layout_resize_pane(
 }
 
 /// Helper function to grow pane.
-// vendor/tmux/layout.c:987  layout_resize_pane_grow()
+// vendor/tmux/layout.c:987  static int layout_resize_pane_grow(struct window *w, struct layout_cell *lc, enum layout_type type, int needed, int opposite)
 pub unsafe fn layout_resize_pane_grow(
     w: *mut window,
     lc: *mut layout_cell,
@@ -695,7 +695,7 @@ pub unsafe fn layout_resize_pane_grow(
 }
 
 /// Helper function to shrink pane.
-// vendor/tmux/layout.c:1028  layout_resize_pane_shrink()
+// vendor/tmux/layout.c:1028  static int layout_resize_pane_shrink(struct window *w, struct layout_cell *lc, enum layout_type type, int needed)
 pub unsafe fn layout_resize_pane_shrink(
     w: *mut window,
     lc: *mut layout_cell,
@@ -738,7 +738,7 @@ pub unsafe fn layout_resize_pane_shrink(
 }
 
 /// Assign window pane to newly split cell.
-// vendor/tmux/layout.c:1060  layout_assign_pane()
+// vendor/tmux/layout.c:1060  void layout_assign_pane(struct layout_cell *lc, struct window_pane *wp, int do_not_resize)
 pub unsafe fn layout_assign_pane(lc: *mut layout_cell, wp: *mut window_pane, do_not_resize: c_int) {
     unsafe {
         layout_make_leaf(lc, wp);
@@ -751,7 +751,7 @@ pub unsafe fn layout_assign_pane(lc: *mut layout_cell, wp: *mut window_pane, do_
 }
 
 /// Calculate the new pane size for resized parent.
-// vendor/tmux/layout.c:1072  layout_new_pane_size()
+// vendor/tmux/layout.c:1072  static u_int layout_new_pane_size(struct window *w, u_int previous, struct layout_cell *lc, enum layout_type type, u_int size, u_int count_left, u_int size_left)
 pub unsafe fn layout_new_pane_size(
     w: *mut window,
     previous: u32,
@@ -798,7 +798,7 @@ pub unsafe fn layout_new_pane_size(
 }
 
 /// Check if the cell and all its children can be resized to a specific size.
-// vendor/tmux/layout.c:1110  layout_set_size_check()
+// vendor/tmux/layout.c:1110  static int layout_set_size_check(struct window *w, struct layout_cell *lc, enum layout_type type, int size)
 pub unsafe fn layout_set_size_check(
     w: *mut window,
     lc: *mut layout_cell,
@@ -876,7 +876,7 @@ pub unsafe fn layout_set_size_check(
 
 // unsafe extern "C" { pub fn layout_resize_child_cells(w: *mut window, lc: *mut layout_cell); }
 /// Resize all child cells to fit within the current cell.
-// vendor/tmux/layout.c:1167  layout_resize_child_cells()
+// vendor/tmux/layout.c:1167  static void layout_resize_child_cells(struct window *w, struct layout_cell *lc)
 pub unsafe fn layout_resize_child_cells(w: *mut window, lc: *mut layout_cell) {
     unsafe {
         if (*lc).type_ == layout_type::LAYOUT_WINDOWPANE {
@@ -945,7 +945,7 @@ pub unsafe fn layout_resize_child_cells(w: *mut window, lc: *mut layout_cell) {
 
 /// Split a pane into two. size is a hint, or -1 for default half/half
 /// split. This must be followed by `layout_assign_pane` before much else happens!
-// vendor/tmux/layout.c:1323  layout_split_pane()
+// vendor/tmux/layout.c:1323  struct layout_cell *layout_split_pane(struct window_pane *wp, enum layout_type type, int size, int flags)
 pub unsafe fn layout_split_pane(
     wp: *mut window_pane,
     type_: layout_type,
@@ -1129,7 +1129,7 @@ pub unsafe fn layout_split_pane(
 }
 
 /// Destroy the cell associated with a pane.
-// vendor/tmux/layout.c:1485  layout_close_pane()
+// vendor/tmux/layout.c:1485  void layout_close_pane(struct window_pane *wp)
 pub unsafe fn layout_close_pane(wp: *mut window_pane) {
     unsafe {
         let w = (*wp).window;
@@ -1147,7 +1147,7 @@ pub unsafe fn layout_close_pane(wp: *mut window_pane) {
 }
 
 /// Spread cells evenly within a parent cell
-// vendor/tmux/layout.c:1506  layout_spread_cell()
+// vendor/tmux/layout.c:1506  int layout_spread_cell(struct window *w, struct layout_cell *parent)
 pub unsafe fn layout_spread_cell(w: *mut window, parent: *mut layout_cell) -> c_int {
     unsafe {
         // Count number of cells
@@ -1227,7 +1227,7 @@ pub unsafe fn layout_spread_cell(w: *mut window, parent: *mut layout_cell) -> c_
 }
 
 /// Spread out a pane and its parent cells
-// vendor/tmux/layout.c:1573  layout_spread_out()
+// vendor/tmux/layout.c:1573  void layout_spread_out(struct window_pane *wp)
 pub unsafe fn layout_spread_out(wp: *mut window_pane) {
     unsafe {
         let mut parent = (*wp).layout_cell;

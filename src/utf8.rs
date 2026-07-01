@@ -24,11 +24,11 @@ use crate::*;
 
 #[cfg(feature = "utf8proc")]
 unsafe extern "C" {
-    // vendor/tmux/compat/utf8proc.c:24  utf8proc_wcwidth()
+    // vendor/tmux/compat/utf8proc.c:24  int utf8proc_wcwidth(wchar_t wc)
     fn utf8proc_wcwidth(_: wchar_t) -> i32;
-    // vendor/tmux/compat/utf8proc.c:40  utf8proc_mbtowc()
+    // vendor/tmux/compat/utf8proc.c:40  int utf8proc_mbtowc(wchar_t *pwc, const char *s, size_t n)
     fn utf8proc_mbtowc(_: *mut wchar_t, _: *const u8, _: usize) -> i32;
-    // vendor/tmux/compat/utf8proc.c:58  utf8proc_wctomb()
+    // vendor/tmux/compat/utf8proc.c:58  int utf8proc_wctomb(char *s, wchar_t wc)
     fn utf8proc_wctomb(_: *mut char, _: wchar_t) -> i32;
 }
 
@@ -153,7 +153,7 @@ impl utf8_item_data {
 
 impl_ord!(utf8_item_data as utf8_data_cmp);
 
-// vendor/tmux/utf8.c:228  utf8_data_cmp()
+// vendor/tmux/utf8.c:228  static int utf8_data_cmp(struct utf8_item *ui1, struct utf8_item *ui2)
 fn utf8_data_cmp(ui1: &utf8_item_data, ui2: &utf8_item_data) -> std::cmp::Ordering {
     ui1.initialized_slice().cmp(ui2.initialized_slice())
 }
@@ -178,19 +178,19 @@ fn utf8_set_width(width: u8) -> utf8_char {
     (width as utf8_char + 1) << 29
 }
 
-// vendor/tmux/utf8.c:264  utf8_item_by_data()
+// vendor/tmux/utf8.c:264  static struct utf8_item *utf8_item_by_data(const u_char *data, size_t size)
 pub fn utf8_item_by_data(item: &utf8_item_data) -> Option<utf8_item_index> {
     UTF8_DATA_TREE.with(|tree| tree.borrow().get(item).copied())
 }
 
-// vendor/tmux/utf8.c:276  utf8_item_by_index()
+// vendor/tmux/utf8.c:276  static struct utf8_item *utf8_item_by_index(u_int index)
 pub fn utf8_item_by_index(index: u32) -> Option<utf8_item_data> {
     let ui = utf8_item_index { index };
 
     UTF8_INDEX_TREE.with(|tree| tree.borrow().get(&ui).copied())
 }
 
-// vendor/tmux/utf8.c:435  utf8_put_item()
+// vendor/tmux/utf8.c:435  static int utf8_put_item(const u_char *data, size_t size, u_int *index)
 pub unsafe fn utf8_put_item(data: *const [u8; UTF8_SIZE], size: usize, index: *mut u32) -> i32 {
     unsafe {
         let ud = &utf8_item_data::new(slice::from_raw_parts(data.cast(), size));
@@ -234,7 +234,7 @@ pub fn utf8_in_table(find: wchar_t, table: &[wchar_t]) -> bool {
     table.binary_search(&find).is_ok()
 }
 
-// vendor/tmux/utf8.c:465  utf8_from_data()
+// vendor/tmux/utf8.c:465  enum utf8_state utf8_from_data(const struct utf8_data *ud, utf8_char *uc)
 pub unsafe fn utf8_from_data(ud: *const utf8_data, uc: *mut utf8_char) -> utf8_state {
     unsafe {
         let mut index: u32 = 0;
@@ -282,7 +282,7 @@ pub unsafe fn utf8_from_data(ud: *const utf8_data, uc: *mut utf8_char) -> utf8_s
     }
 }
 
-// vendor/tmux/utf8.c:497  utf8_to_data()
+// vendor/tmux/utf8.c:497  void utf8_to_data(utf8_char uc, struct utf8_data *ud)
 pub fn utf8_to_data(uc: utf8_char) -> utf8_data {
     let mut ud = utf8_data {
         data: [0; UTF8_SIZE],
@@ -315,12 +315,12 @@ pub fn utf8_to_data(uc: utf8_char) -> utf8_data {
     ud
 }
 
-// vendor/tmux/utf8.c:524  utf8_build_one()
+// vendor/tmux/utf8.c:524  u_int utf8_build_one(u_char ch)
 pub fn utf8_build_one(ch: c_uchar) -> u32 {
     utf8_set_size(1) | utf8_set_width(1) | ch as u32
 }
 
-// vendor/tmux/utf8.c:531  utf8_set()
+// vendor/tmux/utf8.c:531  void utf8_set(struct utf8_data *ud, u_char ch)
 pub unsafe fn utf8_set(ud: *mut utf8_data, ch: c_uchar) {
     static EMPTY: utf8_data = utf8_data {
         data: unsafe { zeroed() },
@@ -335,7 +335,7 @@ pub unsafe fn utf8_set(ud: *mut utf8_data, ch: c_uchar) {
     }
 }
 
-// vendor/tmux/utf8.c:541  utf8_copy()
+// vendor/tmux/utf8.c:541  void utf8_copy(struct utf8_data *to, const struct utf8_data *from)
 pub unsafe fn utf8_copy(to: *mut utf8_data, from: *const utf8_data) {
     unsafe {
         memcpy__(to, from);
@@ -346,7 +346,7 @@ pub unsafe fn utf8_copy(to: *mut utf8_data, from: *const utf8_data) {
     }
 }
 
-// vendor/tmux/utf8.c:553  utf8_width()
+// vendor/tmux/utf8.c:553  static enum utf8_state utf8_width(struct utf8_data *ud, int *width)
 pub unsafe fn utf8_width(ud: *mut utf8_data, width: *mut i32) -> utf8_state {
     unsafe {
         let mut wc: wchar_t = 0;
@@ -379,7 +379,7 @@ pub unsafe fn utf8_width(ud: *mut utf8_data, width: *mut i32) -> utf8_state {
     }
 }
 
-// vendor/tmux/utf8.c:587  utf8_towc()
+// vendor/tmux/utf8.c:587  enum utf8_state utf8_towc(const struct utf8_data *ud, wchar_t *wc)
 pub unsafe fn utf8_towc(ud: *const utf8_data, wc: *mut wchar_t) -> utf8_state {
     unsafe {
         #[cfg(feature = "utf8proc")]
@@ -411,7 +411,7 @@ pub unsafe fn utf8_towc(ud: *const utf8_data, wc: *mut wchar_t) -> utf8_state {
     utf8_state::UTF8_DONE
 }
 
-// vendor/tmux/utf8.c:608  utf8_fromwc()
+// vendor/tmux/utf8.c:608  enum utf8_state utf8_fromwc(wchar_t wc, struct utf8_data *ud)
 pub unsafe fn utf8_fromwc(wc: wchar_t, ud: *mut utf8_data) -> utf8_state {
     unsafe {
         let mut width: i32 = 0;
@@ -439,7 +439,7 @@ pub unsafe fn utf8_fromwc(wc: wchar_t, ud: *mut utf8_data) -> utf8_state {
     utf8_state::UTF8_ERROR
 }
 
-// vendor/tmux/utf8.c:640  utf8_open()
+// vendor/tmux/utf8.c:640  enum utf8_state utf8_open(struct utf8_data *ud, u_char ch)
 pub unsafe fn utf8_open(ud: *mut utf8_data, ch: c_uchar) -> utf8_state {
     unsafe {
         memset(ud.cast(), 0, size_of::<utf8_data>());
@@ -457,7 +457,7 @@ pub unsafe fn utf8_open(ud: *mut utf8_data, ch: c_uchar) -> utf8_state {
     utf8_state::UTF8_MORE
 }
 
-// vendor/tmux/utf8.c:657  utf8_append()
+// vendor/tmux/utf8.c:657  enum utf8_state utf8_append(struct utf8_data *ud, u_char ch)
 pub unsafe fn utf8_append(ud: *mut utf8_data, ch: c_uchar) -> utf8_state {
     unsafe {
         let mut width: i32 = 0;
@@ -490,7 +490,7 @@ pub unsafe fn utf8_append(ud: *mut utf8_data, ch: c_uchar) -> utf8_state {
     utf8_state::UTF8_DONE
 }
 
-// vendor/tmux/utf8.c:690  utf8_strvis()
+// vendor/tmux/utf8.c:690  size_t utf8_strvis(char *dst, const char *src, size_t len, int flag)
 pub unsafe fn utf8_strvis(
     mut dst: *mut u8,
     mut src: *const u8,
@@ -578,7 +578,7 @@ pub unsafe fn utf8_strvis_(dst: &mut Vec<u8>, mut src: *const u8, len: usize, fl
     }
 }
 
-// vendor/tmux/utf8.c:728  utf8_stravis()
+// vendor/tmux/utf8.c:728  size_t utf8_stravis(char **dst, const char *src, int flag)
 pub unsafe fn utf8_stravis(dst: *mut *mut u8, src: *const u8, flag: vis_flags) -> i32 {
     unsafe {
         let buf = xreallocarray(null_mut(), 4, strlen(src) + 1);
@@ -598,7 +598,7 @@ pub unsafe fn utf8_stravis_(src: *const u8, flag: vis_flags) -> Vec<u8> {
     }
 }
 
-// vendor/tmux/utf8.c:742  utf8_stravisx()
+// vendor/tmux/utf8.c:742  size_t utf8_stravisx(char **dst, const char *src, size_t srclen, int flag)
 pub unsafe fn utf8_stravisx(
     dst: *mut *mut u8,
     src: *const u8,
@@ -614,7 +614,7 @@ pub unsafe fn utf8_stravisx(
     }
 }
 
-// vendor/tmux/utf8.c:756  utf8_isvalid()
+// vendor/tmux/utf8.c:756  int utf8_isvalid(const char *s)
 pub unsafe fn utf8_isvalid(mut s: *const u8) -> bool {
     unsafe {
         let mut ud: utf8_data = zeroed();
@@ -644,7 +644,7 @@ pub unsafe fn utf8_isvalid(mut s: *const u8) -> bool {
     true
 }
 
-// vendor/tmux/utf8.c:784  utf8_sanitize()
+// vendor/tmux/utf8.c:784  char *utf8_sanitize(const char *src)
 pub unsafe fn utf8_sanitize(mut src: *const u8) -> *mut u8 {
     unsafe {
         let mut dst: *mut u8 = null_mut();
@@ -686,7 +686,7 @@ pub unsafe fn utf8_sanitize(mut src: *const u8) -> *mut u8 {
     }
 }
 
-// vendor/tmux/utf8.c:819  utf8_strlen()
+// vendor/tmux/utf8.c:819  size_t utf8_strlen(const struct utf8_data *s)
 pub unsafe fn utf8_strlen(s: *const utf8_data) -> usize {
     let mut i = 0;
 
@@ -699,7 +699,7 @@ pub unsafe fn utf8_strlen(s: *const utf8_data) -> usize {
     i
 }
 
-// vendor/tmux/utf8.c:830  utf8_strwidth()
+// vendor/tmux/utf8.c:830  u_int utf8_strwidth(const struct utf8_data *s, ssize_t n)
 pub unsafe fn utf8_strwidth(s: *const utf8_data, n: isize) -> u32 {
     unsafe {
         let mut width: u32 = 0;
@@ -717,7 +717,7 @@ pub unsafe fn utf8_strwidth(s: *const utf8_data, n: isize) -> u32 {
     }
 }
 
-// vendor/tmux/utf8.c:848  utf8_fromcstr()
+// vendor/tmux/utf8.c:848  struct utf8_data *utf8_fromcstr(const char *src)
 pub unsafe fn utf8_fromcstr(mut src: *const u8) -> *mut utf8_data {
     unsafe {
         let mut dst: *mut utf8_data = null_mut();
@@ -750,7 +750,7 @@ pub unsafe fn utf8_fromcstr(mut src: *const u8) -> *mut utf8_data {
     }
 }
 
-// vendor/tmux/utf8.c:876  utf8_tocstr()
+// vendor/tmux/utf8.c:876  char *utf8_tocstr(struct utf8_data *src)
 pub unsafe fn utf8_tocstr(mut src: *const utf8_data) -> *mut u8 {
     unsafe {
         let mut dst = null_mut::<u8>();
@@ -792,7 +792,7 @@ pub fn utf8_to_string(src: &[utf8_data]) -> String {
     String::from_utf8(dst).unwrap()
 }
 
-// vendor/tmux/utf8.c:893  utf8_cstrwidth()
+// vendor/tmux/utf8.c:893  u_int utf8_cstrwidth(const char *s)
 pub unsafe fn utf8_cstrwidth(mut s: *const u8) -> u32 {
     unsafe {
         let mut tmp: utf8_data = zeroed();
@@ -822,7 +822,7 @@ pub unsafe fn utf8_cstrwidth(mut s: *const u8) -> u32 {
     }
 }
 
-// vendor/tmux/utf8.c:919  utf8_padcstr()
+// vendor/tmux/utf8.c:919  char *utf8_padcstr(const char *s, u_int width)
 pub unsafe fn utf8_padcstr(s: *const u8, width: u32) -> *mut u8 {
     unsafe {
         let n = utf8_cstrwidth(s);
@@ -844,7 +844,7 @@ pub unsafe fn utf8_padcstr(s: *const u8, width: u32) -> *mut u8 {
     }
 }
 
-// vendor/tmux/utf8.c:940  utf8_rpadcstr()
+// vendor/tmux/utf8.c:940  char *utf8_rpadcstr(const char *s, u_int width)
 pub unsafe fn utf8_rpadcstr(s: *const u8, width: u32) -> *mut u8 {
     unsafe {
         let n = utf8_cstrwidth(s);
@@ -865,7 +865,7 @@ pub unsafe fn utf8_rpadcstr(s: *const u8, width: u32) -> *mut u8 {
     }
 }
 
-// vendor/tmux/utf8.c:960  utf8_cstrhas()
+// vendor/tmux/utf8.c:960  int utf8_cstrhas(const char *s, const struct utf8_data *ud)
 pub unsafe fn utf8_cstrhas(s: *const u8, ud: *const utf8_data) -> bool {
     let mut found = false;
 

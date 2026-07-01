@@ -14,7 +14,7 @@
 use core::ffi::c_void;
 use core::ptr::null_mut;
 
-// vendor/tmux/compat/recallocarray.c:33  recallocarray()
+// vendor/tmux/compat/recallocarray.c:33  void *recallocarray(void *ptr, size_t oldnmemb, size_t newnmemb, size_t size)
 pub unsafe fn recallocarray(
     ptr: *mut c_void,
     oldnmemb: usize,

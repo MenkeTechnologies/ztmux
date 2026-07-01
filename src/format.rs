@@ -68,7 +68,7 @@ RB_GENERATE!(
 );
 
 // Format job tree comparison function.
-// vendor/tmux/format.c:78  format_job_cmp()
+// vendor/tmux/format.c:78  static int format_job_cmp(struct format_job *fj1, struct format_job *fj2)
 pub fn format_job_cmp(fj1: &format_job, fj2: &format_job) -> cmp::Ordering {
     unsafe {
         fj1.tag
@@ -185,7 +185,7 @@ pub struct format_modifier {
 }
 
 /// Format entry tree comparison function.
-// vendor/tmux/format.c:203  format_entry_cmp()
+// vendor/tmux/format.c:203  static int format_entry_cmp(struct format_entry *fe1, struct format_entry *fe2)
 fn format_entry_cmp(fe1: &format_entry, fe2: &format_entry) -> cmp::Ordering {
     unsafe { i32_to_ordering(strcmp(fe1.key, fe2.key)) }
 }
@@ -220,7 +220,7 @@ static FORMAT_LOWER: [SyncCharPtr; 26] = const {
 };
 
 /// Is logging enabled?
-// vendor/tmux/format.c:270  format_logging()
+// vendor/tmux/format.c:270  static inline int format_logging(struct format_tree *ft)
 pub fn format_logging(ft: &format_tree) -> bool {
     log_get_level() != 0 || ft.flags.intersects(format_flags::FORMAT_VERBOSE)
 }
@@ -261,7 +261,7 @@ pub unsafe fn format_log1_(
 }
 
 /// Copy expand state.
-// vendor/tmux/format.c:302  format_copy_state()
+// vendor/tmux/format.c:302  static void format_copy_state(struct format_expand_state *to, struct format_expand_state *from, int flags)
 pub unsafe fn format_copy_state(
     to: *mut format_expand_state,
     from: *mut format_expand_state,
@@ -277,7 +277,7 @@ pub unsafe fn format_copy_state(
 }
 
 /// Format job update callback.
-// vendor/tmux/format.c:315  format_job_update()
+// vendor/tmux/format.c:315  static void format_job_update(struct job *job)
 pub unsafe fn format_job_update(job: *mut job) {
     unsafe {
         let fj = job_get_data(job) as *mut format_job;
@@ -315,7 +315,7 @@ pub unsafe fn format_job_update(job: *mut job) {
 }
 
 /// Format job complete callback.
-// vendor/tmux/format.c:345  format_job_complete()
+// vendor/tmux/format.c:345  static void format_job_complete(struct job *job)
 pub unsafe fn format_job_complete(job: *mut job) {
     unsafe {
         let fj = job_get_data(job) as *mut format_job;
@@ -361,7 +361,7 @@ pub unsafe fn format_job_complete(job: *mut job) {
     }
 }
 
-// vendor/tmux/format.c:381  format_job_get()
+// vendor/tmux/format.c:381  static char *format_job_get(struct format_expand_state *es, const char *cmd)
 pub unsafe fn format_job_get(es: *mut format_expand_state, cmd: *mut u8) -> *mut u8 {
     unsafe {
         let ft: *mut format_tree = (*es).ft;
@@ -447,7 +447,7 @@ pub unsafe fn format_job_get(es: *mut format_expand_state, cmd: *mut u8) -> *mut
     }
 }
 
-// vendor/tmux/format.c:448  format_job_tidy()
+// vendor/tmux/format.c:448  static void format_job_tidy(struct format_job_tree *jobs, int force)
 pub unsafe fn format_job_tidy(jobs: *mut format_job_tree, force: i32) {
     unsafe {
         let now = libc::time(null_mut());
@@ -473,7 +473,7 @@ pub unsafe fn format_job_tidy(jobs: *mut format_job_tree, force: i32) {
     }
 }
 
-// vendor/tmux/format.c:488  format_tidy_jobs()
+// vendor/tmux/format.c:488  void format_tidy_jobs(void)
 pub unsafe fn format_tidy_jobs() {
     unsafe {
         format_job_tidy(&raw mut FORMAT_JOBS, 0);
@@ -485,7 +485,7 @@ pub unsafe fn format_tidy_jobs() {
     }
 }
 
-// vendor/tmux/format.c:501  format_lost_client()
+// vendor/tmux/format.c:501  void format_lost_client(struct client *c)
 pub unsafe fn format_lost_client(c: *mut client) {
     unsafe {
         if !(*c).jobs.is_null() {
@@ -495,7 +495,7 @@ pub unsafe fn format_lost_client(c: *mut client) {
     }
 }
 
-// vendor/tmux/format.c:523  format_cb_host()
+// vendor/tmux/format.c:523  static void *format_cb_host(__unused struct format_tree *ft)
 pub unsafe fn format_cb_host(_ft: *mut format_tree) -> format_table_type {
     unsafe {
         let mut host = MaybeUninit::<[u8; HOST_NAME_MAX + 1]>::uninit();
@@ -509,7 +509,7 @@ pub unsafe fn format_cb_host(_ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `host_short`.
-// vendor/tmux/format.c:534  format_cb_host_short()
+// vendor/tmux/format.c:534  static void *format_cb_host_short(__unused struct format_tree *ft)
 pub unsafe fn format_cb_host_short(_ft: *mut format_tree) -> format_table_type {
     unsafe {
         let mut host = MaybeUninit::<[u8; HOST_NAME_MAX + 1]>::uninit();
@@ -527,13 +527,13 @@ pub unsafe fn format_cb_host_short(_ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for pid.
-// vendor/tmux/format.c:547  format_cb_pid()
+// vendor/tmux/format.c:547  static void *format_cb_pid(__unused struct format_tree *ft)
 pub unsafe fn format_cb_pid(_ft: *mut format_tree) -> format_table_type {
     unsafe { format!("{}", libc::getpid()).into() }
 }
 
 /// Callback for `session_attached_list`.
-// vendor/tmux/format.c:557  format_cb_session_attached_list()
+// vendor/tmux/format.c:557  static void *format_cb_session_attached_list(struct format_tree *ft)
 pub unsafe fn format_cb_session_attached_list(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let s = (*ft).s;
@@ -568,7 +568,7 @@ pub unsafe fn format_cb_session_attached_list(ft: *mut format_tree) -> format_ta
 }
 
 /// Callback for `session_alerts`.
-// vendor/tmux/format.c:620  format_cb_session_alerts()
+// vendor/tmux/format.c:620  static void *format_cb_session_alerts(struct format_tree *ft)
 pub unsafe fn format_cb_session_alerts(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let s: *mut session = (*ft).s;
@@ -609,7 +609,7 @@ pub unsafe fn format_cb_session_alerts(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `session_stack`.
-// vendor/tmux/format.c:650  format_cb_session_stack()
+// vendor/tmux/format.c:650  static void *format_cb_session_stack(struct format_tree *ft)
 pub unsafe fn format_cb_session_stack(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let s = (*ft).s;
@@ -639,7 +639,7 @@ pub unsafe fn format_cb_session_stack(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `window_stack_index`.
-// vendor/tmux/format.c:672  format_cb_window_stack_index()
+// vendor/tmux/format.c:672  static void *format_cb_window_stack_index(struct format_tree *ft)
 pub unsafe fn format_cb_window_stack_index(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if (*ft).wl.is_null() {
@@ -664,7 +664,7 @@ pub unsafe fn format_cb_window_stack_index(ft: *mut format_tree) -> format_table
 }
 
 /// Callback for `window_linked_sessions_list`.
-// vendor/tmux/format.c:697  format_cb_window_linked_sessions_list()
+// vendor/tmux/format.c:697  static void *format_cb_window_linked_sessions_list(struct format_tree *ft)
 pub unsafe fn format_cb_window_linked_sessions_list(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if (*ft).wl.is_null() {
@@ -697,7 +697,7 @@ pub unsafe fn format_cb_window_linked_sessions_list(ft: *mut format_tree) -> for
 }
 
 /// Callback for `window_active_sessions`.
-// vendor/tmux/format.c:727  format_cb_window_active_sessions()
+// vendor/tmux/format.c:727  static void *format_cb_window_active_sessions(struct format_tree *ft)
 pub unsafe fn format_cb_window_active_sessions(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if (*ft).wl.is_null() {
@@ -714,7 +714,7 @@ pub unsafe fn format_cb_window_active_sessions(ft: *mut format_tree) -> format_t
 }
 
 /// Callback for `window_active_sessions_list`.
-// vendor/tmux/format.c:749  format_cb_window_active_sessions_list()
+// vendor/tmux/format.c:749  static void *format_cb_window_active_sessions_list(struct format_tree *ft)
 pub unsafe fn format_cb_window_active_sessions_list(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if (*ft).wl.is_null() {
@@ -749,7 +749,7 @@ pub unsafe fn format_cb_window_active_sessions_list(ft: *mut format_tree) -> for
 }
 
 /// Callback for `window_active_clients`.
-// vendor/tmux/format.c:781  format_cb_window_active_clients()
+// vendor/tmux/format.c:781  static void *format_cb_window_active_clients(struct format_tree *ft)
 pub unsafe fn format_cb_window_active_clients(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if (*ft).wl.is_null() {
@@ -774,7 +774,7 @@ pub unsafe fn format_cb_window_active_clients(ft: *mut format_tree) -> format_ta
 }
 
 /// Callback for `window_active_clients_list`.
-// vendor/tmux/format.c:808  format_cb_window_active_clients_list()
+// vendor/tmux/format.c:808  static void *format_cb_window_active_clients_list(struct format_tree *ft)
 pub unsafe fn format_cb_window_active_clients_list(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if (*ft).wl.is_null() {
@@ -814,7 +814,7 @@ pub unsafe fn format_cb_window_active_clients_list(ft: *mut format_tree) -> form
 }
 
 /// Callback for `window_layout`.
-// vendor/tmux/format.c:845  format_cb_window_layout()
+// vendor/tmux/format.c:845  static void *format_cb_window_layout(struct format_tree *ft)
 pub unsafe fn format_cb_window_layout(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let w = (*ft).w;
@@ -835,7 +835,7 @@ pub unsafe fn format_cb_window_layout(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `window_visible_layout`.
-// vendor/tmux/format.c:859  format_cb_window_visible_layout()
+// vendor/tmux/format.c:859  static void *format_cb_window_visible_layout(struct format_tree *ft)
 pub unsafe fn format_cb_window_visible_layout(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let w = (*ft).w;
@@ -851,7 +851,7 @@ pub unsafe fn format_cb_window_visible_layout(ft: *mut format_tree) -> format_ta
 }
 
 /// Callback for `pane_start_command`.
-// vendor/tmux/format.c:871  format_cb_start_command()
+// vendor/tmux/format.c:871  static void *format_cb_start_command(struct format_tree *ft)
 pub unsafe fn format_cb_start_command(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -865,7 +865,7 @@ pub unsafe fn format_cb_start_command(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `pane_start_path`.
-// vendor/tmux/format.c:883  format_cb_start_path()
+// vendor/tmux/format.c:883  static void *format_cb_start_path(struct format_tree *ft)
 pub unsafe fn format_cb_start_path(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -882,7 +882,7 @@ pub unsafe fn format_cb_start_path(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_current_command`.
-// vendor/tmux/format.c:897  format_cb_current_command()
+// vendor/tmux/format.c:897  static void *format_cb_current_command(struct format_tree *ft)
 pub unsafe fn format_cb_current_command(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -910,7 +910,7 @@ pub unsafe fn format_cb_current_command(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `pane_current_path`.
-// vendor/tmux/format.c:921  format_cb_current_path()
+// vendor/tmux/format.c:921  static void *format_cb_current_path(struct format_tree *ft)
 pub unsafe fn format_cb_current_path(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -928,7 +928,7 @@ pub unsafe fn format_cb_current_path(ft: *mut format_tree) -> format_table_type 
 }
 
 /// Callback for `history_bytes`.
-// vendor/tmux/format.c:937  format_cb_history_bytes()
+// vendor/tmux/format.c:937  static void *format_cb_history_bytes(struct format_tree *ft)
 pub unsafe fn format_cb_history_bytes(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -952,7 +952,7 @@ pub unsafe fn format_cb_history_bytes(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `history_all_bytes`.
-// vendor/tmux/format.c:963  format_cb_history_all_bytes()
+// vendor/tmux/format.c:963  static void *format_cb_history_all_bytes(struct format_tree *ft)
 pub unsafe fn format_cb_history_all_bytes(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -986,7 +986,7 @@ pub unsafe fn format_cb_history_all_bytes(ft: *mut format_tree) -> format_table_
 }
 
 /// Callback for `pane_tabs`.
-// vendor/tmux/format.c:990  format_cb_pane_tabs()
+// vendor/tmux/format.c:990  static void *format_cb_pane_tabs(struct format_tree *ft)
 pub unsafe fn format_cb_pane_tabs(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -1025,7 +1025,7 @@ pub unsafe fn format_cb_pane_tabs(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_fg`.
-// vendor/tmux/format.c:1020  format_cb_pane_fg()
+// vendor/tmux/format.c:1020  static void *format_cb_pane_fg(struct format_tree *ft)
 pub unsafe fn format_cb_pane_fg(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -1042,7 +1042,7 @@ pub unsafe fn format_cb_pane_fg(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_bg`.
-// vendor/tmux/format.c:1057  format_cb_pane_bg()
+// vendor/tmux/format.c:1057  static void *format_cb_pane_bg(struct format_tree *ft)
 pub unsafe fn format_cb_pane_bg(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -1059,7 +1059,7 @@ pub unsafe fn format_cb_pane_bg(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `session_group_list`.
-// vendor/tmux/format.c:1071  format_cb_session_group_list()
+// vendor/tmux/format.c:1071  static void *format_cb_session_group_list(struct format_tree *ft)
 pub unsafe fn format_cb_session_group_list(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let s = (*ft).s;
@@ -1096,7 +1096,7 @@ pub unsafe fn format_cb_session_group_list(ft: *mut format_tree) -> format_table
 }
 
 /// Callback for `session_group_attached_list`.
-// vendor/tmux/format.c:1104  format_cb_session_group_attached_list()
+// vendor/tmux/format.c:1104  static void *format_cb_session_group_attached_list(struct format_tree *ft)
 pub unsafe fn format_cb_session_group_attached_list(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let s = (*ft).s;
@@ -1142,7 +1142,7 @@ pub unsafe fn format_cb_session_group_attached_list(ft: *mut format_tree) -> for
 }
 
 /// Callback for `pane_in_mode`.
-// vendor/tmux/format.c:1144  format_cb_pane_in_mode()
+// vendor/tmux/format.c:1144  static void *format_cb_pane_in_mode(struct format_tree *ft)
 pub unsafe fn format_cb_pane_in_mode(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -1157,7 +1157,7 @@ pub unsafe fn format_cb_pane_in_mode(ft: *mut format_tree) -> format_table_type 
 }
 
 /// Callback for `pane_at_top`.
-// vendor/tmux/format.c:1162  format_cb_pane_at_top()
+// vendor/tmux/format.c:1162  static void *format_cb_pane_at_top(struct format_tree *ft)
 pub unsafe fn format_cb_pane_at_top(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -1178,7 +1178,7 @@ pub unsafe fn format_cb_pane_at_top(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_at_bottom`.
-// vendor/tmux/format.c:1182  format_cb_pane_at_bottom()
+// vendor/tmux/format.c:1182  static void *format_cb_pane_at_bottom(struct format_tree *ft)
 pub unsafe fn format_cb_pane_at_bottom(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -1199,7 +1199,7 @@ pub unsafe fn format_cb_pane_at_bottom(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `cursor_character`.
-// vendor/tmux/format.c:1204  format_cb_cursor_character()
+// vendor/tmux/format.c:1204  static void *format_cb_cursor_character(struct format_tree *ft)
 pub unsafe fn format_cb_cursor_character(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -1227,7 +1227,7 @@ pub unsafe fn format_cb_cursor_character(ft: *mut format_tree) -> format_table_t
 }
 
 /// Callback for `mouse_word`.
-// vendor/tmux/format.c:1235  format_cb_mouse_word()
+// vendor/tmux/format.c:1235  static void *format_cb_mouse_word(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_word(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).m.valid {
@@ -1254,7 +1254,7 @@ pub unsafe fn format_cb_mouse_word(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `mouse_hyperlink`.
-// vendor/tmux/format.c:1260  format_cb_mouse_hyperlink()
+// vendor/tmux/format.c:1260  static void *format_cb_mouse_hyperlink(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_hyperlink(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).m.valid {
@@ -1276,7 +1276,7 @@ pub unsafe fn format_cb_mouse_hyperlink(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `mouse_line`.
-// vendor/tmux/format.c:1285  format_cb_mouse_line()
+// vendor/tmux/format.c:1285  static void *format_cb_mouse_line(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_line(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).m.valid {
@@ -1303,7 +1303,7 @@ pub unsafe fn format_cb_mouse_line(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `mouse_status_line`.
-// vendor/tmux/format.c:1310  format_cb_mouse_status_line()
+// vendor/tmux/format.c:1310  static void *format_cb_mouse_status_line(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_status_line(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).m.valid {
@@ -1326,7 +1326,7 @@ pub unsafe fn format_cb_mouse_status_line(ft: *mut format_tree) -> format_table_
 }
 
 /// Callback for `mouse_status_range`.
-// vendor/tmux/format.c:1333  format_cb_mouse_status_range()
+// vendor/tmux/format.c:1333  static void *format_cb_mouse_status_range(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_status_range(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).m.valid {
@@ -1365,7 +1365,7 @@ pub unsafe fn format_cb_mouse_status_range(ft: *mut format_tree) -> format_table
     }
 }
 
-// vendor/tmux/format.c:1378  format_cb_alternate_on()
+// vendor/tmux/format.c:1378  static void *format_cb_alternate_on(struct format_tree *ft)
 pub unsafe fn format_cb_alternate_on(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1378,7 +1378,7 @@ pub unsafe fn format_cb_alternate_on(ft: *mut format_tree) -> format_table_type 
     }
 }
 
-// vendor/tmux/format.c:1390  format_cb_alternate_saved_x()
+// vendor/tmux/format.c:1390  static void *format_cb_alternate_saved_x(struct format_tree *ft)
 pub unsafe fn format_cb_alternate_saved_x(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1388,7 +1388,7 @@ pub unsafe fn format_cb_alternate_saved_x(ft: *mut format_tree) -> format_table_
     }
 }
 
-// vendor/tmux/format.c:1399  format_cb_alternate_saved_y()
+// vendor/tmux/format.c:1399  static void *format_cb_alternate_saved_y(struct format_tree *ft)
 pub unsafe fn format_cb_alternate_saved_y(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1398,7 +1398,7 @@ pub unsafe fn format_cb_alternate_saved_y(ft: *mut format_tree) -> format_table_
     }
 }
 
-// vendor/tmux/format.c:1420  format_cb_buffer_name()
+// vendor/tmux/format.c:1420  static void *format_cb_buffer_name(struct format_tree *ft)
 pub unsafe fn format_cb_buffer_name(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if let Some(pb) = NonNull::new((*ft).pb) {
@@ -1408,7 +1408,7 @@ pub unsafe fn format_cb_buffer_name(ft: *mut format_tree) -> format_table_type {
     }
 }
 
-// vendor/tmux/format.c:1429  format_cb_buffer_sample()
+// vendor/tmux/format.c:1429  static void *format_cb_buffer_sample(struct format_tree *ft)
 pub unsafe fn format_cb_buffer_sample(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).pb.is_null() {
@@ -1418,7 +1418,7 @@ pub unsafe fn format_cb_buffer_sample(ft: *mut format_tree) -> format_table_type
     }
 }
 
-// vendor/tmux/format.c:1453  format_cb_buffer_size()
+// vendor/tmux/format.c:1453  static void *format_cb_buffer_size(struct format_tree *ft)
 pub unsafe fn format_cb_buffer_size(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).pb.is_null() {
@@ -1430,7 +1430,7 @@ pub unsafe fn format_cb_buffer_size(ft: *mut format_tree) -> format_table_type {
     }
 }
 
-// vendor/tmux/format.c:1466  format_cb_client_cell_height()
+// vendor/tmux/format.c:1466  static void *format_cb_client_cell_height(struct format_tree *ft)
 pub unsafe fn format_cb_client_cell_height(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() && (*(*ft).c).tty.flags.intersects(tty_flags::TTY_STARTED) {
@@ -1440,7 +1440,7 @@ pub unsafe fn format_cb_client_cell_height(ft: *mut format_tree) -> format_table
     }
 }
 
-// vendor/tmux/format.c:1475  format_cb_client_cell_width()
+// vendor/tmux/format.c:1475  static void *format_cb_client_cell_width(struct format_tree *ft)
 pub unsafe fn format_cb_client_cell_width(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() && (*(*ft).c).tty.flags.intersects(tty_flags::TTY_STARTED) {
@@ -1450,7 +1450,7 @@ pub unsafe fn format_cb_client_cell_width(ft: *mut format_tree) -> format_table_
     }
 }
 
-// vendor/tmux/format.c:1511  format_cb_client_control_mode()
+// vendor/tmux/format.c:1511  static void *format_cb_client_control_mode(struct format_tree *ft)
 pub unsafe fn format_cb_client_control_mode(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1463,7 +1463,7 @@ pub unsafe fn format_cb_client_control_mode(ft: *mut format_tree) -> format_tabl
     }
 }
 
-// vendor/tmux/format.c:1523  format_cb_client_discarded()
+// vendor/tmux/format.c:1523  static void *format_cb_client_discarded(struct format_tree *ft)
 pub unsafe fn format_cb_client_discarded(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1473,7 +1473,7 @@ pub unsafe fn format_cb_client_discarded(ft: *mut format_tree) -> format_table_t
     }
 }
 
-// vendor/tmux/format.c:1532  format_cb_client_flags()
+// vendor/tmux/format.c:1532  static void *format_cb_client_flags(struct format_tree *ft)
 pub unsafe fn format_cb_client_flags(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1483,7 +1483,7 @@ pub unsafe fn format_cb_client_flags(ft: *mut format_tree) -> format_table_type 
     }
 }
 
-// vendor/tmux/format.c:1541  format_cb_client_height()
+// vendor/tmux/format.c:1541  static void *format_cb_client_height(struct format_tree *ft)
 pub unsafe fn format_cb_client_height(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() && (*(*ft).c).tty.flags.intersects(tty_flags::TTY_STARTED) {
@@ -1493,7 +1493,7 @@ pub unsafe fn format_cb_client_height(ft: *mut format_tree) -> format_table_type
     }
 }
 
-// vendor/tmux/format.c:1550  format_cb_client_key_table()
+// vendor/tmux/format.c:1550  static void *format_cb_client_key_table(struct format_tree *ft)
 pub unsafe fn format_cb_client_key_table(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1503,7 +1503,7 @@ pub unsafe fn format_cb_client_key_table(ft: *mut format_tree) -> format_table_t
     }
 }
 
-// vendor/tmux/format.c:1559  format_cb_client_last_session()
+// vendor/tmux/format.c:1559  static void *format_cb_client_last_session(struct format_tree *ft)
 pub unsafe fn format_cb_client_last_session(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null()
@@ -1516,7 +1516,7 @@ pub unsafe fn format_cb_client_last_session(ft: *mut format_tree) -> format_tabl
     }
 }
 
-// vendor/tmux/format.c:1570  format_cb_client_name()
+// vendor/tmux/format.c:1570  static void *format_cb_client_name(struct format_tree *ft)
 pub unsafe fn format_cb_client_name(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1526,7 +1526,7 @@ pub unsafe fn format_cb_client_name(ft: *mut format_tree) -> format_table_type {
     }
 }
 
-// vendor/tmux/format.c:1579  format_cb_client_pid()
+// vendor/tmux/format.c:1579  static void *format_cb_client_pid(struct format_tree *ft)
 pub unsafe fn format_cb_client_pid(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1537,7 +1537,7 @@ pub unsafe fn format_cb_client_pid(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `client_prefix`.
-// vendor/tmux/format.c:1588  format_cb_client_prefix()
+// vendor/tmux/format.c:1588  static void *format_cb_client_prefix(struct format_tree *ft)
 pub unsafe fn format_cb_client_prefix(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1551,7 +1551,7 @@ pub unsafe fn format_cb_client_prefix(ft: *mut format_tree) -> format_table_type
     }
 }
 
-// vendor/tmux/format.c:1603  format_cb_client_readonly()
+// vendor/tmux/format.c:1603  static void *format_cb_client_readonly(struct format_tree *ft)
 pub unsafe fn format_cb_client_readonly(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1564,7 +1564,7 @@ pub unsafe fn format_cb_client_readonly(ft: *mut format_tree) -> format_table_ty
     }
 }
 
-// vendor/tmux/format.c:1615  format_cb_client_session()
+// vendor/tmux/format.c:1615  static void *format_cb_client_session(struct format_tree *ft)
 pub unsafe fn format_cb_client_session(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() && !(*(*ft).c).session.is_null() {
@@ -1574,7 +1574,7 @@ pub unsafe fn format_cb_client_session(ft: *mut format_tree) -> format_table_typ
     }
 }
 
-// vendor/tmux/format.c:1624  format_cb_client_termfeatures()
+// vendor/tmux/format.c:1624  static void *format_cb_client_termfeatures(struct format_tree *ft)
 pub unsafe fn format_cb_client_termfeatures(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1584,7 +1584,7 @@ pub unsafe fn format_cb_client_termfeatures(ft: *mut format_tree) -> format_tabl
     }
 }
 
-// vendor/tmux/format.c:1633  format_cb_client_termname()
+// vendor/tmux/format.c:1633  static void *format_cb_client_termname(struct format_tree *ft)
 pub unsafe fn format_cb_client_termname(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1594,7 +1594,7 @@ pub unsafe fn format_cb_client_termname(ft: *mut format_tree) -> format_table_ty
     }
 }
 
-// vendor/tmux/format.c:1642  format_cb_client_termtype()
+// vendor/tmux/format.c:1642  static void *format_cb_client_termtype(struct format_tree *ft)
 pub unsafe fn format_cb_client_termtype(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1607,7 +1607,7 @@ pub unsafe fn format_cb_client_termtype(ft: *mut format_tree) -> format_table_ty
     }
 }
 
-// vendor/tmux/format.c:1654  format_cb_client_tty()
+// vendor/tmux/format.c:1654  static void *format_cb_client_tty(struct format_tree *ft)
 pub unsafe fn format_cb_client_tty(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1617,7 +1617,7 @@ pub unsafe fn format_cb_client_tty(ft: *mut format_tree) -> format_table_type {
     }
 }
 
-// vendor/tmux/format.c:1663  format_cb_client_uid()
+// vendor/tmux/format.c:1663  static void *format_cb_client_uid(struct format_tree *ft)
 pub unsafe fn format_cb_client_uid(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1630,7 +1630,7 @@ pub unsafe fn format_cb_client_uid(ft: *mut format_tree) -> format_table_type {
     }
 }
 
-// vendor/tmux/format.c:1677  format_cb_client_user()
+// vendor/tmux/format.c:1677  static void *format_cb_client_user(struct format_tree *ft)
 pub unsafe fn format_cb_client_user(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1645,7 +1645,7 @@ pub unsafe fn format_cb_client_user(ft: *mut format_tree) -> format_table_type {
     }
 }
 
-// vendor/tmux/format.c:1696  format_cb_client_utf8()
+// vendor/tmux/format.c:1696  static void *format_cb_client_utf8(struct format_tree *ft)
 pub unsafe fn format_cb_client_utf8(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1658,7 +1658,7 @@ pub unsafe fn format_cb_client_utf8(ft: *mut format_tree) -> format_table_type {
     }
 }
 
-// vendor/tmux/format.c:1708  format_cb_client_width()
+// vendor/tmux/format.c:1708  static void *format_cb_client_width(struct format_tree *ft)
 pub unsafe fn format_cb_client_width(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1668,7 +1668,7 @@ pub unsafe fn format_cb_client_width(ft: *mut format_tree) -> format_table_type 
     }
 }
 
-// vendor/tmux/format.c:1717  format_cb_client_written()
+// vendor/tmux/format.c:1717  static void *format_cb_client_written(struct format_tree *ft)
 pub unsafe fn format_cb_client_written(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -1679,7 +1679,7 @@ pub unsafe fn format_cb_client_written(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `config_files`.
-// vendor/tmux/format.c:1743  format_cb_config_files()
+// vendor/tmux/format.c:1743  static void *format_cb_config_files(__unused struct format_tree *ft)
 pub unsafe fn format_cb_config_files(_ft: *mut format_tree) -> format_table_type {
     let mut s = String::new();
 
@@ -1692,7 +1692,7 @@ pub unsafe fn format_cb_config_files(_ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `cursor_flag`.
-// vendor/tmux/format.c:1763  format_cb_cursor_flag()
+// vendor/tmux/format.c:1763  static void *format_cb_cursor_flag(struct format_tree *ft)
 pub unsafe fn format_cb_cursor_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1706,7 +1706,7 @@ pub unsafe fn format_cb_cursor_flag(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `cursor_x`.
-// vendor/tmux/format.c:1806  format_cb_cursor_x()
+// vendor/tmux/format.c:1806  static void *format_cb_cursor_x(struct format_tree *ft)
 pub unsafe fn format_cb_cursor_x(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1717,7 +1717,7 @@ pub unsafe fn format_cb_cursor_x(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `cursor_y`.
-// vendor/tmux/format.c:1815  format_cb_cursor_y()
+// vendor/tmux/format.c:1815  static void *format_cb_cursor_y(struct format_tree *ft)
 pub unsafe fn format_cb_cursor_y(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1728,7 +1728,7 @@ pub unsafe fn format_cb_cursor_y(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `history_limit`.
-// vendor/tmux/format.c:1836  format_cb_history_limit()
+// vendor/tmux/format.c:1836  static void *format_cb_history_limit(struct format_tree *ft)
 pub unsafe fn format_cb_history_limit(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1739,7 +1739,7 @@ pub unsafe fn format_cb_history_limit(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `history_size`.
-// vendor/tmux/format.c:1845  format_cb_history_size()
+// vendor/tmux/format.c:1845  static void *format_cb_history_size(struct format_tree *ft)
 pub unsafe fn format_cb_history_size(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1750,7 +1750,7 @@ pub unsafe fn format_cb_history_size(ft: *mut format_tree) -> format_table_type 
 }
 
 /// Callback for `insert_flag`.
-// vendor/tmux/format.c:1854  format_cb_insert_flag()
+// vendor/tmux/format.c:1854  static void *format_cb_insert_flag(struct format_tree *ft)
 pub unsafe fn format_cb_insert_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1764,7 +1764,7 @@ pub unsafe fn format_cb_insert_flag(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `keypad_cursor_flag`.
-// vendor/tmux/format.c:1866  format_cb_keypad_cursor_flag()
+// vendor/tmux/format.c:1866  static void *format_cb_keypad_cursor_flag(struct format_tree *ft)
 pub unsafe fn format_cb_keypad_cursor_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1778,7 +1778,7 @@ pub unsafe fn format_cb_keypad_cursor_flag(ft: *mut format_tree) -> format_table
 }
 
 /// Callback for `keypad_flag`.
-// vendor/tmux/format.c:1878  format_cb_keypad_flag()
+// vendor/tmux/format.c:1878  static void *format_cb_keypad_flag(struct format_tree *ft)
 pub unsafe fn format_cb_keypad_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1792,7 +1792,7 @@ pub unsafe fn format_cb_keypad_flag(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `mouse_all_flag`.
-// vendor/tmux/format.c:1890  format_cb_mouse_all_flag()
+// vendor/tmux/format.c:1890  static void *format_cb_mouse_all_flag(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_all_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1806,7 +1806,7 @@ pub unsafe fn format_cb_mouse_all_flag(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `mouse_any_flag`.
-// vendor/tmux/format.c:1902  format_cb_mouse_any_flag()
+// vendor/tmux/format.c:1902  static void *format_cb_mouse_any_flag(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_any_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1820,7 +1820,7 @@ pub unsafe fn format_cb_mouse_any_flag(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `mouse_button_flag`.
-// vendor/tmux/format.c:1914  format_cb_mouse_button_flag()
+// vendor/tmux/format.c:1914  static void *format_cb_mouse_button_flag(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_button_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1838,7 +1838,7 @@ pub unsafe fn format_cb_mouse_button_flag(ft: *mut format_tree) -> format_table_
 }
 
 /// Callback for `mouse_pane`.
-// vendor/tmux/format.c:1926  format_cb_mouse_pane()
+// vendor/tmux/format.c:1926  static void *format_cb_mouse_pane(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_pane(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if (*ft).m.valid {
@@ -1852,7 +1852,7 @@ pub unsafe fn format_cb_mouse_pane(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `mouse_sgr_flag`.
-// vendor/tmux/format.c:1941  format_cb_mouse_sgr_flag()
+// vendor/tmux/format.c:1941  static void *format_cb_mouse_sgr_flag(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_sgr_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1866,7 +1866,7 @@ pub unsafe fn format_cb_mouse_sgr_flag(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `mouse_standard_flag`.
-// vendor/tmux/format.c:1953  format_cb_mouse_standard_flag()
+// vendor/tmux/format.c:1953  static void *format_cb_mouse_standard_flag(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_standard_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1884,7 +1884,7 @@ pub unsafe fn format_cb_mouse_standard_flag(ft: *mut format_tree) -> format_tabl
 }
 
 /// Callback for `mouse_utf8_flag`.
-// vendor/tmux/format.c:1965  format_cb_mouse_utf8_flag()
+// vendor/tmux/format.c:1965  static void *format_cb_mouse_utf8_flag(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_utf8_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1898,7 +1898,7 @@ pub unsafe fn format_cb_mouse_utf8_flag(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `mouse_x`.
-// vendor/tmux/format.c:1977  format_cb_mouse_x()
+// vendor/tmux/format.c:1977  static void *format_cb_mouse_x(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_x(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).m.valid {
@@ -1925,7 +1925,7 @@ pub unsafe fn format_cb_mouse_x(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `mouse_y`.
-// vendor/tmux/format.c:1998  format_cb_mouse_y()
+// vendor/tmux/format.c:1998  static void *format_cb_mouse_y(struct format_tree *ft)
 pub unsafe fn format_cb_mouse_y(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).m.valid {
@@ -1952,14 +1952,14 @@ pub unsafe fn format_cb_mouse_y(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `next_session_id`.
-// vendor/tmux/format.c:2019  format_cb_next_session_id()
+// vendor/tmux/format.c:2019  static void *format_cb_next_session_id(__unused struct format_tree *ft)
 pub unsafe fn format_cb_next_session_id(_ft: *mut format_tree) -> format_table_type {
     let value = NEXT_SESSION_ID.load(atomic::Ordering::Relaxed);
     format!("${value}").into()
 }
 
 /// Callback for `origin_flag`.
-// vendor/tmux/format.c:2026  format_cb_origin_flag()
+// vendor/tmux/format.c:2026  static void *format_cb_origin_flag(struct format_tree *ft)
 pub unsafe fn format_cb_origin_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1973,7 +1973,7 @@ pub unsafe fn format_cb_origin_flag(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_active`.
-// vendor/tmux/format.c:2050  format_cb_pane_active()
+// vendor/tmux/format.c:2050  static void *format_cb_pane_active(struct format_tree *ft)
 pub unsafe fn format_cb_pane_active(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -1987,7 +1987,7 @@ pub unsafe fn format_cb_pane_active(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_at_left`.
-// vendor/tmux/format.c:2062  format_cb_pane_at_left()
+// vendor/tmux/format.c:2062  static void *format_cb_pane_at_left(struct format_tree *ft)
 pub unsafe fn format_cb_pane_at_left(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2001,7 +2001,7 @@ pub unsafe fn format_cb_pane_at_left(ft: *mut format_tree) -> format_table_type 
 }
 
 /// Callback for `pane_at_right`.
-// vendor/tmux/format.c:2074  format_cb_pane_at_right()
+// vendor/tmux/format.c:2074  static void *format_cb_pane_at_right(struct format_tree *ft)
 pub unsafe fn format_cb_pane_at_right(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2015,7 +2015,7 @@ pub unsafe fn format_cb_pane_at_right(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `pane_bottom`.
-// vendor/tmux/format.c:2086  format_cb_pane_bottom()
+// vendor/tmux/format.c:2086  static void *format_cb_pane_bottom(struct format_tree *ft)
 pub unsafe fn format_cb_pane_bottom(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2026,7 +2026,7 @@ pub unsafe fn format_cb_pane_bottom(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_dead`.
-// vendor/tmux/format.c:2097  format_cb_pane_dead()
+// vendor/tmux/format.c:2097  static void *format_cb_pane_dead(struct format_tree *ft)
 pub unsafe fn format_cb_pane_dead(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2040,7 +2040,7 @@ pub unsafe fn format_cb_pane_dead(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_dead_signal`.
-// vendor/tmux/format.c:2111  format_cb_pane_dead_signal()
+// vendor/tmux/format.c:2111  static void *format_cb_pane_dead_signal(struct format_tree *ft)
 pub unsafe fn format_cb_pane_dead_signal(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -2057,7 +2057,7 @@ pub unsafe fn format_cb_pane_dead_signal(ft: *mut format_tree) -> format_table_t
 }
 
 /// Callback for `pane_dead_status`.
-// vendor/tmux/format.c:2128  format_cb_pane_dead_status()
+// vendor/tmux/format.c:2128  static void *format_cb_pane_dead_status(struct format_tree *ft)
 pub unsafe fn format_cb_pane_dead_status(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -2074,7 +2074,7 @@ pub unsafe fn format_cb_pane_dead_status(ft: *mut format_tree) -> format_table_t
 }
 
 /// Callback for `pane_dead_time`.
-// vendor/tmux/format.c:2142  format_cb_pane_dead_time()
+// vendor/tmux/format.c:2142  static void *format_cb_pane_dead_time(struct format_tree *ft)
 pub unsafe fn format_cb_pane_dead_time(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let wp = (*ft).wp;
@@ -2086,7 +2086,7 @@ pub unsafe fn format_cb_pane_dead_time(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `pane_format`.
-// vendor/tmux/format.c:2156  format_cb_pane_format()
+// vendor/tmux/format.c:2156  static void *format_cb_pane_format(struct format_tree *ft)
 pub unsafe fn format_cb_pane_format(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if (*ft).type_ == format_type::FORMAT_TYPE_PANE {
@@ -2097,7 +2097,7 @@ pub unsafe fn format_cb_pane_format(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_height`.
-// vendor/tmux/format.c:2165  format_cb_pane_height()
+// vendor/tmux/format.c:2165  static void *format_cb_pane_height(struct format_tree *ft)
 pub unsafe fn format_cb_pane_height(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2108,7 +2108,7 @@ pub unsafe fn format_cb_pane_height(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_id`.
-// vendor/tmux/format.c:2174  format_cb_pane_id()
+// vendor/tmux/format.c:2174  static void *format_cb_pane_id(struct format_tree *ft)
 pub unsafe fn format_cb_pane_id(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2119,7 +2119,7 @@ pub unsafe fn format_cb_pane_id(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_index`.
-// vendor/tmux/format.c:2183  format_cb_pane_index()
+// vendor/tmux/format.c:2183  static void *format_cb_pane_index(struct format_tree *ft)
 pub unsafe fn format_cb_pane_index(ft: *mut format_tree) -> format_table_type {
     unsafe {
         let mut idx: u32 = 0;
@@ -2131,7 +2131,7 @@ pub unsafe fn format_cb_pane_index(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_input_off`.
-// vendor/tmux/format.c:2194  format_cb_pane_input_off()
+// vendor/tmux/format.c:2194  static void *format_cb_pane_input_off(struct format_tree *ft)
 pub unsafe fn format_cb_pane_input_off(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2148,7 +2148,7 @@ pub unsafe fn format_cb_pane_input_off(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `pane_unseen_changes`.
-// vendor/tmux/format.c:2206  format_cb_pane_unseen_changes()
+// vendor/tmux/format.c:2206  static void *format_cb_pane_unseen_changes(struct format_tree *ft)
 pub unsafe fn format_cb_pane_unseen_changes(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2165,7 +2165,7 @@ pub unsafe fn format_cb_pane_unseen_changes(ft: *mut format_tree) -> format_tabl
 }
 
 /// Callback for `pane_key_mode`.
-// vendor/tmux/format.c:2218  format_cb_pane_key_mode()
+// vendor/tmux/format.c:2218  static void *format_cb_pane_key_mode(struct format_tree *ft)
 pub unsafe fn format_cb_pane_key_mode(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() && !(*(*ft).wp).screen.is_null() {
@@ -2182,7 +2182,7 @@ pub unsafe fn format_cb_pane_key_mode(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `pane_last`.
-// vendor/tmux/format.c:2235  format_cb_pane_last()
+// vendor/tmux/format.c:2235  static void *format_cb_pane_last(struct format_tree *ft)
 pub unsafe fn format_cb_pane_last(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2196,7 +2196,7 @@ pub unsafe fn format_cb_pane_last(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_left`.
-// vendor/tmux/format.c:2247  format_cb_pane_left()
+// vendor/tmux/format.c:2247  static void *format_cb_pane_left(struct format_tree *ft)
 pub unsafe fn format_cb_pane_left(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2207,7 +2207,7 @@ pub unsafe fn format_cb_pane_left(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_marked`.
-// vendor/tmux/format.c:2256  format_cb_pane_marked()
+// vendor/tmux/format.c:2256  static void *format_cb_pane_marked(struct format_tree *ft)
 pub unsafe fn format_cb_pane_marked(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2221,7 +2221,7 @@ pub unsafe fn format_cb_pane_marked(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_marked_set`.
-// vendor/tmux/format.c:2268  format_cb_pane_marked_set()
+// vendor/tmux/format.c:2268  static void *format_cb_pane_marked_set(struct format_tree *ft)
 pub unsafe fn format_cb_pane_marked_set(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2235,7 +2235,7 @@ pub unsafe fn format_cb_pane_marked_set(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `pane_mode`.
-// vendor/tmux/format.c:2280  format_cb_pane_mode()
+// vendor/tmux/format.c:2280  static void *format_cb_pane_mode(struct format_tree *ft)
 pub unsafe fn format_cb_pane_mode(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2250,7 +2250,7 @@ pub unsafe fn format_cb_pane_mode(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_path`.
-// vendor/tmux/format.c:2295  format_cb_pane_path()
+// vendor/tmux/format.c:2295  static void *format_cb_pane_path(struct format_tree *ft)
 pub unsafe fn format_cb_pane_path(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2264,7 +2264,7 @@ pub unsafe fn format_cb_pane_path(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_pid`.
-// vendor/tmux/format.c:2307  format_cb_pane_pid()
+// vendor/tmux/format.c:2307  static void *format_cb_pane_pid(struct format_tree *ft)
 pub unsafe fn format_cb_pane_pid(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2275,7 +2275,7 @@ pub unsafe fn format_cb_pane_pid(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_pipe`.
-// vendor/tmux/format.c:2316  format_cb_pane_pipe()
+// vendor/tmux/format.c:2316  static void *format_cb_pane_pipe(struct format_tree *ft)
 pub unsafe fn format_cb_pane_pipe(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2289,7 +2289,7 @@ pub unsafe fn format_cb_pane_pipe(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_right`.
-// vendor/tmux/format.c:2371  format_cb_pane_right()
+// vendor/tmux/format.c:2371  static void *format_cb_pane_right(struct format_tree *ft)
 pub unsafe fn format_cb_pane_right(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2300,7 +2300,7 @@ pub unsafe fn format_cb_pane_right(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_search_string`.
-// vendor/tmux/format.c:2382  format_cb_pane_search_string()
+// vendor/tmux/format.c:2382  static void *format_cb_pane_search_string(struct format_tree *ft)
 pub unsafe fn format_cb_pane_search_string(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2314,7 +2314,7 @@ pub unsafe fn format_cb_pane_search_string(ft: *mut format_tree) -> format_table
 }
 
 /// Callback for `pane_synchronized`.
-// vendor/tmux/format.c:2394  format_cb_pane_synchronized()
+// vendor/tmux/format.c:2394  static void *format_cb_pane_synchronized(struct format_tree *ft)
 pub unsafe fn format_cb_pane_synchronized(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2328,7 +2328,7 @@ pub unsafe fn format_cb_pane_synchronized(ft: *mut format_tree) -> format_table_
 }
 
 /// Callback for `pane_title`.
-// vendor/tmux/format.c:2406  format_cb_pane_title()
+// vendor/tmux/format.c:2406  static void *format_cb_pane_title(struct format_tree *ft)
 pub unsafe fn format_cb_pane_title(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2339,7 +2339,7 @@ pub unsafe fn format_cb_pane_title(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_top`.
-// vendor/tmux/format.c:2415  format_cb_pane_top()
+// vendor/tmux/format.c:2415  static void *format_cb_pane_top(struct format_tree *ft)
 pub unsafe fn format_cb_pane_top(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2350,7 +2350,7 @@ pub unsafe fn format_cb_pane_top(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_tty`.
-// vendor/tmux/format.c:2424  format_cb_pane_tty()
+// vendor/tmux/format.c:2424  static void *format_cb_pane_tty(struct format_tree *ft)
 pub unsafe fn format_cb_pane_tty(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2361,7 +2361,7 @@ pub unsafe fn format_cb_pane_tty(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_width`.
-// vendor/tmux/format.c:2433  format_cb_pane_width()
+// vendor/tmux/format.c:2433  static void *format_cb_pane_width(struct format_tree *ft)
 pub unsafe fn format_cb_pane_width(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2372,7 +2372,7 @@ pub unsafe fn format_cb_pane_width(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `scroll_region_lower`.
-// vendor/tmux/format.c:2485  format_cb_scroll_region_lower()
+// vendor/tmux/format.c:2485  static void *format_cb_scroll_region_lower(struct format_tree *ft)
 pub unsafe fn format_cb_scroll_region_lower(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2383,7 +2383,7 @@ pub unsafe fn format_cb_scroll_region_lower(ft: *mut format_tree) -> format_tabl
 }
 
 /// Callback for `scroll_region_upper`.
-// vendor/tmux/format.c:2494  format_cb_scroll_region_upper()
+// vendor/tmux/format.c:2494  static void *format_cb_scroll_region_upper(struct format_tree *ft)
 pub unsafe fn format_cb_scroll_region_upper(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2394,7 +2394,7 @@ pub unsafe fn format_cb_scroll_region_upper(ft: *mut format_tree) -> format_tabl
 }
 
 /// Callback for `server_sessions`.
-// vendor/tmux/format.c:2503  format_cb_server_sessions()
+// vendor/tmux/format.c:2503  static void *format_cb_server_sessions(__unused struct format_tree *ft)
 pub unsafe fn format_cb_server_sessions(_ft: *mut format_tree) -> format_table_type {
     unsafe {
         let n: u32 = rb_foreach(&raw mut SESSIONS).count() as u32;
@@ -2403,7 +2403,7 @@ pub unsafe fn format_cb_server_sessions(_ft: *mut format_tree) -> format_table_t
 }
 
 /// Callback for `session_attached`.
-// vendor/tmux/format.c:2575  format_cb_session_attached()
+// vendor/tmux/format.c:2575  static void *format_cb_session_attached(struct format_tree *ft)
 pub unsafe fn format_cb_session_attached(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2414,7 +2414,7 @@ pub unsafe fn format_cb_session_attached(ft: *mut format_tree) -> format_table_t
 }
 
 /// Callback for `session_format`.
-// vendor/tmux/format.c:2584  format_cb_session_format()
+// vendor/tmux/format.c:2584  static void *format_cb_session_format(struct format_tree *ft)
 pub unsafe fn format_cb_session_format(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if (*ft).type_ == format_type::FORMAT_TYPE_SESSION {
@@ -2425,7 +2425,7 @@ pub unsafe fn format_cb_session_format(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `session_group`.
-// vendor/tmux/format.c:2593  format_cb_session_group()
+// vendor/tmux/format.c:2593  static void *format_cb_session_group(struct format_tree *ft)
 pub unsafe fn format_cb_session_group(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2439,7 +2439,7 @@ pub unsafe fn format_cb_session_group(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `session_group_attached`.
-// vendor/tmux/format.c:2604  format_cb_session_group_attached()
+// vendor/tmux/format.c:2604  static void *format_cb_session_group_attached(struct format_tree *ft)
 pub unsafe fn format_cb_session_group_attached(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2453,7 +2453,7 @@ pub unsafe fn format_cb_session_group_attached(ft: *mut format_tree) -> format_t
 }
 
 /// Callback for `session_group_many_attached`.
-// vendor/tmux/format.c:2615  format_cb_session_group_many_attached()
+// vendor/tmux/format.c:2615  static void *format_cb_session_group_many_attached(struct format_tree *ft)
 pub unsafe fn format_cb_session_group_many_attached(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2470,7 +2470,7 @@ pub unsafe fn format_cb_session_group_many_attached(ft: *mut format_tree) -> for
 }
 
 /// Callback for `session_group_size`.
-// vendor/tmux/format.c:2629  format_cb_session_group_size()
+// vendor/tmux/format.c:2629  static void *format_cb_session_group_size(struct format_tree *ft)
 pub unsafe fn format_cb_session_group_size(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2484,7 +2484,7 @@ pub unsafe fn format_cb_session_group_size(ft: *mut format_tree) -> format_table
 }
 
 /// Callback for `session_grouped`.
-// vendor/tmux/format.c:2640  format_cb_session_grouped()
+// vendor/tmux/format.c:2640  static void *format_cb_session_grouped(struct format_tree *ft)
 pub unsafe fn format_cb_session_grouped(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2498,7 +2498,7 @@ pub unsafe fn format_cb_session_grouped(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `session_id`.
-// vendor/tmux/format.c:2652  format_cb_session_id()
+// vendor/tmux/format.c:2652  static void *format_cb_session_id(struct format_tree *ft)
 pub unsafe fn format_cb_session_id(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2509,7 +2509,7 @@ pub unsafe fn format_cb_session_id(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `session_many_attached`.
-// vendor/tmux/format.c:2661  format_cb_session_many_attached()
+// vendor/tmux/format.c:2661  static void *format_cb_session_many_attached(struct format_tree *ft)
 pub unsafe fn format_cb_session_many_attached(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2523,7 +2523,7 @@ pub unsafe fn format_cb_session_many_attached(ft: *mut format_tree) -> format_ta
 }
 
 /// Callback for `session_marked`.
-// vendor/tmux/format.c:2673  format_cb_session_marked()
+// vendor/tmux/format.c:2673  static void *format_cb_session_marked(struct format_tree *ft)
 pub unsafe fn format_cb_session_marked(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2537,7 +2537,7 @@ pub unsafe fn format_cb_session_marked(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `session_name`.
-// vendor/tmux/format.c:2685  format_cb_session_name()
+// vendor/tmux/format.c:2685  static void *format_cb_session_name(struct format_tree *ft)
 pub unsafe fn format_cb_session_name(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2548,7 +2548,7 @@ pub unsafe fn format_cb_session_name(ft: *mut format_tree) -> format_table_type 
 }
 
 /// Callback for `session_path`.
-// vendor/tmux/format.c:2694  format_cb_session_path()
+// vendor/tmux/format.c:2694  static void *format_cb_session_path(struct format_tree *ft)
 pub unsafe fn format_cb_session_path(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2559,7 +2559,7 @@ pub unsafe fn format_cb_session_path(ft: *mut format_tree) -> format_table_type 
 }
 
 /// Callback for `session_windows`.
-// vendor/tmux/format.c:2703  format_cb_session_windows()
+// vendor/tmux/format.c:2703  static void *format_cb_session_windows(struct format_tree *ft)
 pub unsafe fn format_cb_session_windows(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2570,19 +2570,19 @@ pub unsafe fn format_cb_session_windows(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `socket_path`.
-// vendor/tmux/format.c:2712  format_cb_socket_path()
+// vendor/tmux/format.c:2712  static void *format_cb_socket_path(__unused struct format_tree *ft)
 pub unsafe fn format_cb_socket_path(_ft: *mut format_tree) -> format_table_type {
     unsafe { format!("{}", _s(SOCKET_PATH)).into() }
 }
 
 /// Callback for version.
-// vendor/tmux/format.c:2719  format_cb_version()
+// vendor/tmux/format.c:2719  static void *format_cb_version(__unused struct format_tree *ft)
 pub fn format_cb_version(_ft: *mut format_tree) -> format_table_type {
     getversion().into()
 }
 
 /// Callback for `active_window_index`.
-// vendor/tmux/format.c:2737  format_cb_active_window_index()
+// vendor/tmux/format.c:2737  static void *format_cb_active_window_index(struct format_tree *ft)
 pub unsafe fn format_cb_active_window_index(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2593,7 +2593,7 @@ pub unsafe fn format_cb_active_window_index(ft: *mut format_tree) -> format_tabl
 }
 
 /// Callback for `last_window_index`.
-// vendor/tmux/format.c:2746  format_cb_last_window_index()
+// vendor/tmux/format.c:2746  static void *format_cb_last_window_index(struct format_tree *ft)
 pub unsafe fn format_cb_last_window_index(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2605,7 +2605,7 @@ pub unsafe fn format_cb_last_window_index(ft: *mut format_tree) -> format_table_
 }
 
 /// Callback for `window_active`.
-// vendor/tmux/format.c:2759  format_cb_window_active()
+// vendor/tmux/format.c:2759  static void *format_cb_window_active(struct format_tree *ft)
 pub unsafe fn format_cb_window_active(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2619,7 +2619,7 @@ pub unsafe fn format_cb_window_active(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `window_activity_flag`.
-// vendor/tmux/format.c:2771  format_cb_window_activity_flag()
+// vendor/tmux/format.c:2771  static void *format_cb_window_activity_flag(struct format_tree *ft)
 pub unsafe fn format_cb_window_activity_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2636,7 +2636,7 @@ pub unsafe fn format_cb_window_activity_flag(ft: *mut format_tree) -> format_tab
 }
 
 /// Callback for `window_bell_flag`.
-// vendor/tmux/format.c:2783  format_cb_window_bell_flag()
+// vendor/tmux/format.c:2783  static void *format_cb_window_bell_flag(struct format_tree *ft)
 pub unsafe fn format_cb_window_bell_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2650,7 +2650,7 @@ pub unsafe fn format_cb_window_bell_flag(ft: *mut format_tree) -> format_table_t
 }
 
 /// Callback for `window_bigger`.
-// vendor/tmux/format.c:2795  format_cb_window_bigger()
+// vendor/tmux/format.c:2795  static void *format_cb_window_bigger(struct format_tree *ft)
 pub unsafe fn format_cb_window_bigger(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -2668,7 +2668,7 @@ pub unsafe fn format_cb_window_bigger(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `window_cell_height`.
-// vendor/tmux/format.c:2809  format_cb_window_cell_height()
+// vendor/tmux/format.c:2809  static void *format_cb_window_cell_height(struct format_tree *ft)
 pub unsafe fn format_cb_window_cell_height(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
@@ -2679,7 +2679,7 @@ pub unsafe fn format_cb_window_cell_height(ft: *mut format_tree) -> format_table
 }
 
 /// Callback for `window_cell_width`.
-// vendor/tmux/format.c:2818  format_cb_window_cell_width()
+// vendor/tmux/format.c:2818  static void *format_cb_window_cell_width(struct format_tree *ft)
 pub unsafe fn format_cb_window_cell_width(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
@@ -2690,7 +2690,7 @@ pub unsafe fn format_cb_window_cell_width(ft: *mut format_tree) -> format_table_
 }
 
 /// Callback for `window_end_flag`.
-// vendor/tmux/format.c:2827  format_cb_window_end_flag()
+// vendor/tmux/format.c:2827  static void *format_cb_window_end_flag(struct format_tree *ft)
 pub unsafe fn format_cb_window_end_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2704,7 +2704,7 @@ pub unsafe fn format_cb_window_end_flag(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `window_flags`.
-// vendor/tmux/format.c:2839  format_cb_window_flags()
+// vendor/tmux/format.c:2839  static void *format_cb_window_flags(struct format_tree *ft)
 pub unsafe fn format_cb_window_flags(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2715,7 +2715,7 @@ pub unsafe fn format_cb_window_flags(ft: *mut format_tree) -> format_table_type 
 }
 
 /// Callback for `window_format`.
-// vendor/tmux/format.c:2848  format_cb_window_format()
+// vendor/tmux/format.c:2848  static void *format_cb_window_format(struct format_tree *ft)
 pub unsafe fn format_cb_window_format(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if (*ft).type_ == format_type::FORMAT_TYPE_WINDOW {
@@ -2726,7 +2726,7 @@ pub unsafe fn format_cb_window_format(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `window_height`.
-// vendor/tmux/format.c:2857  format_cb_window_height()
+// vendor/tmux/format.c:2857  static void *format_cb_window_height(struct format_tree *ft)
 pub unsafe fn format_cb_window_height(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
@@ -2737,7 +2737,7 @@ pub unsafe fn format_cb_window_height(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `window_id`.
-// vendor/tmux/format.c:2866  format_cb_window_id()
+// vendor/tmux/format.c:2866  static void *format_cb_window_id(struct format_tree *ft)
 pub unsafe fn format_cb_window_id(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
@@ -2748,7 +2748,7 @@ pub unsafe fn format_cb_window_id(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `window_index`.
-// vendor/tmux/format.c:2875  format_cb_window_index()
+// vendor/tmux/format.c:2875  static void *format_cb_window_index(struct format_tree *ft)
 pub unsafe fn format_cb_window_index(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2759,7 +2759,7 @@ pub unsafe fn format_cb_window_index(ft: *mut format_tree) -> format_table_type 
 }
 
 /// Callback for `window_last_flag`.
-// vendor/tmux/format.c:2884  format_cb_window_last_flag()
+// vendor/tmux/format.c:2884  static void *format_cb_window_last_flag(struct format_tree *ft)
 pub unsafe fn format_cb_window_last_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2773,7 +2773,7 @@ pub unsafe fn format_cb_window_last_flag(ft: *mut format_tree) -> format_table_t
 }
 
 /// Callback for `window_linked`.
-// vendor/tmux/format.c:2896  format_cb_window_linked()
+// vendor/tmux/format.c:2896  static void *format_cb_window_linked(struct format_tree *ft)
 pub unsafe fn format_cb_window_linked(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2787,7 +2787,7 @@ pub unsafe fn format_cb_window_linked(ft: *mut format_tree) -> format_table_type
 }
 
 /// Callback for `window_linked_sessions`.
-// vendor/tmux/format.c:2919  format_cb_window_linked_sessions()
+// vendor/tmux/format.c:2919  static void *format_cb_window_linked_sessions(struct format_tree *ft)
 pub unsafe fn format_cb_window_linked_sessions(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2798,7 +2798,7 @@ pub unsafe fn format_cb_window_linked_sessions(ft: *mut format_tree) -> format_t
 }
 
 /// Callback for `window_marked_flag`.
-// vendor/tmux/format.c:2946  format_cb_window_marked_flag()
+// vendor/tmux/format.c:2946  static void *format_cb_window_marked_flag(struct format_tree *ft)
 pub unsafe fn format_cb_window_marked_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2812,7 +2812,7 @@ pub unsafe fn format_cb_window_marked_flag(ft: *mut format_tree) -> format_table
 }
 
 /// Callback for `window_name`.
-// vendor/tmux/format.c:2958  format_cb_window_name()
+// vendor/tmux/format.c:2958  static void *format_cb_window_name(struct format_tree *ft)
 pub unsafe fn format_cb_window_name(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
@@ -2823,7 +2823,7 @@ pub unsafe fn format_cb_window_name(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `window_offset_x`.
-// vendor/tmux/format.c:2967  format_cb_window_offset_x()
+// vendor/tmux/format.c:2967  static void *format_cb_window_offset_x(struct format_tree *ft)
 pub unsafe fn format_cb_window_offset_x(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -2840,7 +2840,7 @@ pub unsafe fn format_cb_window_offset_x(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `window_offset_y`.
-// vendor/tmux/format.c:2981  format_cb_window_offset_y()
+// vendor/tmux/format.c:2981  static void *format_cb_window_offset_y(struct format_tree *ft)
 pub unsafe fn format_cb_window_offset_y(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -2857,7 +2857,7 @@ pub unsafe fn format_cb_window_offset_y(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `window_panes`.
-// vendor/tmux/format.c:2995  format_cb_window_panes()
+// vendor/tmux/format.c:2995  static void *format_cb_window_panes(struct format_tree *ft)
 pub unsafe fn format_cb_window_panes(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
@@ -2868,7 +2868,7 @@ pub unsafe fn format_cb_window_panes(ft: *mut format_tree) -> format_table_type 
 }
 
 /// Callback for `window_raw_flags`.
-// vendor/tmux/format.c:3004  format_cb_window_raw_flags()
+// vendor/tmux/format.c:3004  static void *format_cb_window_raw_flags(struct format_tree *ft)
 pub unsafe fn format_cb_window_raw_flags(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2879,7 +2879,7 @@ pub unsafe fn format_cb_window_raw_flags(ft: *mut format_tree) -> format_table_t
 }
 
 /// Callback for `window_silence_flag`.
-// vendor/tmux/format.c:3013  format_cb_window_silence_flag()
+// vendor/tmux/format.c:3013  static void *format_cb_window_silence_flag(struct format_tree *ft)
 pub unsafe fn format_cb_window_silence_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2893,7 +2893,7 @@ pub unsafe fn format_cb_window_silence_flag(ft: *mut format_tree) -> format_tabl
 }
 
 /// Callback for `window_start_flag`.
-// vendor/tmux/format.c:3025  format_cb_window_start_flag()
+// vendor/tmux/format.c:3025  static void *format_cb_window_start_flag(struct format_tree *ft)
 pub unsafe fn format_cb_window_start_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wl.is_null() {
@@ -2907,7 +2907,7 @@ pub unsafe fn format_cb_window_start_flag(ft: *mut format_tree) -> format_table_
 }
 
 /// Callback for `window_width`.
-// vendor/tmux/format.c:3037  format_cb_window_width()
+// vendor/tmux/format.c:3037  static void *format_cb_window_width(struct format_tree *ft)
 pub unsafe fn format_cb_window_width(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
@@ -2918,7 +2918,7 @@ pub unsafe fn format_cb_window_width(ft: *mut format_tree) -> format_table_type 
 }
 
 /// Callback for `window_zoomed_flag`.
-// vendor/tmux/format.c:3046  format_cb_window_zoomed_flag()
+// vendor/tmux/format.c:3046  static void *format_cb_window_zoomed_flag(struct format_tree *ft)
 pub unsafe fn format_cb_window_zoomed_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
@@ -2932,7 +2932,7 @@ pub unsafe fn format_cb_window_zoomed_flag(ft: *mut format_tree) -> format_table
 }
 
 /// Callback for `wrap_flag`.
-// vendor/tmux/format.c:3058  format_cb_wrap_flag()
+// vendor/tmux/format.c:3058  static void *format_cb_wrap_flag(struct format_tree *ft)
 pub unsafe fn format_cb_wrap_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
@@ -2946,7 +2946,7 @@ pub unsafe fn format_cb_wrap_flag(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `buffer_created`.
-// vendor/tmux/format.c:3070  format_cb_buffer_created()
+// vendor/tmux/format.c:3070  static void *format_cb_buffer_created(struct format_tree *ft)
 pub unsafe fn format_cb_buffer_created(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if let Some(pb) = NonNull::new((*ft).pb) {
@@ -2961,7 +2961,7 @@ pub unsafe fn format_cb_buffer_created(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `client_activity`.
-// vendor/tmux/format.c:3084  format_cb_client_activity()
+// vendor/tmux/format.c:3084  static void *format_cb_client_activity(struct format_tree *ft)
 pub unsafe fn format_cb_client_activity(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -2972,7 +2972,7 @@ pub unsafe fn format_cb_client_activity(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `client_created`.
-// vendor/tmux/format.c:3093  format_cb_client_created()
+// vendor/tmux/format.c:3093  static void *format_cb_client_created(struct format_tree *ft)
 pub unsafe fn format_cb_client_created(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
@@ -2983,7 +2983,7 @@ pub unsafe fn format_cb_client_created(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `session_activity`.
-// vendor/tmux/format.c:3102  format_cb_session_activity()
+// vendor/tmux/format.c:3102  static void *format_cb_session_activity(struct format_tree *ft)
 pub unsafe fn format_cb_session_activity(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -2994,7 +2994,7 @@ pub unsafe fn format_cb_session_activity(ft: *mut format_tree) -> format_table_t
 }
 
 /// Callback for `session_created`.
-// vendor/tmux/format.c:3111  format_cb_session_created()
+// vendor/tmux/format.c:3111  static void *format_cb_session_created(struct format_tree *ft)
 pub unsafe fn format_cb_session_created(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -3005,7 +3005,7 @@ pub unsafe fn format_cb_session_created(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `session_last_attached`.
-// vendor/tmux/format.c:3120  format_cb_session_last_attached()
+// vendor/tmux/format.c:3120  static void *format_cb_session_last_attached(struct format_tree *ft)
 pub unsafe fn format_cb_session_last_attached(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
@@ -3016,13 +3016,13 @@ pub unsafe fn format_cb_session_last_attached(ft: *mut format_tree) -> format_ta
 }
 
 /// Callback for `start_time`.
-// vendor/tmux/format.c:3129  format_cb_start_time()
+// vendor/tmux/format.c:3129  static void *format_cb_start_time(__unused struct format_tree *ft)
 pub unsafe fn format_cb_start_time(_ft: *mut format_tree) -> format_table_type {
     format_table_type::Time(unsafe { START_TIME })
 }
 
 /// Callback for `window_activity`.
-// vendor/tmux/format.c:3136  format_cb_window_activity()
+// vendor/tmux/format.c:3136  static void *format_cb_window_activity(struct format_tree *ft)
 pub unsafe fn format_cb_window_activity(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
@@ -3033,31 +3033,31 @@ pub unsafe fn format_cb_window_activity(ft: *mut format_tree) -> format_table_ty
 }
 
 /// Callback for `buffer_mode_format`.
-// vendor/tmux/format.c:3145  format_cb_buffer_mode_format()
+// vendor/tmux/format.c:3145  static void *format_cb_buffer_mode_format(__unused struct format_tree *ft)
 pub unsafe fn format_cb_buffer_mode_format(_ft: *mut format_tree) -> format_table_type {
     WINDOW_BUFFER_MODE.default_format.unwrap().into()
 }
 
 /// Callback for `client_mode_format`.
-// vendor/tmux/format.c:3152  format_cb_client_mode_format()
+// vendor/tmux/format.c:3152  static void *format_cb_client_mode_format(__unused struct format_tree *ft)
 pub unsafe fn format_cb_client_mode_format(_ft: *mut format_tree) -> format_table_type {
     WINDOW_CLIENT_MODE.default_format.unwrap().into()
 }
 
 /// Callback for `tree_mode_format`.
-// vendor/tmux/format.c:3159  format_cb_tree_mode_format()
+// vendor/tmux/format.c:3159  static void *format_cb_tree_mode_format(__unused struct format_tree *ft)
 pub unsafe fn format_cb_tree_mode_format(_ft: *mut format_tree) -> format_table_type {
     WINDOW_TREE_MODE.default_format.unwrap().into()
 }
 
 /// Callback for uid.
-// vendor/tmux/format.c:3166  format_cb_uid()
+// vendor/tmux/format.c:3166  static void *format_cb_uid(__unused struct format_tree *ft)
 pub unsafe fn format_cb_uid(_ft: *mut format_tree) -> format_table_type {
     unsafe { format!("{}", getuid() as i64).into() }
 }
 
 /// Callback for user.
-// vendor/tmux/format.c:3173  format_cb_user()
+// vendor/tmux/format.c:3173  static void *format_cb_user(__unused struct format_tree *ft)
 pub unsafe fn format_cb_user(_ft: *mut format_tree) -> format_table_type {
     unsafe {
         if let Some(pw) = NonNull::new(getpwuid(getuid())) {
@@ -3302,7 +3302,7 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("wrap_flag", format_cb_wrap_flag),
 ];
 
-// vendor/tmux/format.c:3793  format_table_compare()
+// vendor/tmux/format.c:3793  static int format_table_compare(const void *key0, const void *entry0)
 pub unsafe fn format_table_compare(
     key: *const u8,
     entry: *const format_table_entry,
@@ -3310,7 +3310,7 @@ pub unsafe fn format_table_compare(
     unsafe { strcmp_(key, (*entry).key) }
 }
 
-// vendor/tmux/format.c:3803  format_table_get()
+// vendor/tmux/format.c:3803  static const struct format_table_entry *format_table_get(const char *key)
 pub unsafe fn format_table_get(key: *const u8) -> Option<&'static format_table_entry> {
     unsafe {
         match FORMAT_TABLE.binary_search_by(|e| format_table_compare(key, e).reverse()) {
@@ -3320,7 +3320,7 @@ pub unsafe fn format_table_get(key: *const u8) -> Option<&'static format_table_e
     }
 }
 
-// vendor/tmux/format.c:3811  format_merge()
+// vendor/tmux/format.c:3811  void format_merge(struct format_tree *ft, struct format_tree *from)
 pub unsafe fn format_merge(ft: *mut format_tree, from: *mut format_tree) {
     unsafe {
         for fe in rb_foreach(&raw mut (*from).tree).map(NonNull::as_ptr) {
@@ -3331,12 +3331,12 @@ pub unsafe fn format_merge(ft: *mut format_tree, from: *mut format_tree) {
     }
 }
 
-// vendor/tmux/format.c:3823  format_get_pane()
+// vendor/tmux/format.c:3823  struct window_pane *format_get_pane(struct format_tree *ft)
 pub unsafe fn format_get_pane(ft: *mut format_tree) -> *mut window_pane {
     unsafe { (*ft).wp }
 }
 
-// vendor/tmux/format.c:3830  format_create_add_item()
+// vendor/tmux/format.c:3830  static void format_create_add_item(struct format_tree *ft, struct cmdq_item *item)
 pub unsafe fn format_create_add_item(ft: *mut format_tree, item: *mut cmdq_item) {
     unsafe {
         let event = cmdq_get_event(item);
@@ -3347,7 +3347,7 @@ pub unsafe fn format_create_add_item(ft: *mut format_tree, item: *mut cmdq_item)
     }
 }
 
-// vendor/tmux/format.c:3841  format_create()
+// vendor/tmux/format.c:3841  struct format_tree *format_create(struct client *c, struct cmdq_item *item, int tag, int flags)
 pub unsafe fn format_create(
     c: *mut client,
     item: *mut cmdq_item,
@@ -3374,7 +3374,7 @@ pub unsafe fn format_create(
     }
 }
 
-// vendor/tmux/format.c:3865  format_free()
+// vendor/tmux/format.c:3865  void format_free(struct format_tree *ft)
 pub unsafe fn format_free(ft: *mut format_tree) {
     unsafe {
         for fe in rb_foreach(&raw mut (*ft).tree).map(NonNull::as_ptr) {
@@ -3391,21 +3391,21 @@ pub unsafe fn format_free(ft: *mut format_tree) {
     }
 }
 
-// vendor/tmux/format.c:3883  format_log_debug_cb()
+// vendor/tmux/format.c:3883  static void format_log_debug_cb(const char *key, const char *value, void *arg)
 pub unsafe fn format_log_debug_cb(key: &str, value: &str, prefix: *mut u8) {
     unsafe {
         log_debug!("{}: {}={}", _s(prefix), key, value);
     }
 }
 
-// vendor/tmux/format.c:3892  format_log_debug()
+// vendor/tmux/format.c:3892  void format_log_debug(struct format_tree *ft, const char *prefix)
 pub unsafe fn format_log_debug(ft: *mut format_tree, prefix: *const u8) {
     unsafe {
         format_each(ft, format_log_debug_cb, prefix.cast_mut());
     }
 }
 
-// vendor/tmux/format.c:3899  format_each()
+// vendor/tmux/format.c:3899  void format_each(struct format_tree *ft, void (*cb)(const char *, const char *, void *), void *arg)
 pub unsafe fn format_each<T>(ft: *mut format_tree, cb: unsafe fn(&str, &str, *mut T), arg: *mut T) {
     unsafe {
         for fte in FORMAT_TABLE {
@@ -3479,7 +3479,7 @@ pub unsafe fn format_add_(ft: *mut format_tree, key: &str, args: std::fmt::Argum
 }
 
 /// Add a key and time.
-// vendor/tmux/format.c:3968  format_add_tv()
+// vendor/tmux/format.c:3968  void format_add_tv(struct format_tree *ft, const char *key, struct timeval *tv)
 pub unsafe fn format_add_tv(ft: *mut format_tree, key: *const u8, tv: *const timeval) {
     unsafe {
         let fe = Box::leak(Box::new(format_entry {
@@ -3500,7 +3500,7 @@ pub unsafe fn format_add_tv(ft: *mut format_tree, key: *const u8, tv: *const tim
 }
 
 /// Add a key and function.
-// vendor/tmux/format.c:3991  format_add_cb()
+// vendor/tmux/format.c:3991  void format_add_cb(struct format_tree *ft, const char *key, format_cb cb)
 pub unsafe fn format_add_cb(ft: *mut format_tree, key: *const u8, cb: format_cb) {
     unsafe {
         let fe = Box::leak(Box::new(format_entry {
@@ -3521,7 +3521,7 @@ pub unsafe fn format_add_cb(ft: *mut format_tree, key: *const u8, cb: format_cb)
 }
 
 /// Quote shell special characters in string.
-// vendor/tmux/format.c:4015  format_quote_shell()
+// vendor/tmux/format.c:4015  static char *format_quote_shell(const char *s)
 pub unsafe fn format_quote_shell(s: *const u8) -> *mut u8 {
     unsafe {
         let out: *mut u8 = xmalloc(strlen(s) * 2 + 1).as_ptr().cast();
@@ -3542,7 +3542,7 @@ pub unsafe fn format_quote_shell(s: *const u8) -> *mut u8 {
 }
 
 /// Quote #s in string.
-// vendor/tmux/format.c:4032  format_quote_style()
+// vendor/tmux/format.c:4032  static char *format_quote_style(const char *s)
 pub unsafe fn format_quote_style(s: *const u8) -> *mut u8 {
     unsafe {
         let out: *mut u8 = xmalloc(strlen(s) * 2 + 1).as_ptr().cast();
@@ -3564,7 +3564,7 @@ pub unsafe fn format_quote_style(s: *const u8) -> *mut u8 {
 }
 
 /// Make a prettier time.
-// vendor/tmux/format.c:4049  format_pretty_time()
+// vendor/tmux/format.c:4049  char *format_pretty_time(time_t t, int seconds)
 pub unsafe fn format_pretty_time(t: time_t, seconds: i32) -> *mut u8 {
     unsafe {
         let mut now: time_t = libc::time(null_mut());
@@ -3616,7 +3616,7 @@ pub unsafe fn format_pretty_time(t: time_t, seconds: i32) -> *mut u8 {
 }
 
 /// Find a format entry.
-// vendor/tmux/format.c:4133  format_find()
+// vendor/tmux/format.c:4133  static char *format_find(struct format_tree *ft, const char *key, int modifiers, const char *time_format)
 fn format_find(
     ft: *mut format_tree,
     key: *const u8,
@@ -3772,6 +3772,7 @@ fn format_find(
 // ported the same loop correctly. (C's per-iteration `format_check_time` time
 // limit is not replicated here: the port's format_expand_state has no
 // start_time field yet — a separate modernization.)
+// vendor/tmux/format.c:4281  static char *format_unescape(struct format_expand_state *es, const char *s, size_t n)
 pub unsafe fn format_unescape(mut s: *const u8) -> *mut u8 {
     unsafe {
         let mut cp = xmalloc(strlen(s) + 1).as_ptr().cast();
@@ -3807,7 +3808,7 @@ pub unsafe fn format_unescape(mut s: *const u8) -> *mut u8 {
 }
 
 /// Remove escaped characters.
-// vendor/tmux/format.c:4313  format_strip()
+// vendor/tmux/format.c:4313  static char *format_strip(struct format_expand_state *es, const char *s)
 pub unsafe fn format_strip(mut s: *const u8) -> *mut u8 {
     unsafe {
         let out = xmalloc(strlen(s) + 1).as_ptr().cast();
@@ -3839,7 +3840,7 @@ pub unsafe fn format_strip(mut s: *const u8) -> *mut u8 {
 }
 
 /// Skip until end.
-// vendor/tmux/format.c:4370  format_skip()
+// vendor/tmux/format.c:4370  const char *format_skip(const char *s, const char *end)
 pub unsafe fn format_skip(mut s: *const u8, end: *const u8) -> *const u8 {
     unsafe {
         let mut brackets = 0;
@@ -3869,7 +3870,7 @@ pub unsafe fn format_skip(mut s: *const u8, end: *const u8) -> *const u8 {
 }
 
 /// Return left and right alternatives separated by commas.
-// vendor/tmux/format.c:4377  format_choose()
+// vendor/tmux/format.c:4377  static int format_choose(struct format_expand_state *es, const char *s, char **left, char **right, int expand)
 pub unsafe fn format_choose(
     es: *mut format_expand_state,
     s: *const u8,
@@ -3899,19 +3900,19 @@ pub unsafe fn format_choose(
 }
 
 /// Is this true?
-// vendor/tmux/format.c:4403  format_true()
+// vendor/tmux/format.c:4403  int format_true(const char *s)
 pub unsafe fn format_true(s: *const u8) -> bool {
     unsafe { !s.is_null() && *s != b'\0' && (*s != b'0' || *s.add(1) != b'\0') }
 }
 
 /// Check if modifier end.
-// vendor/tmux/format.c:4412  format_is_end()
+// vendor/tmux/format.c:4412  static int format_is_end(char c)
 pub fn format_is_end(c: u8) -> bool {
     c == b';' || c == b':'
 }
 
 /// Add to modifier list.
-// vendor/tmux/format.c:4419  format_add_modifier()
+// vendor/tmux/format.c:4419  static void format_add_modifier(struct format_modifier **list, u_int *count, const char *c, size_t n, char **argv, int argc)
 pub unsafe fn format_add_modifier(
     list: *mut *mut format_modifier,
     count: *mut u32,
@@ -3935,7 +3936,7 @@ pub unsafe fn format_add_modifier(
 }
 
 /// Free modifier list.
-// vendor/tmux/format.c:4437  format_free_modifiers()
+// vendor/tmux/format.c:4437  static void format_free_modifiers(struct format_modifier *list, u_int count)
 pub unsafe fn format_free_modifiers(list: *mut format_modifier, count: u32) {
     unsafe {
         for i in 0..count as usize {
@@ -3946,7 +3947,7 @@ pub unsafe fn format_free_modifiers(list: *mut format_modifier, count: u32) {
 }
 
 /// Build modifier list.
-// vendor/tmux/format.c:4448  format_build_modifiers()
+// vendor/tmux/format.c:4448  static struct format_modifier *format_build_modifiers(struct format_expand_state *es, const char **s, u_int *count)
 pub unsafe fn format_build_modifiers(
     es: *mut format_expand_state,
     s: *mut *const u8,
@@ -4071,7 +4072,7 @@ pub unsafe fn format_build_modifiers(
     }
 }
 
-// vendor/tmux/format.c:4603  format_match()
+// vendor/tmux/format.c:4603  static char *format_match(struct format_modifier *fm, const char *pattern, const char *text)
 pub unsafe fn format_match(
     fm: *mut format_modifier,
     pattern: *const u8,
@@ -4111,7 +4112,7 @@ pub unsafe fn format_match(
     }
 }
 
-// vendor/tmux/format.c:4637  format_sub()
+// vendor/tmux/format.c:4637  static char *format_sub(struct format_modifier *fm, const char *text, const char *pattern, const char *with)
 pub unsafe fn format_sub(
     fm: *mut format_modifier,
     text: *const u8,
@@ -4133,7 +4134,7 @@ pub unsafe fn format_sub(
     }
 }
 
-// vendor/tmux/format.c:4653  format_search()
+// vendor/tmux/format.c:4653  static char *format_search(struct format_modifier *fm, struct window_pane *wp, const char *s)
 pub unsafe fn format_search(
     fm: *mut format_modifier,
     wp: *mut window_pane,
@@ -4155,7 +4156,7 @@ pub unsafe fn format_search(
     }
 }
 
-// vendor/tmux/format.c:4724  format_session_name()
+// vendor/tmux/format.c:4724  static char *format_session_name(struct format_expand_state *es, const char *fmt)
 pub unsafe fn format_session_name(es: *mut format_expand_state, fmt: *const u8) -> *mut u8 {
     unsafe {
         let name = format_expand1(es, fmt);
@@ -4172,7 +4173,7 @@ pub unsafe fn format_session_name(es: *mut format_expand_state, fmt: *const u8) 
     }
 }
 
-// vendor/tmux/format.c:4742  format_loop_sessions()
+// vendor/tmux/format.c:4742  static char *format_loop_sessions(struct format_expand_state *es, const char *fmt)
 pub unsafe fn format_loop_sessions(es: *mut format_expand_state, fmt: *const u8) -> *mut u8 {
     unsafe {
         let ft = (*es).ft;
@@ -4201,7 +4202,7 @@ pub unsafe fn format_loop_sessions(es: *mut format_expand_state, fmt: *const u8)
     }
 }
 
-// vendor/tmux/format.c:4801  format_window_name()
+// vendor/tmux/format.c:4801  static char *format_window_name(struct format_expand_state *es, const char *fmt)
 pub unsafe fn format_window_name(es: *mut format_expand_state, fmt: *const u8) -> *mut u8 {
     unsafe {
         let ft = (*es).ft;
@@ -4222,7 +4223,7 @@ pub unsafe fn format_window_name(es: *mut format_expand_state, fmt: *const u8) -
     }
 }
 
-// vendor/tmux/format.c:4856  format_loop_windows()
+// vendor/tmux/format.c:4856  static char *format_loop_windows(struct format_expand_state *es, const char *fmt)
 pub unsafe fn format_loop_windows(es: *mut format_expand_state, fmt: *const u8) -> *mut u8 {
     unsafe {
         let ft = (*es).ft;
@@ -4279,7 +4280,7 @@ pub unsafe fn format_loop_windows(es: *mut format_expand_state, fmt: *const u8) 
 }
 
 /// Loop over panes.
-// vendor/tmux/format.c:4932  format_loop_panes()
+// vendor/tmux/format.c:4932  static char *format_loop_panes(struct format_expand_state *es, const char *fmt)
 pub unsafe fn format_loop_panes(es: *mut format_expand_state, fmt: *const u8) -> *mut u8 {
     unsafe {
         let ft = (*es).ft;
@@ -4338,7 +4339,7 @@ pub unsafe fn format_loop_panes(es: *mut format_expand_state, fmt: *const u8) ->
 }
 
 /// Loop over clients.
-// vendor/tmux/format.c:4995  format_loop_clients()
+// vendor/tmux/format.c:4995  static char *format_loop_clients(struct format_expand_state *es, const char *fmt)
 pub unsafe fn format_loop_clients(es: *mut format_expand_state, fmt: *const u8) -> *mut u8 {
     unsafe {
         let ft = (*es).ft;
@@ -4380,7 +4381,7 @@ pub unsafe fn format_loop_clients(es: *mut format_expand_state, fmt: *const u8) 
     }
 }
 
-// vendor/tmux/format.c:5038  format_replace_expression()
+// vendor/tmux/format.c:5038  static char *format_replace_expression(struct format_modifier *mexp, struct format_expand_state *es, const char *copy)
 pub unsafe fn format_replace_expression(
     mexp: *mut format_modifier,
     es: *mut format_expand_state,
@@ -4562,7 +4563,7 @@ pub unsafe fn format_replace_expression(
 }
 
 /// Replace a key.
-// vendor/tmux/format.c:5182  format_replace()
+// vendor/tmux/format.c:5182  static int format_replace(struct format_expand_state *es, const char *key, size_t keylen, char **buf, size_t *len, size_t *off)
 pub unsafe fn format_replace(
     es: *mut format_expand_state,
     key: *const u8,
@@ -5110,7 +5111,7 @@ pub unsafe fn format_replace(
 }
 
 /// Expand keys in a template.
-// vendor/tmux/format.c:5826  format_expand1()
+// vendor/tmux/format.c:5826  static char *format_expand1(struct format_expand_state *es, const char *fmt)
 pub unsafe fn format_expand1(es: *mut format_expand_state, mut fmt: *const u8) -> *mut u8 {
     unsafe {
         let ft = (*es).ft;
@@ -5340,7 +5341,7 @@ pub unsafe fn format_expand1(es: *mut format_expand_state, mut fmt: *const u8) -
 }
 
 /// Expand keys in a template, passing through strftime first.
-// vendor/tmux/format.c:5997  format_expand_time()
+// vendor/tmux/format.c:5997  char *format_expand_time(struct format_tree *ft, const char *fmt)
 pub unsafe fn format_expand_time(ft: *mut format_tree, fmt: *const u8) -> *mut u8 {
     unsafe {
         let mut es = MaybeUninit::<format_expand_state>::uninit();
@@ -5354,7 +5355,7 @@ pub unsafe fn format_expand_time(ft: *mut format_tree, fmt: *const u8) -> *mut u
 }
 
 /// Expand keys in a template.
-// vendor/tmux/format.c:6010  format_expand()
+// vendor/tmux/format.c:6010  char *format_expand(struct format_tree *ft, const char *fmt)
 pub unsafe fn format_expand(ft: *mut format_tree, fmt: *const u8) -> *mut u8 {
     unsafe {
         let mut es = MaybeUninit::<format_expand_state>::uninit();
@@ -5368,7 +5369,7 @@ pub unsafe fn format_expand(ft: *mut format_tree, fmt: *const u8) -> *mut u8 {
 }
 
 /// Expand a single string.
-// vendor/tmux/format.c:6023  format_single()
+// vendor/tmux/format.c:6023  char *format_single(struct cmdq_item *item, const char *fmt, struct client *c, struct session *s, struct winlink *wl, struct window_pane *wp)
 pub unsafe fn format_single(
     item: *mut cmdq_item,
     fmt: &str,
@@ -5388,7 +5389,7 @@ pub unsafe fn format_single(
 }
 
 /// Expand a single string using state.
-// vendor/tmux/format.c:6037  format_single_from_state()
+// vendor/tmux/format.c:6037  char *format_single_from_state(struct cmdq_item *item, const char *fmt, struct client *c, struct cmd_find_state *fs)
 pub unsafe fn format_single_from_state(
     item: *mut cmdq_item,
     fmt: &str,
@@ -5399,7 +5400,7 @@ pub unsafe fn format_single_from_state(
 }
 
 /// Expand a single string using target.
-// vendor/tmux/format.c:6045  format_single_from_target()
+// vendor/tmux/format.c:6045  char *format_single_from_target(struct cmdq_item *item, const char *fmt)
 pub unsafe fn format_single_from_target(item: *mut cmdq_item, fmt: *const u8) -> *mut u8 {
     unsafe {
         let tc = cmdq_get_target_client(item);
@@ -5409,7 +5410,7 @@ pub unsafe fn format_single_from_target(item: *mut cmdq_item, fmt: *const u8) ->
 }
 
 /// Create and add defaults.
-// vendor/tmux/format.c:6054  format_create_defaults()
+// vendor/tmux/format.c:6054  struct format_tree *format_create_defaults(struct cmdq_item *item, struct client *c, struct session *s, struct winlink *wl, struct window_pane *wp)
 pub unsafe fn format_create_defaults(
     item: *mut cmdq_item,
     c: *mut client,
@@ -5434,7 +5435,7 @@ pub unsafe fn format_create_defaults(
 }
 
 /// Create and add defaults using state.
-// vendor/tmux/format.c:6069  format_create_from_state()
+// vendor/tmux/format.c:6069  struct format_tree *format_create_from_state(struct cmdq_item *item, struct client *c, struct cmd_find_state *fs)
 pub unsafe fn format_create_from_state(
     item: *mut cmdq_item,
     c: *mut client,
@@ -5444,7 +5445,7 @@ pub unsafe fn format_create_from_state(
 }
 
 /// Create and add defaults using target.
-// vendor/tmux/format.c:6077  format_create_from_target()
+// vendor/tmux/format.c:6077  struct format_tree *format_create_from_target(struct cmdq_item *item)
 pub unsafe fn format_create_from_target(item: *mut cmdq_item) -> *mut format_tree {
     unsafe {
         let tc = cmdq_get_target_client(item);
@@ -5454,7 +5455,7 @@ pub unsafe fn format_create_from_target(item: *mut cmdq_item) -> *mut format_tre
 }
 
 /// Set defaults for any of arguments that are not NULL.
-// vendor/tmux/format.c:6086  format_defaults()
+// vendor/tmux/format.c:6086  void format_defaults(struct format_tree *ft, struct client *c, struct session *s, struct winlink *wl, struct window_pane *wp)
 pub unsafe fn format_defaults(
     ft: *mut format_tree,
     c: *mut client,
@@ -5533,7 +5534,7 @@ pub unsafe fn format_defaults(
 }
 
 /// Set default format keys for a session.
-// vendor/tmux/format.c:6143  format_defaults_session()
+// vendor/tmux/format.c:6143  static void format_defaults_session(struct format_tree *ft, struct session *s)
 pub unsafe fn format_defaults_session(ft: *mut format_tree, s: *mut session) {
     unsafe {
         (*ft).s = s;
@@ -5541,7 +5542,7 @@ pub unsafe fn format_defaults_session(ft: *mut format_tree, s: *mut session) {
 }
 
 /// Set default format keys for a client.
-// vendor/tmux/format.c:6150  format_defaults_client()
+// vendor/tmux/format.c:6150  static void format_defaults_client(struct format_tree *ft, struct client *c)
 pub unsafe fn format_defaults_client(ft: *mut format_tree, c: *mut client) {
     unsafe {
         if (*ft).s.is_null() {
@@ -5552,7 +5553,7 @@ pub unsafe fn format_defaults_client(ft: *mut format_tree, c: *mut client) {
 }
 
 /// Set default format keys for a window.
-// vendor/tmux/format.c:6159  format_defaults_window()
+// vendor/tmux/format.c:6159  void format_defaults_window(struct format_tree *ft, struct window *w)
 pub unsafe fn format_defaults_window(ft: *mut format_tree, w: *mut window) {
     unsafe {
         (*ft).w = w;
@@ -5560,7 +5561,7 @@ pub unsafe fn format_defaults_window(ft: *mut format_tree, w: *mut window) {
 }
 
 /// Set default format keys for a winlink.
-// vendor/tmux/format.c:6166  format_defaults_winlink()
+// vendor/tmux/format.c:6166  static void format_defaults_winlink(struct format_tree *ft, struct winlink *wl)
 pub unsafe fn format_defaults_winlink(ft: *mut format_tree, wl: *mut winlink) {
     unsafe {
         if (*ft).w.is_null() {
@@ -5571,7 +5572,7 @@ pub unsafe fn format_defaults_winlink(ft: *mut format_tree, wl: *mut winlink) {
 }
 
 /// Set default format keys for a window pane.
-// vendor/tmux/format.c:6175  format_defaults_pane()
+// vendor/tmux/format.c:6175  void format_defaults_pane(struct format_tree *ft, struct window_pane *wp)
 pub unsafe fn format_defaults_pane(ft: *mut format_tree, wp: *mut window_pane) {
     unsafe {
         if (*ft).w.is_null() {
@@ -5588,7 +5589,7 @@ pub unsafe fn format_defaults_pane(ft: *mut format_tree, wp: *mut window_pane) {
 }
 
 /// Set default format keys for paste buffer.
-// vendor/tmux/format.c:6190  format_defaults_paste_buffer()
+// vendor/tmux/format.c:6190  void format_defaults_paste_buffer(struct format_tree *ft, struct paste_buffer *pb)
 pub unsafe fn format_defaults_paste_buffer(ft: *mut format_tree, pb: *mut paste_buffer) {
     unsafe {
         (*ft).pb = pb;
@@ -5596,7 +5597,7 @@ pub unsafe fn format_defaults_paste_buffer(ft: *mut format_tree, pb: *mut paste_
 }
 
 /// Return word at given coordinates. Caller frees.
-// vendor/tmux/format.c:6207  format_grid_word()
+// vendor/tmux/format.c:6207  char *format_grid_word(struct grid *gd, u_int x, u_int y)
 pub unsafe fn format_grid_word(gd: *mut grid, mut x: u32, mut y: u32) -> String {
     unsafe {
         let mut ud: Vec<utf8_data> = Vec::new();
@@ -5671,7 +5672,7 @@ pub unsafe fn format_grid_word(gd: *mut grid, mut x: u32, mut y: u32) -> String 
 }
 
 /// Return line at given coordinates. Caller frees.
-// vendor/tmux/format.c:6276  format_grid_line()
+// vendor/tmux/format.c:6276  char *format_grid_line(struct grid *gd, u_int y)
 pub unsafe fn format_grid_line(gd: *mut grid, y: u32) -> String {
     unsafe {
         let mut ud: Vec<utf8_data> = Vec::new();
@@ -5690,7 +5691,7 @@ pub unsafe fn format_grid_line(gd: *mut grid, y: u32) -> String {
 }
 
 /// Return hyperlink at given coordinates. Caller frees.
-// vendor/tmux/format.c:6305  format_grid_hyperlink()
+// vendor/tmux/format.c:6305  char *format_grid_hyperlink(struct grid *gd, u_int x, u_int y, struct screen* s)
 pub unsafe fn format_grid_hyperlink(
     gd: *mut grid,
     x: u32,

@@ -17,7 +17,7 @@ static mut ALL_IMAGES: images = TAILQ_HEAD_INITIALIZER!(ALL_IMAGES);
 
 static mut ALL_IMAGES_COUNT: u32 = 0;
 
-// vendor/tmux/image.c:54  image_free()
+// vendor/tmux/image.c:54  static void image_free(struct image *im)
 unsafe fn image_free(im: NonNull<image>) {
     unsafe {
         let im = im.as_ptr();
@@ -33,7 +33,7 @@ unsafe fn image_free(im: NonNull<image>) {
     }
 }
 
-// vendor/tmux/image.c:68  image_free_all()
+// vendor/tmux/image.c:68  int image_free_all(struct screen *s)
 pub unsafe fn image_free_all(s: *mut screen) -> bool {
     unsafe {
         let redraw = !tailq_empty(&raw mut (*s).images);
@@ -46,7 +46,7 @@ pub unsafe fn image_free_all(s: *mut screen) -> bool {
 }
 
 /// Create text placeholder for an image.
-// vendor/tmux/image.c:82  image_fallback()
+// vendor/tmux/image.c:82  static void image_fallback(char **ret, u_int sx, u_int sy)
 pub fn image_fallback(sx: u32, sy: u32) -> CString {
     let sx = sx as usize;
     let sy = sy as usize;
@@ -79,7 +79,7 @@ pub fn image_fallback(sx: u32, sy: u32) -> CString {
     CString::new(buf).unwrap()
 }
 
-// vendor/tmux/image.c:123  image_store()
+// vendor/tmux/image.c:123  struct image*image_store(struct screen *s, struct sixel_image *si)
 pub unsafe fn image_store(s: *mut screen, si: *mut sixel_image) -> *mut image {
     unsafe {
         let mut im = Box::new(image {
@@ -109,7 +109,7 @@ pub unsafe fn image_store(s: *mut screen, si: *mut sixel_image) -> *mut image {
     }
 }
 
-// vendor/tmux/image.c:149  image_check_line()
+// vendor/tmux/image.c:149  int image_check_line(struct screen *s, u_int py, u_int ny)
 pub unsafe fn image_check_line(s: *mut screen, py: u32, ny: u32) -> bool {
     unsafe {
         let mut redraw = false;
@@ -124,7 +124,7 @@ pub unsafe fn image_check_line(s: *mut screen, py: u32, ny: u32) -> bool {
     }
 }
 
-// vendor/tmux/image.c:166  image_check_area()
+// vendor/tmux/image.c:166  int image_check_area(struct screen *s, u_int px, u_int py, u_int nx, u_int ny)
 pub unsafe fn image_check_area(s: *mut screen, px: u32, py: u32, nx: u32, ny: u32) -> bool {
     unsafe {
         let mut redraw = false;
@@ -143,7 +143,7 @@ pub unsafe fn image_check_area(s: *mut screen, px: u32, py: u32, nx: u32, ny: u3
     }
 }
 
-// vendor/tmux/image.c:186  image_scroll_up()
+// vendor/tmux/image.c:186  int image_scroll_up(struct screen *s, u_int lines)
 pub unsafe fn image_scroll_up(s: *mut screen, lines: u32) -> bool {
     unsafe {
         let mut redraw = false;

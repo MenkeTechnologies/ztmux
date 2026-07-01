@@ -21,7 +21,7 @@ use crate::{
     fatalx,
 };
 
-// vendor/tmux/xmalloc.c:27  xmalloc()
+// vendor/tmux/xmalloc.c:27  void *xmalloc(size_t size)
 pub fn xmalloc(size: usize) -> NonNull<c_void> {
     debug_assert_ne!(size, 0, "xmalloc: zero size");
 
@@ -34,7 +34,7 @@ pub fn xmalloc(size: usize) -> NonNull<c_void> {
         .cast()
 }
 
-// vendor/tmux/xmalloc.c:41  xcalloc()
+// vendor/tmux/xmalloc.c:41  void *xcalloc(size_t nmemb, size_t size)
 pub fn xcalloc(nmemb: usize, size: usize) -> NonNull<c_void> {
     debug_assert!(size != 0 && nmemb != 0, "xcalloc: zero size");
 
@@ -51,7 +51,7 @@ pub unsafe fn xcalloc1<'a, T>() -> &'a mut T {
     unsafe { ptr.as_mut() }
 }
 
-// vendor/tmux/xmalloc.c:55  xrealloc()
+// vendor/tmux/xmalloc.c:55  void *xrealloc(void *ptr, size_t size)
 pub unsafe fn xrealloc(ptr: *mut c_void, size: usize) -> NonNull<c_void> {
     unsafe { xrealloc_(ptr, size) }
 }
@@ -60,7 +60,7 @@ pub unsafe fn xrealloc_<T>(ptr: *mut T, size: usize) -> NonNull<T> {
     unsafe { xreallocarray_old(ptr, 1, size) }
 }
 
-// vendor/tmux/xmalloc.c:61  xreallocarray()
+// vendor/tmux/xmalloc.c:61  void *xreallocarray(void *ptr, size_t nmemb, size_t size)
 pub unsafe fn xreallocarray(ptr: *mut c_void, nmemb: usize, size: usize) -> NonNull<c_void> {
     unsafe { xreallocarray_old(ptr, nmemb, size) }
 }
@@ -92,7 +92,7 @@ pub unsafe fn xreallocarray_<T>(ptr: *mut T, nmemb: usize) -> NonNull<T> {
     }
 }
 
-// vendor/tmux/xmalloc.c:75  xrecallocarray()
+// vendor/tmux/xmalloc.c:75  void *xrecallocarray(void *ptr, size_t oldnmemb, size_t nmemb, size_t size)
 pub unsafe fn xrecallocarray(
     ptr: *mut c_void,
     oldnmemb: usize,
@@ -128,7 +128,7 @@ pub unsafe fn xrecallocarray__<T>(ptr: *mut T, oldnmemb: usize, nmemb: usize) ->
         .cast()
 }
 
-// vendor/tmux/xmalloc.c:89  xstrdup()
+// vendor/tmux/xmalloc.c:89  char *xstrdup(const char *str)
 pub unsafe fn xstrdup(str: *const u8) -> NonNull<u8> {
     NonNull::new(unsafe { crate::libc::strdup(str) }).unwrap()
 }
@@ -149,7 +149,7 @@ pub fn xstrdup___(str: Option<&str>) -> *mut u8 {
     xstrdup__(str)
 }
 
-// vendor/tmux/xmalloc.c:99  xstrndup()
+// vendor/tmux/xmalloc.c:99  char *xstrndup(const char *str, size_t maxlen)
 pub unsafe fn xstrndup(str: *const u8, maxlen: usize) -> NonNull<u8> {
     NonNull::new(unsafe { crate::libc::strndup(str, maxlen) }).unwrap()
 }

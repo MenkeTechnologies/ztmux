@@ -14,12 +14,12 @@
 
 #[cfg(target_os = "linux")]
 unsafe extern "C" {
-    // vendor/tmux/compat/closefrom.c:90  closefrom()
+    // vendor/tmux/compat/closefrom.c:90  void closefrom(int lowfd)
     pub fn closefrom(__lowfd: i32);
 }
 
 #[cfg(target_os = "macos")]
-// vendor/tmux/compat/closefrom.c:63  closefrom_fallback()
+// vendor/tmux/compat/closefrom.c:66  static void closefrom_fallback(int lowfd)
 fn closefrom_fallback(lowfd: i32) {
     unsafe {
         let mut maxfd = libc::sysconf(libc::_SC_OPEN_MAX);
@@ -43,6 +43,7 @@ fn closefrom_fallback(lowfd: i32) {
 // getdtablesize() — i.e. the (server-raised) RLIMIT_NOFILE, which can be
 // millions — so the pane child hung here between fork and exec and never reached
 // execvp (pane_current_command then reported the server binary, not the child).
+// vendor/tmux/compat/closefrom.c:90  void closefrom(int lowfd)
 pub fn closefrom(lowfd: i32) {
     unsafe {
         let pid = libc::getpid();

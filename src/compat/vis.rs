@@ -161,7 +161,7 @@ fn encode_octal_(dst: &mut Vec<u8>, c: i32) {
     dst.push(ones_place + b'0');
 }
 
-// vendor/tmux/compat/vis.c:155  strvis()
+// vendor/tmux/compat/vis.c:155  int strvis(char *dst, const char *src, int flag)
 pub unsafe fn strvis(mut dst: *mut u8, mut src: *const u8, flag: vis_flags) -> i32 {
     unsafe {
         let start = dst;
@@ -176,7 +176,7 @@ pub unsafe fn strvis(mut dst: *mut u8, mut src: *const u8, flag: vis_flags) -> i
     }
 }
 
-// vendor/tmux/compat/vis.c:167  strnvis()
+// vendor/tmux/compat/vis.c:167  int strnvis(char *dst, const char *src, size_t siz, int flag)
 pub unsafe fn strnvis(mut dst: *mut u8, mut src: *const u8, dlen: usize, flag: vis_flags) -> i32 {
     unsafe {
         let mut i = 0;
@@ -193,7 +193,7 @@ pub unsafe fn strnvis(mut dst: *mut u8, mut src: *const u8, dlen: usize, flag: v
     }
 }
 
-// vendor/tmux/compat/vis.c:210  stravis()
+// vendor/tmux/compat/vis.c:210  int stravis(char **outp, const char *src, int flag)
 pub unsafe fn stravis(outp: *mut *mut u8, src: *const u8, flag: vis_flags) -> i32 {
     unsafe {
         let buf: *mut u8 = libc::calloc(4, crate::libc::strlen(src) + 1).cast();
@@ -212,7 +212,7 @@ pub unsafe fn stravis(outp: *mut *mut u8, src: *const u8, flag: vis_flags) -> i3
     }
 }
 
-// vendor/tmux/compat/vis.c:57  vis()
+// vendor/tmux/compat/vis.c:57  char *vis(char *dst, int c, int flag, int nextc)
 pub unsafe fn vis(dst: *mut u8, c: c_int, flag: vis_flags, nextc: c_int) -> *mut u8 {
     unsafe { vis_(dst, c, flag, nextc) }
 }

@@ -1,4 +1,4 @@
-// vendor/tmux/compat/strtonum.c:31  strtonum()
+// vendor/tmux/compat/strtonum.c:31  long long strtonum(const char *numstr, long long minval, long long maxval, const char **errstrp)
 pub unsafe fn strtonum<T>(
     nptr: *const u8,
     minval: T,

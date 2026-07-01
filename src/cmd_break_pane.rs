@@ -32,7 +32,7 @@ pub static CMD_BREAK_PANE_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_break_pane_exec,
 };
 
-// vendor/tmux/cmd-break-pane.c:92  cmd_break_pane_exec()
+// vendor/tmux/cmd-break-pane.c:92  static enum cmd_retval cmd_break_pane_exec(struct cmd *self, struct cmdq_item *item)
 pub unsafe fn cmd_break_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

@@ -47,7 +47,7 @@ pub static CMD_DISPLAY_POPUP_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-display-menu.c:71  cmd_display_menu_args_parse()
+// vendor/tmux/cmd-display-menu.c:71  static enum args_parse_type cmd_display_menu_args_parse(struct args *args, u_int idx, __unused char **cause)
 unsafe fn cmd_display_menu_args_parse(
     args: *mut args,
     idx: u32,
@@ -322,7 +322,7 @@ unsafe fn cmd_display_menu_get_position(
     }
 }
 
-// vendor/tmux/cmd-display-menu.c:284  cmd_display_menu_exec()
+// vendor/tmux/cmd-display-menu.c:284  static enum cmd_retval cmd_display_menu_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_display_menu_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -455,7 +455,7 @@ unsafe fn cmd_display_menu_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
     }
 }
 
-// vendor/tmux/cmd-display-menu.c:387  cmd_display_popup_exec()
+// vendor/tmux/cmd-display-menu.c:387  static enum cmd_retval cmd_display_popup_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_display_popup_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

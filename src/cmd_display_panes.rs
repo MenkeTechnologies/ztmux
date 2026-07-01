@@ -34,12 +34,12 @@ pub struct cmd_display_panes_data<'a> {
     pub state: *mut args_command_state<'a>,
 }
 
-// vendor/tmux/cmd-display-panes.c:62  cmd_display_panes_args_parse()
+// vendor/tmux/cmd-display-panes.c:62  static enum args_parse_type cmd_display_panes_args_parse(__unused struct args *args, __unused u_int idx, __unused char **cause)
 fn cmd_display_panes_args_parse(_: *mut args, _: u32, _: *mut *mut u8) -> args_parse_type {
     args_parse_type::ARGS_PARSE_COMMANDS_OR_STRING
 }
 
-// vendor/tmux/cmd-display-panes.c:125  cmd_display_panes_draw_pane()
+// vendor/tmux/cmd-display-panes.c:125  static void cmd_display_panes_draw_pane(struct cmd_display_panes_ctx *ctx, struct window_pane *wp)
 unsafe fn cmd_display_panes_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) {
     unsafe {
         let c = (*ctx).c;
@@ -227,7 +227,7 @@ unsafe fn cmd_display_panes_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
     }
 }
 
-// vendor/tmux/cmd-display-panes.c:266  cmd_display_panes_draw()
+// vendor/tmux/cmd-display-panes.c:266  static void cmd_display_panes_draw(struct client *c, __unused void *data)
 unsafe fn cmd_display_panes_draw(c: *mut client, _data: *mut c_void, ctx: *mut screen_redraw_ctx) {
     unsafe {
         let w: *mut window = (*(*(*c).session).curw).window;
@@ -247,7 +247,7 @@ unsafe fn cmd_display_panes_draw(c: *mut client, _data: *mut c_void, ctx: *mut s
     }
 }
 
-// vendor/tmux/cmd-display-panes.c:294  cmd_display_panes_free()
+// vendor/tmux/cmd-display-panes.c:294  static void cmd_display_panes_free(__unused struct client *c, void *data)
 unsafe fn cmd_display_panes_free(_c: *mut client, data: *mut c_void) {
     unsafe {
         let cdata = data as *mut cmd_display_panes_data;
@@ -260,7 +260,7 @@ unsafe fn cmd_display_panes_free(_c: *mut client, data: *mut c_void) {
     }
 }
 
-// vendor/tmux/cmd-display-panes.c:305  cmd_display_panes_key()
+// vendor/tmux/cmd-display-panes.c:305  static int cmd_display_panes_key(struct client *c, void *data, struct key_event *event)
 unsafe fn cmd_display_panes_key(c: *mut client, data: *mut c_void, event: *mut key_event) -> i32 {
     unsafe {
         let cdata = data as *mut cmd_display_panes_data;
@@ -308,7 +308,7 @@ unsafe fn cmd_display_panes_key(c: *mut client, data: *mut c_void, event: *mut k
     }
 }
 
-// vendor/tmux/cmd-display-panes.c:351  cmd_display_panes_exec()
+// vendor/tmux/cmd-display-panes.c:351  static enum cmd_retval cmd_display_panes_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_display_panes_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

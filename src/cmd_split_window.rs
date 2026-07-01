@@ -29,7 +29,7 @@ pub static CMD_SPLIT_WINDOW_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::zeroed(),
 };
 
-// vendor/tmux/cmd-split-window.c:74  cmd_split_window_exec()
+// vendor/tmux/cmd-split-window.c:74  static enum cmd_retval cmd_split_window_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_split_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);

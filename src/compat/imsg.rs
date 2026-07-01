@@ -199,7 +199,7 @@ pub unsafe fn imsg_read(imsgbuf: *mut imsgbuf) -> isize {
     }
 }
 
-// vendor/tmux/compat/imsg.c:139  imsg_get()
+// vendor/tmux/compat/imsg.c:139  ssize_t imsg_get(struct imsgbuf *imsgbuf, struct imsg *imsg)
 pub unsafe fn imsg_get(imsgbuf: *mut imsgbuf, imsg: *mut imsg) -> isize {
     unsafe {
         let mut m = MaybeUninit::<imsg>::uninit();
@@ -265,7 +265,7 @@ pub unsafe fn imsg_get(imsgbuf: *mut imsgbuf, imsg: *mut imsg) -> isize {
     }
 }
 
-// vendor/tmux/compat/imsg.c:180  imsg_get_ibuf()
+// vendor/tmux/compat/imsg.c:180  int imsg_get_ibuf(struct imsg *imsg, struct ibuf *ibuf)
 pub unsafe fn imsg_get_ibuf(imsg: *mut imsg, ibuf: *mut ibuf) -> c_int {
     unsafe {
         if (*imsg).buf.is_null() {
@@ -276,7 +276,7 @@ pub unsafe fn imsg_get_ibuf(imsg: *mut imsg, ibuf: *mut ibuf) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg.c:190  imsg_get_data()
+// vendor/tmux/compat/imsg.c:190  int imsg_get_data(struct imsg *imsg, void *data, size_t len)
 pub unsafe fn imsg_get_data(imsg: *mut imsg, data: *mut c_void, len: usize) -> i32 {
     unsafe {
         if len == 0 {
@@ -291,17 +291,17 @@ pub unsafe fn imsg_get_data(imsg: *mut imsg, data: *mut c_void, len: usize) -> i
     }
 }
 
-// vendor/tmux/compat/imsg.c:216  imsg_get_fd()
+// vendor/tmux/compat/imsg.c:216  int imsg_get_fd(struct imsg *imsg)
 pub unsafe fn imsg_get_fd(imsg: *mut imsg) -> i32 {
     unsafe { std::ptr::replace(&raw mut (*imsg).fd, -1) }
 }
 
-// vendor/tmux/compat/imsg.c:222  imsg_get_id()
+// vendor/tmux/compat/imsg.c:222  uint32_t imsg_get_id(struct imsg *imsg)
 pub unsafe fn imsg_get_id(imsg: *const imsg) -> u32 {
     unsafe { (*imsg).hdr.peerid }
 }
 
-// vendor/tmux/compat/imsg.c:228  imsg_get_len()
+// vendor/tmux/compat/imsg.c:228  size_t imsg_get_len(struct imsg *imsg)
 pub unsafe fn imsg_get_len(imsg: *const imsg) -> usize {
     unsafe {
         if (*imsg).buf.is_null() {
@@ -311,17 +311,17 @@ pub unsafe fn imsg_get_len(imsg: *const imsg) -> usize {
     }
 }
 
-// vendor/tmux/compat/imsg.c:234  imsg_get_pid()
+// vendor/tmux/compat/imsg.c:234  pid_t imsg_get_pid(struct imsg *imsg)
 pub unsafe fn imsg_get_pid(imsg: *const imsg) -> pid_t {
     unsafe { (*imsg).hdr.pid as pid_t }
 }
 
-// vendor/tmux/compat/imsg.c:240  imsg_get_type()
+// vendor/tmux/compat/imsg.c:240  uint32_t imsg_get_type(struct imsg *imsg)
 pub unsafe fn imsg_get_type(imsg: *const imsg) -> u32 {
     unsafe { (*imsg).hdr.type_ }
 }
 
-// vendor/tmux/compat/imsg.c:246  imsg_compose()
+// vendor/tmux/compat/imsg.c:246  int imsg_compose(struct imsgbuf *imsgbuf, uint32_t type, uint32_t id, pid_t pid, int fd, const void *data, size_t datalen)
 pub unsafe fn imsg_compose(
     imsgbuf: *mut imsgbuf,
     type_: u32,
@@ -348,7 +348,7 @@ pub unsafe fn imsg_compose(
     }
 }
 
-// vendor/tmux/compat/imsg.c:268  imsg_composev()
+// vendor/tmux/compat/imsg.c:268  int imsg_composev(struct imsgbuf *imsgbuf, uint32_t type, uint32_t id, pid_t pid, int fd, const struct iovec *iov, int iovcnt)
 pub unsafe fn imsg_composev(
     imsgbuf: *mut imsgbuf,
     type_: u32,
@@ -388,7 +388,7 @@ pub unsafe fn imsg_composev(
     }
 }
 
-// vendor/tmux/compat/imsg.c:300  imsg_compose_ibuf()
+// vendor/tmux/compat/imsg.c:300  int imsg_compose_ibuf(struct imsgbuf *imsgbuf, uint32_t type, uint32_t id, pid_t pid, struct ibuf *buf)
 pub unsafe fn imsg_compose_ibuf(
     imsgbuf: *mut imsgbuf,
     type_: u32,
@@ -438,7 +438,7 @@ pub unsafe fn imsg_compose_ibuf(
     }
 }
 
-// vendor/tmux/compat/imsg.c:336  imsg_forward()
+// vendor/tmux/compat/imsg.c:336  int imsg_forward(struct imsgbuf *imsgbuf, struct imsg *msg)
 pub unsafe fn imsg_forward(imsgbuf: *mut imsgbuf, msg: *mut imsg) -> c_int {
     unsafe {
         let mut len = 0;
@@ -474,7 +474,7 @@ pub unsafe fn imsg_forward(imsgbuf: *mut imsgbuf, msg: *mut imsg) -> c_int {
     }
 }
 
-// vendor/tmux/compat/imsg.c:361  imsg_create()
+// vendor/tmux/compat/imsg.c:361  struct ibuf *imsg_create(struct imsgbuf *imsgbuf, uint32_t type, uint32_t id, pid_t pid, size_t datalen)
 pub unsafe fn imsg_create(
     imsgbuf: *mut imsgbuf,
     type_: u32,
@@ -513,7 +513,7 @@ pub unsafe fn imsg_create(
     }
 }
 
-// vendor/tmux/compat/imsg.c:391  imsg_add()
+// vendor/tmux/compat/imsg.c:391  int imsg_add(struct ibuf *msg, const void *data, size_t datalen)
 pub unsafe fn imsg_add(msg: *mut ibuf, data: *const c_void, datalen: usize) -> i32 {
     unsafe {
         if datalen != 0 && ibuf_add(msg, data, datalen) == -1 {
@@ -524,7 +524,7 @@ pub unsafe fn imsg_add(msg: *mut ibuf, data: *const c_void, datalen: usize) -> i
     }
 }
 
-// vendor/tmux/compat/imsg.c:402  imsg_close()
+// vendor/tmux/compat/imsg.c:402  void imsg_close(struct imsgbuf *imsgbuf, struct ibuf *msg)
 pub unsafe fn imsg_close(imsgbuf: *mut imsgbuf, msg: *mut ibuf) {
     unsafe {
         let hdr: *mut imsg_hdr = (*msg).buf as *mut imsg_hdr;
@@ -539,7 +539,7 @@ pub unsafe fn imsg_close(imsgbuf: *mut imsgbuf, msg: *mut ibuf) {
     }
 }
 
-// vendor/tmux/compat/imsg.c:414  imsg_free()
+// vendor/tmux/compat/imsg.c:414  void imsg_free(struct imsg *imsg)
 pub unsafe fn imsg_free(imsg: *mut imsg) {
     unsafe { ibuf_free((*imsg).buf) }
 }

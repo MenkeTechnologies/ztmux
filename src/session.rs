@@ -29,23 +29,23 @@ pub static NEXT_SESSION_ID: AtomicU32 = AtomicU32::new(0);
 
 pub static mut SESSION_GROUPS: session_groups = rb_initializer();
 
-// vendor/tmux/session.c:41  session_cmp()
+// vendor/tmux/session.c:41  int session_cmp(struct session *s1, struct session *s2)
 pub fn session_cmp(s1: &session, s2: &session) -> cmp::Ordering {
     s1.name.cmp(&s2.name)
 }
 
-// vendor/tmux/session.c:48  session_group_cmp()
+// vendor/tmux/session.c:48  int session_group_cmp(struct session_group *s1, struct session_group *s2)
 pub fn session_group_cmp(s1: &session_group, s2: &session_group) -> cmp::Ordering {
     s1.name.cmp(&s2.name)
 }
 
-// vendor/tmux/session.c:59  session_alive()
+// vendor/tmux/session.c:59  int session_alive(struct session *s)
 pub unsafe fn session_alive(s: *mut session) -> bool {
     unsafe { rb_foreach(&raw mut SESSIONS).any(|s_loop| s_loop.as_ptr() == s) }
 }
 
 /// Find session by name.
-// vendor/tmux/session.c:72  session_find()
+// vendor/tmux/session.c:72  struct session *session_find(const char *name)
 pub unsafe fn session_find(name: &str) -> *mut session {
     let mut s = MaybeUninit::<session>::uninit();
     let s = s.as_mut_ptr();
@@ -57,7 +57,7 @@ pub unsafe fn session_find(name: &str) -> *mut session {
 }
 
 /// Find session by id parsed from a string.
-// vendor/tmux/session.c:82  session_find_by_id_str()
+// vendor/tmux/session.c:82  struct session *session_find_by_id_str(const char *s)
 pub unsafe fn session_find_by_id_str(s: &str) -> *mut session {
     unsafe {
         if !s.starts_with('$') {
@@ -72,7 +72,7 @@ pub unsafe fn session_find_by_id_str(s: &str) -> *mut session {
 }
 
 /// Find session by id.
-// vendor/tmux/session.c:98  session_find_by_id()
+// vendor/tmux/session.c:98  struct session *session_find_by_id(u_int id)
 pub unsafe fn session_find_by_id(id: u32) -> Option<NonNull<session>> {
     unsafe { rb_foreach(&raw mut SESSIONS).find(|s| (*s.as_ptr()).id == id) }
 }
@@ -138,7 +138,7 @@ impl session {
 }
 
 /// Create a new session.
-// vendor/tmux/session.c:111  session_create()
+// vendor/tmux/session.c:111  struct session *session_create(const char *prefix, const char *name, const char *cwd, struct environ *env, struct options *oo, struct termios *tio)
 pub unsafe fn session_create(
     prefix: *const u8,
     name: Option<&str>,
@@ -151,7 +151,7 @@ pub unsafe fn session_create(
 }
 
 /// Add a reference to a session.
-// vendor/tmux/session.c:161  session_add_ref()
+// vendor/tmux/session.c:161  void session_add_ref(struct session *s, const char *from)
 pub unsafe fn session_add_ref(s: *mut session, from: *const u8) {
     let __func__ = "session_add_ref";
     unsafe {
@@ -167,7 +167,7 @@ pub unsafe fn session_add_ref(s: *mut session, from: *const u8) {
 }
 
 /// Remove a reference from a session.
-// vendor/tmux/session.c:169  session_remove_ref()
+// vendor/tmux/session.c:169  void session_remove_ref(struct session *s, const char *from)
 pub unsafe fn session_remove_ref(s: *mut session, from: *const u8) {
     let __func__ = "session_remove_ref";
     unsafe {
@@ -187,7 +187,7 @@ pub unsafe fn session_remove_ref(s: *mut session, from: *const u8) {
 }
 
 /// Free session.
-// vendor/tmux/session.c:180  session_free()
+// vendor/tmux/session.c:180  static void session_free(__unused int fd, __unused short events, void *arg)
 pub unsafe extern "C-unwind" fn session_free(_fd: i32, _events: i16, arg: *mut c_void) {
     unsafe {
         let s = arg as *mut session;
@@ -208,7 +208,7 @@ pub unsafe extern "C-unwind" fn session_free(_fd: i32, _events: i16, arg: *mut c
 }
 
 /// Destroy a session.
-// vendor/tmux/session.c:197  session_destroy()
+// vendor/tmux/session.c:197  void session_destroy(struct session *s, int notify, const char *from)
 pub unsafe fn session_destroy(s: *mut session, notify: i32, from: *const u8) {
     let __func__ = c!("session_destroy");
     unsafe {
@@ -271,7 +271,7 @@ pub unsafe fn session_check_name(name: *const u8) -> Option<String> {
 }
 
 /// Lock session if it has timed out.
-// vendor/tmux/session.c:233  session_lock_timer()
+// vendor/tmux/session.c:233  static void session_lock_timer(__unused int fd, __unused short events, void *arg)
 pub unsafe extern "C-unwind" fn session_lock_timer(_fd: i32, _events: i16, s: NonNull<session>) {
     unsafe {
         if (*s.as_ptr()).attached == 0 {
@@ -290,7 +290,7 @@ pub unsafe extern "C-unwind" fn session_lock_timer(_fd: i32, _events: i16, s: No
 }
 
 /// Update activity time.
-// vendor/tmux/session.c:249  session_update_activity()
+// vendor/tmux/session.c:249  void session_update_activity(struct session *s, struct timeval *from)
 pub unsafe fn session_update_activity(s: *mut session, from: *mut timeval) {
     unsafe {
         let last = &raw mut (*s).last_activity_time;
@@ -336,7 +336,7 @@ pub unsafe fn session_update_activity(s: *mut session, from: *mut timeval) {
 }
 
 /// Find the next usable session.
-// vendor/tmux/session.c:277  session_next_session()
+// vendor/tmux/session.c:277  struct session *session_next_session(struct session *s, struct sort_criteria *sort_crit)
 pub unsafe fn session_next_session(s: *mut session) -> *mut session {
     unsafe {
         if rb_empty(&raw mut SESSIONS) || !session_alive(s) {
@@ -356,7 +356,7 @@ pub unsafe fn session_next_session(s: *mut session) -> *mut session {
 }
 
 /// Find the previous usable session.
-// vendor/tmux/session.c:300  session_previous_session()
+// vendor/tmux/session.c:300  struct session *session_previous_session(struct session *s, struct sort_criteria *sort_crit)
 pub unsafe fn session_previous_session(s: *mut session) -> *mut session {
     unsafe {
         if rb_empty(&raw mut SESSIONS) || !session_alive(s) {
@@ -375,7 +375,7 @@ pub unsafe fn session_previous_session(s: *mut session) -> *mut session {
 }
 
 /// Attach a window to a session.
-// vendor/tmux/session.c:323  session_attach()
+// vendor/tmux/session.c:323  struct winlink *session_attach(struct session *s, struct window *w, int idx, char **cause)
 pub unsafe fn session_attach(
     s: *mut session,
     w: *mut window,
@@ -399,7 +399,7 @@ pub unsafe fn session_attach(
 }
 
 /// Detach a window from a session.
-// vendor/tmux/session.c:341  session_detach()
+// vendor/tmux/session.c:341  int session_detach(struct session *s, struct winlink *wl)
 pub unsafe fn session_detach(s: *mut session, wl: *mut winlink) -> i32 {
     unsafe {
         if (*s).curw == wl && session_last(s) != 0 && session_previous(s, false) != 0 {
@@ -421,7 +421,7 @@ pub unsafe fn session_detach(s: *mut session, wl: *mut winlink) -> i32 {
 }
 
 /// Return if session has window.
-// vendor/tmux/session.c:362  session_has()
+// vendor/tmux/session.c:362  int session_has(struct session *s, struct window *w)
 pub unsafe fn session_has(s: *mut session, w: *mut window) -> bool {
     unsafe {
         tailq_foreach::<_, discr_wentry>(&raw mut (*w).winlinks)
@@ -430,7 +430,7 @@ pub unsafe fn session_has(s: *mut session, w: *mut window) -> bool {
 }
 
 /// Return 1 if a window is linked outside this session (not including session groups). The window must be in this session!
-// vendor/tmux/session.c:378  session_is_linked()
+// vendor/tmux/session.c:378  int session_is_linked(struct session *s, struct window *w)
 pub unsafe fn session_is_linked(s: *mut session, w: *mut window) -> bool {
     unsafe {
         let sg = session_group_contains(s);
@@ -441,7 +441,7 @@ pub unsafe fn session_is_linked(s: *mut session, w: *mut window) -> bool {
     }
 }
 
-// vendor/tmux/session.c:388  session_next_alert()
+// vendor/tmux/session.c:388  static struct winlink *session_next_alert(struct winlink *wl)
 pub unsafe fn session_next_alert(mut wl: *mut winlink) -> *mut winlink {
     unsafe {
         while !wl.is_null() {
@@ -455,7 +455,7 @@ pub unsafe fn session_next_alert(mut wl: *mut winlink) -> *mut winlink {
 }
 
 /// Move session to next window.
-// vendor/tmux/session.c:400  session_next()
+// vendor/tmux/session.c:400  int session_next(struct session *s, int alert)
 pub unsafe fn session_next(s: *mut session, alert: bool) -> i32 {
     unsafe {
         if (*s).curw.is_null() {
@@ -481,7 +481,7 @@ pub unsafe fn session_next(s: *mut session, alert: bool) -> i32 {
     }
 }
 
-// vendor/tmux/session.c:419  session_previous_alert()
+// vendor/tmux/session.c:419  static struct winlink *session_previous_alert(struct winlink *wl)
 pub unsafe fn session_previous_alert(mut wl: *mut winlink) -> *mut winlink {
     unsafe {
         while !wl.is_null() {
@@ -495,7 +495,7 @@ pub unsafe fn session_previous_alert(mut wl: *mut winlink) -> *mut winlink {
 }
 
 /// Move session to previous window.
-// vendor/tmux/session.c:431  session_previous()
+// vendor/tmux/session.c:431  int session_previous(struct session *s, int alert)
 pub unsafe fn session_previous(s: *mut session, alert: bool) -> i32 {
     unsafe {
         if (*s).curw.is_null() {
@@ -522,7 +522,7 @@ pub unsafe fn session_previous(s: *mut session, alert: bool) -> i32 {
 }
 
 /// Move session to specific window.
-// vendor/tmux/session.c:451  session_select()
+// vendor/tmux/session.c:451  int session_select(struct session *s, int idx)
 pub unsafe fn session_select(s: *mut session, idx: i32) -> i32 {
     unsafe {
         let wl = winlink_find_by_index(&raw mut (*s).windows, idx);
@@ -531,7 +531,7 @@ pub unsafe fn session_select(s: *mut session, idx: i32) -> i32 {
 }
 
 /// Move session to last used window.
-// vendor/tmux/session.c:461  session_last()
+// vendor/tmux/session.c:461  int session_last(struct session *s)
 pub unsafe fn session_last(s: *mut session) -> i32 {
     unsafe {
         let wl = tailq_first(&raw mut (*s).lastw);
@@ -547,7 +547,7 @@ pub unsafe fn session_last(s: *mut session) -> i32 {
 }
 
 /// Set current winlink to wl.
-// vendor/tmux/session.c:476  session_set_current()
+// vendor/tmux/session.c:476  int session_set_current(struct session *s, struct winlink *wl)
 pub unsafe fn session_set_current(s: *mut session, wl: *mut winlink) -> i32 {
     unsafe {
         let old: *mut winlink = (*s).curw;
@@ -577,7 +577,7 @@ pub unsafe fn session_set_current(s: *mut session, wl: *mut winlink) -> i32 {
 }
 
 /// Find the session group containing a session.
-// vendor/tmux/session.c:502  session_group_contains()
+// vendor/tmux/session.c:502  struct session_group *session_group_contains(struct session *target)
 pub unsafe fn session_group_contains(target: *mut session) -> *mut session_group {
     unsafe {
         for sg in rb_foreach(&raw mut SESSION_GROUPS) {
@@ -593,7 +593,7 @@ pub unsafe fn session_group_contains(target: *mut session) -> *mut session_group
 }
 
 /// Find session group by name.
-// vendor/tmux/session.c:518  session_group_find()
+// vendor/tmux/session.c:518  struct session_group *session_group_find(const char *name)
 pub unsafe fn session_group_find(name: &str) -> *mut session_group {
     unsafe {
         let mut sg = MaybeUninit::<session_group>::uninit();
@@ -605,7 +605,7 @@ pub unsafe fn session_group_find(name: &str) -> *mut session_group {
 }
 
 /// Create a new session group.
-// vendor/tmux/session.c:528  session_group_new()
+// vendor/tmux/session.c:528  struct session_group *session_group_new(const char *name)
 pub unsafe fn session_group_new(name: &str) -> *mut session_group {
     unsafe {
         let mut sg = session_group_find(name);
@@ -623,7 +623,7 @@ pub unsafe fn session_group_new(name: &str) -> *mut session_group {
 }
 
 /// Add a session to a session group.
-// vendor/tmux/session.c:545  session_group_add()
+// vendor/tmux/session.c:545  void session_group_add(struct session_group *sg, struct session *s)
 pub unsafe fn session_group_add(sg: *mut session_group, s: *mut session) {
     unsafe {
         if session_group_contains(s).is_null() {
@@ -633,7 +633,7 @@ pub unsafe fn session_group_add(sg: *mut session_group, s: *mut session) {
 }
 
 /// Remove a session from its group and destroy the group if empty.
-// vendor/tmux/session.c:553  session_group_remove()
+// vendor/tmux/session.c:553  static void session_group_remove(struct session *s)
 pub unsafe fn session_group_remove(s: *mut session) {
     unsafe {
         let sg = session_group_contains(s);
@@ -651,13 +651,13 @@ pub unsafe fn session_group_remove(s: *mut session) {
 }
 
 /// Count number of sessions in session group.
-// vendor/tmux/session.c:569  session_group_count()
+// vendor/tmux/session.c:569  u_int session_group_count(struct session_group *sg)
 pub unsafe fn session_group_count(sg: *mut session_group) -> u32 {
     unsafe { tailq_foreach(&raw mut (*sg).sessions).count() as u32 }
 }
 
 /// Count number of clients attached to sessions in session group.
-// vendor/tmux/session.c:582  session_group_attached_count()
+// vendor/tmux/session.c:582  u_int session_group_attached_count(struct session_group *sg)
 pub unsafe fn session_group_attached_count(sg: *mut session_group) -> u32 {
     unsafe {
         tailq_foreach(&raw mut (*sg).sessions)
@@ -667,7 +667,7 @@ pub unsafe fn session_group_attached_count(sg: *mut session_group) -> u32 {
 }
 
 /// Synchronize a session to its session group.
-// vendor/tmux/session.c:595  session_group_synchronize_to()
+// vendor/tmux/session.c:595  void session_group_synchronize_to(struct session *s)
 pub unsafe fn session_group_synchronize_to(s: *mut session) {
     unsafe {
         let sg = session_group_contains(s);
@@ -689,7 +689,7 @@ pub unsafe fn session_group_synchronize_to(s: *mut session) {
 }
 
 /// Synchronize a session group to a session.
-// vendor/tmux/session.c:614  session_group_synchronize_from()
+// vendor/tmux/session.c:614  void session_group_synchronize_from(struct session *target)
 pub unsafe fn session_group_synchronize_from(target: *mut session) {
     unsafe {
         let sg = session_group_contains(target);
@@ -708,7 +708,7 @@ pub unsafe fn session_group_synchronize_from(target: *mut session) {
 // Synchronize a session with a target session. This means destroying all
 // winlinks then recreating them, then updating the current window, last window
 // stack and alerts.
-// vendor/tmux/session.c:634  session_group_synchronize1()
+// vendor/tmux/session.c:634  static void session_group_synchronize1(struct session *target, struct session *s)
 pub unsafe fn session_group_synchronize1(target: *mut session, s: *mut session) {
     let mut old_windows = MaybeUninit::<winlinks>::uninit();
     let mut old_lastw = MaybeUninit::<winlink_stack>::uninit();
@@ -774,7 +774,7 @@ pub unsafe fn session_group_synchronize1(target: *mut session, s: *mut session) 
 }
 
 /// Renumber the windows across winlinks attached to a specific session.
-// vendor/tmux/session.c:693  session_renumber_windows()
+// vendor/tmux/session.c:693  void session_renumber_windows(struct session *s)
 pub unsafe fn session_renumber_windows(s: *mut session) {
     unsafe {
         let mut old_wins = MaybeUninit::<winlinks>::uninit();

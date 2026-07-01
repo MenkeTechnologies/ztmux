@@ -16,7 +16,7 @@ use std::borrow::Cow;
 use crate::grid_attr;
 
 #[rustfmt::skip]
-// vendor/tmux/attributes.c:26  attributes_tostring()
+// vendor/tmux/attributes.c:26  const char *attributes_tostring(int attr)
 pub fn attributes_tostring(attr: grid_attr) -> Cow<'static, str> {
     if attr.is_empty() {
         return Cow::Borrowed("none");
@@ -41,7 +41,7 @@ pub fn attributes_tostring(attr: grid_attr) -> Cow<'static, str> {
     ))
 }
 
-// vendor/tmux/attributes.c:57  attributes_fromstring()
+// vendor/tmux/attributes.c:57  int attributes_fromstring(const char *str)
 pub fn attributes_fromstring(str: &str) -> Result<grid_attr, ()> {
     struct table_entry {
         name: &'static str,

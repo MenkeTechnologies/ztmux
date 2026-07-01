@@ -45,7 +45,7 @@ pub struct cmd_source_file_data {
     pub nfiles: u32,
 }
 
-// vendor/tmux/cmd-source-file.c:64  cmd_source_file_complete_cb()
+// vendor/tmux/cmd-source-file.c:64  static enum cmd_retval cmd_source_file_complete_cb(struct cmdq_item *item, __unused void *data)
 unsafe fn cmd_source_file_complete_cb(item: *mut cmdq_item, _data: *mut c_void) -> cmd_retval {
     unsafe {
         cfg_print_causes(item);
@@ -53,7 +53,7 @@ unsafe fn cmd_source_file_complete_cb(item: *mut cmdq_item, _data: *mut c_void) 
     }
 }
 
-// vendor/tmux/cmd-source-file.c:81  cmd_source_file_complete()
+// vendor/tmux/cmd-source-file.c:81  static void cmd_source_file_complete(struct client *c, struct cmd_source_file_data *cdata)
 unsafe fn cmd_source_file_complete(c: *mut client, cdata: *mut cmd_source_file_data) {
     unsafe {
         if CFG_FINISHED.load(atomic::Ordering::Acquire) {
@@ -75,7 +75,7 @@ unsafe fn cmd_source_file_complete(c: *mut client, cdata: *mut cmd_source_file_d
     }
 }
 
-// vendor/tmux/cmd-source-file.c:102  cmd_source_file_done()
+// vendor/tmux/cmd-source-file.c:102  static void cmd_source_file_done(struct client *c, const char *path, int error, int closed, struct evbuffer *buffer, void *data)
 unsafe fn cmd_source_file_done(
     c: *mut client,
     path: *mut u8,
@@ -131,7 +131,7 @@ unsafe fn cmd_source_file_done(
     }
 }
 
-// vendor/tmux/cmd-source-file.c:136  cmd_source_file_add()
+// vendor/tmux/cmd-source-file.c:136  static void cmd_source_file_add(struct cmd_source_file_data *cdata, const char *path)
 unsafe fn cmd_source_file_add(cdata: *mut cmd_source_file_data, path: *const u8) {
     unsafe {
         log_debug!("cmd_source_file_add: {}", _s(path));
@@ -141,7 +141,7 @@ unsafe fn cmd_source_file_add(cdata: *mut cmd_source_file_data, path: *const u8)
     }
 }
 
-// vendor/tmux/cmd-source-file.c:145  cmd_source_file_quote_for_glob()
+// vendor/tmux/cmd-source-file.c:145  static char *cmd_source_file_quote_for_glob(const char *path)
 unsafe fn cmd_source_file_quote_for_glob(path: *const u8) -> *mut u8 {
     unsafe {
         let quoted: *mut u8 = xmalloc(2 * strlen(path) + 1).as_ptr().cast();
@@ -166,7 +166,7 @@ unsafe fn cmd_source_file_quote_for_glob(path: *const u8) -> *mut u8 {
     }
 }
 
-// vendor/tmux/cmd-source-file.c:160  cmd_source_file_exec()
+// vendor/tmux/cmd-source-file.c:160  static enum cmd_retval cmd_source_file_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_source_file_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     let __func__ = "cmd_source_file_exec";
 

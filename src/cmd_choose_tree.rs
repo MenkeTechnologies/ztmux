@@ -70,7 +70,7 @@ pub static CMD_CUSTOMIZE_MODE_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_choose_tree_exec,
 };
 
-// vendor/tmux/cmd-choose-tree.c:101  cmd_choose_tree_args_parse()
+// vendor/tmux/cmd-choose-tree.c:101  static enum args_parse_type cmd_choose_tree_args_parse(__unused struct args *args, __unused u_int idx, __unused char **cause)
 fn cmd_choose_tree_args_parse(
     _args: *mut args,
     _idx: u32,
@@ -79,7 +79,7 @@ fn cmd_choose_tree_args_parse(
     args_parse_type::ARGS_PARSE_COMMANDS_OR_STRING
 }
 
-// vendor/tmux/cmd-choose-tree.c:108  cmd_choose_tree_exec()
+// vendor/tmux/cmd-choose-tree.c:108  static enum cmd_retval cmd_choose_tree_exec(struct cmd *self, struct cmdq_item *item)
 unsafe fn cmd_choose_tree_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
