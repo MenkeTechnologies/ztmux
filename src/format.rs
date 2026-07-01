@@ -3763,6 +3763,15 @@ fn format_find(
 
 /// Unescape escaped characters.
 // vendor/tmux/format.c:4281  format_unescape()
+//
+// Faithful port of C's `for (; s != end; s++) { … continue; … }`: the `s++`
+// runs on every iteration, INCLUDING when the loop `continue`s. A `while` loop
+// must therefore advance `s` explicitly on every path — the previous port
+// dropped it, so the normal branch never advanced (infinite loop writing past
+// the `xmalloc(strlen + 1)` buffer → crash). See format_strip below, which
+// ported the same loop correctly. (C's per-iteration `format_check_time` time
+// limit is not replicated here: the port's format_expand_state has no
+// start_time field yet — a separate modernization.)
 pub unsafe fn format_unescape(mut s: *const u8) -> *mut u8 {
     unsafe {
         let mut cp = xmalloc(strlen(s) + 1).as_ptr().cast();
@@ -3772,10 +3781,17 @@ pub unsafe fn format_unescape(mut s: *const u8) -> *mut u8 {
             if *s == b'#' && *s.add(1) == b'{' {
                 brackets += 1;
             }
-            if brackets == 0 && *s == b'#' && !strchr(c!(",#{}:"), *s.add(1) as i32).is_null() {
-                s = s.add(1);
+            // `s + 1 != end` in C guards the trailing-`#` case so the `*++s`
+            // below can't step past the terminator.
+            if brackets == 0
+                && *s == b'#'
+                && *s.add(1) != b'\0'
+                && !strchr(c!(",#{}:"), *s.add(1) as i32).is_null()
+            {
+                s = s.add(1); // C: `*cp++ = *++s;`
                 *cp = *s;
                 cp = cp.add(1);
+                s = s.add(1); // C for-loop's own `s++` that runs on `continue`
                 continue;
             }
             if *s == b'}' {
@@ -3783,6 +3799,7 @@ pub unsafe fn format_unescape(mut s: *const u8) -> *mut u8 {
             }
             *cp = *s;
             cp = cp.add(1);
+            s = s.add(1); // C for-loop's `s++`
         }
         *cp = b'\0';
         out
