@@ -1177,31 +1177,39 @@ pub unsafe fn layout_spread_cell(w: *mut window, parent: *mut layout_cell) -> c_
             return 0;
         }
 
-        let mut each = (size - (number - 1)) / number;
+        let each = (size - (number - 1)) / number;
         if each == 0 {
             return 0;
         }
 
-        let mut changed = 0;
-        let mut idx = 0;
-        for lc in tailq_foreach(&raw mut (*parent).cells).map(NonNull::as_ptr) {
-            idx += 1;
-            if idx == number {
-                each = size - ((each + 1) * (number - 1));
-            }
+        // Remaining space after the evenly-distributed part is handed out one
+        // column/row at a time to the LEADING cells (vendor/tmux/layout.c),
+        // not dumped on the last cell. For size 80, n 2: each=39, remainder=1,
+        // so the first pane becomes 40 and the second 39 — matching tmux.
+        let mut remainder = size - (number * (each + 1)) + 1;
 
+        let mut changed = 0;
+        for lc in tailq_foreach(&raw mut (*parent).cells).map(NonNull::as_ptr) {
             let change = match (*parent).type_ {
                 layout_type::LAYOUT_LEFTRIGHT => {
-                    let change = each as i32 - (*lc).sx as i32;
+                    let mut change = each as i32 - (*lc).sx as i32;
+                    if remainder > 0 {
+                        change += 1;
+                        remainder -= 1;
+                    }
                     layout_resize_adjust(w, lc, layout_type::LAYOUT_LEFTRIGHT, change);
                     change
                 }
                 layout_type::LAYOUT_TOPBOTTOM => {
-                    let this = if layout_add_border(w, lc, status) {
+                    let mut this = if layout_add_border(w, lc, status) {
                         each + 1
                     } else {
                         each
                     };
+                    if remainder > 0 {
+                        this += 1;
+                        remainder -= 1;
+                    }
                     let change = this as i32 - (*lc).sy as i32;
                     layout_resize_adjust(w, lc, layout_type::LAYOUT_TOPBOTTOM, change);
                     change
