@@ -60,14 +60,26 @@ releases and the tmux version ztmux was ported from).
 ## Status
 
 The port is seeded from a transpile, so — unlike a from-scratch rewrite — a large
-part of the format engine already works. The initial seed sits at a high pass
-rate; the suite's job now is (a) to guard that from regressing and (b) to grow
-coverage so the remaining gaps surface.
+part of the format engine already works. The suite's job is (a) to guard that
+from regressing and (b) to grow coverage so the remaining gaps surface.
 
-Example of what the suite is for: it immediately flagged that `#{l:…}` (the
-literal operator) **crashes ztmux's server** (`server exited unexpectedly`) while
-tmux prints the literal — a real bug pinned to a single case
-(`034_str_literal.fmt`) instead of hiding in a wall of transpiled code.
+The suite has already paid off. It flagged that `#{l:…}` (the literal operator)
+**crashed ztmux's server** — pinned to one case, root-caused to a dropped pointer
+increment in `format_unescape`, and fixed by a faithful re-port of the C loop.
+
+As coverage grew past the easy format cases, real divergences surfaced (this is
+the point — a green suite of only-easy cases is a false 100%). Currently known,
+each pinned to a single case:
+
+- **`405_select_layout.sh`** — even-horizontal layout rounding: for an 80-col,
+  2-pane split tmux gives the extra column to the left pane (`40|39`), ztmux to
+  the right (`39|40`).
+- **`294_pane_cmd.fmt`** — `#{pane_current_command}` reports the server binary
+  (`ztmux`) rather than the pane's actual process (`sleep`); ztmux isn't yet
+  tracking the running command per pane.
+
+These stay in the suite as failing cases (the CI job is advisory) until the
+underlying code is ported correctly.
 
 ## CI
 

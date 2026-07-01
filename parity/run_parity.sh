@@ -88,7 +88,7 @@ run_one() {
   local sock="ztpar_$$_${RANDOM}"
   local out
   # Fresh isolated server with a fixed geometry and a long-lived dummy pane.
-  timeout 15 "$bin" -L "$sock" -f /dev/null new-session -d -x 80 -y 24 "sleep 300" >/dev/null 2>&1
+  timeout 15 "$bin" -L "$sock" -f /dev/null new-session -d -n base -x 80 -y 24 "sleep 300" >/dev/null 2>&1
   if [[ "$kind" == "fmt" ]]; then
     local fmt; fmt="$(cat "$case")"
     out=$(timeout 15 "$bin" -L "$sock" display-message -p "$fmt" 2>&1)
