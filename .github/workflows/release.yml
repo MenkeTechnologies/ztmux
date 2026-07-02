@@ -26,12 +26,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # --- macOS native ---
+          # --- macOS ---
+          # Both mac targets build on macos-latest (arm64). The native arm
+          # build uses Homebrew's libevent; the x86_64 build cross-compiles
+          # against a libevent we build from source for x86_64 (see the
+          # "Cross libevent" step). We deliberately do NOT use a macos-13
+          # Intel runner here: those are chronically unavailable and left
+          # the x86_64 leg queued for 21h+ (blocking publish + the tap
+          # push). Cross-compiling on the always-available arm runner is
+          # how the other MenkeTechnologies formulas ship x86_64 mac.
           - os: macos-latest
             target: aarch64-apple-darwin
-          # x86_64 on the Intel runner (macos-latest is arm64; its Homebrew
-          # libevent is arm64-only, so a cross x86_64 link fails).
-          - os: macos-13
+          - os: macos-latest
             target: x86_64-apple-darwin
           # --- Linux glibc native ---
           - os: ubuntu-latest
@@ -48,9 +54,34 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libevent-dev
 
-      - name: Install libevent (macOS)
-        if: runner.os == 'macOS'
+      # Native arm mac links Homebrew's (arm64) libevent directly.
+      - name: Install libevent (macOS arm)
+        if: matrix.target == 'aarch64-apple-darwin'
         run: brew install libevent
+
+      # x86_64 mac cross-build: Homebrew libevent on the arm runner is
+      # arm64-only, so build a static x86_64 libevent from source and point
+      # the link at it. TMUX_RS_DISABLE_HOMEBREW_LIBS stops build.rs adding
+      # the arm `brew --prefix libevent` search path; RUSTFLAGS supplies the
+      # x86_64 one instead. build.rs still emits `-l static=event_core`.
+      - name: Cross libevent for x86_64 (macOS)
+        if: matrix.target == 'x86_64-apple-darwin'
+        run: |
+          set -euo pipefail
+          ver=2.1.12-stable
+          curl --fail -LO "https://github.com/libevent/libevent/releases/download/release-${ver}/libevent-${ver}.tar.gz"
+          tar xf "libevent-${ver}.tar.gz"
+          cd "libevent-${ver}"
+          ./configure --host=x86_64-apple-darwin --disable-shared --enable-static \
+            --disable-openssl --disable-samples --disable-libevent-regress \
+            CC="clang -arch x86_64" CFLAGS="-arch x86_64 -O2"
+          make -j"$(sysctl -n hw.ncpu)"
+          libdir="$PWD/.libs"
+          test -f "$libdir/libevent_core.a"
+          {
+            echo "TMUX_RS_DISABLE_HOMEBREW_LIBS=1"
+            echo "RUSTFLAGS=-L native=$libdir"
+          } >> "$GITHUB_ENV"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
