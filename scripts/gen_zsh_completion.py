@@ -1,126 +1,28 @@
 #!/usr/bin/env python3
-"""Generate completions/_ztmux from ztmux's actual command surface.
+"""Generate completions/_ztmux with full tmux depth plus ztmux extensions.
 
-Sources of truth:
-  * the `cmd_entry { name, alias, usage }` table in src/ported/cmd_*.rs
-  * the client subcommands added under src/extensions/
-    (dashboard, switch, tree, doctor, stats, graph, watch, events, ps,
-    snapshot, prune, layout, find, recent, usage, grep, peek, bcast,
-    pstree, ports, info)
-  * the global option string parsed by tmux_main() in src/ported/tmux.rs
+Strategy: take the canonical zsh `_tmux` completion (vendored at
+scripts/_tmux.base.zsh) — which carries the full argument intelligence for
+every tmux command (option names for set-option/set-window-option, format
+variables, targets, layouts, key tables, styles, colours) — rewrite it for the
+`ztmux` binary, and inject the ztmux client extensions as `_ztmux-<verb>`
+functions.  The base's own auto-discovery loop lists every `_ztmux-*` function
+alongside the real tmux commands, so the extensions appear in `ztmux <TAB>`
+with their own argument completion.
+
+The vendored base is zsh's upstream `_tmux` (see scripts/_tmux.base.zsh); to
+refresh it, copy a newer `_tmux` from `$fpath` over that file and rerun this.
 
 Run from the repo root:  python3 scripts/gen_zsh_completion.py
 """
 from __future__ import annotations
 
-import glob
-import re
-import sys
+BASE = "scripts/_tmux.base.zsh"
+OUT = "completions/_ztmux"
 
-# ── extract (name, alias, usage) from the cmd_entry table ────────────────────
-
-CMD_RE = re.compile(r"cmd_entry\s*\{(.*?)\}", re.S)
-
-
-def extract_commands() -> list[tuple[str, str, str]]:
-    rows: dict[str, tuple[str, str, str]] = {}
-    for path in sorted(glob.glob("src/ported/cmd_*.rs")):
-        src = open(path, encoding="utf-8").read()
-        for m in CMD_RE.finditer(src):
-            blk = m.group(1)
-            nm = re.search(r'name:\s*"([^"]+)"', blk)
-            if not nm:
-                continue
-            al = re.search(r'alias:\s*Some\("([^"]+)"\)', blk)
-            us = re.search(r'usage:\s*"((?:[^"\\]|\\.)*)"', blk)
-            name = nm.group(1)
-            rows[name] = (name, al.group(1) if al else "", us.group(1) if us else "")
-    return [rows[k] for k in sorted(rows)]
-
-
-# ── usage string → zsh _arguments specs ──────────────────────────────────────
-
-TARGET_COMPL = {
-    "target-session": "__ztmux_sessions",
-    "target-client": "__ztmux_clients",
-    "target-window": "__ztmux_windows",
-    "src-window": "__ztmux_windows",
-    "dst-window": "__ztmux_windows",
-    "target-pane": "__ztmux_panes",
-    "src-pane": "__ztmux_panes",
-    "dst-pane": "__ztmux_panes",
-    "buffer-name": "__ztmux_buffers",
-    "target-buffer": "__ztmux_buffers",
-    "key-table": "__ztmux_key_tables",
-    "shell-command": " ",
-    "working-directory": "_files -/",
-    "file": "_files",
-    "path": "_files",
-}
-
-
-def sanitize(text: str) -> str:
-    """Make a description safe inside a single-quoted _arguments spec."""
-    return text.replace("'", "").replace(":", " ").replace("[", "(").replace("]", ")")
-
-
-def arg_completion(argword: str) -> str:
-    """Return the `:desc:action` tail for an option that takes `argword`."""
-    if "|" in argword:  # fixed value set, e.g. json|jsonl|csv
-        vals = " ".join(argword.split("|"))
-        return f":format:({vals})"
-    key = argword.strip()
-    action = TARGET_COMPL.get(key, "")
-    return f":{sanitize(key)}:{action}"
-
-
-def parse_usage(usage: str) -> tuple[list[str], list[str]]:
-    """Return (option specs, positional specs) for one usage string."""
-    opts: list[str] = []
-    positional: list[str] = []
-    # Split into `[...]` groups and bare tokens.
-    tokens = re.findall(r"\[[^\]]*\]|\S+", usage)
-    for tok in tokens:
-        if tok.startswith("[") and tok.endswith("]"):
-            inner = tok[1:-1].strip()
-        else:
-            inner = tok
-        if not inner:
-            continue
-        if inner.startswith("-") and len(inner) > 1 and inner[1] != " ":
-            body = inner[1:]
-            if " " in body:  # a single flag that takes an argument: `-c working-dir`
-                flag, argword = body.split(" ", 1)
-                # only the first letter is the flag; rest is the arg name
-                letter = flag[0]
-                opts.append(f"-{letter}[option {letter}]{arg_completion(argword)}")
-            else:  # a bundle of boolean flags: `-abc`
-                for letter in body:
-                    opts.append(f"-{letter}[flag {letter}]")
-        else:
-            # a positional such as `key`, `command`, `template`
-            positional.append(sanitize(inner.strip("[]")))
-    return opts, positional
-
-
-def command_specs(usage: str) -> list[str]:
-    opts, positional = parse_usage(usage)
-    specs = list(opts)
-    if positional:
-        # everything trailing (command + args, key, template, …) is free-form.
-        specs.append("*:::arg:_normal")
-    return specs
-
-
-def describe(name: str) -> str:
-    return sanitize(name.replace("-", " "))
-
-
-# ── emit the completion ──────────────────────────────────────────────────────
-
-# (name, arg-spec list for _arguments, description). Client subcommands under
-# src/extensions/ with no tmux C counterpart. An empty spec list means the
-# subcommand takes no arguments.
+# ── ztmux client extensions (no tmux C counterpart) ──────────────────────────
+# (verb, _arguments specs, description).  Dynamic-value specs reference the
+# base's helper functions, which are renamed __tmux-* -> __ztmux-* below.
 EXTENSIONS = [
     ("dashboard", [], "live ratatui server dashboard (ztmux extension)"),
     ("switch", [], "interactive session/window/pane picker (ztmux extension)"),
@@ -219,7 +121,7 @@ EXTENSIONS = [
         [
             ":command:",
             "-c[only panes whose command contains SUBSTR]:command:",
-            "-s[only panes in SESSION]:session:__ztmux_sessions",
+            "-s[only panes in SESSION]:session:__ztmux-sessions",
             "-N[send keys without a trailing Enter]",
             "--no-enter[send keys without a trailing Enter]",
             "-f[actually send (default: dry-run)]",
@@ -240,7 +142,7 @@ EXTENSIONS = [
     (
         "info",
         [
-            ":target:__ztmux_panes",
+            ":target:__ztmux-panes",
             "-o[output format]:format:(json)",
             "--json[machine-readable JSON output]",
         ],
@@ -249,102 +151,49 @@ EXTENSIONS = [
 ]
 
 
+def ext_function(name: str, specs: list[str], desc: str) -> str:
+    """Emit a `_ztmux-<verb>` subcommand function in the base's own style:
+    print the description when $tmux_describe is set (drives the command list),
+    otherwise run _arguments for the verb's own flags."""
+    lines = [
+        f"_ztmux-{name}() {{",
+        f'  [[ -n ${{tmux_describe}} ]] && print "{desc}" && return',
+    ]
+    if specs:
+        spec_str = " \\\n    ".join(f"'{s}'" for s in specs)
+        lines.append(f"  _arguments -s \\\n    {spec_str}")
+    lines.append("}")
+    return "\n".join(lines)
+
+
 def main() -> int:
-    cmds = extract_commands()
+    base = open(BASE, encoding="utf-8").read()
 
-    # command list for _describe (name + alias entries)
-    describe_lines: list[str] = []
-    for name, alias, _ in cmds:
-        describe_lines.append(f"    '{name}:{describe(name)}'")
-        if alias:
-            describe_lines.append(f"    '{alias}:{describe(name)} (alias)'")
-    for name, _, desc in EXTENSIONS:
-        describe_lines.append(f"    '{name}:{sanitize(desc)}'")
+    # Rewrite every _tmux/_tmux-*/__tmux-*/_tmux_* identifier to its ztmux form.
+    # This is a single self-consistent rename (functions, helpers and arrays all
+    # move together), so no collision with a separately-loaded upstream _tmux.
+    base = base.replace("_tmux", "_ztmux")
+    # These carry a bare `tmux` token that the identifier rename does not touch.
+    base = base.replace("#compdef tmux", "#compdef ztmux")
+    base = base.replace("command tmux", "command ztmux")
+    base = base.replace(
+        "# tmux <http://tmux.github.io> completion for zsh <http://zsh.sf.net>.",
+        "# ztmux completion for zshrs — full tmux depth + ztmux extensions.\n"
+        "# GENERATED by scripts/gen_zsh_completion.py; do not edit by hand.",
+    )
 
-    # per-command arg dispatch
-    case_lines: list[str] = []
-    for name, alias, usage in cmds:
-        pattern = f"{name}|{alias}" if alias else name
-        specs = command_specs(usage)
-        if specs:
-            spec_str = " \\\n        ".join(f"'{s}'" for s in specs)
-            case_lines.append(f"      {pattern})\n        _arguments -s \\\n        {spec_str} && ret=0\n        ;;")
-        else:
-            case_lines.append(f"      {pattern})\n        _message 'no arguments'\n        ;;")
-    for name, specs, _ in EXTENSIONS:
-        if specs:
-            spec_str = " \\\n        ".join(f"'{s}'" for s in specs)
-            case_lines.append(f"      {name})\n        _arguments -s \\\n        {spec_str} && ret=0\n        ;;")
-        else:
-            case_lines.append(f"      {name})\n        _message 'no arguments'\n        ;;")
+    # Inject the extension subcommand functions just before the main _ztmux().
+    anchor = "# And here is the actual _ztmux(), that puts it all together:"
+    if anchor not in base:
+        raise SystemExit(f"anchor not found in {BASE}: {anchor!r}")
+    ext_block = "\n\n".join(ext_function(n, s, d) for n, s, d in EXTENSIONS)
+    marker = "# ── ztmux client extensions ─────────────────────────────────────────────────"
+    base = base.replace(anchor, f"{marker}\n{ext_block}\n\n{anchor}", 1)
 
-    out = f"""#compdef ztmux
-# ztmux zsh completion — GENERATED from the cmd_entry table + src/extensions.
-# Do not edit by hand; regenerate with:  python3 scripts/gen_zsh_completion.py
-#
-# Covers every implemented command (and alias), the client subcommands
-# (dashboard, switch, tree, doctor, stats, graph, watch, events, ps, snapshot,
-# prune, layout, find, recent, usage, grep, peek, bcast, pstree, ports,
-# info), and the structured `-o json|jsonl|csv|tsv|table` output flag on the
-# list-* commands.
-
-__ztmux_run() {{ ztmux "$@" 2>/dev/null }}
-__ztmux_sessions()  {{ local -a v; v=(${{(f)"$(__ztmux_run list-sessions -F '#{{session_name}}')"}}); compadd -a v }}
-__ztmux_clients()   {{ local -a v; v=(${{(f)"$(__ztmux_run list-clients  -F '#{{client_name}}')"}}); compadd -a v }}
-__ztmux_windows()   {{ local -a v; v=(${{(f)"$(__ztmux_run list-windows -a -F '#{{session_name}}:#{{window_index}}')"}}); compadd -a v }}
-__ztmux_panes()     {{ local -a v; v=(${{(f)"$(__ztmux_run list-panes  -a -F '#{{session_name}}:#{{window_index}}.#{{pane_index}}')"}}); compadd -a v }}
-__ztmux_buffers()   {{ local -a v; v=(${{(f)"$(__ztmux_run list-buffers   -F '#{{buffer_name}}')"}}); compadd -a v }}
-__ztmux_key_tables() {{ compadd root prefix copy-mode copy-mode-vi }}
-
-_ztmux() {{
-  local curcontext="$curcontext" state line ret=1
-  local -a commands
-  commands=(
-{chr(10).join(describe_lines)}
-  )
-
-  _arguments -C \\
-    '2[force 256 colours]' \\
-    '-C[start in control mode]' \\
-    '-D[do not daemonise the server]' \\
-    '-l[behave as a login shell]' \\
-    '-N[do not start the server]' \\
-    '-q[suppress errors]' \\
-    '-u[assume UTF-8]' \\
-    '-U[unlock the server]' \\
-    '-v[request verbose logging]' \\
-    '-V[report version]' \\
-    '-c[execute shell-command]:shell command: ' \\
-    '-f[specify configuration file]:config file:_files' \\
-    '-L[socket name]:socket name: ' \\
-    '-S[socket path]:socket path:_files' \\
-    '-T[terminal features]:features: ' \\
-    '1: :->cmds' \\
-    '*:: :->args' && ret=0
-
-  case $state in
-    cmds)
-      _describe -t commands 'ztmux command' commands && ret=0
-      ;;
-    args)
-      curcontext="${{curcontext%:*:*}}:ztmux-$line[1]:"
-      case $line[1] in
-{chr(10).join(case_lines)}
-      *)
-        _default && ret=0
-        ;;
-      esac
-      ;;
-  esac
-  return ret
-}}
-
-_ztmux "$@"
-"""
-    open("completions/_ztmux", "w", encoding="utf-8").write(out)
-    print(f"wrote completions/_ztmux — {len(cmds)} commands + {len(EXTENSIONS)} extensions")
+    open(OUT, "w", encoding="utf-8").write(base)
+    print(f"wrote {OUT} — upstream _tmux depth + {len(EXTENSIONS)} ztmux extensions")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
