@@ -148,6 +148,16 @@ EXTENSIONS = [
         ],
         "deep inspector for a single pane (ztmux extension)",
     ),
+    (
+        "dedup",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "find redundant panes (same cwd + command) (ztmux extension)",
+    ),
+    (
+        "size",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "report pane geometry, smallest first (ztmux extension)",
+    ),
 ]
 
 

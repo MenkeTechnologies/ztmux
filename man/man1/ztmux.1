@@ -213,6 +213,24 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .I target
 .RB [ \-o
 .IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B dedup
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B size
+.RB [ \-o
+.IR json ]
 .SH DESCRIPTION
 .B ztmux
 is a terminal multiplexer: it lets a number of terminals be created,
@@ -693,6 +711,31 @@ CPU/memory/RSS, and the tail of its current screen.
 .B \-o
 .I json
 emits the same as one object.
+.SS ztmux dedup
+.B ztmux dedup
+groups every live pane by its current working directory and running command and
+prints only the groups with two or more members \(em the redundant panes you can
+close. Where
+.B prune
+reclaims dead or empty objects and
+.B find
+searches metadata for a query,
+.B dedup
+computes the duplicate relation the others do not. Each group is given a stable
+integer id so the flat table stays greppable; panes with no working directory
+are skipped.
+.B \-o
+.I json
+emits one object per group, each carrying its member panes.
+.SS ztmux size
+.B ztmux size
+reports every live pane's
+.IR width x height
+and derived cell area, smallest area first, so the cramped panes sort to the top
+\(em the "which pane is too small to work in" view.
+.B \-o
+.I json
+emits the same rows as a JSON array.
 .SS Default key bindings
 For convenience each extension is also bound under the prefix key (these
 bindings are original to
