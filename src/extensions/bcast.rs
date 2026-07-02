@@ -82,9 +82,7 @@ fn parse_args() -> Option<Args> {
     let consumed: Vec<&String> = rest
         .iter()
         .enumerate()
-        .filter_map(|(i, a)| {
-            (i > 0 && (rest[i - 1] == "-c" || rest[i - 1] == "-s")).then_some(a)
-        })
+        .filter_map(|(i, a)| (i > 0 && (rest[i - 1] == "-c" || rest[i - 1] == "-s")).then_some(a))
         .collect();
     let command = rest
         .iter()

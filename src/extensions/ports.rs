@@ -109,13 +109,13 @@ fn attribute(listens: &[(i64, u32)], procs: &[Proc], panes: &[Pane]) -> Vec<Row>
             };
             let (pane, loc) = owner
                 .and_then(|op| panes.iter().find(|p| p.pid == op))
-                .map_or((String::new(), "-".to_string()), |p| {
-                    (p.id.clone(), loc(p))
-                });
+                .map_or((String::new(), "-".to_string()), |p| (p.id.clone(), loc(p)));
             Row {
                 port,
                 pid,
-                command: comm.get(&pid).map_or_else(|| "?".to_string(), |c| basename(c).to_string()),
+                command: comm
+                    .get(&pid)
+                    .map_or_else(|| "?".to_string(), |c| basename(c).to_string()),
                 pane,
                 loc,
             }
@@ -141,7 +141,10 @@ fn render_text(rows: &[Row], color: bool) -> String {
     out.push_str(&format!(
         "{}\n",
         paint(
-            &format!("{:>6} {:<8} {:<16} {:>7} {}", "PORT", "PANE", "LOCATION", "PID", "COMMAND"),
+            &format!(
+                "{:>6} {:<8} {:<16} {:>7} {}",
+                "PORT", "PANE", "LOCATION", "PID", "COMMAND"
+            ),
             "1"
         )
     ));
@@ -203,9 +206,21 @@ mod tests {
 
     fn procs() -> Vec<Proc> {
         vec![
-            Proc { pid: 100, ppid: 1, comm: "zsh".into() },
-            Proc { pid: 200, ppid: 100, comm: "npm".into() },
-            Proc { pid: 300, ppid: 200, comm: "node".into() },
+            Proc {
+                pid: 100,
+                ppid: 1,
+                comm: "zsh".into(),
+            },
+            Proc {
+                pid: 200,
+                ppid: 100,
+                comm: "npm".into(),
+            },
+            Proc {
+                pid: 300,
+                ppid: 200,
+                comm: "node".into(),
+            },
         ]
     }
 

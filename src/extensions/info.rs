@@ -30,7 +30,10 @@ pub(crate) fn run(socket: &str) -> i32 {
         eprintln!("ztmux info: no pane matched {target:?}");
         return 1;
     };
-    let stat = gather(&[pane.pid]).get(&pane.pid).cloned().unwrap_or_default();
+    let stat = gather(&[pane.pid])
+        .get(&pane.pid)
+        .cloned()
+        .unwrap_or_default();
     let tail = capture_pane(socket, &pane.id, false)
         .map(|c| tail_lines(&c, TAIL))
         .unwrap_or_default();
@@ -87,7 +90,11 @@ fn resolve<'a>(snap: &'a Snapshot, target: &str) -> Option<&'a Pane> {
 
 /// The last `n` non-empty-trailing lines of a capture.
 fn tail_lines(content: &str, n: usize) -> Vec<String> {
-    let mut lines: Vec<String> = content.trim_end_matches('\n').lines().map(str::to_string).collect();
+    let mut lines: Vec<String> = content
+        .trim_end_matches('\n')
+        .lines()
+        .map(str::to_string)
+        .collect();
     let start = lines.len().saturating_sub(n);
     lines.split_off(start)
 }
@@ -102,7 +109,10 @@ fn render_text(pane: &Pane, stat: &ProcStat, tail: &[String], color: bool) -> St
     };
     let loc = format!("{}:{}.{}", pane.session, pane.window, pane.index);
     let mut out = String::new();
-    out.push_str(&format!("{}\n", paint(&format!("{} {}", pane.id, loc), "1;36")));
+    out.push_str(&format!(
+        "{}\n",
+        paint(&format!("{} {}", pane.id, loc), "1;36")
+    ));
     let row = |k: &str, v: String| format!("  {:<10} {}\n", format!("{k}:"), v);
     out.push_str(&row("command", pane.command.clone()));
     out.push_str(&row("pid", pane.pid.to_string()));
@@ -150,7 +160,10 @@ fn render_json(pane: &Pane, stat: &ProcStat, tail: &[String]) -> String {
         "state": stat.state,
         "screen_tail": tail,
     });
-    format!("{}\n", serde_json::to_string_pretty(&doc).unwrap_or_default())
+    format!(
+        "{}\n",
+        serde_json::to_string_pretty(&doc).unwrap_or_default()
+    )
 }
 
 #[cfg(test)]
@@ -160,9 +173,33 @@ mod tests {
     fn snap() -> Snapshot {
         Snapshot {
             panes: vec![
-                Pane { id: "%0".into(), session: "work".into(), window: 0, index: 0, pid: 10, command: "zsh".into(), ..Default::default() },
-                Pane { id: "%1".into(), session: "work".into(), window: 0, index: 1, pid: 11, command: "nvim".into(), ..Default::default() },
-                Pane { id: "%2".into(), session: "ops".into(), window: 2, index: 0, pid: 12, command: "top".into(), ..Default::default() },
+                Pane {
+                    id: "%0".into(),
+                    session: "work".into(),
+                    window: 0,
+                    index: 0,
+                    pid: 10,
+                    command: "zsh".into(),
+                    ..Default::default()
+                },
+                Pane {
+                    id: "%1".into(),
+                    session: "work".into(),
+                    window: 0,
+                    index: 1,
+                    pid: 11,
+                    command: "nvim".into(),
+                    ..Default::default()
+                },
+                Pane {
+                    id: "%2".into(),
+                    session: "ops".into(),
+                    window: 2,
+                    index: 0,
+                    pid: 12,
+                    command: "top".into(),
+                    ..Default::default()
+                },
             ],
             ..Default::default()
         }
@@ -209,7 +246,12 @@ mod tests {
     #[test]
     fn json_carries_identity_stats_and_tail() {
         let pane = &snap().panes[1];
-        let stat = ProcStat { cpu: 3.0, mem: 1.0, rss_kb: 2048, state: "S".into() };
+        let stat = ProcStat {
+            cpu: 3.0,
+            mem: 1.0,
+            rss_kb: 2048,
+            state: "S".into(),
+        };
         let tail = vec!["last line".to_string()];
         let v: serde_json::Value = serde_json::from_str(&render_json(pane, &stat, &tail)).unwrap();
         assert_eq!(v["pane"], "%1");
@@ -223,7 +265,12 @@ mod tests {
     #[test]
     fn text_shows_fields_and_screen_section() {
         let pane = &snap().panes[0];
-        let stat = ProcStat { cpu: 5.5, mem: 2.0, rss_kb: 1024, state: "R".into() };
+        let stat = ProcStat {
+            cpu: 5.5,
+            mem: 2.0,
+            rss_kb: 1024,
+            state: "R".into(),
+        };
         let s = render_text(pane, &stat, &["hello".to_string()], false);
         assert!(s.contains("%0 work:0.0"));
         assert!(s.contains("command:") && s.contains("zsh"));

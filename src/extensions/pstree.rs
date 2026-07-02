@@ -173,18 +173,48 @@ mod tests {
 
     fn procs() -> Vec<Proc> {
         vec![
-            Proc { pid: 100, ppid: 1, comm: "zsh".into() },
-            Proc { pid: 200, ppid: 100, comm: "npm".into() },
-            Proc { pid: 300, ppid: 200, comm: "node".into() },
-            Proc { pid: 400, ppid: 100, comm: "vim".into() },
+            Proc {
+                pid: 100,
+                ppid: 1,
+                comm: "zsh".into(),
+            },
+            Proc {
+                pid: 200,
+                ppid: 100,
+                comm: "npm".into(),
+            },
+            Proc {
+                pid: 300,
+                ppid: 200,
+                comm: "node".into(),
+            },
+            Proc {
+                pid: 400,
+                ppid: 100,
+                comm: "vim".into(),
+            },
         ]
     }
 
     fn snap() -> Snapshot {
         Snapshot {
             panes: vec![
-                Pane { id: "%0".into(), session: "w".into(), window: 0, index: 0, pid: 100, ..Default::default() },
-                Pane { id: "%1".into(), session: "w".into(), window: 0, index: 1, pid: 999, ..Default::default() },
+                Pane {
+                    id: "%0".into(),
+                    session: "w".into(),
+                    window: 0,
+                    index: 0,
+                    pid: 100,
+                    ..Default::default()
+                },
+                Pane {
+                    id: "%1".into(),
+                    session: "w".into(),
+                    window: 0,
+                    index: 1,
+                    pid: 999,
+                    ..Default::default()
+                },
             ],
             ..Default::default()
         }
@@ -226,7 +256,10 @@ mod tests {
         let forest = build_forest(&snap(), &procs());
         let v: serde_json::Value = serde_json::from_str(&render_json(&forest)).unwrap();
         assert_eq!(v[0]["tree"]["command"], "zsh");
-        assert_eq!(v[0]["tree"]["children"][0]["children"][0]["command"], "node");
+        assert_eq!(
+            v[0]["tree"]["children"][0]["children"][0]["command"],
+            "node"
+        );
         assert!(v[1]["tree"].is_null());
     }
 
@@ -235,8 +268,16 @@ mod tests {
     #[test]
     fn self_parent_does_not_recurse_forever() {
         let procs = vec![
-            Proc { pid: 100, ppid: 1, comm: "zsh".into() },
-            Proc { pid: 100, ppid: 100, comm: "zsh".into() },
+            Proc {
+                pid: 100,
+                ppid: 1,
+                comm: "zsh".into(),
+            },
+            Proc {
+                pid: 100,
+                ppid: 100,
+                comm: "zsh".into(),
+            },
         ];
         let forest = build_forest(&snap(), &procs);
         // Completes and roots at the pane pid without hanging.

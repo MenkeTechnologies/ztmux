@@ -46,9 +46,7 @@ pub(crate) fn run(socket: &str) -> i32 {
 /// The value of `-t <substr>`, if present.
 fn target_arg() -> Option<String> {
     let args: Vec<String> = std::env::args().collect();
-    args.windows(2)
-        .find(|w| w[0] == "-t")
-        .map(|w| w[1].clone())
+    args.windows(2).find(|w| w[0] == "-t").map(|w| w[1].clone())
 }
 
 /// Build the ordered list of panes to dump, running `grab` for each pane's

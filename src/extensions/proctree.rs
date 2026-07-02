@@ -94,7 +94,14 @@ mod tests {
     fn parses_pid_ppid_and_basenames_comm() {
         let t = parse_table("    1     0 /sbin/launchd\n  341     1 /usr/libexec/logd\n");
         assert_eq!(t.len(), 2);
-        assert_eq!(t[0], Proc { pid: 1, ppid: 0, comm: "launchd".into() });
+        assert_eq!(
+            t[0],
+            Proc {
+                pid: 1,
+                ppid: 0,
+                comm: "launchd".into()
+            }
+        );
         assert_eq!(t[1].comm, "logd");
     }
 
@@ -115,9 +122,21 @@ mod tests {
     #[test]
     fn children_map_groups_and_sorts_by_pid() {
         let procs = vec![
-            Proc { pid: 10, ppid: 1, comm: "zsh".into() },
-            Proc { pid: 30, ppid: 10, comm: "node".into() },
-            Proc { pid: 20, ppid: 10, comm: "vim".into() },
+            Proc {
+                pid: 10,
+                ppid: 1,
+                comm: "zsh".into(),
+            },
+            Proc {
+                pid: 30,
+                ppid: 10,
+                comm: "node".into(),
+            },
+            Proc {
+                pid: 20,
+                ppid: 10,
+                comm: "vim".into(),
+            },
         ];
         let m = children_map(&procs);
         assert_eq!(m.get(&10), Some(&vec![20, 30]));
@@ -128,10 +147,26 @@ mod tests {
     fn ancestor_in_finds_nearest_root() {
         // 40 → 30 → 10 → 1. Roots {10} → 10; roots {1} → 1 (skips 30,10 if not root).
         let procs = vec![
-            Proc { pid: 1, ppid: 0, comm: "init".into() },
-            Proc { pid: 10, ppid: 1, comm: "zsh".into() },
-            Proc { pid: 30, ppid: 10, comm: "npm".into() },
-            Proc { pid: 40, ppid: 30, comm: "node".into() },
+            Proc {
+                pid: 1,
+                ppid: 0,
+                comm: "init".into(),
+            },
+            Proc {
+                pid: 10,
+                ppid: 1,
+                comm: "zsh".into(),
+            },
+            Proc {
+                pid: 30,
+                ppid: 10,
+                comm: "npm".into(),
+            },
+            Proc {
+                pid: 40,
+                ppid: 30,
+                comm: "node".into(),
+            },
         ];
         let pm = parent_map(&procs);
         assert_eq!(ancestor_in(40, &pm, &[10]), Some(10));
@@ -142,7 +177,11 @@ mod tests {
     #[test]
     fn ancestor_walk_is_cycle_safe() {
         // A self-parent (pid == ppid) must not loop forever.
-        let procs = vec![Proc { pid: 5, ppid: 5, comm: "weird".into() }];
+        let procs = vec![Proc {
+            pid: 5,
+            ppid: 5,
+            comm: "weird".into(),
+        }];
         let pm = parent_map(&procs);
         assert_eq!(ancestor_in(5, &pm, &[1]), None);
     }

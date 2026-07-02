@@ -11,6 +11,7 @@ pub(crate) mod events;
 pub(crate) mod find;
 pub(crate) mod graph;
 pub(crate) mod grep;
+pub(crate) mod help;
 pub(crate) mod info;
 pub(crate) mod layout;
 pub(crate) mod peek;
