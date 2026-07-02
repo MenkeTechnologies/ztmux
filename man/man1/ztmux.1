@@ -121,6 +121,34 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .RB [ \-t
 .IR window ]
 .RB [ \-f ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B find
+.I query
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B recent
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B usage
+.RB [ \-o
+.IR json ]
 .SH DESCRIPTION
 .B ztmux
 is a terminal multiplexer: it lets a number of terminals be created,
@@ -472,6 +500,38 @@ lists the presets. It is
 or
 .B \-\-apply
 to run them.
+.SS ztmux find
+.B ztmux find
+.I query
+searches every pane in the server and prints the ones whose command, current
+path, title, or enclosing window name contains
+.I query
+(a case-insensitive substring match). Each row shows the pane id, its
+.RI ( session : window . pane )
+location, the command, which fields matched, and the path. It exits non-zero
+when nothing matched, so it composes in shell
+.B if
+tests.
+.B \-o
+.I json
+emits the matches as a JSON array.
+.SS ztmux recent
+.B ztmux recent
+lists the sessions ranked by last activity, most-recently-active first, with a
+compact relative age for both activity and creation time. It is the pipeable
+"jump back to what I was last doing" primitive.
+.B \-o
+.I json
+emits the rows as a JSON array (activity and creation kept as raw Unix
+seconds).
+.SS ztmux usage
+.B ztmux usage
+aggregates each pane's CPU%, memory%, and resident-set size by session and
+prints one row per session, busiest (by CPU) first \(em the "which session is
+eating the machine" view.
+.B \-o
+.I json
+emits the rollup as a JSON array.
 .SS Default key bindings
 For convenience each extension is also bound under the prefix key (these
 bindings are original to

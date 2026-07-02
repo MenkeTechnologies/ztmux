@@ -4,8 +4,8 @@
 #
 # Covers every implemented command (and alias), the client subcommands
 # (dashboard, switch, tree, doctor, stats, graph, watch, events, ps, snapshot,
-# prune, layout), and the structured `-o json|jsonl|csv|tsv|table`
-# output flag on the list-* commands.
+# prune, layout, find, recent, usage), and the structured
+# `-o json|jsonl|csv|tsv|table` output flag on the list-* commands.
 
 __ztmux_run() { ztmux "$@" 2>/dev/null }
 __ztmux_sessions()  { local -a v; v=(${(f)"$(__ztmux_run list-sessions -F '#{session_name}')"}); compadd -a v }
@@ -200,6 +200,9 @@ _ztmux() {
     'snapshot:dump the whole server as one nested JSON document (ztmux extension)'
     'prune:remove dead/empty/idle server objects (ztmux extension)'
     'layout:apply a named layout preset to a window (ztmux extension)'
+    'find:search panes by command/path/title/window (ztmux extension)'
+    'recent:list sessions ranked by last activity (ztmux extension)'
+    'usage:per-session CPU/MEM/RSS resource rollup (ztmux extension)'
   )
 
   _arguments -C \
@@ -1109,6 +1112,22 @@ _ztmux() {
         '-t[target window]:target' \
         '-f[apply (default: dry-run)]' \
         '--apply[apply (default: dry-run)]' && ret=0
+        ;;
+      find)
+        _arguments -s \
+        ':query:' \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
+        ;;
+      recent)
+        _arguments -s \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
+        ;;
+      usage)
+        _arguments -s \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
         ;;
       *)
         _default && ret=0

@@ -5,7 +5,7 @@ Sources of truth:
   * the `cmd_entry { name, alias, usage }` table in src/ported/cmd_*.rs
   * the client subcommands added under src/extensions/
     (dashboard, switch, tree, doctor, stats, graph, watch, events, ps,
-    snapshot, prune, layout)
+    snapshot, prune, layout, find, recent, usage)
   * the global option string parsed by tmux_main() in src/ported/tmux.rs
 
 Run from the repo root:  python3 scripts/gen_zsh_completion.py
@@ -174,6 +174,25 @@ EXTENSIONS = [
         ],
         "apply a named layout preset to a window (ztmux extension)",
     ),
+    (
+        "find",
+        [
+            ":query:",
+            "-o[output format]:format:(json)",
+            "--json[machine-readable JSON output]",
+        ],
+        "search panes by command/path/title/window (ztmux extension)",
+    ),
+    (
+        "recent",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "list sessions ranked by last activity (ztmux extension)",
+    ),
+    (
+        "usage",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "per-session CPU/MEM/RSS resource rollup (ztmux extension)",
+    ),
 ]
 
 
@@ -212,8 +231,8 @@ def main() -> int:
 #
 # Covers every implemented command (and alias), the client subcommands
 # (dashboard, switch, tree, doctor, stats, graph, watch, events, ps, snapshot,
-# prune, layout), and the structured `-o json|jsonl|csv|tsv|table`
-# output flag on the list-* commands.
+# prune, layout, find, recent, usage), and the structured
+# `-o json|jsonl|csv|tsv|table` output flag on the list-* commands.
 
 __ztmux_run() {{ ztmux "$@" 2>/dev/null }}
 __ztmux_sessions()  {{ local -a v; v=(${{(f)"$(__ztmux_run list-sessions -F '#{{session_name}}')"}}); compadd -a v }}
