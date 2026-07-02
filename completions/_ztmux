@@ -1989,6 +1989,104 @@ _ztmux-size() {
     '--json[machine-readable JSON output]'
 }
 
+_ztmux-groups() {
+  [[ -n ${tmux_describe} ]] && print "cluster sessions by session group (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-tty() {
+  [[ -n ${tmux_describe} ]] && print "map every pane to its terminal device (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-git() {
+  [[ -n ${tmux_describe} ]] && print "git branch + dirty state of every pane's repo (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-active() {
+  [[ -n ${tmux_describe} ]] && print "focused window/pane of every session (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-ssh() {
+  [[ -n ${tmux_describe} ]] && print "which panes hold an SSH connection, and where (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-disk() {
+  [[ -n ${tmux_describe} ]] && print "filesystem usage behind each pane's cwd (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-net() {
+  [[ -n ${tmux_describe} ]] && print "established outbound connections per pane (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-env() {
+  [[ -n ${tmux_describe} ]] && print "per-session environment overrides (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-history() {
+  [[ -n ${tmux_describe} ]] && print "rank panes by scrollback buffer size (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-mode() {
+  [[ -n ${tmux_describe} ]] && print "panes currently frozen in a mode (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-zoom() {
+  [[ -n ${tmux_describe} ]] && print "windows with a zoomed pane (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-marks() {
+  [[ -n ${tmux_describe} ]] && print "the marked pane(s) (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-alerts() {
+  [[ -n ${tmux_describe} ]] && print "windows with a pending bell/activity/silence alert (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-titles() {
+  [[ -n ${tmux_describe} ]] && print "every pane's advertised title (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
 # And here is the actual _ztmux(), that puts it all together:
 _ztmux() {
   local curcontext="${curcontext}" state line ret=1

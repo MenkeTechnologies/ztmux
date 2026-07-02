@@ -158,6 +158,76 @@ EXTENSIONS = [
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "report pane geometry, smallest first (ztmux extension)",
     ),
+    (
+        "groups",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "cluster sessions by session group (ztmux extension)",
+    ),
+    (
+        "tty",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "map every pane to its terminal device (ztmux extension)",
+    ),
+    (
+        "git",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "git branch + dirty state of every pane's repo (ztmux extension)",
+    ),
+    (
+        "active",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "focused window/pane of every session (ztmux extension)",
+    ),
+    (
+        "ssh",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "which panes hold an SSH connection, and where (ztmux extension)",
+    ),
+    (
+        "disk",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "filesystem usage behind each pane's cwd (ztmux extension)",
+    ),
+    (
+        "net",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "established outbound connections per pane (ztmux extension)",
+    ),
+    (
+        "env",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "per-session environment overrides (ztmux extension)",
+    ),
+    (
+        "history",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "rank panes by scrollback buffer size (ztmux extension)",
+    ),
+    (
+        "mode",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes currently frozen in a mode (ztmux extension)",
+    ),
+    (
+        "zoom",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows with a zoomed pane (ztmux extension)",
+    ),
+    (
+        "marks",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the marked pane(s) (ztmux extension)",
+    ),
+    (
+        "alerts",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows with a pending bell/activity/silence alert (ztmux extension)",
+    ),
+    (
+        "titles",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "every pane's advertised title (ztmux extension)",
+    ),
 ]
 
 

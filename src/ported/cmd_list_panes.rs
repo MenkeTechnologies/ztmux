@@ -47,6 +47,11 @@ const LIST_PANES_FIELDS: &[Field] = &[
     Field { key: "title", fmt: c!("#{pane_title}"), kind: FieldKind::Str },
     Field { key: "width", fmt: c!("#{pane_width}"), kind: FieldKind::Int },
     Field { key: "height", fmt: c!("#{pane_height}"), kind: FieldKind::Int },
+    Field { key: "history_size", fmt: c!("#{history_size}"), kind: FieldKind::Int },
+    Field { key: "history_limit", fmt: c!("#{history_limit}"), kind: FieldKind::Int },
+    Field { key: "in_mode", fmt: c!("#{pane_in_mode}"), kind: FieldKind::Bool },
+    Field { key: "mode", fmt: c!("#{pane_mode}"), kind: FieldKind::Str },
+    Field { key: "marked", fmt: c!("#{pane_marked}"), kind: FieldKind::Bool },
 ];
 
 /// C `vendor/tmux/cmd-list-panes.c:52`: `static enum cmd_retval cmd_list_panes_exec(struct cmd *self, struct cmdq_item *item)`

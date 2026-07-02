@@ -231,6 +231,132 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .B size
 .RB [ \-o
 .IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B groups
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B tty
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B git
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B active
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B ssh
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B disk
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B net
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B env
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B history
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B mode
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B zoom
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B marks
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B alerts
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B titles
+.RB [ \-o
+.IR json ]
 .SH DESCRIPTION
 .B ztmux
 is a terminal multiplexer: it lets a number of terminals be created,
@@ -733,6 +859,162 @@ reports every live pane's
 .IR width x height
 and derived cell area, smallest area first, so the cramped panes sort to the top
 \(em the "which pane is too small to work in" view.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux groups
+.B ztmux groups
+lists only the sessions that belong to a session group \(em sessions created
+with
+.B new\-session \-t
+that share one set of windows \(em clustered by group then name, so members of
+the same group sit together. It is the "which of my sessions are really the same
+windows" view; ungrouped sessions are omitted.
+.B \-o
+.I json
+emits one object per group, each carrying its member sessions.
+.SS ztmux tty
+.B ztmux tty
+maps every live pane to its terminal device
+.RI ( /dev/ttys NNN ),
+sorted by location \(em the path you write to a pane directly or correlate with
+.BR ps (1),
+.BR w (1),
+or
+.BR lsof (8).
+Dead panes are skipped.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux git
+.B ztmux git
+asks git about every live pane's working directory and prints one row per pane
+that is inside a repository \(em its repo name, current branch (or short SHA
+when detached), and whether the tree is dirty. It is the multi-repo, multi-pane
+status board: "which pane is on which branch, and is it dirty." Panes outside a
+repo are omitted; unique directories are resolved once. Rows are sorted by repo,
+branch, then location.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux active
+.B ztmux active
+prints the focus point of every session \(em its active window and the active
+pane inside it, with that pane's command and path. Where
+.B tree
+prints the whole structure,
+.B active
+is the one-line-per-session "where is focus, everywhere" jump map. Sorted by
+session.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux ssh
+.B ztmux ssh
+scans the process table for
+.B ssh
+clients, parses each one's destination from its command line, and attributes it
+to the pane it runs under \(em the map of every live remote session: "which pane
+am I remoted into, and where." SSH processes under no pane are dropped. Rows are
+sorted by location then target.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux disk
+.B ztmux disk
+runs
+.BR df (1)
+against every live pane's working directory and reports the filesystem, how full
+it is, and how much is free \(em fullest first, the "which pane is on a disk
+about to fill up" view. Unique directories are resolved once; panes with no
+directory are omitted.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux net
+.B ztmux net
+lists every established outbound TCP connection and attributes it to the pane it
+runs under \(em "what is this pane talking to." Where
+.B ports
+shows inbound listeners,
+.B net
+shows the live remote peers; connections under no pane are dropped so the table
+stays the panes' own traffic. Rows are sorted by location then peer.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux env
+.B ztmux env
+compares every session's environment against the server's global environment
+.RB ( show\-environment \~ \-g )
+and prints only the variables that differ \(em the per-session overrides, the
+"why does this session's shell behave differently" view. Rows are sorted by
+session then variable.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux history
+.B ztmux history
+ranks every live pane by how many lines of scrollback it is holding, largest
+first, with how full each is against its own
+.B history\-limit
+\(em the "which pane is hoarding scrollback" view, the off-screen counterpart to
+.BR "ztmux size" .
+Ties break by location.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux mode
+.B ztmux mode
+lists the panes that are currently in a mode (copy-mode, view-mode, or a
+chooser) and which one \(em so a pane left paused, no longer showing live
+output, is easy to find. Panes showing live output are omitted; rows are sorted
+by location.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux zoom
+.B ztmux zoom
+lists the windows that currently have a zoomed pane and the pane each is zoomed
+to \(em so a window left zoomed (hiding its other panes) is easy to find.
+Windows in a normal split are omitted; rows are sorted by session then window.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux marks
+.B ztmux marks
+lists the marked pane \(em the one set with
+.B select\-pane \-m
+that
+.BR join\-pane , swap\-pane ,
+and
+.B move\-pane
+use as the implicit source. tmux keeps at most one mark, so this is normally
+zero or one row.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux alerts
+.B ztmux alerts
+lists every window with a pending alert \(em a bell, activity (under
+.BR monitor\-activity ),
+or silence (under
+.BR monitor\-silence ) \(em
+and which alerts are pending on each, across the whole server without an
+attached client. Windows with no alert are omitted; rows are sorted by session
+then window.
+.B \-o
+.I json
+emits the same rows as a JSON array.
+.SS ztmux titles
+.B ztmux titles
+prints every live pane's advertised title \(em what the program inside set with
+the terminal title escape or
+.BR "select\-pane \-T" .
+ssh and many shells push the current host or command into it, so it is the
+complement to
+.BR "ztmux ssh" .
+Panes with an empty title are omitted; rows are sorted by location.
 .B \-o
 .I json
 emits the same rows as a JSON array.

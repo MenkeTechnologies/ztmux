@@ -50,6 +50,10 @@ const LIST_WINDOWS_FIELDS: &[Field] = &[
     Field { key: "width", fmt: c!("#{window_width}"), kind: FieldKind::Int },
     Field { key: "height", fmt: c!("#{window_height}"), kind: FieldKind::Int },
     Field { key: "layout", fmt: c!("#{window_layout}"), kind: FieldKind::Str },
+    Field { key: "zoomed", fmt: c!("#{window_zoomed_flag}"), kind: FieldKind::Bool },
+    Field { key: "bell", fmt: c!("#{window_bell_flag}"), kind: FieldKind::Bool },
+    Field { key: "activity", fmt: c!("#{window_activity_flag}"), kind: FieldKind::Bool },
+    Field { key: "silence", fmt: c!("#{window_silence_flag}"), kind: FieldKind::Bool },
 ];
 
 /// C `vendor/tmux/cmd-list-windows.c:59`: `static enum cmd_retval cmd_list_windows_exec(struct cmd *self, struct cmdq_item *item)`

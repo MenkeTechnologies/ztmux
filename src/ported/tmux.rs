@@ -655,6 +655,20 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"info"
                     | b"dedup"
                     | b"size"
+                    | b"groups"
+                    | b"tty"
+                    | b"git"
+                    | b"active"
+                    | b"ssh"
+                    | b"disk"
+                    | b"net"
+                    | b"env"
+                    | b"history"
+                    | b"mode"
+                    | b"zoom"
+                    | b"marks"
+                    | b"alerts"
+                    | b"titles"
             ) {
                 let sock = if SOCKET_PATH.is_null() {
                     String::new()
@@ -684,6 +698,20 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"info" => crate::extensions::info::run(&sock),
                     b"dedup" => crate::extensions::dedup::run(&sock),
                     b"size" => crate::extensions::size::run(&sock),
+                    b"groups" => crate::extensions::groups::run(&sock),
+                    b"tty" => crate::extensions::tty::run(&sock),
+                    b"git" => crate::extensions::git::run(&sock),
+                    b"active" => crate::extensions::active::run(&sock),
+                    b"ssh" => crate::extensions::ssh::run(&sock),
+                    b"disk" => crate::extensions::disk::run(&sock),
+                    b"net" => crate::extensions::net::run(&sock),
+                    b"env" => crate::extensions::env::run(&sock),
+                    b"history" => crate::extensions::history::run(&sock),
+                    b"mode" => crate::extensions::mode::run(&sock),
+                    b"zoom" => crate::extensions::zoom::run(&sock),
+                    b"marks" => crate::extensions::marks::run(&sock),
+                    b"alerts" => crate::extensions::alerts::run(&sock),
+                    b"titles" => crate::extensions::titles::run(&sock),
                     _ => crate::extensions::dashboard::run(&sock),
                 };
                 std::process::exit(code);

@@ -32,6 +32,10 @@ pub(crate) struct Window {
     pub(crate) width: i64,
     pub(crate) height: i64,
     pub(crate) layout: String,
+    pub(crate) zoomed: bool,
+    pub(crate) bell: bool,
+    pub(crate) activity: bool,
+    pub(crate) silence: bool,
 }
 
 #[derive(Deserialize, Default, Clone)]
@@ -50,6 +54,11 @@ pub(crate) struct Pane {
     pub(crate) title: String,
     pub(crate) width: i64,
     pub(crate) height: i64,
+    pub(crate) history_size: i64,
+    pub(crate) history_limit: i64,
+    pub(crate) in_mode: bool,
+    pub(crate) mode: String,
+    pub(crate) marked: bool,
 }
 
 #[derive(Deserialize, Default, Clone)]
