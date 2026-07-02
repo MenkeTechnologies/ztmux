@@ -84,6 +84,22 @@ pub(crate) fn ztmux_cmd(socket: &str, args: &[&str]) -> Command {
     c
 }
 
+/// Capture a pane's screen via `capture-pane -p`. With `history`, the full
+/// scrollback is included (`-S -`); otherwise only the visible screen. Returns
+/// the raw text, or `None` if the capture command failed.
+pub(crate) fn capture_pane(socket: &str, target: &str, history: bool) -> Option<String> {
+    let mut args: Vec<&str> = vec!["capture-pane", "-p", "-t", target];
+    if history {
+        args.push("-S");
+        args.push("-");
+    }
+    let out = ztmux_cmd(socket, &args).output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
 /// Run a list command and parse its JSON stdout into `Vec<T>`.
 pub(crate) fn run_json<T: DeserializeOwned>(socket: &str, args: &[&str]) -> Result<Vec<T>, String> {
     let out = ztmux_cmd(socket, args)
