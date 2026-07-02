@@ -228,6 +228,208 @@ EXTENSIONS = [
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "every pane's advertised title (ztmux extension)",
     ),
+    (
+        "equalize",
+        [
+            ":layout:(even-horizontal even-vertical main-horizontal main-vertical tiled)",
+            "-s[only windows in SESSION]:session:__ztmux-sessions",
+            "-f[apply (default: dry-run)]",
+            "--force[apply (default: dry-run)]",
+        ],
+        "re-balance every multi-pane window's layout (ztmux extension)",
+    ),
+    (
+        "respawn",
+        [
+            "-s[only dead panes in SESSION]:session:__ztmux-sessions",
+            "-f[respawn (default: dry-run)]",
+            "--force[respawn (default: dry-run)]",
+        ],
+        "revive every dead pane in place (ztmux extension)",
+    ),
+    (
+        "clear",
+        [
+            "-s[only panes in SESSION]:session:__ztmux-sessions",
+            "-f[clear (default: dry-run)]",
+            "--force[clear (default: dry-run)]",
+        ],
+        "free the scrollback of every pane (ztmux extension)",
+    ),
+    (
+        "retitle",
+        [
+            "-s[only panes in SESSION]:session:__ztmux-sessions",
+            "-f[apply (default: dry-run)]",
+            "--force[apply (default: dry-run)]",
+        ],
+        "label every pane with its running command (ztmux extension)",
+    ),
+    (
+        "cwd",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "working directories in use, busiest first (ztmux extension)",
+    ),
+    (
+        "who",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "clients attached to the server, by session (ztmux extension)",
+    ),
+    (
+        "age",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "sessions ranked by creation age, oldest first (ztmux extension)",
+    ),
+    (
+        "cmd",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "histogram of commands running across panes (ztmux extension)",
+    ),
+    (
+        "dead",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "dead panes still held open in a window (ztmux extension)",
+    ),
+    (
+        "layouts",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the current layout string of every window (ztmux extension)",
+    ),
+    (
+        "detached",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "sessions with no client attached, freshest first (ztmux extension)",
+    ),
+    (
+        "density",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows ranked by pane count, most first (ztmux extension)",
+    ),
+    (
+        "nested",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes running a nested terminal multiplexer (ztmux extension)",
+    ),
+    (
+        "solo",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows holding a single, unsplit pane (ztmux extension)",
+    ),
+    (
+        "shells",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes sitting at a bare shell prompt (ztmux extension)",
+    ),
+    (
+        "fanout",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "sessions ranked by total pane count (ztmux extension)",
+    ),
+    (
+        "busy",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes running a program, not idle at a prompt (ztmux extension)",
+    ),
+    (
+        "focus",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the active pane of every window (ztmux extension)",
+    ),
+    (
+        "named",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows with a deliberate name, not the running command (ztmux extension)",
+    ),
+    (
+        "project",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "project kind and root behind every pane (ztmux extension)",
+    ),
+    (
+        "remote",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the git remote each pane's repo points at (ztmux extension)",
+    ),
+    (
+        "ahead",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "how far each repo is ahead of/behind upstream (ztmux extension)",
+    ),
+    (
+        "changes",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "uncommitted file count per pane's repo, dirtiest first (ztmux extension)",
+    ),
+    (
+        "stash",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "repositories with stashed work behind a pane (ztmux extension)",
+    ),
+    (
+        "elapsed",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "how long each pane's process has been running (ztmux extension)",
+    ),
+    (
+        "mem",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes ranked by process resident memory (ztmux extension)",
+    ),
+    (
+        "state",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes whose process is in an abnormal state (ztmux extension)",
+    ),
+    (
+        "commit",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the last commit in every pane's repo (ztmux extension)",
+    ),
+    (
+        "linked",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows linked into more than one session (ztmux extension)",
+    ),
+    (
+        "conflicts",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "repos with unresolved merge conflicts (ztmux extension)",
+    ),
+    (
+        "user",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the owner of every pane's process (ztmux extension)",
+    ),
+    (
+        "tag",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the git describe/tag context of every pane's repo (ztmux extension)",
+    ),
+    (
+        "vcs",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "which version-control system each pane is under (ztmux extension)",
+    ),
+    (
+        "gone",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes whose working directory no longer exists (ztmux extension)",
+    ),
+    (
+        "buffers",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the server's paste buffers, largest first (ztmux extension)",
+    ),
+    (
+        "worktree",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes sitting in a linked git worktree (ztmux extension)",
+    ),
+    (
+        "submodules",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "repos with submodules and how many are out of sync (ztmux extension)",
+    ),
 ]
 
 

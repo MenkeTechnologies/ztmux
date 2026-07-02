@@ -669,6 +669,43 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"marks"
                     | b"alerts"
                     | b"titles"
+                    | b"equalize"
+                    | b"respawn"
+                    | b"clear"
+                    | b"retitle"
+                    | b"cwd"
+                    | b"who"
+                    | b"age"
+                    | b"cmd"
+                    | b"dead"
+                    | b"layouts"
+                    | b"detached"
+                    | b"density"
+                    | b"nested"
+                    | b"solo"
+                    | b"shells"
+                    | b"fanout"
+                    | b"busy"
+                    | b"focus"
+                    | b"named"
+                    | b"project"
+                    | b"remote"
+                    | b"ahead"
+                    | b"changes"
+                    | b"stash"
+                    | b"elapsed"
+                    | b"mem"
+                    | b"state"
+                    | b"commit"
+                    | b"linked"
+                    | b"conflicts"
+                    | b"user"
+                    | b"tag"
+                    | b"vcs"
+                    | b"gone"
+                    | b"buffers"
+                    | b"worktree"
+                    | b"submodules"
             ) {
                 let sock = if SOCKET_PATH.is_null() {
                     String::new()
@@ -712,6 +749,43 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"marks" => crate::extensions::marks::run(&sock),
                     b"alerts" => crate::extensions::alerts::run(&sock),
                     b"titles" => crate::extensions::titles::run(&sock),
+                    b"equalize" => crate::extensions::equalize::run(&sock),
+                    b"respawn" => crate::extensions::respawn::run(&sock),
+                    b"clear" => crate::extensions::clear::run(&sock),
+                    b"retitle" => crate::extensions::retitle::run(&sock),
+                    b"cwd" => crate::extensions::cwd::run(&sock),
+                    b"who" => crate::extensions::who::run(&sock),
+                    b"age" => crate::extensions::age::run(&sock),
+                    b"cmd" => crate::extensions::cmd::run(&sock),
+                    b"dead" => crate::extensions::dead::run(&sock),
+                    b"layouts" => crate::extensions::layouts::run(&sock),
+                    b"detached" => crate::extensions::detached::run(&sock),
+                    b"density" => crate::extensions::density::run(&sock),
+                    b"nested" => crate::extensions::nested::run(&sock),
+                    b"solo" => crate::extensions::solo::run(&sock),
+                    b"shells" => crate::extensions::shells::run(&sock),
+                    b"fanout" => crate::extensions::fanout::run(&sock),
+                    b"busy" => crate::extensions::busy::run(&sock),
+                    b"focus" => crate::extensions::focus::run(&sock),
+                    b"named" => crate::extensions::named::run(&sock),
+                    b"project" => crate::extensions::project::run(&sock),
+                    b"remote" => crate::extensions::remote::run(&sock),
+                    b"ahead" => crate::extensions::ahead::run(&sock),
+                    b"changes" => crate::extensions::changes::run(&sock),
+                    b"stash" => crate::extensions::stash::run(&sock),
+                    b"elapsed" => crate::extensions::elapsed::run(&sock),
+                    b"mem" => crate::extensions::mem::run(&sock),
+                    b"state" => crate::extensions::state::run(&sock),
+                    b"commit" => crate::extensions::commit::run(&sock),
+                    b"linked" => crate::extensions::linked::run(&sock),
+                    b"conflicts" => crate::extensions::conflicts::run(&sock),
+                    b"user" => crate::extensions::user::run(&sock),
+                    b"tag" => crate::extensions::tag::run(&sock),
+                    b"vcs" => crate::extensions::vcs::run(&sock),
+                    b"gone" => crate::extensions::gone::run(&sock),
+                    b"buffers" => crate::extensions::buffers::run(&sock),
+                    b"worktree" => crate::extensions::worktree::run(&sock),
+                    b"submodules" => crate::extensions::submodules::run(&sock),
                     _ => crate::extensions::dashboard::run(&sock),
                 };
                 std::process::exit(code);

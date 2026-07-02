@@ -13,9 +13,8 @@
 
 use std::collections::HashMap;
 use std::io::IsTerminal;
-use std::path::Path;
-use std::process::Command;
 
+use super::gitcmd::{git_out, repo_name};
 use super::tmux_query::{Pane, poll};
 
 /// What git reports about one working directory.
@@ -93,29 +92,6 @@ fn resolve_git(path: &str) -> Option<GitInfo> {
         branch,
         dirty,
     })
-}
-
-/// One `git -C <path> <args…>` invocation; the trimmed stdout on success, else
-/// `None`.
-fn git_out(path: &str, args: &[&str]) -> Option<String> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(path)
-        .args(args)
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
-}
-
-/// The last path component of a repo root (`/home/u/proj` → `proj`), for the
-/// compact REPO column.
-fn repo_name(root: &str) -> String {
-    Path::new(root)
-        .file_name()
-        .map_or_else(|| root.to_string(), |n| n.to_string_lossy().into_owned())
 }
 
 /// One row per live pane whose directory resolved to a repo, sorted by repo,

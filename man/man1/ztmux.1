@@ -357,6 +357,344 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .B titles
 .RB [ \-o
 .IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B equalize
+.RI [ layout ]
+.RB [ \-s
+.IR session ]
+.RB [ \-f ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B respawn
+.RB [ \-s
+.IR session ]
+.RB [ \-f ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B clear
+.RB [ \-s
+.IR session ]
+.RB [ \-f ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B retitle
+.RB [ \-s
+.IR session ]
+.RB [ \-f ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B cwd
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B who
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B age
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B cmd
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B dead
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B layouts
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B detached
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B density
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B nested
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B solo
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B shells
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B fanout
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B busy
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B focus
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B named
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B project
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B remote
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B ahead
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B changes
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B stash
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B elapsed
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B mem
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B state
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B commit
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B linked
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B conflicts
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B user
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B tag
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B vcs
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B gone
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B buffers
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B worktree
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B submodules
+.RB [ \-o
+.IR json ]
 .SH DESCRIPTION
 .B ztmux
 is a terminal multiplexer: it lets a number of terminals be created,
@@ -1018,6 +1356,676 @@ Panes with an empty title are omitted; rows are sorted by location.
 .B \-o
 .I json
 emits the same rows as a JSON array.
+.SS ztmux equalize
+.B ztmux equalize
+re-lays every window that has more than one pane to a balanced layout, across
+the whole server or one session with
+.BR \-s .
+The
+.I layout
+positional selects the target
+.RB ( even\-horizontal ,
+.BR even\-vertical ,
+.BR main\-horizontal ,
+.BR main\-vertical ,
+or
+.BR tiled ,
+the default). Where
+.B ztmux layout
+applies a preset to one window, this sweeps them all. Like
+.BR prune ,
+it is dry-run by default and only applies with
+.BR \-f / \-\-force .
+.SS ztmux respawn
+.B ztmux respawn
+restarts every dead pane in place (running
+.B respawn\-pane
+on each), across the whole server or one session with
+.BR \-s .
+Where
+.B prune
+removes dead panes,
+.B respawn
+revives them. Like
+.BR prune ,
+it is dry-run by default and only acts with
+.BR \-f / \-\-force .
+.SS ztmux clear
+.B ztmux clear
+runs
+.B clear\-history
+on every pane that holds scrollback, across the whole server or one session with
+.BR \-s ,
+reclaiming that memory in one command. It is the write-side companion to
+.BR "ztmux history" .
+Panes with an empty buffer are skipped. Like
+.BR prune ,
+it is dry-run by default and only acts with
+.BR \-f / \-\-force .
+.SS ztmux retitle
+.B ztmux retitle
+sets each live pane's title (via
+.BR "select\-pane \-T" )
+to the command running in it, so
+.B ztmux titles
+and the status line show what each pane is doing. Only panes whose title differs
+from their command are touched. Like
+.BR prune ,
+it is dry-run by default and only applies with
+.BR \-f / \-\-force .
+.SS ztmux cwd
+.B ztmux cwd
+groups every live pane by its working directory and ranks the directories by
+pane count, busiest first \(en the "which directories am I working in, and how
+many panes sit in each" view. Where
+.B ztmux dedup
+reports only the panes that collide on the pair
+.RI ( path ", " command ),
+.B cwd
+lists every directory with its pane count and the distinct commands running
+there.
+.B $HOME
+is abbreviated to
+.B ~
+for display. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the full path, the pane count, the distinct commands, and every pane
+location as a machine-readable array.
+.SS ztmux who
+.B ztmux who
+lists the clients attached to the server \(en the terminals looking at it right
+now \(en with each client's tty, the session it is viewing, its screen size, its
+.BR $TERM ,
+and its pid. Clients are grouped by the session they view (a shared or remote
+socket may carry several). With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux age
+.B ztmux age
+ranks sessions by their creation time, oldest first \(en the mirror image of
+.BR "ztmux recent" ,
+which ranks by last activity. It surfaces the long-lived sessions that have been
+up the longest. A compact relative age is shown for the terminal; a session
+whose creation time is unknown sorts last and renders as
+.BR \- .
+With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+the raw unix creation timestamp is emitted.
+.SS ztmux cmd
+.B ztmux cmd
+counts how many live panes are running each command and ranks the commands by
+that count, busiest first \(en the "what am I running, and how much of it" view.
+Where
+.B ztmux ps
+prints one row per pane and
+.B ztmux cwd
+groups panes by directory,
+.B cmd
+collapses the server by command. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the command, the pane count, and every pane location as a
+machine-readable array.
+.SS ztmux dead
+.B ztmux dead
+reports every dead pane \(en a pane whose process exited while
+.B remain-on-exit
+kept it in place. Where
+.B ztmux prune
+reclaims dead panes and
+.B ztmux respawn
+revives them (both mutating),
+.B dead
+only lists them: the read-only inventory to look at before pruning or
+respawning. Each row shows the pane, its location, the command that was running,
+its last pid, and its working directory. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array; an empty server prints just
+the header.
+.SS ztmux layouts
+.B ztmux layouts
+reports the current layout string of every window \(en its pane count and the
+raw tmux layout geometry that
+.B select-layout
+consumes. Where
+.B ztmux layout
+applies a named preset and
+.B ztmux equalize
+re-balances windows,
+.B layouts
+only reports, so it is the view to capture before changing a layout (to restore
+it later) or to diff for windows that drifted off a preset. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux detached
+.B ztmux detached
+lists the sessions with no client attached \(en the ones running in the
+background \(en ranked by last activity, freshest first. Where
+.B ztmux recent
+ranks every session and
+.B ztmux age
+ranks them by creation time,
+.B detached
+filters to the ones nobody is looking at, so the session you most likely want to
+reattach sorts to the top and the stale ones you can safely kill sink to the
+bottom. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+the raw unix timestamps are emitted; an all-attached server prints just the
+header.
+.SS ztmux density
+.B ztmux density
+ranks windows by how many panes they hold, most-split first \(en the companion
+to
+.B ztmux size
+(which ranks individual panes by cell area) for spotting the window that has
+grown unwieldy and wants a
+.B break-pane
+or a fresh layout. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux nested
+.B ztmux nested
+lists the panes whose foreground command is itself a terminal multiplexer
+.RB ( tmux ", " ztmux ", " screen ", " zellij ", " byobu ", " dvtm ", " abduco ", " dtach ) \(en
+a multiplexer running inside one of this server's own panes. It is matched on the
+pane's
+.B pane_current_command
+so it catches a multiplexer started directly in a local pane; a remote
+multiplexer reached over SSH shows up as
+.B ssh
+(see
+.BR "ztmux ssh" )
+rather than here. Nested multiplexers swallow the prefix key and confuse
+.B send-keys
+and
+.BR capture-pane ,
+so it helps to see exactly where they are. The command is matched exactly, so
+.B tmuxinator
+and
+.B screenfetch
+are not mistaken for the real thing. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array; a server with none prints
+just the header.
+.SS ztmux solo
+.B ztmux solo
+lists the windows that hold a single, unsplit pane \(en the complement of
+.B ztmux density
+(which ranks windows by how many panes they hold). These are the windows you
+could split further or fold into another; each row also shows what the lone pane
+is running, so it doubles as the "which windows are a single bare shell" view.
+With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array; a server with no single-pane
+windows prints just the header.
+.SS ztmux shells
+.B ztmux shells
+lists the panes sitting at a bare shell prompt \(en a pane whose foreground
+command is an interactive shell
+.RB ( zsh ", " bash ", " fish ", " "\&..." )
+is idle, so it is a pane you can drop into and reuse. Where
+.B ztmux cmd
+counts every command and
+.B ztmux nested
+isolates the multiplexer panes,
+.B shells
+isolates the free, at-prompt panes. It is matched on the pane's
+.B pane_current_command
+so a pane running a foreground job reports that job instead and correctly drops
+out. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array; a server with no idle shells
+prints just the header.
+.SS ztmux fanout
+.B ztmux fanout
+ranks sessions by their total pane count across every window \(en pure
+structure, with no resource probing. Where
+.B ztmux density
+ranks individual windows and
+.B ztmux usage
+ranks sessions by the CPU and memory they burn (reading
+.IR /proc ),
+.B fanout
+answers "which session have I fanned out the most panes in" \(en a fast,
+always-available structural size, where a session full of idle shells is large
+even though it is light in
+.BR usage .
+With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux busy
+.B ztmux busy
+lists the live panes running a program rather than sitting idle at a prompt \(en
+the exact complement of
+.BR "ztmux shells" .
+These are the panes with an editor, a build, an
+.BR ssh ,
+or a nested multiplexer in the foreground: the "where is work actually happening
+right now" view. The two share a shell set, so
+.B busy
+and
+.B shells
+partition the live panes exactly. It is matched on the pane's
+.BR pane_current_command .
+With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array; a server where every pane is
+idle prints just the header.
+.SS ztmux focus
+.B ztmux focus
+reports the active pane of every window \(en the pane your cursor lands in when
+you select that window. Where
+.B ztmux active
+reports focus once per session (the session's active window and its active
+pane),
+.B focus
+reports it once per window, so you see the landing pane for every window, not
+just the frontmost one \(en the "if I switch to window N, where do I end up" map.
+Each row shows the window, the active pane, and what it is running. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux named
+.B ztmux named
+lists the windows whose name no longer tracks the running command. With
+.B automatic-rename
+on, a window's name mirrors its active pane's command; a window whose name
+differs is one you have deliberately named (with
+.B rename-window
+or by turning automatic-rename off so a chosen name sticks). It is the "which
+windows did I bother to name, and what did I call them" view \(en the navigation
+map for
+.BR "select-window -t <name>" .
+Windows with an empty name, or whose name still equals the active command, are
+omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux project
+.B ztmux project
+reports the project kind and root behind every pane's directory. For each live
+pane it walks up from the working directory to the nearest project marker
+.RB ( Cargo.toml ", " go.mod ", " package.json ", " pyproject.toml ", " Gemfile ", "
+"\&..." , falling back to a bare
+.BR .git )
+and reports what kind of project the pane is sitting in and where its root is.
+Where
+.B ztmux git
+answers branch and dirty state and
+.B ztmux cwd
+groups by raw directory,
+.B project
+answers what you are working
+.I on
+in each pane. It is filesystem-only \(en marker lookups, no subprocess \(en and
+resolves each unique directory once. Panes not inside any recognised project are
+omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array, sorted by kind, project,
+then location.
+.SS ztmux remote
+.B ztmux remote
+reports the git
+.B origin
+remote each pane's repository points at, in a compact
+.I host/owner/repo
+form. Where
+.B ztmux git
+reports the working-tree condition and
+.B ztmux ahead
+reports sync distance,
+.B remote
+answers which repository a pane is in \(en the identity \(en so a wall of panes
+maps to the actual projects behind them. Panes outside a repo or with no
+.B origin
+are omitted, and each unique directory is resolved once. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows, including the raw URL, as a machine-readable array,
+sorted by remote then location.
+.SS ztmux ahead
+.B ztmux ahead
+reports how far each pane's repository is ahead of (unpushed) and behind
+(unpulled) its upstream. For every live pane on a branch that tracks an upstream
+it asks git for the ahead/behind counts and prints both, with the most
+out-of-sync repositories first, so the ones needing a push or pull float to the
+top. Panes outside a repo, or on a branch with no upstream, are omitted; each
+unique directory is resolved once. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux changes
+.B ztmux changes
+counts the files with uncommitted edits in every pane's repository \(en the
+.B git status --porcelain
+line count \(en and ranks the repos by it, dirtiest first. Where
+.B ztmux git
+reports dirty state as a yes/no and
+.B ztmux ahead
+counts unpushed commits,
+.B changes
+reports how much unsaved work is sitting in each working tree, so you can see
+where to commit next. Clean repositories and non-repo panes are omitted; each
+unique directory is resolved once. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux stash
+.B ztmux stash
+reports the repositories that have entries in
+.B git stash list
+behind a pane, and how many \(en the shelved work that is easy to forget across
+a wall of panes. Where
+.B ztmux changes
+counts uncommitted files and
+.B ztmux ahead
+counts unpushed commits,
+.B stash
+surfaces the third bucket of unfinished state: work you set aside and moved on
+from. Repositories with no stashes and non-repo panes are omitted; rows are
+sorted by stash count, most first. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux elapsed
+.B ztmux elapsed
+reports how long each pane's foreground process has been running, longest first
+\(en the view that surfaces the three-hour build you forgot about or the
+.B ssh
+session open since this morning. Where
+.B ztmux usage
+ranks by CPU and memory (how hard a process is working),
+.B elapsed
+ranks by wall-clock age (how long it has been working). A single
+.B ps
+call covers every pid. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows, elapsed as raw seconds, as a machine-readable array.
+.SS ztmux mem
+.B ztmux mem
+ranks every pane's process by resident set size, biggest first \(en the
+RAM-focused board. Where
+.B ztmux usage
+aggregates memory per session and
+.B ztmux ps
+prints the whole process table sorted by CPU,
+.B mem
+is the single-metric ranking for "which pane is eating memory", the companion
+to
+.B ztmux size
+(screen geometry) and
+.B ztmux history
+(scrollback). Process stats come from one shared
+.B ps
+call. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows, RSS in kilobytes, as a machine-readable array.
+.SS ztmux state
+.B ztmux state
+lists the panes whose process is in an abnormal state \(en a zombie that was
+never reaped, a process stopped by a signal, or one wedged in an uninterruptible
+disk or kernel wait. Where
+.B ztmux ps
+prints every pane's process with its state mixed in,
+.B state
+isolates just the panes that need a look: the health filter. The leading
+.B ps
+state code is mapped to a readable label. Healthy panes (running or sleeping)
+and panes with no process are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux commit
+.B ztmux commit
+reports the last commit in every pane's repository \(en the short SHA, how long
+ago it landed, and its subject \(en most-recent commit first. Where
+.B ztmux git
+shows branch and dirty state,
+.B ztmux ahead
+shows unpushed commits, and
+.B ztmux changes
+shows uncommitted files,
+.B commit
+shows what was last done in each repo. Panes outside a repo are omitted; each
+unique directory is resolved once. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows, commit time as raw unix seconds, as a machine-readable
+array.
+.SS ztmux linked
+.B ztmux linked
+reports the windows that live in more than one session at once. tmux's
+.B link-window
+lets a single window (the same
+.BR @id )
+appear under several session/index slots, where an edit in one is an edit in
+all; that sharing is invisible in the normal tree.
+.B linked
+groups every window by its id and reports the ones present in two or more
+sessions, with every place they show up, most-shared first. It is built purely
+from the server snapshot. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array; a server with no linked
+windows prints just the header.
+.SS ztmux conflicts
+.B ztmux conflicts
+counts the unmerged paths \(en the files a merge, rebase, or cherry-pick left in
+conflict \(en in every pane's repository, and reports only the repos that have
+any. Where
+.B ztmux changes
+counts all uncommitted files,
+.B conflicts
+isolates the subset that blocks progress: the repo is mid-operation and needs a
+resolution first. Repos with no conflicts and non-repo panes are omitted; rows
+are sorted by conflict count, most first. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux user
+.B ztmux user
+reports the user each pane's foreground process runs as, grouped by user. On a
+single-user box this is uniform, but on a shared host or a server it answers who
+is running what and where, and it catches the pane left in a
+.B sudo
+or
+.B root
+shell among your own. Where
+.B ztmux ps
+prints CPU and memory and
+.B ztmux elapsed
+prints runtime,
+.B user
+prints ownership. One
+.B ps
+call covers every pid. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux tag
+.B ztmux tag
+runs
+.B git describe --tags
+in every pane's repository and reports the result: the nearest tag and how many
+commits the checkout is past it (for example
+.IR v1.2.3-4-gabc123 ,
+four commits beyond
+.IR v1.2.3 ).
+Where
+.B ztmux commit
+shows the last commit and
+.B ztmux ahead
+shows distance from upstream,
+.B tag
+shows distance from the last release. A checkout sitting exactly on a tag is
+flagged. Repositories with no reachable tag, and non-repo panes, are omitted;
+each unique directory is resolved once. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux vcs
+.B ztmux vcs
+reports which version-control system each pane's directory is under, by walking
+up to the nearest marker
+.RB ( .git ", " .hg ", " .svn ", " .jj ", " "\&..." ).
+Where
+.B ztmux git
+and its siblings assume git,
+.B vcs
+answers the prior question \(en is this a checkout, and of what \(en so a
+polyglot tree with a Mercurial repo here and a Subversion checkout there names
+each. It is filesystem-only and resolves each unique directory once. Panes under
+no recognised VCS are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux gone
+.B ztmux gone
+finds the live panes whose working directory no longer exists on disk \(en
+deleted, renamed, or unmounted out from under them, so new commands fail for no
+obvious reason. Where
+.B ztmux cwd
+groups panes by directory and
+.B ztmux dead
+lists dead processes,
+.B gone
+flags a live pane in a dead place, so you can
+.B cd
+it somewhere real. It is filesystem-only and checks each unique directory once. A
+server whose panes are all in real directories prints just the header. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux buffers
+.B ztmux buffers
+lists the server's paste buffers \(en everything copied in copy-mode or loaded
+with
+.BR set-buffer / load-buffer \(en
+with each buffer's size and a one-line preview of its contents, largest first.
+The normal views never show the paste stack;
+.B buffers
+does, so you can see what you have before pasting. It reads the same
+.B list-buffers -o json
+output the port already emits. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows (full sample retained) as a machine-readable array; a
+server with no buffers prints just the header.
+.SS ztmux worktree
+.B ztmux worktree
+finds the panes sitting in a linked git worktree \(en a side checkout created by
+.B git worktree add
+that shares history with a main repo elsewhere. For each pane in a repo it
+compares the worktree's git-dir against the shared common git-dir; they differ
+only for a linked worktree. Where
+.B ztmux git
+reports branch and dirty state,
+.B worktree
+answers which panes are in a side checkout rather than the main tree. The main
+worktree, submodules, and non-repo panes are omitted; each unique directory is
+resolved once. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux submodules
+.B ztmux submodules
+runs
+.B git submodule status
+in every pane's repository and reports the repos that have submodules, with a
+count of how many are out of sync \(en not initialised, or checked out at a
+different commit than the superproject records. Where
+.B ztmux changes
+and
+.B ztmux ahead
+describe the superproject's own state,
+.B submodules
+describes its dependencies: the nested checkouts that quietly drift and break a
+build. Repos with no submodules and non-repo panes are omitted; those with drift
+sort first. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
 .SS Default key bindings
 For convenience each extension is also bound under the prefix key (these
 bindings are original to

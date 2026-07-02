@@ -83,20 +83,72 @@
       <thead><tr><th>Path</th><th>What</th></tr></thead>
       <tbody>
         <tr><td><code>src/ported/</code></td><td>The tmux port &mdash; <strong>138</strong> modules plus <strong>23</strong> compat shims that mirror <code>vendor/tmux</code> one-to-one. Held to C-name fidelity by the anti-drift gate.</td></tr>
-        <tr><td><code>src/extensions/</code></td><td>Original ztmux features with no C counterpart &mdash; the dashboard, fuzzy switcher, and structured output. Exempt from the gate.</td></tr>
+        <tr><td><code>src/extensions/</code></td><td>Original ztmux features with no C counterpart &mdash; structured output, the dashboard and fuzzy-switcher TUIs, and the family of pipeable client subcommands (see <em>Extensions</em>). Exempt from the gate.</td></tr>
         <tr><td><code>src/lib.rs</code>, <code>src/main.rs</code></td><td>Crate roots: the module tree (which re-points every ported module's file into <code>ported/</code>) plus the binary entry.</td></tr>
         <tr><td><code>vendor/tmux</code></td><td>Read-only, SHA-pinned reference &mdash; see <em>How the port is built</em>.</td></tr>
       </tbody>
     </table>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXTENSIONS &mdash; BEYOND tmux</h2>
-    <p class="prose">Because ztmux owns the whole stack, it adds capabilities upstream tmux does not have. All three are plain clients &mdash; they re-invoke the ztmux binary and read its own machine-readable output, so they need no linkage to the server internals:</p>
+    <p class="prose">Because ztmux owns the whole stack, it adds capabilities upstream tmux does not have. They are plain clients &mdash; they re-invoke the ztmux binary and read its own machine-readable output, so they need no linkage to the server internals. The foundation is structured output plus the two interactive TUIs:</p>
     <table class="hud">
       <thead><tr><th>Feature</th><th>Invocation</th><th>What</th></tr></thead>
       <tbody>
         <tr><td>Structured output</td><td><code>list-* -o json|jsonl|csv|tsv|table</code></td><td>Typed, machine-readable output for every <code>list-*</code> command, driven by the same <code>#{&hellip;}</code> format engine. <code>table</code> is aligned columns for humans; <code>json</code> feeds scripts and the TUIs below.</td></tr>
         <tr><td>Live dashboard</td><td><code>ztmux dashboard</code></td><td>A ratatui TUI: the session&rarr;window&rarr;pane tree, per-pane detail table, live server stats with a pane-count sparkline, kill-with-confirm, and 1&nbsp;s auto-refresh.</td></tr>
         <tr><td>Fuzzy switcher</td><td><code>ztmux switch</code></td><td>Type-to-filter picker over every session, window, and pane; Enter runs the right <code>switch-client</code>&nbsp;/&nbsp;<code>select-window</code>&nbsp;/&nbsp;<code>select-pane</code> to jump there.</td></tr>
+      </tbody>
+    </table>
+    <p class="prose">On top of that sits a family of one-shot client subcommands, each resolving the running server over the <code>list-* -o json</code> query layer. The <strong>inspection</strong> verbs are pipeable tables that also emit <code>-o json</code> / <code>--json</code>; the <strong>action</strong> verbs are dry-run by default and only mutate when passed <code>-f</code> / <code>--force</code>.</p>
+    <p class="prose"><strong>// INSPECTION</strong> &mdash; read-only, pipeable:</p>
+    <table class="hud">
+      <thead><tr><th>Command</th><th>What</th></tr></thead>
+      <tbody>
+        <tr><td><code>ztmux tree</code></td><td>Print the whole server as a session&rarr;window&rarr;pane ASCII tree.</td></tr>
+        <tr><td><code>ztmux stats</code></td><td>One-shot summary report of the running server.</td></tr>
+        <tr><td><code>ztmux graph</code></td><td>Render the server tree as DOT, Mermaid, or HTML.</td></tr>
+        <tr><td><code>ztmux snapshot</code></td><td>Dump the whole server as one nested JSON document.</td></tr>
+        <tr><td><code>ztmux doctor</code></td><td>Environment / server health check.</td></tr>
+        <tr><td><code>ztmux watch</code></td><td>Top-like live per-pane process monitor (TUI).</td></tr>
+        <tr><td><code>ztmux events</code></td><td>Stream server lifecycle events as JSONL.</td></tr>
+        <tr><td><code>ztmux ps</code></td><td>One-shot pipeable per-pane process table.</td></tr>
+        <tr><td><code>ztmux pstree</code></td><td>Process tree running under every pane.</td></tr>
+        <tr><td><code>ztmux usage</code></td><td>Per-session CPU / MEM / RSS resource rollup.</td></tr>
+        <tr><td><code>ztmux recent</code></td><td>Sessions ranked by last activity, freshest first.</td></tr>
+        <tr><td><code>ztmux find</code></td><td>Search panes by command / path / title / window.</td></tr>
+        <tr><td><code>ztmux grep</code></td><td>Search the live on-screen contents of every pane.</td></tr>
+        <tr><td><code>ztmux peek</code></td><td>Dump the visible contents of every pane at once.</td></tr>
+        <tr><td><code>ztmux info</code></td><td>Deep inspector for a single pane.</td></tr>
+        <tr><td><code>ztmux ports</code></td><td>Listening TCP ports mapped back to their pane.</td></tr>
+        <tr><td><code>ztmux net</code></td><td>Established outbound connections, per pane.</td></tr>
+        <tr><td><code>ztmux ssh</code></td><td>Which panes hold an SSH connection, and to which host.</td></tr>
+        <tr><td><code>ztmux git</code></td><td>Git branch + dirty state of every pane sitting in a repo.</td></tr>
+        <tr><td><code>ztmux disk</code></td><td>Filesystem usage behind each pane's working directory.</td></tr>
+        <tr><td><code>ztmux dedup</code></td><td>Find redundant panes (same cwd + command).</td></tr>
+        <tr><td><code>ztmux size</code></td><td>Pane geometry, smallest cell-area first.</td></tr>
+        <tr><td><code>ztmux history</code></td><td>Rank panes by scrollback buffer size, biggest first.</td></tr>
+        <tr><td><code>ztmux tty</code></td><td>Map every pane to its terminal device (<code>/dev/ttysNNN</code>).</td></tr>
+        <tr><td><code>ztmux groups</code></td><td>Sessions clustered by session group.</td></tr>
+        <tr><td><code>ztmux active</code></td><td>The focused window + pane of every session.</td></tr>
+        <tr><td><code>ztmux zoom</code></td><td>Windows that currently have a zoomed pane.</td></tr>
+        <tr><td><code>ztmux mode</code></td><td>Panes frozen in a mode (copy-mode, view-mode, chooser).</td></tr>
+        <tr><td><code>ztmux marks</code></td><td>The marked pane (source for join / swap / move).</td></tr>
+        <tr><td><code>ztmux alerts</code></td><td>Windows with a pending bell / activity / silence alert.</td></tr>
+        <tr><td><code>ztmux titles</code></td><td>Every pane's advertised terminal title.</td></tr>
+        <tr><td><code>ztmux env</code></td><td>Per-session environment overrides vs the global env.</td></tr>
+      </tbody>
+    </table>
+    <p class="prose"><strong>// ACTIONS</strong> &mdash; dry-run by default, apply with <code>-f</code>:</p>
+    <table class="hud">
+      <thead><tr><th>Command</th><th>What</th></tr></thead>
+      <tbody>
+        <tr><td><code>ztmux prune</code></td><td>Remove dead panes, empty sessions, and idle sessions.</td></tr>
+        <tr><td><code>ztmux layout</code></td><td>Apply a named layout preset to one window.</td></tr>
+        <tr><td><code>ztmux equalize</code></td><td>Re-balance every multi-pane window's layout, server-wide.</td></tr>
+        <tr><td><code>ztmux bcast</code></td><td>Broadcast a command to many panes at once.</td></tr>
+        <tr><td><code>ztmux respawn</code></td><td>Revive every dead pane in place (the inverse of prune).</td></tr>
+        <tr><td><code>ztmux clear</code></td><td>Free the scrollback of every pane holding any.</td></tr>
+        <tr><td><code>ztmux retitle</code></td><td>Label every pane with the command it is running.</td></tr>
       </tbody>
     </table>
 
