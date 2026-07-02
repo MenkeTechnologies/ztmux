@@ -4,8 +4,9 @@
 #
 # Covers every implemented command (and alias), the client subcommands
 # (dashboard, switch, tree, doctor, stats, graph, watch, events, ps, snapshot,
-# prune, layout, find, recent, usage, grep, peek, bcast), and the structured
-# `-o json|jsonl|csv|tsv|table` output flag on the list-* commands.
+# prune, layout, find, recent, usage, grep, peek, bcast, pstree, ports,
+# info), and the structured `-o json|jsonl|csv|tsv|table` output flag on the
+# list-* commands.
 
 __ztmux_run() { ztmux "$@" 2>/dev/null }
 __ztmux_sessions()  { local -a v; v=(${(f)"$(__ztmux_run list-sessions -F '#{session_name}')"}); compadd -a v }
@@ -206,6 +207,9 @@ _ztmux() {
     'grep:search the live contents of every pane (ztmux extension)'
     'peek:dump the visible contents of every pane (ztmux extension)'
     'bcast:broadcast a command to many panes at once (ztmux extension)'
+    'pstree:process tree running under every pane (ztmux extension)'
+    'ports:listening TCP ports mapped to panes (ztmux extension)'
+    'info:deep inspector for a single pane (ztmux extension)'
   )
 
   _arguments -C \
@@ -1155,6 +1159,22 @@ _ztmux() {
         '--no-enter[send keys without a trailing Enter]' \
         '-f[actually send (default: dry-run)]' \
         '--force[actually send (default: dry-run)]' && ret=0
+        ;;
+      pstree)
+        _arguments -s \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
+        ;;
+      ports)
+        _arguments -s \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
+        ;;
+      info)
+        _arguments -s \
+        ':target:__ztmux_panes' \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
         ;;
       *)
         _default && ret=0

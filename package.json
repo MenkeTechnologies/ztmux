@@ -16,7 +16,7 @@
     "fmt:check": "cargo fmt --all --check",
     "doc": "RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps --locked",
     "doc:open": "cargo doc --no-deps --open",
-    "localinstall": "cargo install --path .",
+    "localinstall": "cargo install --path . --force",
     "port-report": "python3 scripts/gen_port_report.py",
     "annotate": "python3 scripts/annotate_c_links.py",
     "clean": "cargo clean"

@@ -185,6 +185,34 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR session ]
 .RB [ \-N ]
 .RB [ \-f ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B pstree
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B ports
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B info
+.I target
+.RB [ \-o
+.IR json ]
 .SH DESCRIPTION
 .B ztmux
 is a terminal multiplexer: it lets a number of terminals be created,
@@ -628,6 +656,43 @@ is given. It is
 or
 .B \-\-force
 to actually send.
+.SS ztmux pstree
+.B ztmux pstree
+walks the OS process table and prints the full descendant process tree rooted
+at each pane's process \(em the "what is actually running in here" view, where
+.B ps
+shows only the pane's own shell. A pane whose process has exited shows
+.BR "(no process)" .
+.B \-o
+.I json
+emits a nested JSON document per pane.
+.SS ztmux ports
+.B ztmux ports
+lists every listening TCP socket and maps each back to the pane it runs under
+by walking the process tree, answering "which pane is my dev server in". A
+socket owned by no pane is still listed with a
+.B \-
+location. It degrades quietly to an empty table when
+.BR lsof (8)
+is unavailable.
+.B \-o
+.I json
+emits the rows as a JSON array.
+.SS ztmux info
+.B ztmux info
+.I target
+resolves
+.I target
+\(em a pane id
+.RI ( %N ),
+a
+.RI ( session : window . pane )
+location, or a session name \(em to one pane and prints everything the query
+layer knows about it: identity and geometry, its process id/command and
+CPU/memory/RSS, and the tail of its current screen.
+.B \-o
+.I json
+emits the same as one object.
 .SS Default key bindings
 For convenience each extension is also bound under the prefix key (these
 bindings are original to
