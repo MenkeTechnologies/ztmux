@@ -4,7 +4,7 @@
 #
 # Covers every implemented command (and alias), the client subcommands
 # (dashboard, switch, tree, doctor, stats, graph, watch, events, ps, snapshot,
-# prune, layout, find, recent, usage), and the structured
+# prune, layout, find, recent, usage, grep, peek, bcast), and the structured
 # `-o json|jsonl|csv|tsv|table` output flag on the list-* commands.
 
 __ztmux_run() { ztmux "$@" 2>/dev/null }
@@ -203,6 +203,9 @@ _ztmux() {
     'find:search panes by command/path/title/window (ztmux extension)'
     'recent:list sessions ranked by last activity (ztmux extension)'
     'usage:per-session CPU/MEM/RSS resource rollup (ztmux extension)'
+    'grep:search the live contents of every pane (ztmux extension)'
+    'peek:dump the visible contents of every pane (ztmux extension)'
+    'bcast:broadcast a command to many panes at once (ztmux extension)'
   )
 
   _arguments -C \
@@ -1128,6 +1131,30 @@ _ztmux() {
         _arguments -s \
         '-o[output format]:format:(json)' \
         '--json[machine-readable JSON output]' && ret=0
+        ;;
+      grep)
+        _arguments -s \
+        ':pattern:' \
+        '-a[search full scrollback, not just the visible screen]' \
+        '--history[search full scrollback, not just the visible screen]' \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
+        ;;
+      peek)
+        _arguments -s \
+        '-t[limit to panes whose location contains SUBSTR]:location:' \
+        '-o[output format]:format:(json)' \
+        '--json[machine-readable JSON output]' && ret=0
+        ;;
+      bcast)
+        _arguments -s \
+        ':command:' \
+        '-c[only panes whose command contains SUBSTR]:command:' \
+        '-s[only panes in SESSION]:session:__ztmux_sessions' \
+        '-N[send keys without a trailing Enter]' \
+        '--no-enter[send keys without a trailing Enter]' \
+        '-f[actually send (default: dry-run)]' \
+        '--force[actually send (default: dry-run)]' && ret=0
         ;;
       *)
         _default && ret=0

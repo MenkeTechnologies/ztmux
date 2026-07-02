@@ -628,6 +628,9 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"find"
                     | b"recent"
                     | b"usage"
+                    | b"grep"
+                    | b"peek"
+                    | b"bcast"
             ) {
                 let sock = if SOCKET_PATH.is_null() {
                     String::new()
@@ -649,6 +652,9 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"find" => crate::extensions::find::run(&sock),
                     b"recent" => crate::extensions::recent::run(&sock),
                     b"usage" => crate::extensions::usage::run(&sock),
+                    b"grep" => crate::extensions::grep::run(&sock),
+                    b"peek" => crate::extensions::peek::run(&sock),
+                    b"bcast" => crate::extensions::bcast::run(&sock),
                     _ => crate::extensions::dashboard::run(&sock),
                 };
                 std::process::exit(code);

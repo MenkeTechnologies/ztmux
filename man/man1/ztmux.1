@@ -149,6 +149,42 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .B usage
 .RB [ \-o
 .IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B grep
+.I pattern
+.RB [ \-a ]
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B peek
+.RB [ \-t
+.IR substr ]
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B bcast
+.I command
+.RB [ \-c
+.IR substr ]
+.RB [ \-s
+.IR session ]
+.RB [ \-N ]
+.RB [ \-f ]
 .SH DESCRIPTION
 .B ztmux
 is a terminal multiplexer: it lets a number of terminals be created,
@@ -532,6 +568,66 @@ eating the machine" view.
 .B \-o
 .I json
 emits the rollup as a JSON array.
+.SS ztmux grep
+.B ztmux grep
+.I pattern
+captures every pane and prints the lines whose contents contain
+.I pattern
+(a case-insensitive substring), one
+.RI ( location : line : " text)"
+per match. Where
+.B find
+matches pane metadata,
+.B grep
+matches what is actually on the screen. By default only the visible screen is
+searched; pass
+.B \-a
+or
+.B \-\-history
+to search the full scrollback. It exits non-zero when nothing matched.
+.B \-o
+.I json
+emits the matches as a JSON array.
+.SS ztmux peek
+.B ztmux peek
+captures the visible contents of every pane and prints each under a header
+identifying it \(em the "show me every screen at once" view.
+.B \-t
+.I substr
+limits the dump to panes whose
+.RI ( session : window . pane )
+location contains
+.IR substr .
+.B \-o
+.I json
+emits an array of
+.RI { pane , location , command , content }
+objects.
+.SS ztmux bcast
+.B ztmux bcast
+.I command
+sends
+.I command
+to every pane matching the filters \(em the cross-server generalisation of
+.BR synchronize-panes .
+.B \-c
+.I substr
+restricts to panes whose running command contains
+.IR substr ;
+.B \-s
+.I session
+restricts to one session; both may be combined. The command is sent literally
+followed by Enter unless
+.B \-N
+or
+.B \-\-no\-enter
+is given. It is
+.B dry-run by default
+(prints the panes it would target); pass
+.B \-f
+or
+.B \-\-force
+to actually send.
 .SS Default key bindings
 For convenience each extension is also bound under the prefix key (these
 bindings are original to

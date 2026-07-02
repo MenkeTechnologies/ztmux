@@ -5,7 +5,7 @@ Sources of truth:
   * the `cmd_entry { name, alias, usage }` table in src/ported/cmd_*.rs
   * the client subcommands added under src/extensions/
     (dashboard, switch, tree, doctor, stats, graph, watch, events, ps,
-    snapshot, prune, layout, find, recent, usage)
+    snapshot, prune, layout, find, recent, usage, grep, peek, bcast)
   * the global option string parsed by tmux_main() in src/ported/tmux.rs
 
 Run from the repo root:  python3 scripts/gen_zsh_completion.py
@@ -193,6 +193,39 @@ EXTENSIONS = [
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "per-session CPU/MEM/RSS resource rollup (ztmux extension)",
     ),
+    (
+        "grep",
+        [
+            ":pattern:",
+            "-a[search full scrollback, not just the visible screen]",
+            "--history[search full scrollback, not just the visible screen]",
+            "-o[output format]:format:(json)",
+            "--json[machine-readable JSON output]",
+        ],
+        "search the live contents of every pane (ztmux extension)",
+    ),
+    (
+        "peek",
+        [
+            "-t[limit to panes whose location contains SUBSTR]:location:",
+            "-o[output format]:format:(json)",
+            "--json[machine-readable JSON output]",
+        ],
+        "dump the visible contents of every pane (ztmux extension)",
+    ),
+    (
+        "bcast",
+        [
+            ":command:",
+            "-c[only panes whose command contains SUBSTR]:command:",
+            "-s[only panes in SESSION]:session:__ztmux_sessions",
+            "-N[send keys without a trailing Enter]",
+            "--no-enter[send keys without a trailing Enter]",
+            "-f[actually send (default: dry-run)]",
+            "--force[actually send (default: dry-run)]",
+        ],
+        "broadcast a command to many panes at once (ztmux extension)",
+    ),
 ]
 
 
@@ -231,7 +264,7 @@ def main() -> int:
 #
 # Covers every implemented command (and alias), the client subcommands
 # (dashboard, switch, tree, doctor, stats, graph, watch, events, ps, snapshot,
-# prune, layout, find, recent, usage), and the structured
+# prune, layout, find, recent, usage, grep, peek, bcast), and the structured
 # `-o json|jsonl|csv|tsv|table` output flag on the list-* commands.
 
 __ztmux_run() {{ ztmux "$@" 2>/dev/null }}

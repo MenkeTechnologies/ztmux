@@ -11,7 +11,7 @@
 
 use std::io::IsTerminal;
 
-use super::tmux_query::{Pane, Snapshot, capture_pane, poll};
+use super::tmux_query::{Pane, capture_pane, poll};
 
 /// One matched line within a pane.
 struct Match {
@@ -69,7 +69,7 @@ fn query_arg() -> Option<String> {
 fn search(captures: &[(Pane, String)], query: &str) -> Vec<Match> {
     let needle = query.to_lowercase();
     let mut ordered: Vec<&(Pane, String)> = captures.iter().collect();
-    ordered.sort_by(|a, b| loc(&a.0).cmp(&loc(&b.0)));
+    ordered.sort_by_key(|(p, _)| loc(p));
     let mut out = Vec::new();
     for (p, content) in ordered {
         for (i, line) in content.lines().enumerate() {
