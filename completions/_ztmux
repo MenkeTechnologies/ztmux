@@ -1992,7 +1992,7 @@ _ztmux() {
     '-L[specify socket name]:socket name:__ztmux-socket-name' \
     "-N[don't start the server even if the command would normally do so]" \
     '-S[specify socket path]:server socket:_path_files -g "*(=,/)"' \
-    '-T+[set terminal features for the client]: : _values -s , 256 clipboard ccolour cstyle extkeys focus margins mouse overline rectfill RGB strikethrough sync title usstyle' \
+    '-T+[set terminal features for the client]: : _values -s , feature 256 clipboard ccolour cstyle extkeys focus margins mouse overline rectfill RGB strikethrough sync title usstyle' \
     '-u[force using UTF-8]' \
     '-v[request verbose logging]' \
     '-V[report tmux version]' \

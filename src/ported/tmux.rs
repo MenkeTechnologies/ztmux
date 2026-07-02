@@ -528,7 +528,10 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
             }
         }
 
-        while let Some(opt) = getopt(argc, argv.cast(), c!("2c:CDdf:lL:NqS:T:uUvV")) {
+        // Option string mirrors upstream tmux (`vendor/tmux/tmux.c`):
+        // "2c:CDdf:hlL:NqS:T:uUvV". `h` is included so clustered/late forms
+        // like `-Nh` still reach the help handler, matching tmux's `case 'h'`.
+        while let Some(opt) = getopt(argc, argv.cast(), c!("2c:CDdf:hlL:NqS:T:uUvV")) {
             match opt {
                 b'2' => tty_add_features(&raw mut feat, "256", c!(":,")),
                 b'c' => SHELL_COMMAND = OPTARG.cast(),
@@ -551,6 +554,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                         .push(CString::new(cstr_to_str(OPTARG)).unwrap());
                     CFG_QUIET.store(false, atomic::Ordering::Relaxed);
                 }
+                b'h' => help(),
                 b'V' => {
                     println!("ztmux {}", getversion());
                     std::process::exit(0);
