@@ -50,6 +50,66 @@ pub fn usage() -> ! {
     std::process::exit(1)
 }
 
+/// Cyberpunk `--help` / `-h` screen. Not part of upstream tmux (tmux only has
+/// the terse `usage()` above); added so `ztmux --help` reads like the rest of
+/// the toolchain (`tp --help`). Prints to stdout and exits 0.
+pub fn help() -> ! {
+    // ANSI Shadow banner (figlet -f "ANSI Shadow" ZTMUX), gradient cyan→magenta→red.
+    print!(
+        concat!(
+            "\x1b[36m ███████╗████████╗███╗   ███╗██╗   ██╗██╗  ██╗\x1b[0m\n",
+            "\x1b[36m ╚══███╔╝╚══██╔══╝████╗ ████║██║   ██║╚██╗██╔╝\x1b[0m\n",
+            "\x1b[35m   ███╔╝    ██║   ██╔████╔██║██║   ██║ ╚███╔╝ \x1b[0m\n",
+            "\x1b[35m  ███╔╝     ██║   ██║╚██╔╝██║██║   ██║ ██╔██╗ \x1b[0m\n",
+            "\x1b[31m ███████╗   ██║   ██║ ╚═╝ ██║╚██████╔╝██╔╝ ██╗\x1b[0m\n",
+            "\x1b[31m ╚══════╝   ╚═╝   ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝\x1b[0m\n",
+        )
+    );
+    println!(
+        "\x1b[36m ┌──────────────────────────────────────────────────────┐\x1b[0m"
+    );
+    println!(
+        "\x1b[36m │ STATUS: ONLINE  // SIGNAL: ████████░░ // v{}\x1b[36m   │\x1b[0m",
+        getversion()
+    );
+    println!(
+        "\x1b[36m └──────────────────────────────────────────────────────┘\x1b[0m"
+    );
+    println!("\x1b[35m  >> TERMINAL MULTIPLEXER // TMUX-COMPATIBLE <<\x1b[0m");
+    println!();
+    println!("A terminal multiplexer: run and switch many terminals in one screen.");
+    println!();
+    println!(
+        "\x1b[33m  USAGE:\x1b[0m ztmux [OPTIONS] [command [flags]]"
+    );
+    println!();
+    println!("\x1b[36m  ── SERVER ─────────────────────────────────────────────\x1b[0m");
+    println!("  -L <socket-name>   \x1b[32m//\x1b[0m Server socket name under the socket dir");
+    println!("  -S <socket-path>   \x1b[32m//\x1b[0m Full path to the server socket");
+    println!("  -N                 \x1b[32m//\x1b[0m Do not start the server");
+    println!("  -D                 \x1b[32m//\x1b[0m Run in the foreground (do not daemonize)");
+    println!("\x1b[36m  ── SESSION ────────────────────────────────────────────\x1b[0m");
+    println!("  -c <shell-command> \x1b[32m//\x1b[0m Execute shell-command using the default shell");
+    println!("  -f <file>          \x1b[32m//\x1b[0m Load an alternate configuration file");
+    println!("  -l                 \x1b[32m//\x1b[0m Behave as a login shell");
+    println!("\x1b[36m  ── TERMINAL ───────────────────────────────────────────\x1b[0m");
+    println!("  -2                 \x1b[32m//\x1b[0m Force 256-colour support");
+    println!("  -C                 \x1b[32m//\x1b[0m Control mode (-CC also disables echo)");
+    println!("  -T <features>      \x1b[32m//\x1b[0m Set terminal features (comma-separated)");
+    println!("  -u                 \x1b[32m//\x1b[0m Force UTF-8");
+    println!("\x1b[36m  ── SYSTEM ─────────────────────────────────────────────\x1b[0m");
+    println!("  -v                 \x1b[32m//\x1b[0m Increase logging verbosity (repeat up to -vvvv)");
+    println!("  -V, --version      \x1b[32m//\x1b[0m Print version and exit");
+    println!("  -h, --help         \x1b[32m//\x1b[0m Print this help and exit");
+    println!("\x1b[36m  ── POSITIONAL ─────────────────────────────────────────\x1b[0m");
+    println!("  [command [flags]]  \x1b[32m//\x1b[0m tmux command to run (default: attach/new session)");
+    println!();
+    println!("\x1b[35m  ztmux {} \x1b[0m// \x1b[33m(c) Jacob Menke and contributors\x1b[0m", getversion());
+    println!("\x1b[33m  >>> JACK IN. SPLIT YOUR PANES. OWN YOUR SESSIONS. <<<\x1b[0m");
+    println!("\x1b[36m ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░\x1b[0m");
+    std::process::exit(0)
+}
+
 /// C `vendor/tmux/tmux.c:63`: `static const char *getshell(void)`
 unsafe fn getshell() -> Cow<'static, CStr> {
     unsafe {
@@ -452,6 +512,21 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
             );
         }
         expand_paths(TMUX_CONF, &mut CFG_FILES.lock().unwrap(), 1);
+
+        // tmux itself has no `--help`; the getopt() below turns `--help` into a
+        // terse one-line usage. Intercept `-h`/`--help` among the leading option
+        // words (before the command) and show the full cyberpunk help instead.
+        for i in 1..argc {
+            let arg = cstr_to_str(*argv.add(i as usize));
+            if arg == "-h" || arg == "--help" {
+                help();
+            }
+            // Stop at the end-of-options marker or the first non-option word
+            // (the tmux command), which handles its own `--help`.
+            if arg == "--" || !arg.starts_with('-') {
+                break;
+            }
+        }
 
         while let Some(opt) = getopt(argc, argv.cast(), c!("2c:CDdf:lL:NqS:T:uUvV")) {
             match opt {
