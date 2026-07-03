@@ -349,7 +349,6 @@ pub unsafe fn utf8_copy(to: *mut utf8_data, from: *const utf8_data) {
     }
 }
 
-/// C `vendor/tmux/utf8.c:553`: `static enum utf8_state utf8_width(struct utf8_data *ud, int *width)`
 thread_local! {
     /// Port of the user-configurable half of `utf8_width_cache` (utf8.c). ztmux
     /// keeps the built-in default widths in [`UTF8_FORCE_WIDE`] plus the
@@ -440,6 +439,7 @@ pub unsafe fn utf8_update_width_cache() {
     }
 }
 
+/// C `vendor/tmux/utf8.c:553`: `static enum utf8_state utf8_width(struct utf8_data *ud, int *width)`
 pub unsafe fn utf8_width(ud: *mut utf8_data, width: *mut i32) -> utf8_state {
     unsafe {
         let mut wc: wchar_t = 0;

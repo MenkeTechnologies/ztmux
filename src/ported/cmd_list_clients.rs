@@ -11,7 +11,6 @@
 // WHATSOEVER RESULTING FROM LOSS OF MIND, USE, DATA OR PROFITS, WHETHER
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-use crate::compat::queue::tailq_foreach;
 use crate::*;
 
 const LIST_CLIENTS_TEMPLATE: *const u8 = c!(
@@ -22,8 +21,8 @@ pub static CMD_LIST_CLIENTS_ENTRY: cmd_entry = cmd_entry {
     name: "list-clients",
     alias: Some("lsc"),
 
-    args: args_parse::new("F:f:o:t:", 0, 0, None),
-    usage: "[-F format] [-f filter] [-o json|jsonl|csv|tsv|table|yaml] [-t target-session]",
+    args: args_parse::new("F:f:O:o:rt:", 0, 0, None),
+    usage: "[-r] [-F format] [-f filter] [-O order] [-o json|jsonl|csv|tsv|table|yaml] [-t target-session]",
 
     target: cmd_entry_flag::new(
         b't',
@@ -65,6 +64,19 @@ unsafe fn cmd_list_clients_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
         }
         let filter = args_get(args, b'f');
 
+        // -O sort order / -r reverse (C cmd-list-clients.c). SORT_END = natural
+        // (tailq) order, so a missing -O leaves the previous ordering unchanged.
+        let order = sort_order_from_string(args_get(args, b'O'));
+        if order == sort_order::SORT_END && args_has(args, 'O') {
+            cmdq_error!(item, "invalid sort order");
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
+        let sort_crit = sort_criteria {
+            order,
+            reversed: args_has(args, 'r'),
+            order_seq: null_mut(),
+        };
+
         let mut structured = match OutputFormat::parse(args_get(args, b'o')) {
             Ok(fmt) => fmt.map(|f| Structured::new(f, LIST_CLIENTS_FIELDS)),
             Err(()) => {
@@ -74,7 +86,7 @@ unsafe fn cmd_list_clients_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
         };
 
         let mut idx = 0;
-        for c in tailq_foreach(&raw mut CLIENTS).map(NonNull::as_ptr) {
+        for c in sort_get_clients(sort_crit) {
             if (*c).session.is_null() || (!s.is_null() && s != (*c).session) {
                 continue;
             }
