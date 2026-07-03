@@ -268,10 +268,6 @@ fn server_checks(c: &mut Vec<Check>, socket: &str) {
 
     // A ztmux socket lives in its own `ztmux-<uid>` namespace; a stray $TMUX means
     // the user is inside a *real* tmux client, a classic source of confusion.
-    match std::env::var("ZTMUX") {
-        Ok(v) if !v.is_empty() => c.push(Check::ok("server", "$ZTMUX", v)),
-        _ => c.push(Check::ok("server", "$ZTMUX", "(unset — not attached)")),
-    }
     if let Ok(v) = std::env::var("TMUX")
         && !v.is_empty()
     {
