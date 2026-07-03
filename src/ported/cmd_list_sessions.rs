@@ -18,8 +18,8 @@ pub static CMD_LIST_SESSIONS_ENTRY: cmd_entry = cmd_entry {
     name: "list-sessions",
     alias: Some("ls"),
 
-    args: args_parse::new("F:f:o:", 0, 0, None),
-    usage: "[-F format] [-f filter] [-o json|jsonl|csv|tsv|table|yaml]",
+    args: args_parse::new("F:f:O:o:r", 0, 0, None),
+    usage: "[-r] [-F format] [-f filter] [-O order] [-o json|jsonl|csv|tsv|table|yaml]",
 
     flags: cmd_flag::CMD_AFTERHOOK,
     exec: cmd_list_sessions_exec,
@@ -55,6 +55,20 @@ unsafe fn cmd_list_sessions_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
         }
         let filter = args_get(args, b'f');
 
+        // -O sort order / -r reverse (C cmd-list-sessions.c:68-73). A missing or
+        // unknown -O yields SORT_END, which sort_get_sessions treats as natural
+        // (RB-tree) order — matching the previous unsorted iteration.
+        let order = sort_order_from_string(args_get(args, b'O'));
+        if order == sort_order::SORT_END && args_has(args, 'O') {
+            cmdq_error!(item, "invalid sort order");
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
+        let sort_crit = sort_criteria {
+            order,
+            reversed: args_has(args, 'r'),
+            order_seq: null_mut(),
+        };
+
         // -o requests structured output (ztmux extension); collect rows and
         // emit once at the end instead of printing a text line per session.
         let mut structured = match OutputFormat::parse(args_get(args, b'o')) {
@@ -65,7 +79,7 @@ unsafe fn cmd_list_sessions_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
             }
         };
 
-        for (n, s) in rb_foreach(&raw mut SESSIONS).enumerate() {
+        for (n, s) in sort_get_sessions(sort_crit).into_iter().enumerate() {
             let ft = format_create(
                 cmdq_get_client(item),
                 item,
@@ -73,7 +87,7 @@ unsafe fn cmd_list_sessions_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
                 format_flags::empty(),
             );
             format_add!(ft, "line", "{n}");
-            format_defaults(ft, null_mut(), Some(s), None, None);
+            format_defaults(ft, null_mut(), NonNull::new(s), None, None);
 
             let flag;
             if !filter.is_null() {
