@@ -11,15 +11,15 @@
 // WHATSOEVER RESULTING FROM LOSS OF MIND, USE, DATA OR PROFITS, WHETHER
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-use crate::compat::{queue::tailq_foreach, tree::rb_foreach};
+use crate::compat::tree::rb_foreach;
 use crate::*;
 
 pub static CMD_LIST_PANES_ENTRY: cmd_entry = cmd_entry {
     name: "list-panes",
     alias: Some("lsp"),
 
-    args: args_parse::new("asF:f:o:t:", 0, 0, None),
-    usage: "[-as] [-F format] [-f filter] [-o json|jsonl|csv|tsv|table|yaml] [-t target-window]",
+    args: args_parse::new("asF:f:O:o:rt:", 0, 0, None),
+    usage: "[-asr] [-F format] [-f filter] [-O order] [-o json|jsonl|csv|tsv|table|yaml] [-t target-window]",
 
     target: cmd_entry_flag::new(
         b't',
@@ -61,6 +61,14 @@ unsafe fn cmd_list_panes_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retv
         let target = cmdq_get_target(item);
         let s = (*target).s;
         let wl = (*target).wl;
+
+        // -O sort order validated once here (C cmd-list-panes.c:66-70); each
+        // window helper re-reads it and sorts its own panes.
+        let order = sort_order_from_string(args_get(args, b'O'));
+        if order == sort_order::SORT_END && args_has(args, 'O') {
+            cmdq_error!(item, "invalid sort order");
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
 
         let mut structured = match OutputFormat::parse(args_get(args, b'o')) {
             Ok(fmt) => fmt.map(|f| Structured::new(f, LIST_PANES_FIELDS)),
@@ -167,7 +175,19 @@ fn cmd_list_panes_window(
         }
         let filter = args_get_(args, 'f');
 
-        for (n, wp) in tailq_foreach::<_, discr_entry>(&raw mut (*(*wl).window).panes).enumerate() {
+        // -O sort order / -r reverse the panes within this window
+        // (C cmd-list-panes.c: sort_get_panes_window). SORT_END = natural (tailq)
+        // order, matching the previous iteration.
+        let sort_crit = sort_criteria {
+            order: sort_order_from_string(args_get(args, b'O')),
+            reversed: args_has(args, 'r'),
+            order_seq: null_mut(),
+        };
+
+        for (n, wp) in sort_get_panes_window((*wl).window, sort_crit)
+            .into_iter()
+            .enumerate()
+        {
             let ft = format_create(
                 cmdq_get_client(item),
                 item,
@@ -175,7 +195,7 @@ fn cmd_list_panes_window(
                 format_flags::empty(),
             );
             format_add!(ft, "line", "{n}");
-            format_defaults(ft, null_mut(), NonNull::new(s), NonNull::new(wl), Some(wp));
+            format_defaults(ft, null_mut(), NonNull::new(s), NonNull::new(wl), NonNull::new(wp));
 
             let flag;
             if !filter.is_null() {
