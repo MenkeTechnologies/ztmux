@@ -2519,6 +2519,34 @@ _ztmux-visual() {
     '--json[machine-readable JSON output]'
 }
 
+_ztmux-keytable() {
+  [[ -n ${tmux_describe} ]] && print "clients parked on a non-root key table (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-control() {
+  [[ -n ${tmux_describe} ]] && print "clients attached in control mode (-CC) (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-utf8() {
+  [[ -n ${tmux_describe} ]] && print "the UTF-8 state of every attached client (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-mouse() {
+  [[ -n ${tmux_describe} ]] && print "which sessions have mouse mode enabled (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
 # And here is the actual _ztmux(), that puts it all together:
 _ztmux() {
   local curcontext="${curcontext}" state line ret=1

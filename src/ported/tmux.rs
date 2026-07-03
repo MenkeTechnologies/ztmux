@@ -730,6 +730,10 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"lock"
                     | b"titlebar"
                     | b"visual"
+                    | b"keytable"
+                    | b"control"
+                    | b"utf8"
+                    | b"mouse"
             ) {
                 let sock = if SOCKET_PATH.is_null() {
                     String::new()
@@ -834,6 +838,10 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"lock" => crate::extensions::lock::run(&sock),
                     b"titlebar" => crate::extensions::titlebar::run(&sock),
                     b"visual" => crate::extensions::visual::run(&sock),
+                    b"keytable" => crate::extensions::keytable::run(&sock),
+                    b"control" => crate::extensions::control::run(&sock),
+                    b"utf8" => crate::extensions::utf8::run(&sock),
+                    b"mouse" => crate::extensions::mouse::run(&sock),
                     _ => crate::extensions::dashboard::run(&sock),
                 };
                 std::process::exit(code);

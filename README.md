@@ -216,8 +216,9 @@ They fall into a few families:
   `pstree`, `mem`, `state`, `elapsed`), geometry (`size`, `density`, `layouts`, `solo`),
   directories and repositories (`cwd`, `project`, `git`, `remote`, `ahead`, `changes`,
   `stash`, `commit`, `conflicts`, `vcs`, `worktree`, `submodules`, `gone`), network (`ssh`,
-  `net`, `ports`), clients (`who`, `readonly`, `idle`, `viewers`, `connected`, `constrain`),
-  and configuration (`hooks`, `keys`, `monitor`, `remain`, `sync`, `limit`, `visual`, …).
+  `net`, `ports`), clients (`who`, `readonly`, `idle`, `viewers`, `connected`, `constrain`,
+  `keytable`, `control`, `utf8`), and configuration (`hooks`, `keys`, `monitor`, `remain`,
+  `sync`, `limit`, `visual`, `mouse`, …).
 - **Live TUIs** — `dashboard` (full-screen server monitor), `switch` (fuzzy session/window/
   pane picker), `watch` (top-like per-pane process monitor).
 - **Actions** — `prune`, `equalize`, `respawn`, `clear`, `retitle`, `bcast`, `layout`.

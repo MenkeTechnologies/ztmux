@@ -911,6 +911,42 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .B visual
 .RB [ \-o
 .IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B keytable
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B control
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B utf8
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B mouse
+.RB [ \-o
+.IR json ]
 .SH DESCRIPTION
 .B ztmux
 is a terminal multiplexer: it lets a number of terminals be created,
@@ -2665,6 +2701,75 @@ shows which have fired,
 .B visual
 shows how a session presents an alert when it fires, and which of the three it
 applies to. Sessions using the default (bell-only) are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux keytable
+.B ztmux keytable
+lists the clients that are parked on a non-root key table. Every client
+dispatches keys through a key table \(en normally
+.BR root ,
+but the prefix switches it to
+.BR prefix ,
+copy mode to
+.BR copy-mode / copy-mode-vi ,
+and
+.B switch-client \-T
+can leave a client on any custom table. A client on a non-root table is why keys
+appear to stop working, so each row shows the client, its session and tty, and
+the table it is on. Clients on
+.B root
+are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux control
+.B ztmux control
+lists the clients attached in control mode
+.RB ( \-C / \-CC ,
+as iTerm2 and other front ends use). A control-mode client speaks the textual
+control protocol instead of drawing the terminal itself, so it behaves very
+differently from a normal attached client. Each row shows the client, its
+session and tty. Normal screen-drawing clients are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux utf8
+.B ztmux utf8
+reports the UTF-8 state of every attached client
+.RB ( client_utf8 ),
+which tmux derives from
+.BR LANG / LC_* ,
+the
+.B \-u
+flag, and the terminal's advertised features. A client tmux considers non-UTF-8
+draws wide, box-drawing, and emoji glyphs as
+.B ?
+or mojibake while every other client renders them correctly. Unlike the filtered
+flag reports, all clients are listed with a
+.BR yes / no
+column, since both states are diagnostic. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux mouse
+.B ztmux mouse
+reports which sessions have the
+.B mouse
+option enabled. Mouse mode lets tmux capture mouse events to select panes,
+drag borders, and scroll into copy mode; because it is a session option it can
+differ between sessions, and it also changes how the inner program sees clicks.
+Every session is listed with an
+.BR on / off
+column. With
 .B \-o
 .I json
 (or
