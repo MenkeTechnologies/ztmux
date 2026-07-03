@@ -1424,6 +1424,10 @@ pub unsafe fn options_push_changes(name: &str) {
             alerts_reset_all();
         }
 
+        if name == "codepoint-widths" {
+            utf8_update_width_cache();
+        }
+
         if name == "window-style" || name == "window-active-style" {
             for wp in rb_foreach(&raw mut ALL_WINDOW_PANES) {
                 (*wp.as_ptr()).flags |= window_pane_flags::PANE_STYLECHANGED;

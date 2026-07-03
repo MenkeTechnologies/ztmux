@@ -20,6 +20,9 @@ use std::{
 
 use crate::compat::vis;
 use crate::libc::{memcpy, memset};
+use crate::options_::{
+    options_array_first, options_array_item_value, options_array_next, options_get_only,
+};
 use crate::*;
 
 #[cfg(feature = "utf8proc")]
@@ -347,12 +350,110 @@ pub unsafe fn utf8_copy(to: *mut utf8_data, from: *const utf8_data) {
 }
 
 /// C `vendor/tmux/utf8.c:553`: `static enum utf8_state utf8_width(struct utf8_data *ud, int *width)`
+thread_local! {
+    /// Port of the user-configurable half of `utf8_width_cache` (utf8.c). ztmux
+    /// keeps the built-in default widths in [`UTF8_FORCE_WIDE`] plus the
+    /// regional-indicator case in [`utf8_width`]; this holds only the
+    /// `codepoint-widths` overrides, which take precedence — behaviourally
+    /// identical to C merging both into one RB tree and returning the per-entry
+    /// width first.
+    static UTF8_WIDTH_OVERRIDES: RefCell<BTreeMap<wchar_t, u32>> =
+        const { RefCell::new(BTreeMap::new()) };
+}
+
+/// Look up a `codepoint-widths` override for `wc`. The default-width half lives
+/// in [`utf8_width`] itself.
+/// C `vendor/tmux/utf8.c:286`: `static struct utf8_width_item *utf8_find_in_width_cache(wchar_t wc)`
+fn utf8_find_in_width_cache(wc: wchar_t) -> Option<u32> {
+    UTF8_WIDTH_OVERRIDES.with(|m| m.borrow().get(&wc).copied())
+}
+
+/// C `vendor/tmux/utf8.c:297`: `static void utf8_insert_width_cache(wchar_t wc, u_int width)`
+fn utf8_insert_width_cache(wc: wchar_t, width: u32) {
+    log_debug!("Unicode width cache: {:08X}={}", wc as u32, width);
+    UTF8_WIDTH_OVERRIDES.with(|m| {
+        m.borrow_mut().insert(wc, width);
+    });
+}
+
+/// Parse a single `codepoint-widths` entry — `U+XXXX=W`, `U+XXXX-U+YYYY=W`
+/// (a range), or a literal `<char>=W`. Width is bounded 0..=2; malformed
+/// entries are ignored, matching the C.
+/// C `vendor/tmux/utf8.c:319`: `static void utf8_add_to_width_cache(const char *s)`
+fn utf8_add_to_width_cache(s: &str) {
+    let Some((key, wstr)) = s.split_once('=') else {
+        return;
+    };
+    let Ok(width) = wstr.parse::<u32>() else {
+        return;
+    };
+    if width > 2 {
+        return;
+    }
+    if let Some(hex) = key.strip_prefix("U+") {
+        let (start_s, end_s) = match hex.split_once("-U+") {
+            Some((a, b)) => (a, b),
+            None => (hex, hex),
+        };
+        let (Ok(start), Ok(end)) = (
+            wchar_t::from_str_radix(start_s, 16),
+            wchar_t::from_str_radix(end_s, 16),
+        ) else {
+            return;
+        };
+        if start == 0 || end == 0 || end < start {
+            return;
+        }
+        for wc in start..=end {
+            utf8_insert_width_cache(wc, width);
+        }
+    } else {
+        // A single literal UTF-8 character (reject empty or multi-char).
+        let mut chars = key.chars();
+        let (Some(c), None) = (chars.next(), chars.next()) else {
+            return;
+        };
+        utf8_insert_width_cache(c as wchar_t, width);
+    }
+}
+
+/// Rebuild the `codepoint-widths` overrides from the global option. Called from
+/// the options on-set path when `codepoint-widths` changes.
+/// C `vendor/tmux/utf8.c:407`: `void utf8_update_width_cache(void)`
+pub unsafe fn utf8_update_width_cache() {
+    unsafe {
+        UTF8_WIDTH_OVERRIDES.with(|m| m.borrow_mut().clear());
+        let o = options_get_only(GLOBAL_OPTIONS, "codepoint-widths");
+        if o.is_null() {
+            return;
+        }
+        let mut a = options_array_first(o);
+        while !a.is_null() {
+            let val = options_array_item_value(a);
+            if !val.is_null()
+                && let Some(s) = cstr_to_str_((*val).string)
+            {
+                utf8_add_to_width_cache(s);
+            }
+            a = options_array_next(a);
+        }
+    }
+}
+
 pub unsafe fn utf8_width(ud: *mut utf8_data, width: *mut i32) -> utf8_state {
     unsafe {
         let mut wc: wchar_t = 0;
 
         if utf8_towc(ud, &raw mut wc) != utf8_state::UTF8_DONE {
             return utf8_state::UTF8_ERROR;
+        }
+        // A `codepoint-widths` override wins over the built-in defaults, exactly
+        // as C's merged width cache returns the per-entry width first
+        // (utf8.c:560-564).
+        if let Some(w) = utf8_find_in_width_cache(wc) {
+            *width = w as i32;
+            log_debug!("cached width for {:08X} is {}", wc as u32, *width);
+            return utf8_state::UTF8_DONE;
         }
         // The regional-indicator code points U+1F1E6..=U+1F1FF are listed in
         // UTF8_FORCE_WIDE, but C's utf8_default_width_cache (utf8.c:60-85) gives

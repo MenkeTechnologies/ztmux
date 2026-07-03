@@ -205,7 +205,7 @@ macro_rules! options_table_window_hook {
     };
 }
 
-pub static OPTIONS_TABLE: [options_table_entry; 194] = [
+pub static OPTIONS_TABLE: [options_table_entry; 196] = [
     options_table_entry {
         name: "backspace",
         type_: options_table_type::OPTIONS_TABLE_KEY,
@@ -226,6 +226,26 @@ pub static OPTIONS_TABLE: [options_table_entry; 194] = [
             "The maximum number of automatic buffers. When this is reached, the oldest buffer is deleted."
         ),
         choices: &[],
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "codepoint-widths",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_ARRAY,
+        default_str: Some(""),
+        separator: c!(","),
+        text: c!("Array of override widths for Unicode codepoints."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "variation-selector-always-wide",
+        type_: options_table_type::OPTIONS_TABLE_FLAG,
+        scope: OPTIONS_TABLE_SERVER,
+        default_num: 1,
+        text: c!(
+            "If the Unicode VS16 codepoint should always be treated as a wide character."
+        ),
         ..options_table_entry::const_default()
     },
     options_table_entry {
