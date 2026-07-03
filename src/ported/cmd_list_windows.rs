@@ -11,7 +11,6 @@
 // WHATSOEVER RESULTING FROM LOSS OF MIND, USE, DATA OR PROFITS, WHETHER
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-use crate::compat::tree::rb_foreach;
 use crate::*;
 
 const LIST_WINDOWS_TEMPLATE: *const u8 = c!(
@@ -25,8 +24,8 @@ pub static CMD_LIST_WINDOWS_ENTRY: cmd_entry = cmd_entry {
     name: "list-windows",
     alias: Some("lsw"),
 
-    args: args_parse::new("F:f:o:at:", 0, 0, None),
-    usage: "[-a] [-F format] [-f filter] [-o json|jsonl|csv|tsv|table|yaml] [-t target-session]",
+    args: args_parse::new("aF:f:O:o:rt:", 0, 0, None),
+    usage: "[-ar] [-F format] [-f filter] [-O order] [-o json|jsonl|csv|tsv|table|yaml] [-t target-session]",
 
     target: cmd_entry_flag::new(
         b't',
@@ -70,63 +69,37 @@ unsafe fn cmd_list_windows_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
             }
         };
 
-        if args_has(args, 'a') {
-            cmd_list_windows_server(self_, item, &mut structured);
-        } else {
-            cmd_list_windows_session(
-                self_,
-                NonNull::new_unchecked((*target).s),
-                item,
-                0,
-                &mut structured,
-            );
+        // -O sort order / -r reverse (C cmd-list-windows.c:75-88). A missing -O
+        // is SORT_END = natural (per-session RB) order, matching the previous
+        // nested iteration.
+        let order = sort_order_from_string(args_get(args, b'O'));
+        if order == sort_order::SORT_END && args_has(args, 'O') {
+            cmdq_error!(item, "invalid sort order");
+            return cmd_retval::CMD_RETURN_ERROR;
         }
+        let sort_crit = sort_criteria {
+            order,
+            reversed: args_has(args, 'r'),
+            order_seq: null_mut(),
+        };
 
-        if let Some(out) = structured.as_ref() {
-            cmdq_print!(item, "{}", out.render());
-        }
-
-        cmd_retval::CMD_RETURN_NORMAL
-    }
-}
-
-unsafe fn cmd_list_windows_server(
-    self_: *mut cmd,
-    item: *mut cmdq_item,
-    structured: &mut Option<Structured>,
-) {
-    unsafe {
-        for s in rb_foreach(&raw mut SESSIONS) {
-            cmd_list_windows_session(self_, s, item, 1, structured);
-        }
-    }
-}
-
-unsafe fn cmd_list_windows_session(
-    self_: *mut cmd,
-    s: NonNull<session>,
-    item: *mut cmdq_item,
-    type_: i32,
-    structured: &mut Option<Structured>,
-) {
-    unsafe {
-        let args = cmd_get_args(self_);
-
-        let mut template = args_get_(args, 'F');
-        if template.is_null() {
-            match type_ {
-                0 => {
-                    template = LIST_WINDOWS_TEMPLATE;
-                }
-                1 => {
-                    template = LIST_WINDOWS_WITH_SESSION_TEMPLATE;
-                }
-                _ => (),
+        // -a lists every window server-wide (globally sorted, with the session
+        // shown); otherwise the target session's windows.
+        let mut template = args_get(args, b'F');
+        let winlinks = if args_has(args, 'a') {
+            if template.is_null() {
+                template = LIST_WINDOWS_WITH_SESSION_TEMPLATE;
             }
-        }
-        let filter = args_get_(args, 'f');
+            sort_get_winlinks(sort_crit)
+        } else {
+            if template.is_null() {
+                template = LIST_WINDOWS_TEMPLATE;
+            }
+            sort_get_winlinks_session((*target).s, sort_crit)
+        };
+        let filter = args_get(args, b'f');
 
-        for (n, wl) in rb_foreach(&raw mut (*s.as_ptr()).windows).enumerate() {
+        for (n, wl) in winlinks.into_iter().enumerate() {
             let ft = format_create(
                 cmdq_get_client(item),
                 item,
@@ -134,7 +107,13 @@ unsafe fn cmd_list_windows_session(
                 format_flags::empty(),
             );
             format_add!(ft, "line", "{n}");
-            format_defaults(ft, null_mut(), Some(s), Some(wl), None);
+            format_defaults(
+                ft,
+                null_mut(),
+                NonNull::new((*wl).session),
+                NonNull::new(wl),
+                None,
+            );
 
             let flag;
             if !filter.is_null() {
@@ -156,5 +135,11 @@ unsafe fn cmd_list_windows_session(
 
             format_free(ft);
         }
+
+        if let Some(out) = structured.as_ref() {
+            cmdq_print!(item, "{}", out.render());
+        }
+
+        cmd_retval::CMD_RETURN_NORMAL
     }
 }

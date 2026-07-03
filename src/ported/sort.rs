@@ -426,10 +426,6 @@ pub unsafe fn sort_get_panes_window(w: *mut window, sc: sort_criteria) -> Vec<*m
     }
 }
 
-#[expect(
-    dead_code,
-    reason = "unified sort path (cmd-list-*/mode-tree), not yet wired"
-)]
 /// C `vendor/tmux/sort.c:571`: `struct winlink **sort_get_winlinks(u_int *n, struct sort_criteria *sort_crit)`
 pub unsafe fn sort_get_winlinks(sc: sort_criteria) -> Vec<*mut winlink> {
     unsafe {
