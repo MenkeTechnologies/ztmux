@@ -374,6 +374,19 @@ pub unsafe fn options_default(
             options_table_type::OPTIONS_TABLE_STRING => {
                 (*ov).string = xstrdup___((*oe).default_str);
             }
+            options_table_type::OPTIONS_TABLE_COMMAND => {
+                // Parse the default command string into a cmdlist, exactly as C
+                // options_default does (options.c). A parse error leaves the
+                // cmdlist null. Without this a scalar COMMAND option's value
+                // would hold a number reinterpreted as a cmdlist pointer and
+                // crash when read via options_get_command.
+                if let Some(s) = (*oe).default_str {
+                    match cmd_parse_from_string(s, None) {
+                        Ok(cmdlist) => (*ov).cmdlist = cmdlist,
+                        Err(error) => drop(CString::from_raw(error.cast())),
+                    }
+                }
+            }
             _ => {
                 (*ov).number = (*oe).default_num;
             }
@@ -902,6 +915,48 @@ pub unsafe fn options_get_number_(oo: *const options, name: &str) -> i64 {
     }
 }
 
+/// C `vendor/tmux/options.c:839`: `struct options_entry *options_set_command(struct options *oo, const char *name, struct cmd_list *value)`
+pub unsafe fn options_set_command(
+    oo: *mut options,
+    name: &str,
+    value: *mut cmd_list,
+) -> *mut options_entry {
+    unsafe {
+        if name.starts_with('@') {
+            fatalx_!("user option {name} must be a string");
+        }
+        let mut o = options_get_only(oo, name);
+        if o.is_null() {
+            o = options_default(oo, options_parent_table_entry(oo, name));
+            if o.is_null() {
+                return null_mut();
+            }
+        }
+        if !OPTIONS_IS_COMMAND(o) {
+            fatalx_!("option {name} is not a command");
+        }
+        if !(*o).value.cmdlist.is_null() {
+            cmd_list_free((*o).value.cmdlist);
+        }
+        (*o).value.cmdlist = value;
+        o
+    }
+}
+
+/// C `vendor/tmux/options.c`: `struct cmd_list *options_get_command(struct options *oo, const char *name)`
+pub unsafe fn options_get_command(oo: *const options, name: &str) -> *mut cmd_list {
+    unsafe {
+        let o = options_get_const(oo, name);
+        if o.is_null() {
+            fatalx_!("missing option {name}");
+        }
+        if !OPTIONS_IS_COMMAND(o) {
+            fatalx_!("option {name} is not a command");
+        }
+        (*o).value.cmdlist
+    }
+}
+
 /// panics if internally stored value is out of range of returned type
 #[track_caller]
 pub fn options_get_number___<T: TryFrom<i64>>(oo: &options, name: &str) -> T {
@@ -1360,10 +1415,19 @@ pub unsafe fn options_from_string(
                 return options_from_string_choice(oe, oo, name, value);
             }
 
-            options_table_type::OPTIONS_TABLE_COMMAND => {}
+            options_table_type::OPTIONS_TABLE_COMMAND => {
+                let Some(s) = cstr_to_str_(value) else {
+                    return Err(CString::new("bad command").unwrap());
+                };
+                match cmd_parse_from_string(s, None) {
+                    Ok(cmdlist) => {
+                        options_set_command(oo, name, cmdlist);
+                        return Ok(());
+                    }
+                    Err(error) => return Err(CString::from_raw(error.cast())),
+                }
+            }
         }
-
-        Err(CString::new("").unwrap())
     }
 }
 

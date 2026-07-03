@@ -205,7 +205,7 @@ macro_rules! options_table_window_hook {
     };
 }
 
-pub static OPTIONS_TABLE: [options_table_entry; 197] = [
+pub static OPTIONS_TABLE: [options_table_entry; 198] = [
     options_table_entry {
         name: "backspace",
         type_: options_table_type::OPTIONS_TABLE_KEY,
@@ -541,6 +541,14 @@ pub static OPTIONS_TABLE: [options_table_entry; 197] = [
         scope: OPTIONS_TABLE_SESSION,
         default_str: Some(""),
         text: c!("Default command to run in new panes. If empty, a shell is started."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "default-client-command",
+        type_: options_table_type::OPTIONS_TABLE_COMMAND,
+        scope: OPTIONS_TABLE_SERVER,
+        default_str: Some("new-session"),
+        text: c!("Default command to run when tmux is run without a command."),
         ..options_table_entry::const_default()
     },
     options_table_entry {

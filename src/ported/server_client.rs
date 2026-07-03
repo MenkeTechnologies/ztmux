@@ -3028,7 +3028,7 @@ pub unsafe fn server_client_dispatch_command(c: *mut client, imsg: *mut imsg) {
         let mut data: msg_command = zeroed();
         let buf;
         let len: usize;
-        let mut argc;
+        let argc;
         let mut argv: *mut *mut u8 = null_mut();
         let cause: *mut u8;
         let values;
@@ -3056,23 +3056,29 @@ pub unsafe fn server_client_dispatch_command(c: *mut client, imsg: *mut imsg) {
                 break 'error;
             }
 
+            // With no command, run the `default-client-command` option (default
+            // `new-session`). The option owns its parsed cmdlist, so that path
+            // must not free it. C: `server_client_default_command`
+            // (server-client.c) via `options_get_command`.
+            let cmdlist;
+            let mut cmdlist_owned = false;
             if argc == 0 {
-                argc = 1;
-                argv = xcalloc1();
-                *argv = xstrdup(c!("new-session")).as_ptr();
+                cmd_free_argv(argc, argv);
+                cmdlist = options_get_command(GLOBAL_OPTIONS, "default-client-command");
+            } else {
+                values = args_from_vector(argc, argv);
+                cmdlist = match cmd_parse_from_arguments(values, argc as u32, None) {
+                    Ok(cmdlist) => cmdlist,
+                    Err(err) => {
+                        cause = err;
+                        break 'error;
+                    }
+                };
+                args_free_values(values, argc as u32);
+                free_(values);
+                cmd_free_argv(argc, argv);
+                cmdlist_owned = true;
             }
-
-            values = args_from_vector(argc, argv);
-            let cmdlist = match cmd_parse_from_arguments(values, argc as u32, None) {
-                Ok(cmdlist) => cmdlist,
-                Err(err) => {
-                    cause = err;
-                    break 'error;
-                }
-            };
-            args_free_values(values, argc as u32);
-            free_(values);
-            cmd_free_argv(argc, argv);
 
             if (*c).flags.intersects(client_flag::READONLY)
                 && !cmd_list_all_have(cmdlist, cmd_flag::CMD_READONLY)
@@ -3087,7 +3093,9 @@ pub unsafe fn server_client_dispatch_command(c: *mut client, imsg: *mut imsg) {
                 cmdq_get_callback!(server_client_command_done, null_mut()).as_ptr(),
             );
 
-            cmd_list_free(cmdlist);
+            if cmdlist_owned {
+                cmd_list_free(cmdlist);
+            }
             return;
         }
         // error:
