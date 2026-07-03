@@ -3087,6 +3087,15 @@ unsafe fn input_osc_52(ictx: *mut input_ctx, p: *const u8) {
         // log_debug("%s: %.*s %s", __func__, (int)(end - p - 1), p, flags);
 
         if streq_(end, "?") {
+            // next-3.7 get-clipboard: off (0) ignores the query; buffer (1)
+            // replies with the newest paste buffer. request (2) / both (3)
+            // request the clipboard from the terminal via the input request
+            // queue, which is not yet ported — they fall back to the buffer
+            // reply here.
+            let get_state: i32 = options_get_number_(GLOBAL_OPTIONS, "get-clipboard") as i32;
+            if get_state == 0 {
+                return;
+            }
             let pb = paste_get_top(null_mut());
             if !pb.is_null() {
                 buf = paste_buffer_data(pb, &raw mut len);

@@ -47,6 +47,7 @@ static OPTIONS_TABLE_PANE_BORDER_LINES_LIST: [&str; 5] =
 static OPTIONS_TABLE_POPUP_BORDER_LINES_LIST: [&str; 7] = [
     "single", "double", "heavy", "simple", "rounded", "padded", "none",
 ];
+static OPTIONS_TABLE_GET_CLIPBOARD_LIST: [&str; 4] = ["off", "buffer", "request", "both"];
 static OPTIONS_TABLE_SET_CLIPBOARD_LIST: [&str; 3] = ["off", "external", "on"];
 static OPTIONS_TABLE_WINDOW_SIZE_LIST: [&str; 4] = ["largest", "smallest", "manual", "latest"];
 static OPTIONS_TABLE_REMAIN_ON_EXIT_LIST: [&str; 3] = ["off", "on", "failed"];
@@ -205,7 +206,7 @@ macro_rules! options_table_window_hook {
     };
 }
 
-pub static OPTIONS_TABLE: [options_table_entry; 198] = [
+pub static OPTIONS_TABLE: [options_table_entry; 199] = [
     options_table_entry {
         name: "backspace",
         type_: options_table_type::OPTIONS_TABLE_KEY,
@@ -448,6 +449,17 @@ pub static OPTIONS_TABLE: [options_table_entry; 198] = [
         maximum: i32::MAX as u32,
         default_num: 100,
         text: c!("Maximum number of commands to keep in history."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "get-clipboard",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_SERVER,
+        choices: &OPTIONS_TABLE_GET_CLIPBOARD_LIST,
+        default_num: 1,
+        text: c!(
+            "When an application requests the clipboard, whether to ignore the request ('off'); respond with the newest buffer ('buffer'); request the clipboard from the most recently used terminal ('request'); or to request the clipboard, create a buffer, and send it to the application ('both')."
+        ),
         ..options_table_entry::const_default()
     },
     options_table_entry {
