@@ -341,7 +341,10 @@ const TMUX_CONF: &str = env_or!(
     "/etc/tmux.conf:~/.tmux.conf:$XDG_CONFIG_HOME/tmux/tmux.conf:~/.config/tmux/tmux.conf"
 );
 const TMUX_SOCK: &str = env_or!("TMUX_SOCK", "$TMUX_TMPDIR:/tmp/");
-const TMUX_TERM: &str = env_or!("TMUX_TERM", "screen");
+// Matches tmux's build default: Makefile.am passes -DTMUX_TERM="@DEFAULT_TERM@"
+// which configure resolves to "tmux-256color" (tmux.h's bare "screen" is only
+// the no-configure fallback). Overridable at build time via the TMUX_TERM env.
+const TMUX_TERM: &str = env_or!("TMUX_TERM", "tmux-256color");
 const TMUX_LOCK_CMD: &str = env_or!("TMUX_LOCK_CMD", "lock -np");
 
 // /usr/include/paths.h
