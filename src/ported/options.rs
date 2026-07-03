@@ -1428,6 +1428,10 @@ pub unsafe fn options_push_changes(name: &str) {
             utf8_update_width_cache();
         }
 
+        if name == "input-buffer-size" {
+            input_set_buffer_size(options_get_number_(GLOBAL_OPTIONS, name) as usize);
+        }
+
         if name == "window-style" || name == "window-active-style" {
             for wp in rb_foreach(&raw mut ALL_WINDOW_PANES) {
                 (*wp.as_ptr()).flags |= window_pane_flags::PANE_STYLECHANGED;

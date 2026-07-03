@@ -67,7 +67,22 @@ struct input_param {
 }
 
 const INPUT_BUF_START: usize = 32;
-const INPUT_BUF_LIMIT: usize = 1048576;
+/// C `vendor/tmux/tmux.h:3275`: `#define INPUT_BUF_DEFAULT_SIZE 1048576`
+pub const INPUT_BUF_DEFAULT_SIZE: usize = 1048576;
+
+/// The maximum bytes accepted in a single input before dropping, configurable
+/// via the `input-buffer-size` server option.
+/// C `vendor/tmux/input.c:767`: `static size_t input_buffer_size = INPUT_BUF_DEFAULT_SIZE;`
+static mut INPUT_BUFFER_SIZE: usize = INPUT_BUF_DEFAULT_SIZE;
+
+/// C `vendor/tmux/input.c:3365`: `void input_set_buffer_size(size_t buffer_size)`
+pub unsafe fn input_set_buffer_size(buffer_size: usize) {
+    unsafe {
+        let old = INPUT_BUFFER_SIZE;
+        log_debug!("input_set_buffer_size: {} -> {}", old, buffer_size);
+        INPUT_BUFFER_SIZE = buffer_size;
+    }
+}
 
 bitflags::bitflags! {
     #[repr(C)]
@@ -1375,7 +1390,7 @@ unsafe fn input_input(ictx: *mut input_ctx) -> i32 {
         let mut available: usize = (*ictx).input_space;
         while (*ictx).input_len + 1 >= available {
             available *= 2;
-            if available > INPUT_BUF_LIMIT {
+            if available > INPUT_BUFFER_SIZE {
                 (*ictx).flags |= input_flags::INPUT_DISCARD;
                 return 0;
             }
