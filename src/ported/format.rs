@@ -586,6 +586,48 @@ pub unsafe fn format_cb_session_attached_list(ft: *mut format_tree) -> format_ta
 }
 
 /// Callback for `session_alerts`.
+/// Callback for `session_alert`.
+/// C `vendor/tmux/format.c:588`: `static void *format_cb_session_alert(struct format_tree *ft)`
+pub unsafe fn format_cb_session_alert(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        let s: *mut session = (*ft).s;
+        const SIZEOF_ALERTS: usize = 1024;
+        let mut alerts = MaybeUninit::<[u8; 1024]>::uninit();
+        let alerts: *mut u8 = alerts.as_mut_ptr().cast();
+        let mut alerted = winlink_flags::empty();
+
+        if s.is_null() {
+            return format_table_type::None;
+        }
+
+        *alerts = b'\0';
+        for wl in rb_foreach(&raw mut (*s).windows).map(NonNull::as_ptr) {
+            if !(*wl).flags.intersects(WINLINK_ALERTFLAGS) {
+                continue;
+            }
+            if !alerted.intersects(winlink_flags::WINLINK_ACTIVITY)
+                && (*wl).flags.intersects(winlink_flags::WINLINK_ACTIVITY)
+            {
+                strlcat(alerts, c!("#"), SIZEOF_ALERTS);
+                alerted |= winlink_flags::WINLINK_ACTIVITY;
+            }
+            if !alerted.intersects(winlink_flags::WINLINK_BELL)
+                && (*wl).flags.intersects(winlink_flags::WINLINK_BELL)
+            {
+                strlcat(alerts, c!("!"), SIZEOF_ALERTS);
+                alerted |= winlink_flags::WINLINK_BELL;
+            }
+            if !alerted.intersects(winlink_flags::WINLINK_SILENCE)
+                && (*wl).flags.intersects(winlink_flags::WINLINK_SILENCE)
+            {
+                strlcat(alerts, c!("~"), SIZEOF_ALERTS);
+                alerted |= winlink_flags::WINLINK_SILENCE;
+            }
+        }
+        format!("{}", _s(alerts)).into()
+    }
+}
+
 /// C `vendor/tmux/format.c:620`: `static void *format_cb_session_alerts(struct format_tree *ft)`
 pub unsafe fn format_cb_session_alerts(ft: *mut format_tree) -> format_table_type {
     unsafe {
@@ -3433,6 +3475,7 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("server_sessions", format_cb_server_sessions),
     format_table_entry::new("session_activity", format_cb_session_activity),
     format_table_entry::new("session_activity_flag", format_cb_session_activity_flag),
+    format_table_entry::new("session_alert", format_cb_session_alert),
     format_table_entry::new("session_alerts", format_cb_session_alerts),
     format_table_entry::new("session_attached", format_cb_session_attached),
     format_table_entry::new("session_attached_list", format_cb_session_attached_list),
