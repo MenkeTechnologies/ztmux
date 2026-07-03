@@ -3,4 +3,3 @@ $TM show-options -g status-format[2]
 $TM show-options -sg get-clipboard
 $TM show-options -sg input-buffer-size
 $TM show-options -sg default-client-command
-$TM show-options -wg tiled-layout-max-columns

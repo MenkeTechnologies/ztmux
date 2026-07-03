@@ -12,6 +12,7 @@
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 use crate::*;
+use crate::options_::options_get_number_;
 use crate::options_::options_get_string_;
 
 struct layout_sets_entry {
@@ -676,12 +677,15 @@ pub unsafe fn layout_set_tiled(w: *mut window) {
             return;
         }
 
+        // Get maximum columns from window option.
+        let max_columns = options_get_number_((*w).options, "tiled-layout-max-columns") as u32;
+
         // How many rows and columns are wanted?
         let mut rows = 1;
         let mut columns = 1;
         while rows * columns < n {
             rows += 1;
-            if rows * columns < n {
+            if rows * columns < n && (max_columns == 0 || columns < max_columns) {
                 columns += 1;
             }
         }
