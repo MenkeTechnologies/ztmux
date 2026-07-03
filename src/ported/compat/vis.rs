@@ -58,6 +58,11 @@ bitflags::bitflags! {
         /// encode newline
         const VIS_NL      = 0x0010;
 
+        /// only encode "unsafe" characters — `\b`, `\a` (BEL) and `\r`, plus
+        /// graphic characters, are left unencoded (C `vis.h`: `VIS_SAFE 0x20`,
+        /// `isvisible` clause in `vis.c:49-51`).
+        const VIS_SAFE    = 0x0020;
+
         /// inhibit the doubling of backslashes and the backslash before the default format
         /// (that is, control characters are represented by ‘^C’ and meta characters as ‘M-C’).
         /// with this flag set, the encoding is ambiguous and non-invertible.
@@ -78,6 +83,9 @@ pub unsafe fn vis_(dst: *mut u8, c: c_int, flag: vis_flags, nextc: c_int) -> *mu
             b'\n' if flag.intersects(vis_flags::VIS_NL) => encode_cstyle(dst, b'n'),
             b'\\' if !flag.intersects(vis_flags::VIS_NOSLASH) => encode_cstyle(dst, b'\\'),
             b'"' if flag.intersects(vis_flags::VIS_DQ) => encode_cstyle(dst, b'"'),
+            // VIS_SAFE keeps the "safe" control characters \a, \b and \r
+            // unencoded (vis.c:49-51 `isvisible`).
+            7 | 8 | 13 if flag.intersects(vis_flags::VIS_SAFE) => encode_passthrough(dst, c),
             7..9 | 11..14 => {
                 const CSTYLE: [u8; 7] = [b'a', b'b', 0, 0, b'v', b'f', b'r'];
                 encode_cstyle(dst, CSTYLE[c as usize - 7])
@@ -95,6 +103,8 @@ pub fn vis__(dst: &mut Vec<u8>, c: c_int, flag: vis_flags, nextc: c_int) {
         b'\n' if flag.intersects(vis_flags::VIS_NL) => encode_cstyle_(dst, b'n'),
         b'\\' if !flag.intersects(vis_flags::VIS_NOSLASH) => encode_cstyle_(dst, b'\\'),
         b'"' if flag.intersects(vis_flags::VIS_DQ) => encode_cstyle_(dst, b'"'),
+        // VIS_SAFE keeps the "safe" control characters \a, \b and \r unencoded.
+        7 | 8 | 13 if flag.intersects(vis_flags::VIS_SAFE) => encode_passthrough_(dst, c),
         7..9 | 11..14 => {
             const CSTYLE: [u8; 7] = [b'a', b'b', 0, 0, b'v', b'f', b'r'];
             encode_cstyle_(dst, CSTYLE[c as usize - 7]);
@@ -284,6 +294,8 @@ mod test {
                     vis_flags::VIS_NL,
                     vis_flags::VIS_DQ,
                     vis_flags::VIS_NOSLASH,
+                    vis_flags::VIS_SAFE,
+                    vis_flags::VIS_SAFE | vis_flags::VIS_NOSLASH,
                 ] {
                     for ch in 0..=u8::MAX {
                         for nextc in [b'\0' as i32, b'0' as i32] {

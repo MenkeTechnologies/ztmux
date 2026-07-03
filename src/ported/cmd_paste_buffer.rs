@@ -17,8 +17,8 @@ pub static CMD_PASTE_BUFFER_ENTRY: cmd_entry = cmd_entry {
     name: "paste-buffer",
     alias: Some("pasteb"),
 
-    args: args_parse::new("db:prs:t:", 0, 0, None),
-    usage: "[-dpr] [-s separator] [-b buffer-name] [-t target-pane]",
+    args: args_parse::new("db:prSs:t:", 0, 0, None),
+    usage: "[-dprS] [-s separator] [-b buffer-name] [-t target-pane]",
 
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
 
@@ -26,6 +26,24 @@ pub static CMD_PASTE_BUFFER_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_paste_buffer_exec,
     source: cmd_entry_flag::zeroed(),
 };
+
+/// Sanitise a run of buffer bytes before writing it to the pane — safe control
+/// characters (`\a`, `\b`, `\r`, `\t`, `\n`) and printable text pass through,
+/// other control bytes are vis-escaped.
+/// C `vendor/tmux/cmd-paste-buffer.c`: `static void cmd_paste_buffer_paste(struct window_pane *wp, const char *buf, size_t len)`
+unsafe fn cmd_paste_buffer_paste(wp: *mut window_pane, buf: *const u8, len: usize) {
+    unsafe {
+        let mut cp: *mut u8 = null_mut();
+        let n = utf8_stravisx(
+            &raw mut cp,
+            buf,
+            len,
+            vis_flags::VIS_SAFE | vis_flags::VIS_NOSLASH,
+        );
+        bufferevent_write((*wp).event, cp.cast(), n as usize);
+        free_(cp);
+    }
+}
 
 /// C `vendor/tmux/cmd-paste-buffer.c:58`: `static enum cmd_retval cmd_paste_buffer_exec(struct cmd *self, struct cmdq_item *item)`
 unsafe fn cmd_paste_buffer_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
@@ -81,6 +99,9 @@ unsafe fn cmd_paste_buffer_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
             let mut bufdata = paste_buffer_data_(pb, &mut bufsize);
             let bufend = bufdata.add(bufsize);
 
+            // With -S write the raw buffer bytes; otherwise sanitise each line
+            // through cmd_paste_buffer_paste (C cmd-paste-buffer.c:108-124).
+            let raw = args_has(args, 'S');
             loop {
                 let line: *mut u8 =
                     libc::memchr(bufdata as _, b'\n' as i32, bufend.addr() - bufdata.addr()).cast();
@@ -88,13 +109,23 @@ unsafe fn cmd_paste_buffer_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
                     break;
                 }
 
-                bufferevent_write((*wp).event, bufdata.cast(), line.addr() - bufdata.addr());
+                let len = line.addr() - bufdata.addr();
+                if raw {
+                    bufferevent_write((*wp).event, bufdata.cast(), len);
+                } else {
+                    cmd_paste_buffer_paste(wp, bufdata, len);
+                }
                 bufferevent_write((*wp).event, sepstr.cast(), seplen);
 
                 bufdata = line.add(1);
             }
             if bufdata != bufend {
-                bufferevent_write((*wp).event, bufdata.cast(), bufend.addr() - bufdata.addr());
+                let len = bufend.addr() - bufdata.addr();
+                if raw {
+                    bufferevent_write((*wp).event, bufdata.cast(), len);
+                } else {
+                    cmd_paste_buffer_paste(wp, bufdata, len);
+                }
             }
 
             if bracket
