@@ -780,6 +780,27 @@ pub unsafe fn window_unzoom(w: *mut window, notify: i32) -> i32 {
     }
 }
 
+/// C `vendor/tmux/window.c:481`: `const char *window_pane_printable_flags(struct window_pane *wp)`
+/// The floating-pane (`F`) branch is omitted because ztmux has no floating
+/// panes, so no pane is ever floating; output is identical to C for every
+/// reachable pane state.
+pub unsafe fn window_pane_printable_flags(wp: *mut window_pane) -> String {
+    unsafe {
+        let w = (*wp).window;
+        let mut flags = String::new();
+        if wp == (*w).active {
+            flags.push('*');
+        }
+        if wp == tailq_first(&raw mut (*w).last_panes) {
+            flags.push('-');
+        }
+        if (*wp).flags.intersects(window_pane_flags::PANE_ZOOMED) {
+            flags.push('Z');
+        }
+        flags
+    }
+}
+
 /// C `vendor/tmux/window.c:807`: `int window_push_zoom(struct window *w, int always, int flag)`
 pub unsafe fn window_push_zoom(w: *mut window, always: bool, flag: bool) -> bool {
     unsafe {
