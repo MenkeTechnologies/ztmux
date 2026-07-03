@@ -259,8 +259,31 @@ failure log. Now that the suite is 100% green it acts as a blocking ratchet (lik
 strykelang's): any case that diverges from the vendored tmux fails the pipeline,
 so a regression in ported behavior cannot land.
 
+## Known gaps (proven-unported next-3.7 behaviour)
+
+`parity/known_gaps/` is the inverse of `parity/cases/`: next-3.7 features ztmux
+does **not** implement yet, each pinned by a case that is expected to *diverge*
+from the reference. The 13 cases cover ~50 individual options/format-vars/commands
+(pane scrollbars, the theme system, copy-mode line numbers, floating-pane format
+vars, `switch-mode`, …), each tied to an unported C area. Run them with the
+inverted runner:
+
+```sh
+bash parity/run_known_gaps.sh   # "GAP" = still unported (expected); "CLOSED" = ported, promote it
+```
+
+The runner is an advisory tripwire — it exits non-zero only when a gap closes
+(the feature got ported and its case should move to `parity/cases/`), so it never
+reddens CI merely because the gaps still exist. See
+[`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
+proof. These gaps do not count against the 1080/1080 ported surface; they measure
+the unbuilt surface beyond it.
+
 ## Growing the suite
 
 Add a `.fmt` (one format) or `.sh` (one scenario) file under `parity/cases/`.
 Keep them small and single-purpose; number-prefix by category. The sibling
 suites scaled this to thousands of cases — the same shape scales here.
+
+To record a newly-found divergence that ztmux does *not* yet match, add a `.sh`
+case under `parity/known_gaps/` instead and confirm it with `run_known_gaps.sh`.
