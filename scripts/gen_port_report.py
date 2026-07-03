@@ -337,10 +337,41 @@ def walk_rs() -> tuple[dict[str, list[tuple[str,int]]], dict[str, set[str]], dic
                 text = f.read_text(errors="replace")
             except Exception:
                 continue
+            # Test code is not port code. A `#[cfg(test)]` module (or a
+            # `#[test]` / `fn test_*` helper) has no C counterpart, so every
+            # such fn would land in the "rust-only" bucket and swamp the
+            # port-fidelity signal (1846 test fns in src/ported). Track the
+            # test scope by brace depth and exclude those fn defs from the
+            # count — the ported/unported/stub classification of real port
+            # fns is unaffected (they never live in test scope).
+            in_test = False          # inside a `#[cfg(test)] mod … { … }`
+            test_depth = 0           # brace depth of that module
+            pending_cfg_test = False # saw `#[cfg(test)]`, awaiting its item
+            pending_test_fn = False  # saw `#[test]`, next fn is a test
             for i, line in enumerate(text.splitlines(), 1):
+                if "#[cfg(test)]" in line:
+                    pending_cfg_test = True
+                if "#[test]" in line:
+                    pending_test_fn = True
+                if in_test:
+                    test_depth += line.count("{") - line.count("}")
+                    if test_depth <= 0:
+                        in_test = False
+                # A `#[cfg(test)]` immediately followed by `mod … {` opens a
+                # test module whose whole body is test code.
+                elif pending_cfg_test and "mod " in line and "{" in line:
+                    in_test = True
+                    test_depth = line.count("{") - line.count("}")
+                    pending_cfg_test = False
                 m = RE_RS_FN.match(line)
                 if m:
-                    fn_defs[m.group(1)].append((rel, i))
+                    name = m.group(1)
+                    is_test = in_test or pending_test_fn or pending_cfg_test \
+                        or name.startswith("test_")
+                    if not is_test:
+                        fn_defs[name].append((rel, i))
+                    pending_test_fn = False
+                    pending_cfg_test = False
                 ls = line.lstrip()
                 is_doc = ls.startswith("///") or ls.startswith("//!") or ls.startswith("/*") or ls.startswith("*") or ls.startswith("//")
                 m2 = RE_PORT_COMMENT.search(line)
