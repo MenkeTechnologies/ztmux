@@ -152,15 +152,67 @@ pub const OPTIONS_TABLE_STATUS_FORMAT1: *const u8 = concat!(
 
 #[expect(clippy::disallowed_methods)]
 pub const OPTIONS_TABLE_STATUS_FORMAT2: *const u8 = concat!(
-    "#[align=centre]#{P:#{?pane_active,#[reverse],}",
-    "#{pane_index}[#{pane_width}x#{pane_height}]#[default] }\0"
+    "#[align=left]#{R: ,#{n:#{session_name}}}P: ",
+    "#[norange default]",
+    "#[list=on align=#{status-justify}]",
+    "#[list=left-marker]<#[list=right-marker]>#[list=on]",
+    "#{P:",
+    "#[range=pane|#{pane_id} ",
+    "#{E:pane-status-style}",
+    "]",
+    "#[push-default]",
+    "#{T:window-pane-status-format}",
+    "#[pop-default]",
+    "#[norange list=on default]  ",
+    ",",
+    "#[range=pane|#{pane_id} list=focus ",
+    "#{?#{!=:#{E:pane-status-current-style},default},",
+    "#{E:pane-status-current-style},",
+    "#{E:pane-status-style}",
+    "}",
+    "]",
+    "#[push-default]",
+    "#{T:window-pane-current-status-format}",
+    "#[pop-default]",
+    "#[norange list=on default] ",
+    "}\0"
 )
 .as_ptr()
 .cast();
 
-pub static mut OPTIONS_TABLE_STATUS_FORMAT_DEFAULT: [*const u8; 3] = [
+pub const OPTIONS_TABLE_STATUS_FORMAT3: *const u8 = concat!(
+    "#[align=left]#{R: ,#{n:#{session_name}}}S: ",
+    "#[norange default]",
+    "#[list=on align=#{status-justify}]",
+    "#[list=left-marker]<#[list=right-marker]>#[list=on]",
+    "#{S:",
+    "#[range=session|#{session_id} ",
+    "#{E:session-status-style}",
+    "]",
+    "#[push-default]",
+    "#S#{session_alert}",
+    "#[pop-default]",
+    "#[norange list=on default]  ",
+    ",",
+    "#[range=session|#{session_id} list=focus ",
+    "#{?#{!=:#{E:session-status-current-style},default},",
+    "#{E:session-status-current-style},",
+    "#{E:session-status-style}",
+    "}",
+    "]",
+    "#[push-default]",
+    "#S*#{session_alert}",
+    "#[pop-default]",
+    "#[norange list=on default] ",
+    "}\0"
+)
+.as_ptr()
+.cast();
+
+pub static mut OPTIONS_TABLE_STATUS_FORMAT_DEFAULT: [*const u8; 4] = [
     OPTIONS_TABLE_STATUS_FORMAT1,
     OPTIONS_TABLE_STATUS_FORMAT2,
+    OPTIONS_TABLE_STATUS_FORMAT3,
     null(),
 ];
 
@@ -207,7 +259,7 @@ macro_rules! options_table_window_hook {
     };
 }
 
-pub static OPTIONS_TABLE: [options_table_entry; 220] = [
+pub static OPTIONS_TABLE: [options_table_entry; 226] = [
     options_table_entry {
         name: "backspace",
         type_: options_table_type::OPTIONS_TABLE_KEY,
@@ -1473,6 +1525,62 @@ pub static OPTIONS_TABLE: [options_table_entry; 220] = [
         choices: &OPTIONS_TABLE_PANE_STATUS_LIST,
         default_num: pane_status::PANE_STATUS_OFF as i64,
         text: c!("Position of the pane status lines."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "pane-status-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("default"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of panes in the status line, except the current pane."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "pane-status-current-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("underscore"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of the current pane in the status line."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "session-status-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("default"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of sessions in the status line, except the current session."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "session-status-current-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("underscore"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of the current session in the status line."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "window-pane-status-format",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("#P:[#T]#{?pane_flags,#{pane_flags}, }"),
+        text: c!("Format of window panes in the status line, except the current pane."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "window-pane-current-status-format",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("#P:[#T]#{?pane_flags,#{pane_flags}, }"),
+        text: c!("Format of the current window pane in the status line."),
         ..options_table_entry::const_default()
     },
     options_table_entry {

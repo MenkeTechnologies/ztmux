@@ -29,18 +29,19 @@ Cases graduate out of this bucket as the feature lands: when a gap starts
 matching next-3.7 byte-for-byte, the runner flags it `CLOSED` and it is promoted
 to `parity/cases/` (the blocking gate) and deleted here. `pane_zoomed_flag`,
 `session_*_flag`, the terminal-feature flags, `codepoint-widths` /
-`variation-selector-always-wide`, `default-client-command`, `get-clipboard`, and
+`variation-selector-always-wide`, `default-client-command`, `get-clipboard`,
 the `theme` / `dark-theme-*` / `light-theme-*` palette options (plus `themeX`
-colour-name parsing) have already made that trip.
+colour-name parsing), and the pane/session status-line options
+(`pane-status-*` / `session-status-*` / `window-pane-status-format`, with
+`status-format[1]`/`[2]` and the `#{R:}` repeat modifier) have already made
+that trip.
 
 | Case | Feature gap | Unported area |
 | --- | --- | --- |
 | `opt_pane_scrollbars.sh` | `pane-scrollbars*` (4) | `screen-redraw.c` scrollbar scene (`redraw_draw_scrollbar_span`, `redraw_pane_scrollbar`) |
 | `opt_copy_mode_line_numbers.sh` | `copy-mode-line-numbers` + styles (6) | `window-copy.c` line numbers / position |
-| `opt_pane_border_status.sh` | `pane-status-*` / `session-status-*` / `window-pane-status-format` (6) | `screen-redraw.c` pane border status |
 | `opt_prompt_cursor.sh` | `prompt-cursor-*` / `prompt-command-cursor-*` / `message-format` (5) | `status.c` prompt cursor |
 | `opt_tree_mode.sh` | `tree-mode-preview-*` / `tree-mode-*-style` / `switch-mode-match-style` (5) | `mode-tree.c`, `window-tree.c` |
-| `opt_misc.sh` | `status-format[2]` (session-status "S:" line) | session-status subsystem (`#{S:...}`, `session-status-*`, `#{session_alert}`) |
 | `fmt_floating_pane.sh` | `pane_floating_flag` / `pane_x` / `pane_y` / `pane_z` / `pane_pb_*` | floating panes (`new-pane`) |
 | `cmd_switch_mode.sh` | `switch-mode` command | `cmd-switch-mode` |
 

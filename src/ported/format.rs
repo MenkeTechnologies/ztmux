@@ -102,10 +102,14 @@ bitflags::bitflags! {
         const FORMAT_CLIENTS = 0x40000;
         const FORMAT_NOT = 0x80000;
         const FORMAT_NOT_NOT = 0x100000;
+        const FORMAT_REPEAT = 0x200000;
         const FORMAT_COLOUR_ESC_FG = 0x8000000;
         const FORMAT_COLOUR_ESC_BG = 0x10000000;
     }
 }
+
+/// C `vendor/tmux/format.c:91`: `#define FORMAT_MAX_REPEAT 10000`
+const FORMAT_MAX_REPEAT: i32 = 10000;
 
 /// Limit on recursion.
 const FORMAT_LOOP_LIMIT: i32 = 100;
@@ -4271,8 +4275,9 @@ pub unsafe fn format_build_modifiers(
             // argument (e.g. `#{P/r:...}`), so they must be here as well as in
             // the no-argument set above (which handles the bare `#{S:...}`).
             // `c` takes an f/b argument for the colour-to-escape form
-            // (`#{c/f:red}`), so it is here in addition to the no-arg set.
-            if strchr(c!("mCNSWPLst=peqc"), *cp as i32).is_null() {
+            // (`#{c/f:red}`), so it is here in addition to the no-arg set. `R`
+            // (repeat) takes a `left,count` argument (`#{R:x,3}`).
+            if strchr(c!("mCNSWPLst=peqcR"), *cp as i32).is_null() {
                 break;
             }
             let mut c = *cp;
@@ -5040,6 +5045,7 @@ pub unsafe fn format_replace(
                             }
                             b'd' => modifiers |= format_modifiers::FORMAT_DIRNAME,
                             b'n' => modifiers |= format_modifiers::FORMAT_LENGTH,
+                            b'R' => modifiers |= format_modifiers::FORMAT_REPEAT,
                             b't' => {
                                 modifiers |= format_modifiers::FORMAT_TIMESTRING;
                                 if (*fm).argc >= 1 {
@@ -5250,6 +5256,35 @@ pub unsafe fn format_replace(
                         value = format_search(search, wp, new);
                     }
                     free_(new);
+                } else if modifiers.intersects(format_modifiers::FORMAT_REPEAT) {
+                    // Repeat the left argument right times (format.c FORMAT_REPEAT).
+                    let mut left: *mut u8 = null_mut();
+                    let mut right: *mut u8 = null_mut();
+                    if format_choose(es, copy, &raw mut left, &raw mut right, 1) != 0 {
+                        format_log1!(es, __func__, "repeat syntax error: {}", _s(copy));
+                        break 'fail;
+                    }
+                    match strtonum_(cstr_to_str(right), 1i32, FORMAT_MAX_REPEAT) {
+                        Err(_) => value = xstrdup(c!("")).as_ptr(),
+                        Ok(nrep) => {
+                            value = xstrdup(c!("")).as_ptr();
+                            let mut i = 0;
+                            while i < nrep {
+                                if format_check_time(es, null_mut()) == 0 {
+                                    free_(right);
+                                    free_(left);
+                                    free_(value);
+                                    break 'fail;
+                                }
+                                new = format_nul!("{}{}", _s(value), _s(left));
+                                free_(value);
+                                value = new;
+                                i += 1;
+                            }
+                        }
+                    }
+                    free_(right);
+                    free_(left);
                 } else if modifiers.intersects(format_modifiers::FORMAT_NOT) {
                     // Logical NOT of the (expanded) argument.
                     // C: value = format_bool_op_1(es, copy, 1).

@@ -1,0 +1,5 @@
+$TM display-message -p '#{R:ab,3}'
+$TM display-message -p '#{R:-,5}'
+$TM display-message -p '#{R:x,0}'
+$TM display-message -p '#{R:x,#{e|+|:1,2}}'
+$TM display-message -p '[#{R: ,2}]'
