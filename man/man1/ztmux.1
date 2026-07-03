@@ -695,6 +695,222 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .B submodules
 .RB [ \-o
 .IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B term
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B start
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B writable
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B sync
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B piped
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B input
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B monitor
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B remain
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B autoname
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B readonly
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B idle
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B viewers
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B connected
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B constrain
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B hooks
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B destroy
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B status
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B keys
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B limit
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B winsize
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B borders
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B lock
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B titlebar
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B visual
+.RB [ \-o
+.IR json ]
 .SH DESCRIPTION
 .B ztmux
 is a terminal multiplexer: it lets a number of terminals be created,
@@ -2021,6 +2237,434 @@ describe the superproject's own state,
 describes its dependencies: the nested checkouts that quietly drift and break a
 build. Repos with no submodules and non-repo panes are omitted; those with drift
 sort first. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux term
+.B ztmux term
+aggregates the attached clients by
+.BR $TERM :
+how many are on
+.IR screen-256color ,
+how many on
+.IR xterm-256color ,
+and so on. Where
+.B ztmux who
+lists each client individually,
+.B term
+is the histogram \(en the client-side companion to
+.B ztmux cmd
+\(en useful when a capability bug only shows up on one terminal type and you need
+to know who is on it. Ordered most-common first. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux start
+.B ztmux start
+reports the full command line each pane's root process was launched with \(en
+its
+.BR pane_pid \(en
+as opposed to
+.BR pane_current_command ,
+the foreground name shown everywhere else. For a shell pane that is the shell
+invocation; for a pane started with
+.B new-window 'ssh host'
+it is that whole command with its arguments, which the foreground name loses. One
+.B ps
+call covers every pid. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux writable
+.B ztmux writable
+finds the panes whose working directory exists but is read-only to you \(en a
+root-owned tree, a read-only mount, someone else's checkout \(en where the first
+write fails for a reason the prompt does not show. It checks each directory with
+.BR access (2).
+Where
+.B ztmux gone
+flags a directory that is
+.IR missing ,
+.B writable
+flags one that is present but read-only. It is filesystem-only and checks each
+unique directory once. A server whose panes can all write prints just the header.
+With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux sync
+.B ztmux sync
+lists the windows that have
+.B synchronize-panes
+turned on \(en where every keystroke goes to all panes at once. That is powerful
+for driving a fleet and dangerous when forgotten, and nothing in the normal views
+shows it, so
+.B sync
+is the safety check before you type. It reads the
+.B pane_synchronized
+flag for every window and reports the ones where it is set. Windows without it are
+omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux piped
+.B ztmux piped
+lists the panes with an active
+.B pipe-pane
+capture \(en output teed to a shell command for logging, monitoring, or
+mirroring. A running pipe is invisible: the pane looks ordinary while everything
+it prints also goes elsewhere.
+.B piped
+reads the
+.B pane_pipe
+flag and reports the panes where a pipe is active \(en the "what am I still
+logging" check. Panes with no pipe are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux input
+.B ztmux input
+lists the panes that are ignoring keyboard input \(en a read-only observer, or a
+pane a script left with input turned off, so it shows output but silently drops
+every keystroke.
+.B input
+reads the
+.B pane_input_off
+flag and reports the panes where input is disabled \(en the "why won't this pane
+take my typing" check. Panes accepting input are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux monitor
+.B ztmux monitor
+lists the windows armed to alert on themselves:
+.B monitor-activity
+raises an alert on any output,
+.B monitor-silence
+after N seconds of none. Where
+.B ztmux alerts
+shows the windows that have already fired,
+.B monitor
+shows the ones armed to fire \(en the standing watches you set and may have
+forgotten. The always-on-by-default bell monitor is left out, as it would match
+nearly every window. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux remain
+.B ztmux remain
+lists the windows with
+.B remain-on-exit
+set, where a pane whose process exits is held open as a dead pane rather than
+closed
+.RB ( on
+always,
+.B failed
+only on a non-zero exit). Where
+.B ztmux dead
+lists the panes that have already died and
+.B ztmux respawn
+revives them,
+.B remain
+shows which windows are configured to hold their dead panes in the first place.
+Windows with the default
+.RB ( off )
+are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux autoname
+.B ztmux autoname
+lists the windows whose name is pinned \(en
+.B automatic-rename
+turned off, so the name stays whatever you set no matter what runs there. Where
+.B ztmux named
+infers intent by comparing a window's name to its command,
+.B autoname
+reads the option directly, so it also catches a pinned name that happens to match
+the command right now. Windows with the default (auto-rename on) are omitted.
+With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux readonly
+.B ztmux readonly
+lists the clients attached in read-only mode \(en with
+.B attach -r
+or
+.BR "switch-client -r" \(en
+which can see a session but not type into it. Nothing in the normal views
+distinguishes an observer from a live client. Where
+.B ztmux who
+lists every client,
+.B readonly
+isolates the view-only ones. Clients that can type are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux idle
+.B ztmux idle
+ranks the attached clients by how long since each last did anything \(en a
+keystroke, a resize, a command \(en most-idle first: the connection someone
+walked away from, the forgotten
+.B attach
+on another machine. Where
+.B ztmux who
+lists the clients and
+.B ztmux readonly
+flags the observers,
+.B idle
+sorts them by staleness. A compact relative age is shown for the terminal; with
+.B \-o
+.I json
+(or
+.BR \-\-json )
+the raw unix activity timestamp and idle seconds are emitted.
+.SS ztmux viewers
+.B ztmux viewers
+counts the clients attached to each session and ranks the sessions by that count,
+most-watched first \(en a paired session, a remote observer, the same session
+open from two machines. Where
+.B ztmux who
+lists the clients individually and
+.B ztmux fanout
+ranks sessions by pane count,
+.B viewers
+ranks them by eyes on them. Sessions with no client attached do not appear. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux connected
+.B ztmux connected
+ranks the attached clients by how long they have been connected, longest first
+\(en the
+.B attach
+left open on a server for days, the paired session joined this morning. Where
+.B ztmux idle
+ranks by time since last activity (staleness of use),
+.B connected
+ranks by time since attach (age of the connection) \(en two different questions
+about the same client. A compact relative age is shown for the terminal; with
+.B \-o
+.I json
+(or
+.BR \-\-json )
+the raw unix attach timestamp and uptime seconds are emitted.
+.SS ztmux constrain
+.B ztmux constrain
+ranks the attached clients by screen size, smallest first. When several clients
+share a session the smallest one caps what everyone sees \(en with the default
+.BR "window-size smallest" ,
+the session is sized to the narrowest and shortest attached client \(en so the
+top row is the client holding a session down. Where
+.B ztmux who
+lists every client and
+.B ztmux viewers
+counts them per session,
+.B constrain
+surfaces the size cap. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows, with width and height, as a machine-readable array.
+.SS ztmux hooks
+.B ztmux hooks
+lists the command hooks configured on each session \(en a command bound to run
+when something happens (a window is selected, a pane dies, a client attaches).
+Hooks are invisible until they fire and easy to forget. For every session
+.B hooks
+reads the session-scope hooks (the ones you set, not the built-in global
+defaults) and reports the event each is bound to and the command it runs \(en the
+"what automation is wired into this server" view. Sessions with no custom hook
+contribute nothing. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array, sorted by session then event.
+.SS ztmux destroy
+.B ztmux destroy
+reports the sessions with
+.B destroy-unattached
+set \(en removed the moment the last client detaches. Handy for throwaway or
+popup sessions, dangerous when forgotten. Where
+.B ztmux detached
+lists the sessions currently without a client,
+.B destroy
+warns which ones will not survive losing theirs. Sessions with the default
+.RB ( off )
+are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux status
+.B ztmux status
+reports the sessions with the status line turned off
+.RB ( "set-option status off" ) \(en
+a full-height view where it is easy to forget the tabs are hidden. It is a small
+awareness view for a per-session display setting that nothing else surfaces.
+Sessions showing the status line (the default) are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux keys
+.B ztmux keys
+summarises the key bindings by table. tmux groups bindings into tables \(en
+.B root
+(no prefix),
+.B prefix
+(after the prefix key),
+.BR copy-mode / copy-mode-vi ,
+and any custom tables created with
+.BR "bind-key -T" .
+A raw
+.B list-keys
+dumps hundreds of bindings at once;
+.B keys
+collapses that into one row per table with its binding count, busiest first,
+surfacing how heavily each table is customised and which custom tables exist at
+all. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux limit
+.B ztmux limit
+reports each session's
+.B history-limit
+\(en the maximum number of lines a pane keeps in its scrollback \(en ranked
+largest first. Where
+.B ztmux history
+ranks panes by the scrollback they are using right now,
+.B limit
+reports the configured cap behind that usage, surfacing the sessions with an
+unusually large (memory-hungry) or small (truncating) buffer. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux winsize
+.B ztmux winsize
+reports the windows whose
+.B window-size
+differs from the global default \(en
+.BR latest ,
+.BR largest ,
+.BR smallest ,
+or
+.B manual
+sizing when clients of different sizes are attached. Most windows inherit the
+default;
+.B winsize
+lists the ones you have deliberately given a different rule. Where
+.B ztmux constrain
+shows which client caps a session,
+.B winsize
+shows which windows opt out of the default sizing. Windows on the default are
+omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux borders
+.B ztmux borders
+reports the windows with
+.B pane-border-status
+enabled \(en a one-line label drawn on each pane's border
+.RB ( top " or " bottom ),
+usually the pane's title or command, so a split window self-documents which pane
+is which. It is off by default;
+.B borders
+lists the windows where it is on and on which edge. Windows with the default
+.RB ( off )
+are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux lock
+.B ztmux lock
+reports the sessions with
+.B lock-after-time
+set \(en which lock their screen (running
+.BR lock-command )
+after that many seconds with no input, a small security measure for a session
+left on a shared or unattended machine. It is off by default and easy to forget.
+.B lock
+lists the armed sessions and after how long, soonest-locking first. Sessions with
+no lock timeout are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows, timeout in seconds, as a machine-readable array.
+.SS ztmux titlebar
+.B ztmux titlebar
+reports the sessions with
+.B set-titles
+on \(en which update the outer terminal emulator's window or tab title to reflect
+the active session, window, and pane. It is off by default. Where
+.B ztmux titles
+shows each pane's own title and
+.B ztmux named
+shows window names,
+.B titlebar
+is about the setting that projects those out to the host terminal. Sessions with
+the default (off) are omitted. With
+.B \-o
+.I json
+(or
+.BR \-\-json )
+it emits the same rows as a machine-readable array.
+.SS ztmux visual
+.B ztmux visual
+reports the sessions that show alerts visually \(en
+.BR visual-bell ,
+.BR visual-activity ,
+and
+.B visual-silence
+put a message on the status line rather than (or as well as) passing a terminal
+bell through. Where
+.B ztmux monitor
+shows which windows are armed to alert and
+.B ztmux alerts
+shows which have fired,
+.B visual
+shows how a session presents an alert when it fires, and which of the three it
+applies to. Sessions using the default (bell-only) are omitted. With
 .B \-o
 .I json
 (or

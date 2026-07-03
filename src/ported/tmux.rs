@@ -706,6 +706,30 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"buffers"
                     | b"worktree"
                     | b"submodules"
+                    | b"term"
+                    | b"start"
+                    | b"writable"
+                    | b"sync"
+                    | b"piped"
+                    | b"input"
+                    | b"monitor"
+                    | b"remain"
+                    | b"autoname"
+                    | b"readonly"
+                    | b"idle"
+                    | b"viewers"
+                    | b"connected"
+                    | b"constrain"
+                    | b"hooks"
+                    | b"destroy"
+                    | b"status"
+                    | b"keys"
+                    | b"limit"
+                    | b"winsize"
+                    | b"borders"
+                    | b"lock"
+                    | b"titlebar"
+                    | b"visual"
             ) {
                 let sock = if SOCKET_PATH.is_null() {
                     String::new()
@@ -786,6 +810,30 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"buffers" => crate::extensions::buffers::run(&sock),
                     b"worktree" => crate::extensions::worktree::run(&sock),
                     b"submodules" => crate::extensions::submodules::run(&sock),
+                    b"term" => crate::extensions::term::run(&sock),
+                    b"start" => crate::extensions::start::run(&sock),
+                    b"writable" => crate::extensions::writable::run(&sock),
+                    b"sync" => crate::extensions::sync::run(&sock),
+                    b"piped" => crate::extensions::piped::run(&sock),
+                    b"input" => crate::extensions::input::run(&sock),
+                    b"monitor" => crate::extensions::monitor::run(&sock),
+                    b"remain" => crate::extensions::remain::run(&sock),
+                    b"autoname" => crate::extensions::autoname::run(&sock),
+                    b"readonly" => crate::extensions::readonly::run(&sock),
+                    b"idle" => crate::extensions::idle::run(&sock),
+                    b"viewers" => crate::extensions::viewers::run(&sock),
+                    b"connected" => crate::extensions::connected::run(&sock),
+                    b"constrain" => crate::extensions::constrain::run(&sock),
+                    b"hooks" => crate::extensions::hooks::run(&sock),
+                    b"destroy" => crate::extensions::destroy::run(&sock),
+                    b"status" => crate::extensions::status::run(&sock),
+                    b"keys" => crate::extensions::keys::run(&sock),
+                    b"limit" => crate::extensions::limit::run(&sock),
+                    b"winsize" => crate::extensions::winsize::run(&sock),
+                    b"borders" => crate::extensions::borders::run(&sock),
+                    b"lock" => crate::extensions::lock::run(&sock),
+                    b"titlebar" => crate::extensions::titlebar::run(&sock),
+                    b"visual" => crate::extensions::visual::run(&sock),
                     _ => crate::extensions::dashboard::run(&sock),
                 };
                 std::process::exit(code);

@@ -430,6 +430,126 @@ EXTENSIONS = [
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "repos with submodules and how many are out of sync (ztmux extension)",
     ),
+    (
+        "term",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "histogram of attached client terminal types (ztmux extension)",
+    ),
+    (
+        "start",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the command line each pane was launched with (ztmux extension)",
+    ),
+    (
+        "writable",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes whose working directory is read-only (ztmux extension)",
+    ),
+    (
+        "sync",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows with synchronize-panes turned on (ztmux extension)",
+    ),
+    (
+        "piped",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes with an active pipe-pane capture (ztmux extension)",
+    ),
+    (
+        "input",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "panes that are ignoring keyboard input (ztmux extension)",
+    ),
+    (
+        "monitor",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows armed to alert on activity or silence (ztmux extension)",
+    ),
+    (
+        "remain",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows that keep panes open after they exit (ztmux extension)",
+    ),
+    (
+        "autoname",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows with a pinned name (automatic-rename off) (ztmux extension)",
+    ),
+    (
+        "readonly",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "clients attached in read-only mode (ztmux extension)",
+    ),
+    (
+        "idle",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "attached clients ranked by time since last activity (ztmux extension)",
+    ),
+    (
+        "viewers",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "how many clients are attached to each session (ztmux extension)",
+    ),
+    (
+        "connected",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "attached clients ranked by connection age (ztmux extension)",
+    ),
+    (
+        "constrain",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "attached clients ranked by screen size, smallest first (ztmux extension)",
+    ),
+    (
+        "hooks",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the command hooks configured on each session (ztmux extension)",
+    ),
+    (
+        "destroy",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "sessions that self-destruct when the last client detaches (ztmux extension)",
+    ),
+    (
+        "status",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "sessions with the status line turned off (ztmux extension)",
+    ),
+    (
+        "keys",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "how many key bindings live in each key table (ztmux extension)",
+    ),
+    (
+        "limit",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "each session's scrollback capacity, largest first (ztmux extension)",
+    ),
+    (
+        "winsize",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows whose sizing mode differs from the default (ztmux extension)",
+    ),
+    (
+        "borders",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "windows that draw a status line on their pane borders (ztmux extension)",
+    ),
+    (
+        "lock",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "sessions set to lock themselves after idle time (ztmux extension)",
+    ),
+    (
+        "titlebar",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "sessions that push a title to the outer terminal (ztmux extension)",
+    ),
+    (
+        "visual",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "sessions that show alerts visually instead of just beeping (ztmux extension)",
+    ),
 ]
 
 

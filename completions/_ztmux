@@ -2351,6 +2351,174 @@ _ztmux-submodules() {
     '--json[machine-readable JSON output]'
 }
 
+_ztmux-term() {
+  [[ -n ${tmux_describe} ]] && print "histogram of attached client terminal types (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-start() {
+  [[ -n ${tmux_describe} ]] && print "the command line each pane was launched with (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-writable() {
+  [[ -n ${tmux_describe} ]] && print "panes whose working directory is read-only (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-sync() {
+  [[ -n ${tmux_describe} ]] && print "windows with synchronize-panes turned on (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-piped() {
+  [[ -n ${tmux_describe} ]] && print "panes with an active pipe-pane capture (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-input() {
+  [[ -n ${tmux_describe} ]] && print "panes that are ignoring keyboard input (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-monitor() {
+  [[ -n ${tmux_describe} ]] && print "windows armed to alert on activity or silence (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-remain() {
+  [[ -n ${tmux_describe} ]] && print "windows that keep panes open after they exit (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-autoname() {
+  [[ -n ${tmux_describe} ]] && print "windows with a pinned name (automatic-rename off) (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-readonly() {
+  [[ -n ${tmux_describe} ]] && print "clients attached in read-only mode (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-idle() {
+  [[ -n ${tmux_describe} ]] && print "attached clients ranked by time since last activity (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-viewers() {
+  [[ -n ${tmux_describe} ]] && print "how many clients are attached to each session (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-connected() {
+  [[ -n ${tmux_describe} ]] && print "attached clients ranked by connection age (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-constrain() {
+  [[ -n ${tmux_describe} ]] && print "attached clients ranked by screen size, smallest first (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-hooks() {
+  [[ -n ${tmux_describe} ]] && print "the command hooks configured on each session (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-destroy() {
+  [[ -n ${tmux_describe} ]] && print "sessions that self-destruct when the last client detaches (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-status() {
+  [[ -n ${tmux_describe} ]] && print "sessions with the status line turned off (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-keys() {
+  [[ -n ${tmux_describe} ]] && print "how many key bindings live in each key table (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-limit() {
+  [[ -n ${tmux_describe} ]] && print "each session's scrollback capacity, largest first (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-winsize() {
+  [[ -n ${tmux_describe} ]] && print "windows whose sizing mode differs from the default (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-borders() {
+  [[ -n ${tmux_describe} ]] && print "windows that draw a status line on their pane borders (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-lock() {
+  [[ -n ${tmux_describe} ]] && print "sessions set to lock themselves after idle time (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-titlebar() {
+  [[ -n ${tmux_describe} ]] && print "sessions that push a title to the outer terminal (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-visual() {
+  [[ -n ${tmux_describe} ]] && print "sessions that show alerts visually instead of just beeping (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
 # And here is the actual _ztmux(), that puts it all together:
 _ztmux() {
   local curcontext="${curcontext}" state line ret=1

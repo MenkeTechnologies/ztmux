@@ -109,6 +109,23 @@ pub(crate) fn capture_pane(socket: &str, target: &str, history: bool) -> Option<
     Some(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
+/// Run a `list-* -F <format>` command and return its stdout lines. Used by the
+/// control-flag extensions (`sync`, `piped`, `input`) to read per-pane/window
+/// flags that the JSON snapshot schema does not carry. Returns an empty vec on
+/// any failure so callers degrade to no rows.
+pub(crate) fn query_lines(socket: &str, args: &[&str]) -> Vec<String> {
+    let Ok(out) = ztmux_cmd(socket, args).output() else {
+        return Vec::new();
+    };
+    if !out.status.success() {
+        return Vec::new();
+    }
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
 /// Run a list command and parse its JSON stdout into `Vec<T>`.
 pub(crate) fn run_json<T: DeserializeOwned>(socket: &str, args: &[&str]) -> Result<Vec<T>, String> {
     let out = ztmux_cmd(socket, args)

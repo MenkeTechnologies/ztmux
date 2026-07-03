@@ -146,10 +146,7 @@ mod tests {
 
     #[test]
     fn client_names_are_collected_and_sorted() {
-        let rows = build_rows(&snap(vec![
-            client("cb", "xterm"),
-            client("ca", "xterm"),
-        ]));
+        let rows = build_rows(&snap(vec![client("cb", "xterm"), client("ca", "xterm")]));
         assert_eq!(rows[0].clients, vec!["ca", "cb"]);
     }
 
@@ -171,10 +168,7 @@ mod tests {
 
     #[test]
     fn json_carries_term_count_and_names() {
-        let rows = build_rows(&snap(vec![
-            client("c1", "xterm"),
-            client("c2", "xterm"),
-        ]));
+        let rows = build_rows(&snap(vec![client("c1", "xterm"), client("c2", "xterm")]));
         let v: serde_json::Value = serde_json::from_str(&render_json(&rows)).unwrap();
         assert_eq!(v[0]["term"], "xterm");
         assert_eq!(v[0]["clients"], 2);
