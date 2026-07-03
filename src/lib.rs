@@ -2630,6 +2630,7 @@ const OPTIONS_TABLE_PANE: i32 = 0x8;
 const OPTIONS_TABLE_IS_ARRAY: i32 = 0x1;
 const OPTIONS_TABLE_IS_HOOK: i32 = 0x2;
 const OPTIONS_TABLE_IS_STYLE: i32 = 0x4;
+const OPTIONS_TABLE_IS_COLOUR: i32 = 0x8;
 
 unsafe impl Sync for options_table_entry {}
 

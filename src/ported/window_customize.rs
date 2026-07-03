@@ -14,8 +14,6 @@
 use crate::*;
 use crate::options_::*;
 
-/// C `vendor/tmux/tmux.h:2383`: `#define OPTIONS_TABLE_IS_COLOUR 0x8`
-const OPTIONS_TABLE_IS_COLOUR: i32 = 0x8;
 
 static WINDOW_CUSTOMIZE_DEFAULT_FORMAT: &str = concat!(
     "#{?is_option,",

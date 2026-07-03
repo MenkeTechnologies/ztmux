@@ -268,6 +268,30 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
     }
 }
 
+/// Parse a single colour into a style's foreground.
+/// C `vendor/tmux/style.c`: `int style_parse_colour(struct style *sy, const struct grid_cell *base, const char *s)`
+pub unsafe fn style_parse_colour(sy: *mut style, base: *const grid_cell, s: *const u8) -> i32 {
+    unsafe {
+        style_set(sy, base);
+
+        if *s == b'\0' {
+            (*sy).gc.fg = -1;
+            return 0;
+        }
+
+        let c = colour_fromstring(cstr_to_str(s));
+        if c == -1 {
+            return -1;
+        }
+        if c == 8 {
+            (*sy).gc.fg = (*base).fg;
+        } else {
+            (*sy).gc.fg = c;
+        }
+        0
+    }
+}
+
 /// C `vendor/tmux/style.c:303`: `const char *style_tostring(struct style *sy)`
 pub unsafe fn style_tostring(sy: *const style) -> *const u8 {
     type s_type = [i8; 256];

@@ -48,6 +48,7 @@ static OPTIONS_TABLE_POPUP_BORDER_LINES_LIST: [&str; 7] = [
     "single", "double", "heavy", "simple", "rounded", "padded", "none",
 ];
 static OPTIONS_TABLE_GET_CLIPBOARD_LIST: [&str; 4] = ["off", "buffer", "request", "both"];
+static OPTIONS_TABLE_THEME_LIST: [&str; 4] = ["detect", "terminal", "light", "dark"];
 static OPTIONS_TABLE_SET_CLIPBOARD_LIST: [&str; 3] = ["off", "external", "on"];
 static OPTIONS_TABLE_WINDOW_SIZE_LIST: [&str; 4] = ["largest", "smallest", "manual", "latest"];
 static OPTIONS_TABLE_REMAIN_ON_EXIT_LIST: [&str; 3] = ["off", "on", "failed"];
@@ -206,7 +207,7 @@ macro_rules! options_table_window_hook {
     };
 }
 
-pub static OPTIONS_TABLE: [options_table_entry; 199] = [
+pub static OPTIONS_TABLE: [options_table_entry; 220] = [
     options_table_entry {
         name: "backspace",
         type_: options_table_type::OPTIONS_TABLE_KEY,
@@ -449,6 +450,197 @@ pub static OPTIONS_TABLE: [options_table_entry; 199] = [
         maximum: i32::MAX as u32,
         default_num: 100,
         text: c!("Maximum number of commands to keep in history."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "theme",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_SERVER,
+        choices: &OPTIONS_TABLE_THEME_LIST,
+        default_num: 0,
+        text: c!(
+            "Whether tmux should detect the terminal theme, use terminal ANSI colours, or force the light or dark theme."
+        ),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "dark-theme-black",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},gray5,black}"),
+        text: c!("Dark theme colour for black."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "dark-theme-white",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},gray90,white}"),
+        text: c!("Dark theme colour for white."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "dark-theme-light-grey",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},gray70,white}"),
+        text: c!("Dark theme colour for light grey."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "dark-theme-dark-grey",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},gray15,black}"),
+        text: c!("Dark theme colour for dark grey."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "dark-theme-green",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},yellowgreen,green}"),
+        text: c!("Dark theme colour for green."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "dark-theme-yellow",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},darkgoldenrod,yellow}"),
+        text: c!("Dark theme colour for yellow."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "dark-theme-red",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},indianred,red}"),
+        text: c!("Dark theme colour for red."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "dark-theme-blue",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},skyblue3,blue}"),
+        text: c!("Dark theme colour for blue."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "dark-theme-cyan",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},cadetblue,cyan}"),
+        text: c!("Dark theme colour for cyan."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "dark-theme-magenta",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},mediumpurple,magenta}"),
+        text: c!("Dark theme colour for magenta."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "light-theme-black",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},gray10,black}"),
+        text: c!("Light theme colour for black."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "light-theme-white",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},gray95,white}"),
+        text: c!("Light theme colour for white."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "light-theme-light-grey",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},gray80,white}"),
+        text: c!("Light theme colour for light grey."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "light-theme-dark-grey",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},gray45,black}"),
+        text: c!("Light theme colour for dark grey."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "light-theme-green",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},seagreen,green}"),
+        text: c!("Light theme colour for green."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "light-theme-yellow",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},darkgoldenrod,yellow}"),
+        text: c!("Light theme colour for yellow."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "light-theme-red",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},indianred4,red}"),
+        text: c!("Light theme colour for red."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "light-theme-blue",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},steelblue,blue}"),
+        text: c!("Light theme colour for blue."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "light-theme-cyan",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},darkcyan,cyan}"),
+        text: c!("Light theme colour for cyan."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "light-theme-magenta",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        default_str: Some("#{?#{e|>=:#{client_colours},256},purple4,magenta}"),
+        text: c!("Light theme colour for magenta."),
         ..options_table_entry::const_default()
     },
     options_table_entry {

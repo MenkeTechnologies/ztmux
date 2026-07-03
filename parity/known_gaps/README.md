@@ -29,12 +29,12 @@ Cases graduate out of this bucket as the feature lands: when a gap starts
 matching next-3.7 byte-for-byte, the runner flags it `CLOSED` and it is promoted
 to `parity/cases/` (the blocking gate) and deleted here. `pane_zoomed_flag`,
 `session_*_flag`, the terminal-feature flags, `codepoint-widths` /
-`variation-selector-always-wide`, `default-client-command`, and `get-clipboard`
-have already made that trip.
+`variation-selector-always-wide`, `default-client-command`, `get-clipboard`, and
+the `theme` / `dark-theme-*` / `light-theme-*` palette options (plus `themeX`
+colour-name parsing) have already made that trip.
 
 | Case | Feature gap | Unported area |
 | --- | --- | --- |
-| `opt_theme.sh` | `theme` + `dark-theme-*` / `light-theme-*` palettes | theme system |
 | `opt_pane_scrollbars.sh` | `pane-scrollbars*` (4) | `screen-redraw.c` scrollbar scene (`redraw_draw_scrollbar_span`, `redraw_pane_scrollbar`) |
 | `opt_copy_mode_line_numbers.sh` | `copy-mode-line-numbers` + styles (6) | `window-copy.c` line numbers / position |
 | `opt_pane_border_status.sh` | `pane-status-*` / `session-status-*` / `window-pane-status-format` (6) | `screen-redraw.c` pane border status |

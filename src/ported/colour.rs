@@ -156,6 +156,14 @@ pub fn colour_tostring(c: i32) -> Cow<'static, str> {
         return Cow::Borrowed("none");
     }
 
+    if c & COLOUR_FLAG_THEME != 0 {
+        let n = c & 0xff;
+        if n >= 0 && (n as usize) < COLOUR_THEME_TABLE.len() {
+            return Cow::Borrowed(COLOUR_THEME_TABLE[n as usize].0);
+        }
+        return Cow::Borrowed("invalid");
+    }
+
     if c & COLOUR_FLAG_RGB != 0 {
         let (r, g, b) = colour_split_rgb(c);
         return Cow::Owned(format!("#{r:02x}{g:02x}{b:02x}"));
@@ -333,6 +341,16 @@ pub fn colour_fromstring(s: &str) -> i32 {
     ] {
         if s.eq_ignore_ascii_case(colour_name) {
             return colour_code;
+        }
+    }
+
+    // C colour.c:424: a theme colour name (themered, themeblue, …) parses to
+    // its table index OR'd with COLOUR_FLAG_THEME; resolved to a real colour at
+    // render time via the client's theme palette (falling back to the ANSI
+    // terminal colour).
+    for (i, entry) in COLOUR_THEME_TABLE.iter().enumerate() {
+        if s.eq_ignore_ascii_case(entry.0) {
+            return (i as i32) | COLOUR_FLAG_THEME;
         }
     }
 
@@ -1333,6 +1351,17 @@ mod tests {
         assert_eq!(colour_tostring(8).as_ref(), "default");
         assert_eq!(colour_fromstring("default"), 8);
         assert_eq!(colour_tostring(-1).as_ref(), "none");
+
+        // Theme colour: name -> index|COLOUR_FLAG_THEME -> name (C colour.c:424/234).
+        assert_eq!(colour_fromstring("themered"), 6 | COLOUR_FLAG_THEME);
+        assert_eq!(colour_fromstring("themeblack"), 0 | COLOUR_FLAG_THEME);
+        assert_eq!(colour_fromstring("thememagenta"), 9 | COLOUR_FLAG_THEME);
+        assert_eq!(colour_tostring(6 | COLOUR_FLAG_THEME).as_ref(), "themered");
+        assert_eq!(colour_tostring(0 | COLOUR_FLAG_THEME).as_ref(), "themeblack");
+        // Case-insensitive parse, like the ANSI names.
+        assert_eq!(colour_fromstring("ThemeCyan"), 8 | COLOUR_FLAG_THEME);
+        // Not a theme colour: falls through unchanged.
+        assert_eq!(colour_fromstring("themebogus"), -1);
     }
 
     // colour_fromstring accepts both the "colour" and US "color" spellings for

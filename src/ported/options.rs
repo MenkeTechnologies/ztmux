@@ -1268,6 +1268,12 @@ unsafe fn options_from_string_check(
         {
             return Err(CString::new(format!("invalid style: {}", _s(value))).unwrap());
         }
+        if ((*oe).flags & OPTIONS_TABLE_IS_COLOUR) != 0
+            && !cstr_to_str(value).contains("#{")
+            && style_parse_colour(&mut sy, &GRID_DEFAULT_CELL, value) != 0
+        {
+            return Err(CString::new(format!("invalid colour: {}", _s(value))).unwrap());
+        }
         Ok(())
     }
 }
