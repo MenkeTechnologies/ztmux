@@ -112,7 +112,7 @@ pub const OPTIONS_TABLE_STATUS_FORMAT1: *const u8 = concat!(
     "#{T:window-status-format}",
     "#[pop-default]",
     "#[norange default]",
-    "#{?window_end_flag,,#{window-status-separator}}",
+    "#{?loop_last_flag,,#{E:window-status-separator}}",
     ",",
     "#[range=window|#{window_index} list=focus ",
     "#{?#{!=:#{E:window-status-current-style},default},",
@@ -139,7 +139,7 @@ pub const OPTIONS_TABLE_STATUS_FORMAT1: *const u8 = concat!(
     "#{T:window-status-current-format}",
     "#[pop-default]",
     "#[norange list=on default]",
-    "#{?window_end_flag,,#{window-status-separator}}",
+    "#{?loop_last_flag,,#{E:window-status-separator}}",
     "}",
     "#[nolist align=right range=right #{E:status-right-style}]",
     "#[push-default]",
@@ -1438,7 +1438,9 @@ pub static OPTIONS_TABLE: [options_table_entry; 220] = [
         name: "pane-border-format",
         type_: options_table_type::OPTIONS_TABLE_STRING,
         scope: OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE,
-        default_str: Some("#{?pane_active,#[reverse],}#{pane_index}#[default] \"#{pane_title}\""),
+        default_str: Some(
+            "#{?pane_active,#[reverse],}#{pane_index}#[default] \"#{pane_title}\"#{?#{mouse},#[align=right]#[range=control|8][#{?#{window_zoomed_flag},u,z}]#[norange]#[range=control|9][x]#[norange],}",
+        ),
         text: c!("Format of text in the pane status lines."),
         ..options_table_entry::const_default()
     },
