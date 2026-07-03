@@ -104,55 +104,112 @@
     <table class="hud">
       <thead><tr><th>Command</th><th>Does</th></tr></thead>
       <tbody>
-        <tr><td><code>ztmux tree</code></td><td>Print the whole server as a session&rarr;window&rarr;pane ASCII tree.</td></tr>
-        <tr><td><code>ztmux stats</code></td><td>One-shot summary report of the running server.</td></tr>
-        <tr><td><code>ztmux graph</code></td><td>Render the server tree as DOT, Mermaid, or HTML.</td></tr>
-        <tr><td><code>ztmux snapshot</code></td><td>Dump the whole server as one nested JSON document.</td></tr>
+        <tr><td><code>ztmux active</code></td><td>Focused window/pane of every session.</td></tr>
+        <tr><td><code>ztmux age</code></td><td>Sessions ranked by creation age, oldest first.</td></tr>
+        <tr><td><code>ztmux ahead</code></td><td>How far each repo is ahead of/behind upstream.</td></tr>
+        <tr><td><code>ztmux alerts</code></td><td>Windows with a pending bell/activity/silence alert.</td></tr>
+        <tr><td><code>ztmux autoname</code></td><td>Windows with a pinned name (automatic-rename off).</td></tr>
+        <tr><td><code>ztmux borders</code></td><td>Windows that draw a status line on their pane borders.</td></tr>
+        <tr><td><code>ztmux buffers</code></td><td>The server's paste buffers, largest first.</td></tr>
+        <tr><td><code>ztmux busy</code></td><td>Panes running a program, not idle at a prompt.</td></tr>
+        <tr><td><code>ztmux changes</code></td><td>Uncommitted file count per pane's repo, dirtiest first.</td></tr>
+        <tr><td><code>ztmux cmd</code></td><td>Histogram of commands running across panes.</td></tr>
+        <tr><td><code>ztmux commit</code></td><td>The last commit in every pane's repo.</td></tr>
+        <tr><td><code>ztmux conflicts</code></td><td>Repos with unresolved merge conflicts.</td></tr>
+        <tr><td><code>ztmux connected</code></td><td>Attached clients ranked by connection age.</td></tr>
+        <tr><td><code>ztmux constrain</code></td><td>Attached clients ranked by screen size, smallest first.</td></tr>
+        <tr><td><code>ztmux control</code></td><td>Clients attached in control mode (-CC).</td></tr>
+        <tr><td><code>ztmux cwd</code></td><td>Working directories in use, busiest first.</td></tr>
+        <tr><td><code>ztmux dead</code></td><td>Dead panes still held open in a window.</td></tr>
+        <tr><td><code>ztmux dedup</code></td><td>Find redundant panes (same cwd + command).</td></tr>
+        <tr><td><code>ztmux density</code></td><td>Windows ranked by pane count, most first.</td></tr>
+        <tr><td><code>ztmux destroy</code></td><td>Sessions that self-destruct when the last client detaches.</td></tr>
+        <tr><td><code>ztmux detached</code></td><td>Sessions with no client attached, freshest first.</td></tr>
+        <tr><td><code>ztmux disk</code></td><td>Filesystem usage behind each pane's cwd.</td></tr>
         <tr><td><code>ztmux doctor</code></td><td>Environment / server health check.</td></tr>
-        <tr><td><code>ztmux watch</code></td><td>Top-like live per-pane process monitor (TUI).</td></tr>
+        <tr><td><code>ztmux elapsed</code></td><td>How long each pane's process has been running.</td></tr>
+        <tr><td><code>ztmux env</code></td><td>Per-session environment overrides.</td></tr>
         <tr><td><code>ztmux events</code></td><td>Stream server lifecycle events as JSONL.</td></tr>
+        <tr><td><code>ztmux fanout</code></td><td>Sessions ranked by total pane count.</td></tr>
+        <tr><td><code>ztmux find</code></td><td>Search panes by command/path/title/window.</td></tr>
+        <tr><td><code>ztmux focus</code></td><td>The active pane of every window.</td></tr>
+        <tr><td><code>ztmux git</code></td><td>Git branch + dirty state of every pane's repo.</td></tr>
+        <tr><td><code>ztmux gone</code></td><td>Panes whose working directory no longer exists.</td></tr>
+        <tr><td><code>ztmux graph</code></td><td>Render the server tree as DOT/Mermaid/HTML.</td></tr>
+        <tr><td><code>ztmux grep</code></td><td>Search the live contents of every pane.</td></tr>
+        <tr><td><code>ztmux groups</code></td><td>Cluster sessions by session group.</td></tr>
+        <tr><td><code>ztmux history</code></td><td>Rank panes by scrollback buffer size.</td></tr>
+        <tr><td><code>ztmux hooks</code></td><td>The command hooks configured on each session.</td></tr>
+        <tr><td><code>ztmux idle</code></td><td>Attached clients ranked by time since last activity.</td></tr>
+        <tr><td><code>ztmux info</code></td><td>Deep inspector for a single pane.</td></tr>
+        <tr><td><code>ztmux input</code></td><td>Panes that are ignoring keyboard input.</td></tr>
+        <tr><td><code>ztmux keys</code></td><td>How many key bindings live in each key table.</td></tr>
+        <tr><td><code>ztmux keytable</code></td><td>Clients parked on a non-root key table.</td></tr>
+        <tr><td><code>ztmux layouts</code></td><td>The current layout string of every window.</td></tr>
+        <tr><td><code>ztmux limit</code></td><td>Each session's scrollback capacity, largest first.</td></tr>
+        <tr><td><code>ztmux linked</code></td><td>Windows linked into more than one session.</td></tr>
+        <tr><td><code>ztmux lock</code></td><td>Sessions set to lock themselves after idle time.</td></tr>
+        <tr><td><code>ztmux marks</code></td><td>The marked pane(s).</td></tr>
+        <tr><td><code>ztmux mem</code></td><td>Panes ranked by process resident memory.</td></tr>
+        <tr><td><code>ztmux mode</code></td><td>Panes currently frozen in a mode.</td></tr>
+        <tr><td><code>ztmux monitor</code></td><td>Windows armed to alert on activity or silence.</td></tr>
+        <tr><td><code>ztmux mouse</code></td><td>Which sessions have mouse mode enabled.</td></tr>
+        <tr><td><code>ztmux named</code></td><td>Windows with a deliberate name, not the running command.</td></tr>
+        <tr><td><code>ztmux nested</code></td><td>Panes running a nested terminal multiplexer.</td></tr>
+        <tr><td><code>ztmux net</code></td><td>Established outbound connections per pane.</td></tr>
+        <tr><td><code>ztmux peek</code></td><td>Dump the visible contents of every pane.</td></tr>
+        <tr><td><code>ztmux piped</code></td><td>Panes with an active pipe-pane capture.</td></tr>
+        <tr><td><code>ztmux ports</code></td><td>Listening TCP ports mapped to panes.</td></tr>
+        <tr><td><code>ztmux project</code></td><td>Project kind and root behind every pane.</td></tr>
         <tr><td><code>ztmux ps</code></td><td>One-shot pipeable per-pane process table.</td></tr>
         <tr><td><code>ztmux pstree</code></td><td>Process tree running under every pane.</td></tr>
-        <tr><td><code>ztmux usage</code></td><td>Per-session CPU / MEM / RSS resource rollup.</td></tr>
-        <tr><td><code>ztmux recent</code></td><td>Sessions ranked by last activity, freshest first.</td></tr>
-        <tr><td><code>ztmux find</code></td><td>Search panes by command / path / title / window.</td></tr>
-        <tr><td><code>ztmux grep</code></td><td>Search the live on-screen contents of every pane.</td></tr>
-        <tr><td><code>ztmux peek</code></td><td>Dump the visible contents of every pane at once.</td></tr>
-        <tr><td><code>ztmux info</code></td><td>Deep inspector for a single pane.</td></tr>
-        <tr><td><code>ztmux ports</code></td><td>Listening TCP ports mapped back to their pane.</td></tr>
-        <tr><td><code>ztmux net</code></td><td>Established outbound connections, per pane.</td></tr>
-        <tr><td><code>ztmux ssh</code></td><td>Which panes hold an SSH connection, and to which host.</td></tr>
-        <tr><td><code>ztmux git</code></td><td>Git branch + dirty state of every pane sitting in a repo.</td></tr>
-        <tr><td><code>ztmux disk</code></td><td>Filesystem usage behind each pane's working directory.</td></tr>
-        <tr><td><code>ztmux dedup</code></td><td>Find redundant panes (same cwd + command).</td></tr>
-        <tr><td><code>ztmux size</code></td><td>Pane geometry, smallest cell-area first.</td></tr>
-        <tr><td><code>ztmux history</code></td><td>Rank panes by scrollback buffer size, biggest first.</td></tr>
-        <tr><td><code>ztmux tty</code></td><td>Map every pane to its terminal device (<code>/dev/ttysNNN</code>).</td></tr>
-        <tr><td><code>ztmux groups</code></td><td>Sessions clustered by session group.</td></tr>
-        <tr><td><code>ztmux active</code></td><td>The focused window + pane of every session.</td></tr>
-        <tr><td><code>ztmux zoom</code></td><td>Windows that currently have a zoomed pane.</td></tr>
-        <tr><td><code>ztmux mode</code></td><td>Panes frozen in a mode (copy-mode, view-mode, chooser).</td></tr>
-        <tr><td><code>ztmux marks</code></td><td>The marked pane (source for join / swap / move).</td></tr>
-        <tr><td><code>ztmux alerts</code></td><td>Windows with a pending bell / activity / silence alert.</td></tr>
-        <tr><td><code>ztmux titles</code></td><td>Every pane's advertised terminal title.</td></tr>
-        <tr><td><code>ztmux env</code></td><td>Per-session environment overrides vs the global env.</td></tr>
+        <tr><td><code>ztmux readonly</code></td><td>Clients attached in read-only mode.</td></tr>
+        <tr><td><code>ztmux recent</code></td><td>List sessions ranked by last activity.</td></tr>
+        <tr><td><code>ztmux remain</code></td><td>Windows that keep panes open after they exit.</td></tr>
+        <tr><td><code>ztmux remote</code></td><td>The git remote each pane's repo points at.</td></tr>
+        <tr><td><code>ztmux shells</code></td><td>Panes sitting at a bare shell prompt.</td></tr>
+        <tr><td><code>ztmux size</code></td><td>Report pane geometry, smallest first.</td></tr>
+        <tr><td><code>ztmux snapshot</code></td><td>Dump the whole server as one nested JSON document.</td></tr>
+        <tr><td><code>ztmux solo</code></td><td>Windows holding a single, unsplit pane.</td></tr>
+        <tr><td><code>ztmux ssh</code></td><td>Which panes hold an SSH connection, and where.</td></tr>
+        <tr><td><code>ztmux start</code></td><td>The command line each pane was launched with.</td></tr>
+        <tr><td><code>ztmux stash</code></td><td>Repositories with stashed work behind a pane.</td></tr>
+        <tr><td><code>ztmux state</code></td><td>Panes whose process is in an abnormal state.</td></tr>
+        <tr><td><code>ztmux stats</code></td><td>One-shot server summary report.</td></tr>
+        <tr><td><code>ztmux status</code></td><td>Sessions with the status line turned off.</td></tr>
+        <tr><td><code>ztmux submodules</code></td><td>Repos with submodules and how many are out of sync.</td></tr>
+        <tr><td><code>ztmux sync</code></td><td>Windows with synchronize-panes turned on.</td></tr>
+        <tr><td><code>ztmux tag</code></td><td>The git describe/tag context of every pane's repo.</td></tr>
+        <tr><td><code>ztmux term</code></td><td>Histogram of attached client terminal types.</td></tr>
+        <tr><td><code>ztmux titlebar</code></td><td>Sessions that push a title to the outer terminal.</td></tr>
+        <tr><td><code>ztmux titles</code></td><td>Every pane's advertised title.</td></tr>
+        <tr><td><code>ztmux tree</code></td><td>Print the session/window/pane tree.</td></tr>
+        <tr><td><code>ztmux tty</code></td><td>Map every pane to its terminal device.</td></tr>
+        <tr><td><code>ztmux usage</code></td><td>Per-session CPU/MEM/RSS resource rollup.</td></tr>
+        <tr><td><code>ztmux user</code></td><td>The owner of every pane's process.</td></tr>
         <tr><td><code>ztmux utf8</code></td><td>The UTF-8 state of every attached client.</td></tr>
-        <tr><td><code>ztmux mouse</code></td><td>Which sessions have mouse mode enabled.</td></tr>
-        <tr><td><code>ztmux keytable</code></td><td>Clients parked on a non-root key table.</td></tr>
-        <tr><td><code>ztmux control</code></td><td>Clients attached in control mode (<code>-CC</code>).</td></tr>
+        <tr><td><code>ztmux vcs</code></td><td>Which version-control system each pane is under.</td></tr>
+        <tr><td><code>ztmux viewers</code></td><td>How many clients are attached to each session.</td></tr>
+        <tr><td><code>ztmux visual</code></td><td>Sessions that show alerts visually instead of just beeping.</td></tr>
+        <tr><td><code>ztmux watch</code></td><td>Top-like live per-pane process monitor.</td></tr>
+        <tr><td><code>ztmux who</code></td><td>Clients attached to the server, by session.</td></tr>
+        <tr><td><code>ztmux winsize</code></td><td>Windows whose sizing mode differs from the default.</td></tr>
+        <tr><td><code>ztmux worktree</code></td><td>Panes sitting in a linked git worktree.</td></tr>
+        <tr><td><code>ztmux writable</code></td><td>Panes whose working directory is read-only.</td></tr>
+        <tr><td><code>ztmux zoom</code></td><td>Windows with a zoomed pane.</td></tr>
       </tbody>
     </table>
     <p class="prose"><strong>// ACTIONS</strong> &mdash; dry-run by default, apply with <code>-f</code>:</p>
     <table class="hud">
       <thead><tr><th>Command</th><th>Does</th></tr></thead>
       <tbody>
-        <tr><td><code>ztmux prune</code></td><td>Remove dead panes, empty sessions, and idle sessions.</td></tr>
-        <tr><td><code>ztmux layout</code></td><td>Apply a named layout preset to one window.</td></tr>
-        <tr><td><code>ztmux equalize</code></td><td>Re-balance every multi-pane window's layout, server-wide.</td></tr>
         <tr><td><code>ztmux bcast</code></td><td>Broadcast a command to many panes at once.</td></tr>
-        <tr><td><code>ztmux respawn</code></td><td>Revive every dead pane in place (the inverse of prune).</td></tr>
-        <tr><td><code>ztmux clear</code></td><td>Free the scrollback of every pane holding any.</td></tr>
-        <tr><td><code>ztmux retitle</code></td><td>Label every pane with the command it is running.</td></tr>
+        <tr><td><code>ztmux clear</code></td><td>Free the scrollback of every pane.</td></tr>
+        <tr><td><code>ztmux equalize</code></td><td>Re-balance every multi-pane window's layout.</td></tr>
+        <tr><td><code>ztmux layout</code></td><td>Apply a named layout preset to a window.</td></tr>
+        <tr><td><code>ztmux prune</code></td><td>Remove dead/empty/idle server objects.</td></tr>
+        <tr><td><code>ztmux respawn</code></td><td>Revive every dead pane in place.</td></tr>
+        <tr><td><code>ztmux retitle</code></td><td>Label every pane with its running command.</td></tr>
       </tbody>
     </table>
 
