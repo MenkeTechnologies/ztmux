@@ -622,6 +622,79 @@ pub unsafe fn format_cb_session_alerts(ft: *mut format_tree) -> format_table_typ
     }
 }
 
+/// Callback for `session_activity_flag`.
+/// C `vendor/tmux/format.c:2526`: `static void *format_cb_session_activity_flag(struct format_tree *ft)`
+pub unsafe fn format_cb_session_activity_flag(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if !(*ft).s.is_null() {
+            for _wl in rb_foreach(&raw mut (*(*ft).s).windows).map(NonNull::as_ptr) {
+                if (*(*ft).wl).flags.intersects(winlink_flags::WINLINK_ACTIVITY) {
+                    return "1".into();
+                }
+                return "0".into();
+            }
+        }
+        format_table_type::None
+    }
+}
+
+/// Callback for `session_bell_flag`.
+/// C `vendor/tmux/format.c:2543`: `static void *format_cb_session_bell_flag(struct format_tree *ft)`
+pub unsafe fn format_cb_session_bell_flag(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if !(*ft).s.is_null() {
+            for wl in rb_foreach(&raw mut (*(*ft).s).windows).map(NonNull::as_ptr) {
+                if (*wl).flags.intersects(winlink_flags::WINLINK_BELL) {
+                    return "1".into();
+                }
+                return "0".into();
+            }
+        }
+        format_table_type::None
+    }
+}
+
+/// Callback for `session_silence_flag`.
+/// C `vendor/tmux/format.c:2559`: `static void *format_cb_session_silence_flag(struct format_tree *ft)`
+pub unsafe fn format_cb_session_silence_flag(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if !(*ft).s.is_null() {
+            for _wl in rb_foreach(&raw mut (*(*ft).s).windows).map(NonNull::as_ptr) {
+                if (*(*ft).wl).flags.intersects(winlink_flags::WINLINK_SILENCE) {
+                    return "1".into();
+                }
+                return "0".into();
+            }
+        }
+        format_table_type::None
+    }
+}
+
+/// Callback for `bracket_paste_flag`.
+/// C `vendor/tmux/format.c:1712`: `static void *format_cb_bracket_paste_flag(struct format_tree *ft)`
+pub unsafe fn format_cb_bracket_paste_flag(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if !(*ft).wp.is_null() && !(*(*ft).wp).screen.is_null() {
+            if (*(*(*ft).wp).screen)
+                .mode
+                .intersects(mode_flag::MODE_BRACKETPASTE)
+            {
+                return "1".into();
+            }
+            return "0".into();
+        }
+        format_table_type::None
+    }
+}
+
+/// Callback for `sixel_support`.
+/// C `vendor/tmux/format.c:1681`: `static void *format_cb_sixel_support(__unused struct format_tree *ft)`.
+/// ztmux is built without sixel support (no `ENABLE_SIXEL`), so this is always
+/// `"0"` — matching the `#else` arm of the C.
+pub unsafe fn format_cb_sixel_support(_ft: *mut format_tree) -> format_table_type {
+    "0".into()
+}
+
 /// Callback for `session_stack`.
 /// C `vendor/tmux/format.c:650`: `static void *format_cb_session_stack(struct format_tree *ft)`
 pub unsafe fn format_cb_session_stack(ft: *mut format_tree) -> format_table_type {
@@ -3134,6 +3207,7 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("alternate_on", format_cb_alternate_on),
     format_table_entry::new("alternate_saved_x", format_cb_alternate_saved_x),
     format_table_entry::new("alternate_saved_y", format_cb_alternate_saved_y),
+    format_table_entry::new("bracket_paste_flag", format_cb_bracket_paste_flag),
     format_table_entry::new("buffer_created", format_cb_buffer_created),
     format_table_entry::new("buffer_mode_format", format_cb_buffer_mode_format),
     format_table_entry::new("buffer_name", format_cb_buffer_name),
@@ -3240,9 +3314,11 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("scroll_region_upper", format_cb_scroll_region_upper),
     format_table_entry::new("server_sessions", format_cb_server_sessions),
     format_table_entry::new("session_activity", format_cb_session_activity),
+    format_table_entry::new("session_activity_flag", format_cb_session_activity_flag),
     format_table_entry::new("session_alerts", format_cb_session_alerts),
     format_table_entry::new("session_attached", format_cb_session_attached),
     format_table_entry::new("session_attached_list", format_cb_session_attached_list),
+    format_table_entry::new("session_bell_flag", format_cb_session_bell_flag),
     format_table_entry::new("session_created", format_cb_session_created),
     format_table_entry::new("session_format", format_cb_session_format),
     format_table_entry::new("session_group", format_cb_session_group),
@@ -3264,8 +3340,10 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("session_marked", format_cb_session_marked),
     format_table_entry::new("session_name", format_cb_session_name),
     format_table_entry::new("session_path", format_cb_session_path),
+    format_table_entry::new("session_silence_flag", format_cb_session_silence_flag),
     format_table_entry::new("session_stack", format_cb_session_stack),
     format_table_entry::new("session_windows", format_cb_session_windows),
+    format_table_entry::new("sixel_support", format_cb_sixel_support),
     format_table_entry::new("socket_path", format_cb_socket_path),
     format_table_entry::new("start_time", format_cb_start_time),
     format_table_entry::new("tree_mode_format", format_cb_tree_mode_format),
