@@ -792,6 +792,8 @@ bitflags::bitflags! {
         const MODE_CURSOR_VERY_VISIBLE = 0x10000;
         const MODE_CURSOR_BLINKING_SET = 0x20000;
         const MODE_KEYS_EXTENDED_2 = 0x40000;
+        const MODE_THEME_UPDATES = 0x80000;
+        const MODE_SYNC = 0x100000;
     }
 }
 
@@ -1458,6 +1460,7 @@ struct window_pane {
 
     resize_queue: window_pane_resizes,
     resize_timer: event,
+    sync_timer: event,
 
     ictx: *mut input_ctx,
 

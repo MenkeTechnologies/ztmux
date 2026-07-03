@@ -1886,6 +1886,7 @@ unsafe fn input_csi_dispatch_rm_private(ictx: *mut input_ctx) {
                 47 | 1047 => screen_write_alternateoff(sctx, gc, 0),
                 1049 => screen_write_alternateoff(sctx, gc, 1),
                 2004 => screen_write_mode_clear(sctx, mode_flag::MODE_BRACKETPASTE),
+                2026 => screen_write_stop_sync((*ictx).wp),
                 _ => log_debug!(
                     "{}: unknown '{}'",
                     "input_csi_dispatch_rm_private",
@@ -1962,6 +1963,7 @@ unsafe fn input_csi_dispatch_sm_private(ictx: *mut input_ctx) {
                 47 | 1047 => screen_write_alternateon(sctx, gc, 0),
                 1049 => screen_write_alternateon(sctx, gc, 1),
                 2004 => screen_write_mode_set(sctx, mode_flag::MODE_BRACKETPASTE),
+                2026 => screen_write_start_sync((*ictx).wp),
                 _ => log_debug!(
                     "{}: unknown '{}'",
                     "input_csi_dispatch_sm_private",

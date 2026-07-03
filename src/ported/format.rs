@@ -695,6 +695,20 @@ pub unsafe fn format_cb_sixel_support(_ft: *mut format_tree) -> format_table_typ
     "0".into()
 }
 
+/// Callback for `synchronized_output_flag`.
+/// C `vendor/tmux/format.c`: `static void *format_cb_synchronized_output_flag(struct format_tree *ft)`
+pub unsafe fn format_cb_synchronized_output_flag(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if !(*ft).wp.is_null() {
+            if (*(*ft).wp).base.mode.intersects(mode_flag::MODE_SYNC) {
+                return "1".into();
+            }
+            return "0".into();
+        }
+        format_table_type::None
+    }
+}
+
 /// Callback for `pane_zoomed_flag`.
 /// C `vendor/tmux/format.c:2472`: `static void *format_cb_pane_zoomed_flag(struct format_tree *ft)`
 pub unsafe fn format_cb_pane_zoomed_flag(ft: *mut format_tree) -> format_table_type {
@@ -3446,6 +3460,10 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("sixel_support", format_cb_sixel_support),
     format_table_entry::new("socket_path", format_cb_socket_path),
     format_table_entry::new("start_time", format_cb_start_time),
+    format_table_entry::new(
+        "synchronized_output_flag",
+        format_cb_synchronized_output_flag,
+    ),
     format_table_entry::new("tree_mode_format", format_cb_tree_mode_format),
     format_table_entry::new("uid", format_cb_uid),
     format_table_entry::new("user", format_cb_user),

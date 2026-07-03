@@ -118,6 +118,59 @@ unsafe fn screen_write_set_cursor(ctx: *mut screen_write_ctx, mut cx: i32, mut c
     }
 }
 
+/// C `vendor/tmux/screen-write.c`: `static void screen_write_sync_callback(int fd, short events, void *data)`
+unsafe extern "C-unwind" fn screen_write_sync_callback(
+    _fd: i32,
+    _events: i16,
+    wp: NonNull<window_pane>,
+) {
+    unsafe {
+        screen_write_stop_sync(wp.as_ptr());
+    }
+}
+
+/// Enter synchronized-output mode (DEC 2026): set the mode flag and (re)arm the
+/// 1-second safety timer that clears it if the application never sends the reset.
+/// ztmux writes cells immediately instead of buffering dirty lines during sync,
+/// so C's `screen_write_flush_dirty` on stop has nothing to flush — the
+/// deferred-render batching is a perf optimisation not ported here, but the
+/// mode state apps set and query (`#{synchronized_output_flag}`, DECRQM) is
+/// faithful.
+/// C `vendor/tmux/screen-write.c`: `void screen_write_start_sync(struct window_pane *wp)`
+pub unsafe fn screen_write_start_sync(wp: *mut window_pane) {
+    unsafe {
+        let tv = timeval { tv_sec: 1, tv_usec: 0 };
+        if wp.is_null() {
+            return;
+        }
+        (*wp).base.mode |= mode_flag::MODE_SYNC;
+        if event_initialized(&raw mut (*wp).sync_timer) == 0 {
+            evtimer_set(
+                &raw mut (*wp).sync_timer,
+                screen_write_sync_callback,
+                NonNull::new_unchecked(wp),
+            );
+        }
+        evtimer_add(&raw mut (*wp).sync_timer, &raw const tv);
+        log_debug!("screen_write_start_sync: %{} started sync mode", (*wp).id);
+    }
+}
+
+/// Leave synchronized-output mode.
+/// C `vendor/tmux/screen-write.c`: `void screen_write_stop_sync(struct window_pane *wp)`
+pub unsafe fn screen_write_stop_sync(wp: *mut window_pane) {
+    unsafe {
+        if wp.is_null() || !(*wp).base.mode.intersects(mode_flag::MODE_SYNC) {
+            return;
+        }
+        if event_initialized(&raw mut (*wp).sync_timer) != 0 {
+            evtimer_del(&raw mut (*wp).sync_timer);
+        }
+        (*wp).base.mode &= !mode_flag::MODE_SYNC;
+        log_debug!("screen_write_stop_sync: %{} stopped sync mode", (*wp).id);
+    }
+}
+
 /// Do a full redraw.
 /// C `vendor/tmux/screen-write.c:125`: `static void screen_write_redraw_cb(const struct tty_ctx *ttyctx)`
 unsafe fn screen_write_redraw_cb(ttyctx: *const tty_ctx) {

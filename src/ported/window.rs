@@ -1218,6 +1218,9 @@ unsafe fn window_pane_destroy(wp: *mut window_pane) {
         if event_initialized(&raw mut (*wp).resize_timer) != 0 {
             event_del(&raw mut (*wp).resize_timer);
         }
+        if event_initialized(&raw mut (*wp).sync_timer) != 0 {
+            event_del(&raw mut (*wp).sync_timer);
+        }
         for r in tailq_foreach(&raw mut (*wp).resize_queue).map(NonNull::as_ptr) {
             tailq_remove::<_, ()>(&raw mut (*wp).resize_queue, r);
             free_(r);
