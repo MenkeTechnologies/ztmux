@@ -695,6 +695,21 @@ pub unsafe fn format_cb_sixel_support(_ft: *mut format_tree) -> format_table_typ
     "0".into()
 }
 
+/// Callback for `pane_zoomed_flag`.
+/// C `vendor/tmux/format.c:2472`: `static void *format_cb_pane_zoomed_flag(struct format_tree *ft)`
+pub unsafe fn format_cb_pane_zoomed_flag(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        let wp = (*ft).wp;
+        if !wp.is_null() {
+            if (*wp).flags.intersects(window_pane_flags::PANE_ZOOMED) {
+                return "1".into();
+            }
+            return "0".into();
+        }
+        format_table_type::None
+    }
+}
+
 /// Callback for `session_stack`.
 /// C `vendor/tmux/format.c:650`: `static void *format_cb_session_stack(struct format_tree *ft)`
 pub unsafe fn format_cb_session_stack(ft: *mut format_tree) -> format_table_type {
@@ -3309,6 +3324,7 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("pane_tty", format_cb_pane_tty),
     format_table_entry::new("pane_unseen_changes", format_cb_pane_unseen_changes),
     format_table_entry::new("pane_width", format_cb_pane_width),
+    format_table_entry::new("pane_zoomed_flag", format_cb_pane_zoomed_flag),
     format_table_entry::new("pid", format_cb_pid),
     format_table_entry::new("scroll_region_lower", format_cb_scroll_region_lower),
     format_table_entry::new("scroll_region_upper", format_cb_scroll_region_upper),

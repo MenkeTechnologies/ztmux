@@ -1407,7 +1407,7 @@ bitflags::bitflags! {
         const PANE_DROP = 0x2;
         const PANE_FOCUSED = 0x4;
         const PANE_VISITED = 0x8;
-        /* 0x10 unused */
+        const PANE_ZOOMED = 0x10;
         /* 0x20 unused */
         const PANE_INPUTOFF = 0x40;
         const PANE_CHANGED = 0x80;

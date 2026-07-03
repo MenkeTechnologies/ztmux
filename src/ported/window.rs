@@ -737,6 +737,7 @@ pub unsafe fn window_zoom(wp: *mut window_pane) -> i32 {
         if (*w).active != wp {
             window_set_active_pane(w, wp, 1);
         }
+        (*wp).flags |= window_pane_flags::PANE_ZOOMED;
 
         for wp1 in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
             (*wp1).saved_layout_cell = (*wp1).layout_cell;
@@ -767,6 +768,7 @@ pub unsafe fn window_unzoom(w: *mut window, notify: i32) -> i32 {
         for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
             (*wp).layout_cell = (*wp).saved_layout_cell;
             (*wp).saved_layout_cell = null_mut();
+            (*wp).flags &= !window_pane_flags::PANE_ZOOMED;
         }
         layout_fix_panes(w, null_mut());
 
