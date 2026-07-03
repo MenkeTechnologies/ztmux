@@ -274,9 +274,10 @@ pub static OPTIONS_TABLE: [options_table_entry; 220] = [
     },
     options_table_entry {
         name: "cursor-colour",
-        type_: options_table_type::OPTIONS_TABLE_COLOUR,
+        type_: options_table_type::OPTIONS_TABLE_STRING,
         scope: OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE,
-        default_num: -1,
+        default_str: Some(""),
+        flags: OPTIONS_TABLE_IS_COLOUR,
         text: c!("Colour of the cursor."),
         ..options_table_entry::const_default()
     },
@@ -796,17 +797,19 @@ pub static OPTIONS_TABLE: [options_table_entry; 220] = [
     },
     options_table_entry {
         name: "display-panes-active-colour",
-        type_: options_table_type::OPTIONS_TABLE_COLOUR,
+        type_: options_table_type::OPTIONS_TABLE_STRING,
         scope: OPTIONS_TABLE_SESSION,
-        default_num: 1,
+        default_str: Some("themered"),
+        flags: OPTIONS_TABLE_IS_COLOUR,
         text: c!("Colour of the active pane for 'display-panes'."),
         ..options_table_entry::const_default()
     },
     options_table_entry {
         name: "display-panes-colour",
-        type_: options_table_type::OPTIONS_TABLE_COLOUR,
+        type_: options_table_type::OPTIONS_TABLE_STRING,
         scope: OPTIONS_TABLE_SESSION,
-        default_num: 4,
+        default_str: Some("themeblue"),
+        flags: OPTIONS_TABLE_IS_COLOUR,
         text: c!("Colour of not active panes for 'display-panes'."),
         ..options_table_entry::const_default()
     },
@@ -1272,9 +1275,10 @@ pub static OPTIONS_TABLE: [options_table_entry; 220] = [
     },
     options_table_entry {
         name: "clock-mode-colour",
-        type_: options_table_type::OPTIONS_TABLE_COLOUR,
+        type_: options_table_type::OPTIONS_TABLE_STRING,
         scope: OPTIONS_TABLE_WINDOW,
-        default_num: 4,
+        default_str: Some("themeblue"),
+        flags: OPTIONS_TABLE_IS_COLOUR,
         text: c!("Colour of the clock in clock mode."),
         ..options_table_entry::const_default()
     },

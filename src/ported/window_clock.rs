@@ -261,7 +261,13 @@ pub unsafe fn window_clock_draw_screen(wme: NonNull<window_mode_entry>) {
         let y: u32;
         let mut idx: u32;
 
-        let colour: i32 = options_get_number_((*(*wp).window).options, "clock-mode-colour") as i32;
+        // clock-mode-colour is a STRING/IS_COLOUR option in next-3.7: expand
+        // and parse via style_apply, then take the resolved fg (window-clock.c).
+        let ft = format_create_defaults(null_mut(), null_mut(), null_mut(), null_mut(), wp);
+        let mut cgc: grid_cell = zeroed();
+        style_apply(&raw mut cgc, (*(*wp).window).options, c!("clock-mode-colour"), ft);
+        format_free(ft);
+        let colour: i32 = cgc.fg;
         let style: i32 = options_get_number_((*(*wp).window).options, "clock-mode-style") as i32;
 
         screen_write_start(&raw mut ctx, s);

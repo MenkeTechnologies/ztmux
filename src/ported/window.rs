@@ -2019,8 +2019,12 @@ pub unsafe fn window_pane_default_cursor(wp: *mut window_pane) {
     unsafe {
         let s = (*wp).screen;
 
-        let c: i32 = options_get_number___::<i32>(&*(*wp).options, "cursor-colour");
-        (*s).default_ccolour = c;
+        // cursor-colour is a STRING/IS_COLOUR option in next-3.7: expand and
+        // parse via style_apply, then take the resolved fg (screen.c
+        // screen_set_default_cursor).
+        let mut cgc: grid_cell = zeroed();
+        style_apply(&raw mut cgc, (*wp).options, c!("cursor-colour"), null_mut());
+        (*s).default_ccolour = cgc.fg;
 
         let c: i32 = options_get_number___::<i32>(&*(*wp).options, "cursor-style");
         (*s).default_mode = mode_flag::empty();

@@ -1226,20 +1226,36 @@ pub unsafe fn options_string_to_style(
             return &mut (*o).style;
         }
         let s = (*o).value.string;
+        let oe = (*o).tableentry;
         log_debug!("{}: {} is '{}'", _s(__func__), name, _s(s));
+
+        // OPTIONS_TABLE_IS_COLOUR options carry a single colour, parsed via
+        // style_parse_colour (options.c); everything else is a full style.
+        let is_colour = !oe.is_null() && ((*oe).flags & OPTIONS_TABLE_IS_COLOUR) != 0;
 
         style_set(&mut (*o).style, &GRID_DEFAULT_CELL);
         (*o).cached = cstr_to_str(s).contains("#{") as i32;
 
         if !ft.is_null() && (*o).cached == 0 {
             let expanded = format_expand(ft, s);
-            if style_parse(&mut (*o).style, &GRID_DEFAULT_CELL, expanded) != 0 {
-                free_(expanded);
+            let failed = if is_colour {
+                style_parse_colour(&mut (*o).style, &GRID_DEFAULT_CELL, expanded)
+            } else {
+                style_parse(&mut (*o).style, &GRID_DEFAULT_CELL, expanded)
+            };
+            free_(expanded);
+            if failed != 0 {
                 return null_mut();
             }
-            free_(expanded);
-        } else if style_parse(&mut (*o).style, &GRID_DEFAULT_CELL, s) != 0 {
-            return null_mut();
+        } else {
+            let failed = if is_colour {
+                style_parse_colour(&mut (*o).style, &GRID_DEFAULT_CELL, s)
+            } else {
+                style_parse(&mut (*o).style, &GRID_DEFAULT_CELL, s)
+            };
+            if failed != 0 {
+                return null_mut();
+            }
         }
         &mut (*o).style
     }

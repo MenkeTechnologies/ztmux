@@ -12,7 +12,7 @@
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 use crate::*;
-use crate::{cmd_::cmd_queue::cmdq_get_callback1, options_::options_get_number_};
+use crate::cmd_::cmd_queue::cmdq_get_callback1;
 
 const WINDOW_TREE_DEFAULT_COMMAND: &str = "switch-client -Zt '%%'";
 const WINDOW_TREE_DEFAULT_FORMAT: &str = concat!(
@@ -626,8 +626,14 @@ unsafe fn window_tree_draw_session(
         let total = winlink_count(&raw mut (*s).windows);
 
         memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
-        let colour = options_get_number_(oo, "display-panes-colour");
-        let active_colour = options_get_number_(oo, "display-panes-active-colour");
+        // display-panes[-active]-colour are STRING/IS_COLOUR options in
+        // next-3.7: expand+parse via style_apply, take fg.
+        let mut cgc: grid_cell = zeroed();
+        style_apply(&raw mut cgc, oo, c!("display-panes-colour"), null_mut());
+        let colour = cgc.fg;
+        let mut acgc: grid_cell = zeroed();
+        style_apply(&raw mut acgc, oo, c!("display-panes-active-colour"), null_mut());
+        let active_colour = acgc.fg;
 
         if sx / total < 24 {
             visible = sx / 24;
@@ -783,8 +789,14 @@ unsafe fn window_tree_draw_window(
         let total = window_count_panes(w);
 
         memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
-        let colour: i32 = options_get_number_(oo, "display-panes-colour") as i32;
-        let active_colour: i32 = options_get_number_(oo, "display-panes-active-colour") as i32;
+        // display-panes[-active]-colour are STRING/IS_COLOUR options in
+        // next-3.7: expand+parse via style_apply, take fg.
+        let mut cgc: grid_cell = zeroed();
+        style_apply(&raw mut cgc, oo, c!("display-panes-colour"), null_mut());
+        let colour: i32 = cgc.fg;
+        let mut acgc: grid_cell = zeroed();
+        style_apply(&raw mut acgc, oo, c!("display-panes-active-colour"), null_mut());
+        let active_colour: i32 = acgc.fg;
 
         let visible = if sx / total < 24 {
             if sx / 24 != 0 { sx / 24 } else { 1 }

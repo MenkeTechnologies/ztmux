@@ -45,7 +45,6 @@ unsafe fn cmd_display_panes_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
         let c = (*ctx).c;
         let tty = &raw mut (*c).tty;
         let s = (*c).session;
-        let oo = &*(*s).options;
         let w = (*wp).window;
 
         'out: {
@@ -115,18 +114,20 @@ unsafe fn cmd_display_panes_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
                 return;
             }
 
-            let colour: i32 = options_get_number___(oo, "display-panes-colour");
-            let active_colour: i32 = options_get_number___(oo, "display-panes-active-colour");
-
-            let mut fgc = GRID_DEFAULT_CELL;
-            let mut bgc = GRID_DEFAULT_CELL;
-            if (*w).active == wp {
-                fgc.fg = active_colour;
-                bgc.bg = active_colour;
+            // display-panes[-active]-colour are STRING/IS_COLOUR options in
+            // next-3.7: pick the name, expand+parse via style_apply, take fg
+            // (cmd-display-panes.c cmd_display_panes_draw_pane).
+            let name = if (*w).active == wp {
+                c!("display-panes-active-colour")
             } else {
-                fgc.fg = colour;
-                bgc.bg = colour;
-            }
+                c!("display-panes-colour")
+            };
+            let ft = format_create_defaults(null_mut(), c, s, null_mut(), wp);
+            let mut fgc = GRID_DEFAULT_CELL;
+            style_apply(&raw mut fgc, (*s).options, name, ft);
+            format_free(ft);
+            let mut bgc = GRID_DEFAULT_CELL;
+            bgc.bg = fgc.fg;
 
             let mut rbuf = [0i8; 16];
             let mut lbuf = [0i8; 16];
