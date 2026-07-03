@@ -19,8 +19,8 @@ pub static CMD_KILL_WINDOW_ENTRY: cmd_entry = cmd_entry {
     name: "kill-window",
     alias: Some("killw"),
 
-    args: args_parse::new("at:", 0, 0, None),
-    usage: "[-a] [-t target-window]",
+    args: args_parse::new("af:t:", 0, 0, None),
+    usage: "[-a] [-f filter] [-t target-window]",
 
     target: cmd_entry_flag::new(
         b't',
@@ -52,6 +52,28 @@ pub static CMD_UNLINK_WINDOW_ENTRY: cmd_entry = cmd_entry {
 };
 
 /// C `vendor/tmux/cmd-kill-window.c:61`: `static enum cmd_retval cmd_kill_window_exec(struct cmd *self, struct cmdq_item *item)`
+/// Whether window `wl` passes the `-f` filter format (true when no filter).
+/// C `vendor/tmux/cmd-kill-window.c`: `static int cmd_kill_window_filter(struct cmdq_item *item, struct session *s, struct winlink *wl, const char *filter)`
+unsafe fn cmd_kill_window_filter(
+    item: *mut cmdq_item,
+    s: *mut session,
+    wl: *mut winlink,
+    filter: *const u8,
+) -> bool {
+    unsafe {
+        if filter.is_null() {
+            return true;
+        }
+        let ft = format_create(cmdq_get_client(item), item, FORMAT_NONE, format_flags::empty());
+        format_defaults(ft, null_mut(), NonNull::new(s), NonNull::new(wl), None);
+        let expanded = format_expand(ft, filter);
+        let flag = format_true(expanded);
+        free_(expanded);
+        format_free(ft);
+        flag
+    }
+}
+
 unsafe fn cmd_kill_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -72,16 +94,25 @@ unsafe fn cmd_kill_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
             return cmd_retval::CMD_RETURN_NORMAL;
         }
 
+        // -f only filters the -a batch (C cmd-kill-window.c).
+        let filter = args_get(args, b'f');
+        if !filter.is_null() && !args_has(args, 'a') {
+            cmdq_error!(item, "-f only valid with -a");
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
+
         if args_has(args, 'a') {
             if rb_prev(wl).is_null() && rb_next(wl).is_null() {
                 return cmd_retval::CMD_RETURN_NORMAL;
             }
 
-            // Kill all windows except the current one.
+            // Kill all windows except the current one (that pass the filter).
             loop {
                 found = 0;
                 for loop_ in rb_foreach(&raw mut (*s).windows).map(NonNull::as_ptr) {
-                    if (*loop_).window != (*wl).window {
+                    if (*loop_).window != (*wl).window
+                        && cmd_kill_window_filter(item, s, loop_, filter)
+                    {
                         server_kill_window((*loop_).window, 0);
                         found += 1;
                         break;
@@ -93,18 +124,20 @@ unsafe fn cmd_kill_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
                 }
             }
 
-            // If the current window appears in the session more than once,
-            // kill it as well.
+            // If the current window appears in the session more than once, kill
+            // it as well if it matches the filter.
             found = 0;
+            let mut kill_current = false;
             for loop_ in rb_foreach(&raw mut (*s).windows).map(NonNull::as_ptr) {
                 if (*loop_).window == (*wl).window {
                     found += 1;
+                    if cmd_kill_window_filter(item, s, loop_, filter) {
+                        kill_current = true;
+                    }
                 }
             }
-            if found > 1 {
-                {
-                    server_kill_window((*wl).window, 0);
-                }
+            if kill_current && found > 1 {
+                server_kill_window((*wl).window, 0);
             }
 
             server_renumber_all();
