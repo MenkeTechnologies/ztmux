@@ -1970,6 +1970,14 @@ pub(crate) unsafe fn status_prompt_complete_list(s: *const u8, at_start: i32) ->
                 status_prompt_add_list(&mut list, alias);
             }
         }
+        // ztmux: original extension subcommands (`ztmux <name>`), completable in
+        // the command prompt alongside the built-in commands.
+        for &name in crate::extensions::EXTENSION_COMMANDS {
+            if name.starts_with(s) {
+                status_prompt_add_list(&mut list, name);
+            }
+        }
+
         let o = options_get_only(GLOBAL_OPTIONS, "command-alias");
         if !o.is_null() {
             let mut a = options_array_first(o);
