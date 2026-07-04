@@ -216,6 +216,10 @@ pub unsafe fn server_client_set_key_table(c: *mut client, mut name: *const u8) {
         if libc::gettimeofday(&raw mut (*(*c).keytable).activity_time, null_mut()) != 0 {
             fatal("gettimeofday failed");
         }
+
+        // ztmux: reconcile the ratatui keybinding hint bar with the new table
+        // (no-op unless ZTMUX_RATATUI is set, so the default path is untouched).
+        crate::extensions::ratatui_ui::reconcile_hint(c);
     }
 }
 

@@ -440,12 +440,17 @@ unsafe fn prompt_graphemes(buf: *const utf8_data) -> Vec<(String, u16)> {
 /// overlay reliably (fn-pointer identity isn't guaranteed unique).
 static PROMPT_OVERLAY_MARK: u8 = 0;
 
+/// Highlighted completion candidate in the palette (-1 == none). Navigated with
+/// Up/Down, applied with Tab. Reset when the prompt opens or the input changes.
+static PROMPT_SEL: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+
 fn prompt_mark() -> *mut core::ffi::c_void {
     (&raw const PROMPT_OVERLAY_MARK).cast_mut().cast()
 }
 
 pub(crate) unsafe fn set_prompt_overlay(c: *mut client) {
     unsafe {
+        PROMPT_SEL.store(-1, std::sync::atomic::Ordering::Relaxed);
         server_client_set_overlay(
             c,
             0,
@@ -581,8 +586,9 @@ unsafe fn prompt_overlay_key(
     event: *mut key_event,
 ) -> i32 {
     unsafe {
-        let key = (*event).key;
-        if KEYC_IS_MOUSE(key) {
+        use std::sync::atomic::Ordering::Relaxed;
+        let raw = (*event).key;
+        if KEYC_IS_MOUSE(raw) {
             let m = &raw mut (*event).m;
             let inside = prompt_layout(c).is_some_and(|l| {
                 (*m).x >= l.px as u32
@@ -596,10 +602,49 @@ unsafe fn prompt_overlay_key(
             }
             return 0;
         }
-        status_prompt_key(c, key);
-        // Repaint the window (panes behind the box, so a shrinking completion
-        // list doesn't ghost) plus the overlay itself, after each keystroke.
-        (*c).flags |= client_flag::REDRAWWINDOW | client_flag::REDRAWOVERLAY;
+
+        let key = raw & !KEYC_MASK_FLAGS; // mirror status_prompt_key's masking
+        let cands = prompt_completions(c);
+        let n = cands.len() as i32;
+        let redraw = |c: *mut client| {
+            (*c).flags |= client_flag::REDRAWWINDOW | client_flag::REDRAWOVERLAY;
+        };
+
+        // Up/Down navigate the completion list (falling through to the normal
+        // prompt's history when there is nothing to complete).
+        if n > 0 && (key == keyc::KEYC_UP as key_code || key == keyc::KEYC_DOWN as key_code) {
+            let cur = PROMPT_SEL.load(Relaxed);
+            let next = if key == keyc::KEYC_DOWN as key_code {
+                (cur + 1).min(n - 1)
+            } else {
+                (cur - 1).max(0)
+            };
+            PROMPT_SEL.store(next, Relaxed);
+            redraw(c);
+            return 0;
+        }
+
+        // Tab applies the highlighted (or first) candidate INLINE - never letting
+        // tmux's own completion open its menu at the status line (the bug where
+        // Tab jumped to the bottom command box). Always swallowed.
+        if key == 0x09 {
+            if n > 0 {
+                let idx = PROMPT_SEL.load(Relaxed).max(0) as usize;
+                if let Some(cand) = cands.get(idx) {
+                    crate::status::status_prompt_replace_complete(c, Some(cand));
+                }
+            }
+            PROMPT_SEL.store(-1, Relaxed);
+            redraw(c);
+            return 0;
+        }
+
+        // Everything else (typing, Left/Right cursor, Backspace, Enter to run,
+        // Escape to cancel, history) goes to the normal prompt handler; the
+        // candidate list is about to change, so drop the highlight.
+        PROMPT_SEL.store(-1, Relaxed);
+        status_prompt_key(c, raw);
+        redraw(c);
         0
     }
 }
@@ -701,22 +746,419 @@ unsafe fn prompt_overlay_draw(
             }
         }
 
-        // Completion rows.
+        // Completion rows, with the navigable highlight (Up/Down) reverse-video.
+        let sel = PROMPT_SEL.load(std::sync::atomic::Ordering::Relaxed);
         for (i, cand) in cands.iter().take(n_rows as usize).enumerate() {
             let ry = 2 + i as u16;
+            let style = if i as i32 == sel {
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::REVERSED | Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
             let mut cx = 2u16;
             for ch in cand.chars() {
                 if cx >= boxw - 1 {
                     break;
                 }
-                buf[(cx, ry)]
-                    .set_char(ch)
-                    .set_style(Style::default().fg(Color::Gray));
+                buf[(cx, ry)].set_char(ch).set_style(style);
                 cx += 1;
             }
         }
 
         blit_tty(tty, &buf, l.px as u32, l.py as u32);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keybinding hint bar (zellij-style "which-key"): when the client enters a
+// non-root key table (e.g. after the prefix) float a rounded bar near the
+// bottom listing the bindings available right now. It carries NO key callback,
+// so the very next keypress falls straight through to normal dispatch and the
+// generic key path tears the overlay down - exactly the transient which-key
+// feel. Driven from `server_client_set_key_table`, the single funnel every key
+// table change passes through, so it tracks prefix/custom tables precisely.
+// ---------------------------------------------------------------------------
+
+/// The hint overlay owns a heap-allocated [`HintLayout`] as its `data`, computed
+/// ONCE when the overlay is set and freed by [`hint_free`]. The check and draw
+/// callbacks just read it - enumerating ~100 bindings and packing rows on every
+/// check call (the overlay check runs many times per redraw) was what made
+/// pressing the prefix lag. We recognise our own overlay by the draw-callback
+/// pointer rather than a data sentinel, since `data` now varies per overlay.
+unsafe fn hint_is_ours(c: *mut client) -> bool {
+    unsafe {
+        (*c).overlay_draw
+            .is_some_and(|f| std::ptr::fn_addr_eq(f, hint_draw as OverlayDrawFn))
+    }
+}
+
+type OverlayDrawFn = unsafe fn(*mut client, *mut core::ffi::c_void, *mut screen_redraw_ctx);
+
+/// Free the cached [`HintLayout`] when the overlay is torn down.
+unsafe fn hint_free(_c: *mut client, data: *mut core::ffi::c_void) {
+    unsafe {
+        if !data.is_null() {
+            drop(Box::from_raw(data.cast::<HintLayout>()));
+        }
+    }
+}
+
+/// Collect `(key, note)` pairs for the note-bearing, non-mouse bindings of the
+/// client's current key table - the same curated set `list-keys -N` shows.
+unsafe fn hint_bindings(c: *mut client) -> Vec<(String, String)> {
+    unsafe {
+        let table = (*c).keytable;
+        let mut out = Vec::new();
+        if table.is_null() {
+            return out;
+        }
+        let mut bd = key_bindings_first(table);
+        while !bd.is_null() {
+            let key = (*bd).key;
+            let note = (*bd).note;
+            if !KEYC_IS_MOUSE(key) && !note.is_null() && *note != 0 {
+                let ks = key_string_lookup_key(key, 0);
+                if !ks.is_null() {
+                    // key_string_lookup_key hands back a reused static buffer, so
+                    // copy both strings out before the next call clobbers it.
+                    let keystr = crate::cstr_to_str(ks).to_string();
+                    let notestr = crate::cstr_to_str(note).to_string();
+                    out.push((keystr, notestr));
+                }
+            }
+            bd = key_bindings_next(table, bd);
+        }
+        out
+    }
+}
+
+/// Geometry + greedily-packed rows of the hint bar, computed fresh each frame so
+/// the draw and the pane-clipping check callback always agree.
+struct HintLayout {
+    px: u16,
+    py: u16,
+    w: u16,
+    h: u16,
+    table: String,
+    rows: Vec<Vec<(String, String)>>,
+}
+
+unsafe fn hint_layout(c: *mut client) -> Option<HintLayout> {
+    unsafe {
+        if (*c).keytable.is_null() {
+            return None;
+        }
+        let sx = (*c).tty.sx as u16;
+        let sy = (*c).tty.sy as u16;
+        if sx < 24 || sy < 6 {
+            return None;
+        }
+        let chips = hint_bindings(c);
+        if chips.is_empty() {
+            return None;
+        }
+        let table = strip_markup(crate::cstr_to_str((*(*c).keytable).name));
+
+        // Greedy-pack chips ("key note") into rows no wider than the inner box.
+        let gap = 2usize;
+        let inner = (sx.saturating_sub(6) as usize).min(120);
+        let chip_w = |k: &str, n: &str| k.chars().count() + 1 + n.chars().count();
+        let mut rows: Vec<Vec<(String, String)>> = Vec::new();
+        let mut cur: Vec<(String, String)> = Vec::new();
+        let mut curw = 0usize;
+        for (k, n) in chips {
+            let cw = chip_w(&k, &n);
+            if !cur.is_empty() && curw + gap + cw > inner {
+                rows.push(std::mem::take(&mut cur));
+                curw = cw;
+            } else {
+                curw += if cur.is_empty() { cw } else { gap + cw };
+            }
+            cur.push((k, n));
+        }
+        if !cur.is_empty() {
+            rows.push(cur);
+        }
+        rows.truncate(7);
+
+        let row_w = |r: &Vec<(String, String)>| -> usize {
+            r.iter().map(|(k, v)| chip_w(k, v)).sum::<usize>() + gap * r.len().saturating_sub(1)
+        };
+        let widest = rows.iter().map(row_w).max().unwrap_or(0) as u16;
+        let title_w = table.chars().count() as u16 + 4;
+        let w = (widest + 4).max(title_w).min(sx.saturating_sub(2));
+        let h = rows.len() as u16 + 2;
+
+        // Sit just above a bottom status line (or at the very bottom otherwise).
+        let sa = status_at_line(c);
+        let bottom = if sa > 0 { sa as u16 } else { sy };
+        let py = bottom.saturating_sub(h);
+        let px = sx.saturating_sub(w) / 2;
+
+        Some(HintLayout {
+            px,
+            py,
+            w,
+            h,
+            table,
+            rows,
+        })
+    }
+}
+
+/// Overlay check callback: report the bar rect as covered so live panes are
+/// clipped around it - no freeze, the window keeps drawing underneath.
+unsafe fn hint_check_cb(
+    _c: *mut client,
+    data: *mut core::ffi::c_void,
+    px: u32,
+    py: u32,
+    nx: u32,
+    r: *mut overlay_ranges,
+) {
+    unsafe {
+        if let Some(l) = data.cast::<HintLayout>().as_ref() {
+            server_client_overlay_range(
+                l.px as u32,
+                l.py as u32,
+                l.w as u32,
+                l.h as u32,
+                px,
+                py,
+                nx,
+                r,
+            );
+        } else {
+            (*r).px[0] = px;
+            (*r).nx[0] = nx;
+            (*r).px[1] = 0;
+            (*r).nx[1] = 0;
+            (*r).px[2] = 0;
+            (*r).nx[2] = 0;
+        }
+    }
+}
+
+/// Draw the hint bar onto the tty: a rounded box titled with the table name,
+/// each binding rendered as a highlighted key followed by its note.
+unsafe fn hint_draw(c: *mut client, data: *mut core::ffi::c_void, _rctx: *mut screen_redraw_ctx) {
+    unsafe {
+        let Some(l) = data.cast::<HintLayout>().as_ref() else {
+            return;
+        };
+        let tty = &raw mut (*c).tty;
+        let area = Rect::new(0, 0, l.w, l.h);
+        let mut buf = Buffer::empty(area);
+        Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Yellow))
+            .title(Line::from(format!(" {} ", l.table)).centered())
+            .render(area, &mut buf);
+
+        let key_style = Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD);
+        let note_style = Style::default().fg(Color::Gray);
+        for (ri, row) in l.rows.iter().enumerate() {
+            let ry = 1 + ri as u16;
+            let mut cx = 2u16;
+            for (k, n) in row {
+                for ch in k.chars() {
+                    if cx >= l.w - 1 {
+                        break;
+                    }
+                    buf[(cx, ry)].set_char(ch).set_style(key_style);
+                    cx += 1;
+                }
+                if cx < l.w - 1 {
+                    cx += 1; // space between key and its note
+                }
+                for ch in n.chars() {
+                    if cx >= l.w - 1 {
+                        break;
+                    }
+                    buf[(cx, ry)].set_char(ch).set_style(note_style);
+                    cx += 1;
+                }
+                cx += 2; // gap before the next chip
+                if cx >= l.w - 1 {
+                    break;
+                }
+            }
+        }
+        blit_tty(tty, &buf, l.px as u32, l.py as u32);
+    }
+}
+
+/// True if the `@ztmux-hint` user option is explicitly turned off. Unset means
+/// the bar is on (whenever the ratatui UI is enabled). Read through the public
+/// option accessors so an unset option never fatals: presence is probed with
+/// `options_get_only_const` (session scope and global `set -g` scope), and only
+/// then is the inheriting string read.
+unsafe fn hint_option_off(c: *mut client) -> bool {
+    unsafe {
+        let sopts = (*(*c).session).options;
+        let set_here = !crate::options_::options_get_only_const(sopts, "@ztmux-hint").is_null();
+        let set_global =
+            !crate::options_::options_get_only_const(GLOBAL_S_OPTIONS, "@ztmux-hint").is_null();
+        if !set_here && !set_global {
+            return false; // unset -> default on
+        }
+        let v = crate::cstr_to_str(crate::options_::options_get_string_(sopts, "@ztmux-hint"));
+        matches!(v.trim(), "off" | "0" | "false" | "no" | "")
+    }
+}
+
+/// Show or hide the hint bar to match the client's current key table. Called at
+/// the tail of `server_client_set_key_table`.
+pub(crate) unsafe fn reconcile_hint(c: *mut client) {
+    unsafe {
+        if !enabled() || c.is_null() || (*c).session.is_null() {
+            return;
+        }
+        // Runtime opt-out: `set -g @ztmux-hint off` hides just the hint bar and
+        // leaves the other ratatui surfaces (menus, clock, palette) untouched.
+        if hint_option_off(c) {
+            if hint_is_ours(c) {
+                server_client_clear_overlay(c);
+            }
+            return;
+        }
+        let kt = (*c).keytable;
+        let want = !kt.is_null() && !server_client_is_default_key_table(c, kt);
+        if want {
+            // Claim the overlay slot only if it's free (never clobber a menu,
+            // popup or the command prompt). Compute the layout ONCE here and hand
+            // it to the overlay as owned data; the check/draw callbacks just read
+            // it (recomputing per check call was the prefix-activation lag).
+            if (*c).overlay_draw.is_none()
+                && let Some(layout) = hint_layout(c)
+            {
+                let data = Box::into_raw(Box::new(layout)).cast::<core::ffi::c_void>();
+                server_client_set_overlay(
+                    c,
+                    0,
+                    Some(hint_check_cb),
+                    None,
+                    Some(hint_draw),
+                    None,
+                    Some(hint_free),
+                    None,
+                    data,
+                );
+            }
+        } else if hint_is_ours(c) {
+            server_client_clear_overlay(c);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ztmux's own rounded ratatui frame for synced / sync-marked panes (a
+// zellij-style box), the sole sync/mark indicator - the earlier tmux
+// border-recolour has been dropped in favour of this. Only active when the
+// ratatui UI is enabled, so the byte-for-byte parity path is untouched.
+// ---------------------------------------------------------------------------
+
+/// True if this pane is marked for sync (per-pane `@ztmux_sel` == "1").
+unsafe fn pane_marked_for_sync(po: *mut options) -> bool {
+    unsafe {
+        if crate::options_::options_get_only_const(po, "@ztmux_sel").is_null() {
+            return false;
+        }
+        crate::cstr_to_str(crate::options_::options_get_string_(po, "@ztmux_sel")) == "1"
+    }
+}
+
+/// Draw ztmux's own rounded ratatui frame around a synced (or sync-marked)
+/// pane: a zellij-style coloured box overlaid on the pane's outer ring with a
+/// title badge, kept separate from tmux's plain border recolour. Drawn at the
+/// end of every pane redraw (full or partial) so it survives the pane's output.
+pub(crate) unsafe fn draw_sync_frame_pane(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) {
+    unsafe {
+        if !enabled() || wp.is_null() {
+            return;
+        }
+        let po = (*wp).options;
+        // The pane states ztmux frames, most-urgent first: actively broadcasting
+        // (synced), selected to be synced next (marked), or watched by an armed
+        // content-trigger (`pipe_fd` is the `#{pane_pipe}` signal).
+        let (color, label) = if crate::options_::options_get_number_(po, "synchronize-panes") != 0 {
+            (Color::Indexed(196), " \u{27f2} SYNCED ") // bright red
+        } else if pane_marked_for_sync(po) {
+            (Color::Indexed(214), " \u{25c6} SELECTED ") // orange
+        } else if (*wp).pipe_fd != -1 {
+            (Color::Indexed(51), " \u{26a1} TRIGGER ") // cyan
+        } else {
+            return;
+        };
+        let sx = (*wp).sx as u16;
+        let sy = (*wp).sy as u16;
+        if sx < 4 || sy < 3 {
+            return;
+        }
+        // Only frame panes that sit fully inside the viewport (keep it simple;
+        // partials are skipped rather than clipped).
+        if (*wp).xoff < (*ctx).ox
+            || (*wp).yoff < (*ctx).oy
+            || (*wp).xoff + (*wp).sx > (*ctx).ox + (*ctx).sx
+            || (*wp).yoff + (*wp).sy > (*ctx).oy + (*ctx).sy
+        {
+            return;
+        }
+
+        let c = (*ctx).c;
+        let tty = &raw mut (*c).tty;
+        let area = Rect::new(0, 0, sx, sy);
+        let mut buf = Buffer::empty(area);
+        Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
+            .title(Line::from(label))
+            .render(area, &mut buf);
+
+        let yoff = (*wp).yoff - (*ctx).oy
+            + if (*ctx).statustop != 0 {
+                (*ctx).statuslines
+            } else {
+                0
+            };
+        let xoff = (*wp).xoff - (*ctx).ox;
+        blit_tty_frame(tty, &buf, xoff, yoff);
+    }
+}
+
+/// Blit only the perimeter (border + title row) of a rendered buffer, leaving
+/// the pane's interior content untouched.
+unsafe fn blit_tty_frame(tty: *mut tty, buf: &Buffer, px: u32, py: u32) {
+    unsafe {
+        let area = buf.area;
+        for y in 0..area.height {
+            for x in 0..area.width {
+                if x != 0 && x != area.width - 1 && y != 0 && y != area.height - 1 {
+                    continue; // interior - leave the pane's content alone
+                }
+                let cell = &buf[(x, y)];
+                let st = cell.style();
+                let mut gc = std::mem::MaybeUninit::<grid_cell>::uninit();
+                memcpy__(gc.as_mut_ptr(), &raw const GRID_DEFAULT_CELL);
+                let gc = gc.as_mut_ptr();
+                set_char(gc, cell.symbol());
+                (*gc).fg = map_color(st.fg);
+                (*gc).bg = map_color(st.bg);
+                (*gc).attr = map_modifier(st.add_modifier);
+                tty_cursor(tty, px + x as u32, py + y as u32);
+                tty_cell(
+                    tty,
+                    gc,
+                    &raw const GRID_DEFAULT_CELL,
+                    std::ptr::null(),
+                    std::ptr::null_mut(),
+                );
+            }
+        }
     }
 }
 

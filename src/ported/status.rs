@@ -1244,7 +1244,7 @@ unsafe fn status_prompt_paste(c: *mut client) -> i32 {
 }
 
 /// Finish completion.
-unsafe fn status_prompt_replace_complete(c: *mut client, s: Option<&str>) -> i32 {
+pub(crate) unsafe fn status_prompt_replace_complete(c: *mut client, s: Option<&str>) -> i32 {
     unsafe {
         let mut word: [u8; 64] = [0; 64];
         let completion: Option<String>;

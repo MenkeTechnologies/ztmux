@@ -71,6 +71,15 @@ macro_rules! DEFAULT_PANE_MENU {
             " 'Respawn' 'R' {respawn-pane -k}",
             " '#{?pane_marked,Unmark,Mark}' 'm' {select-pane -m}",
             " '#{?#{>:#{window_panes},1},,-}#{?window_zoomed_flag,Unzoom,Zoom}' 'z' {resize-pane -Z}",
+            // ztmux originals: edit this pane's scrollback in $EDITOR, and the
+            // zellij-style multi-pane sync marks (mark panes, then sync the set).
+            // Reachable from the menu regardless of how the user's config has
+            // rebound the `e`/`m`/`M` keys.
+            " ''",
+            " 'Edit Scrollback in $EDITOR' 'e' {capture-pane -S - -b ztmux-scrollback ; save-buffer -b ztmux-scrollback /tmp/ztmux-scrollback.txt ; delete-buffer -b ztmux-scrollback ; display-popup -E -w 90% -h 90% 'exec ${EDITOR:-${VISUAL:-vi}} /tmp/ztmux-scrollback.txt'}",
+            " '#{?@ztmux_sel,Deselect This Pane,Select This Pane for Sync}' 'g' {set -pF @ztmux_sel '#{?@ztmux_sel,,1}'}",
+            " 'Sync Selected Panes' 'y' {run-shell \"ztmux -S #{socket_path} pick sync\"}",
+            " '#{?synchronize-panes,,-}Unsync All Panes' 'U' {run-shell \"ztmux -S #{socket_path} pick clear\"}",
         )
     };
 }
@@ -675,8 +684,11 @@ pub unsafe fn key_bindings_init() {
     // non-default sockets (a bare `ztmux` would otherwise use the default
     // socket); display-popup does not format-expand its command, so `#{...}`
     // cannot be used here. If $TMUX is unset the empty -S falls back to default.
+    // A few of these are not extension launchers but native ztmux bindings
+    // (scrollback-to-$EDITOR, the multi-pane selection). They may use `#{...}`
+    // formats freely; only the `display-popup` *command* above cannot.
     #[rustfmt::skip]
-    static ZTMUX_EXTENSION_BINDINGS: [&str; 7] = [
+    static ZTMUX_EXTENSION_BINDINGS: [&str; 11] = [
         "bind -N 'ztmux: live server dashboard' C-d { display-popup -E -w 90% -h 90% 'ztmux -S \"${TMUX%%,*}\" dashboard' }",
         "bind -N 'ztmux: session/window/pane picker' S { display-popup -E -w 80% -h 70% 'ztmux -S \"${TMUX%%,*}\" switcher' }",
         "bind -N 'ztmux: server tree' T { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" tree | less -R' }",
@@ -684,6 +696,21 @@ pub unsafe fn key_bindings_init() {
         "bind -N 'ztmux: live process monitor' W { display-popup -E -w 90% -h 90% 'ztmux -S \"${TMUX%%,*}\" watch' }",
         "bind -N 'ztmux: server stats' I { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" stats | less -R' }",
         "bind -N 'ztmux: server graph' G { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" graph | less -R' }",
+        // Edit this pane's full scrollback in $EDITOR. Captured at bind time (so
+        // the active pane is the source, before the popup opens), dumped to a
+        // file, then opened in $EDITOR inside a popup.
+        "bind -N 'ztmux: edit this pane scrollback in $EDITOR' e { capture-pane -S - -b ztmux-scrollback ; save-buffer -b ztmux-scrollback /tmp/ztmux-scrollback.txt ; delete-buffer -b ztmux-scrollback ; display-popup -E -w 90% -h 90% 'exec ${EDITOR:-${VISUAL:-vi}} /tmp/ztmux-scrollback.txt' }",
+        // Multi-pane sync selection. Kept OFF the native `m`/`M` marked-pane
+        // bindings (those stay tmux's select-pane -m/-M for swap): our select
+        // lives on `C-s`, and `M` syncs the whole selection.
+        //   prefix C-s -> select/deselect THIS pane (selections persist)
+        //   prefix M   -> sync all selected panes (then the selection clears)
+        // The pane border menu also exposes select / sync / clear.
+        "bind -N 'ztmux: select/deselect this pane for sync' C-s { set -pF @ztmux_sel '#{?@ztmux_sel,,1}' ; display-message 'pane #{pane_index} #{?@ztmux_sel,\u{2713} selected for sync,deselected}' }",
+        "bind -N 'ztmux: sync all selected panes' M { run-shell 'ztmux -S \"${TMUX%%,*}\" pick sync' ; display-message 'synced all selected panes' }",
+        // Inline trigger wizard: chain four command-prompts (name, pane glob,
+        // match regex, action) straight into `triggers add` - no JSON editing.
+        "bind -N 'ztmux: add a content-trigger (inline wizard)' R { command-prompt -p 'trigger name:,pane glob (*):,match regex:,action:' { run-shell \"ztmux -S '#{socket_path}' triggers add '%1' '%2' '%3' '%4'\" } }",
     ];
 
     unsafe {

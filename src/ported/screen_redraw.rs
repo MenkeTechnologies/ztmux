@@ -1052,6 +1052,11 @@ pub unsafe fn screen_redraw_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
             tty_draw_line(tty, s, i, j, width, x, y, &raw mut defaults, palette);
         }
 
+        // ztmux: our own rounded ratatui frame on synced / sync-marked panes,
+        // drawn on top of the freshly-painted content (no-op unless the ratatui
+        // UI is enabled and this pane is synced/marked).
+        crate::extensions::ratatui_ui::draw_sync_frame_pane(ctx, wp);
+
         #[cfg(feature = "sixel")]
         crate::tty_::tty_draw_images(c, wp, s);
 

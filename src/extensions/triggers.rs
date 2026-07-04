@@ -28,7 +28,7 @@ use super::tmux_query::{poll, ztmux_cmd};
 use crate::libc::{REG_EXTENDED, REG_ICASE, REG_NOSUB, regcomp, regex_t, regexec, regfree};
 
 /// One trigger rule as stored in `~/.ztmux/triggers.json`.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize)]
 struct Rule {
     /// Label used for display, logging, and the per-rule debounce state file.
     name: String,
@@ -58,7 +58,7 @@ fn default_debounce() -> u64 {
     3000
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, serde::Serialize)]
 struct Config {
     #[serde(default)]
     triggers: Vec<Rule>,
@@ -92,11 +92,15 @@ pub(crate) fn run(socket: &str) -> i32 {
         None | Some("list") | Some("ls") => list(),
         Some("arm") => arm(socket),
         Some("disarm") | Some("off") => disarm(socket),
+        Some("add") | Some("new") => add(&args, socket),
+        Some("wizard") => wizard(socket),
         Some("test") => test_cmd(&args),
         Some("__match") => match_stream(socket, &args),
         Some(other) => {
             eprintln!("ztmux triggers: unknown subcommand {other:?}");
-            eprintln!("usage: ztmux triggers [list|arm|disarm|test <text>]");
+            eprintln!(
+                "usage: ztmux triggers [list|arm|disarm|add <name> <pane> <match> <action>|test <text>]"
+            );
             2
         }
     }
@@ -107,6 +111,95 @@ fn sub_after(args: &[String], key: &str) -> Option<String> {
     args.iter()
         .position(|a| a == key)
         .and_then(|i| args.get(i + 1).cloned())
+}
+
+// ---------------------------------------------------------------------------
+// add — append a rule without hand-editing the JSON (drives the inline wizard)
+// ---------------------------------------------------------------------------
+
+/// `ztmux triggers add <name> <pane-glob> <match-regex> <action>` appends a rule
+/// to `~/.ztmux/triggers.json` and re-arms. Empty positional fields fall back to
+/// sensible defaults (auto name, `*` pane); an empty match or action is an
+/// error. This is what the `command-prompt` wizard binding calls.
+fn add(args: &[String], socket: &str) -> i32 {
+    let Some(start) = args
+        .iter()
+        .position(|a| a == "add" || a == "new")
+        .map(|i| i + 1)
+    else {
+        return 2;
+    };
+    let pos = &args[start.min(args.len())..];
+    let field = |i: usize| pos.get(i).map(|s| s.trim().to_string()).unwrap_or_default();
+
+    let pattern = field(2);
+    let action = field(3);
+    if pattern.is_empty() || action.is_empty() {
+        eprintln!("ztmux triggers add: both a match regex and an action are required");
+        return 2;
+    }
+    let mut rules = load_rules();
+    let name = {
+        let n = field(0);
+        if n.is_empty() {
+            format!("rule{}", rules.len() + 1)
+        } else {
+            n
+        }
+    };
+    let pane = {
+        let p = field(1);
+        if p.is_empty() { star() } else { p }
+    };
+
+    rules.push(Rule {
+        name: name.clone(),
+        pane,
+        pattern,
+        action,
+        ignore_case: false,
+        debounce_ms: default_debounce(),
+    });
+
+    let json = match serde_json::to_string_pretty(&Config { triggers: rules }) {
+        Ok(j) => j,
+        Err(e) => {
+            eprintln!("ztmux triggers add: {e}");
+            return 1;
+        }
+    };
+    if let Err(e) = std::fs::write(config_path(), json) {
+        eprintln!("ztmux triggers add: {}: {e}", config_path().display());
+        return 1;
+    }
+    println!("added trigger '{name}'");
+    // Re-arm so the new rule takes effect immediately.
+    arm(socket)
+}
+
+/// Open the inline trigger wizard: a chained `command-prompt` that collects the
+/// four fields (name, pane glob, match regex, action) through the floating
+/// prompt, then calls `triggers add`. No JSON editing. Targets the current
+/// client, so run it from a shell inside the session (or bind a key to it).
+fn wizard(socket: &str) -> i32 {
+    let template = format!("run-shell \"ztmux -S '{socket}' triggers add '%1' '%2' '%3' '%4'\"");
+    match ztmux_cmd(
+        socket,
+        &[
+            "command-prompt",
+            "-p",
+            "trigger name:,pane glob (*):,match regex:,action:",
+            &template,
+        ],
+    )
+    .status()
+    {
+        Ok(s) if s.success() => 0,
+        _ => {
+            eprintln!("ztmux triggers wizard: could not open the prompt (need an attached client)");
+            1
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
