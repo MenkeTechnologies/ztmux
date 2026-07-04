@@ -14,16 +14,15 @@
 use crate::compat::{
     getpeereid,
     imsg::{
-        imsg_clear, imsg_compose, imsg_flush, imsg_free, imsg_get, imsg_get_fd, imsg_init,
-        imsg_read, imsgbuf,
+        imsg_compose, imsg_free, imsg_get, imsg_get_fd, imsgbuf, imsgbuf_allow_fdpass,
+        imsgbuf_clear, imsgbuf_flush, imsgbuf_init, imsgbuf_queuelen, imsgbuf_read, imsgbuf_write,
     },
-    imsg_buffer::msgbuf_write,
     queue::{tailq_foreach, tailq_init, tailq_insert_tail, tailq_remove},
     setproctitle,
 };
 use crate::event_::{signal_add, signal_set};
 use crate::libc::{
-    AF_UNIX, EAGAIN, PF_UNSPEC, SA_RESTART, SIG_DFL, SIG_IGN, SIGCHLD, SIGCONT, SIGHUP, SIGINT,
+    AF_UNIX, PF_UNSPEC, SA_RESTART, SIG_DFL, SIG_IGN, SIGCHLD, SIGCONT, SIGHUP, SIGINT,
     SIGPIPE, SIGQUIT, SIGTERM, SIGTSTP, SIGTTIN, SIGTTOU, SIGUSR1, SIGUSR2, SIGWINCH, close, gid_t,
     sigaction, sigemptyset, socketpair, uname, utsname,
 };
@@ -75,13 +74,12 @@ pub unsafe extern "C-unwind" fn proc_event_cb(_fd: i32, events: i16, arg: *mut c
         let imsg = imsg.as_mut_ptr();
 
         if (*peer).flags & PEER_BAD == 0 && events & EV_READ != 0 {
-            let mut n = imsg_read(&raw mut (*peer).ibuf);
-            if (n == -1 && errno!() != EAGAIN) || n == 0 {
+            if imsgbuf_read(&raw mut (*peer).ibuf) != 1 {
                 ((*peer).dispatchcb.unwrap())(null_mut(), (*peer).arg);
                 return;
             }
             loop {
-                n = imsg_get(&raw mut (*peer).ibuf, imsg);
+                let n = imsg_get(&raw mut (*peer).ibuf, imsg);
                 if n == -1 {
                     ((*peer).dispatchcb.unwrap())(null_mut(), (*peer).arg);
                     return;
@@ -106,15 +104,12 @@ pub unsafe extern "C-unwind" fn proc_event_cb(_fd: i32, events: i16, arg: *mut c
             }
         }
 
-        if events & EV_WRITE != 0
-            && msgbuf_write((&raw mut (*peer).ibuf.w).cast()) <= 0
-            && errno!() != EAGAIN
-        {
+        if events & EV_WRITE != 0 && imsgbuf_write(&raw mut (*peer).ibuf) == -1 {
             ((*peer).dispatchcb.unwrap())(null_mut(), (*peer).arg);
             return;
         }
 
-        if ((*peer).flags & PEER_BAD != 0) && (*peer).ibuf.w.queued == 0 {
+        if ((*peer).flags & PEER_BAD != 0) && imsgbuf_queuelen(&raw mut (*peer).ibuf) == 0 {
             ((*peer).dispatchcb.unwrap())(null_mut(), (*peer).arg);
             return;
         }
@@ -154,7 +149,7 @@ pub unsafe fn proc_update_event(peer: *mut tmuxpeer) {
         event_del(&raw mut (*peer).event);
 
         let mut events: i16 = EV_READ;
-        if (*peer).ibuf.w.queued > 0 {
+        if imsgbuf_queuelen(&raw mut (*peer).ibuf) > 0 {
             events |= EV_WRITE;
         }
         event_set(
@@ -272,7 +267,7 @@ pub unsafe fn proc_loop(tp: *mut tmuxproc, loopcb: Option<unsafe fn() -> i32>) {
 pub unsafe fn proc_exit(tp: *mut tmuxproc) {
     unsafe {
         for peer in tailq_foreach(&raw mut (*tp).peers).map(NonNull::as_ptr) {
-            imsg_flush(&raw mut (*peer).ibuf);
+            imsgbuf_flush(&raw mut (*peer).ibuf);
         }
         (*tp).exit = 1;
     }
@@ -404,7 +399,10 @@ pub unsafe fn proc_add_peer(
         (*peer).dispatchcb = dispatchcb;
         (*peer).arg = arg;
 
-        imsg_init(&raw mut (*peer).ibuf, fd);
+        if imsgbuf_init(&raw mut (*peer).ibuf, fd) == -1 {
+            fatal("imsgbuf_init");
+        }
+        imsgbuf_allow_fdpass(&raw mut (*peer).ibuf);
         event_set(
             &raw mut (*peer).event,
             fd,
@@ -432,7 +430,7 @@ pub unsafe fn proc_remove_peer(peer: *mut tmuxpeer) {
         log_debug!("remove peer {:p}", peer);
 
         event_del(&raw mut (*peer).event);
-        imsg_clear(&raw mut (*peer).ibuf);
+        imsgbuf_clear(&raw mut (*peer).ibuf);
 
         close((*peer).ibuf.fd);
         free_(peer);
@@ -449,7 +447,7 @@ pub unsafe fn proc_kill_peer(peer: *mut tmuxpeer) {
 /// C `vendor/tmux/proc.c:349`: `void proc_flush_peer(struct tmuxpeer *peer)`
 pub unsafe fn proc_flush_peer(peer: *mut tmuxpeer) {
     unsafe {
-        imsg_flush(&raw mut (*peer).ibuf);
+        imsgbuf_flush(&raw mut (*peer).ibuf);
     }
 }
 

@@ -13,7 +13,7 @@ exclude = ["vendor"]
 
 [package]
 name         = "ztmux"
-version      = "3.7.5"
+version      = "3.7.6"
 authors      = ["MenkeTechnologies"]
 categories   = ["command-line-utilities"]
 edition      = "2024"
@@ -155,3 +155,10 @@ wildcard_imports                    = "allow"
 # against. Revisit per-module as the code is brought to idiomatic Rust.
 explicit_counter_loop               = "allow" # match upstream C index-loop structure
 manual_checked_ops                  = "allow" # match upstream C manual bounds/division guards
+
+# Keep line-number debug info in release builds (`pnpm build`, `cargo install`)
+# so the crash backtraces written by the server's fatal/signal handlers
+# (server-crash-<pid>.txt) symbolicate to file:line instead of bare addresses.
+# Line tables only: negligible runtime cost, small binary-size bump.
+[profile.release]
+debug = "line-tables-only"

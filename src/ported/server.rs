@@ -160,6 +160,48 @@ unsafe extern "C-unwind" fn server_tidy_event(_fd: i32, _events: i16, _data: *mu
     }
 }
 
+/// Fatal-signal handler installed in the server process. A hardware fault or
+/// abort (SIGSEGV/SIGBUS/SIGABRT/SIGILL/SIGFPE) kills the process outright and
+/// never runs the Rust panic hook, so those crashes previously left no trace.
+/// Dump a backtrace, then restore the default disposition and re-raise so the
+/// process still terminates with the original signal (and can core dump).
+unsafe extern "C" fn server_crash_signal(sig: c_int) {
+    unsafe {
+        let name = _s(strsignal(sig).cast::<u8>());
+        crate::log::dump_backtrace(&format!("fatal signal {sig} ({name})"));
+
+        // Restore the default handler for this signal and re-raise it.
+        let mut sa: crate::libc::sigaction = zeroed();
+        crate::libc::sigemptyset(&raw mut sa.sa_mask);
+        sa.sa_flags = 0;
+        sa.sa_sigaction = crate::libc::SIG_DFL;
+        crate::libc::sigaction(sig, &raw const sa, null_mut());
+        crate::libc::raise(sig);
+    }
+}
+
+/// Install `server_crash_signal` for the fatal signals so an unexpected server
+/// death always leaves a `server-crash-<pid>.txt` behind.
+unsafe fn server_install_crash_handlers() {
+    unsafe {
+        let mut sa: crate::libc::sigaction = zeroed();
+        crate::libc::sigemptyset(&raw mut sa.sa_mask);
+        // No SA_RESTART: we are re-raising to die, not resuming.
+        sa.sa_flags = 0;
+        sa.sa_sigaction = server_crash_signal as *const () as usize;
+
+        for sig in [
+            crate::libc::SIGSEGV,
+            crate::libc::SIGBUS,
+            crate::libc::SIGABRT,
+            crate::libc::SIGILL,
+            crate::libc::SIGFPE,
+        ] {
+            crate::libc::sigaction(sig, &raw const sa, null_mut());
+        }
+    }
+}
+
 /// C `vendor/tmux/server.c:176`: `int server_start(struct tmuxproc *client, uint64_t flags, struct event_base *base, int lockfd, char *lockfile)`
 pub unsafe fn server_start(
     client: *mut tmuxproc,
@@ -216,12 +258,14 @@ pub unsafe fn server_start(
 
             log_close();
 
-            if let Err(err) =
-                std::fs::write(format!("server-panic-{}.txt", std::process::id()), err_str)
-            {
+            let panic_path = crate::log::ztmux_dir()
+                .join(format!("server-panic-{}.txt", std::process::id()));
+            if let Err(err) = std::fs::write(&panic_path, err_str) {
                 eprintln!("error in panic handler! {err}");
             }
         }));
+
+        server_install_crash_handlers();
 
         // now in child process i.e. server
         proc_clear_signals(client, 0);
@@ -231,6 +275,15 @@ pub unsafe fn server_start(
             fatalx("event_reinit failed");
         }
         SERVER_PROC = proc_start(c"server");
+
+        // proc_start has now opened the log; record that the crash diagnostics
+        // (panic hook + fatal-signal handlers) are armed for this server.
+        log_debug!(
+            "{}: crash diagnostics armed (pid {}), logging to {}",
+            "server_start",
+            std::process::id(),
+            crate::log::ztmux_dir().display(),
+        );
 
         proc_set_signals(SERVER_PROC, Some(server_signal));
         sigprocmask(SIG_SETMASK, &raw mut oldset, null_mut());
@@ -290,6 +343,14 @@ pub unsafe fn server_start(
         server_add_accept(0);
         proc_loop(SERVER_PROC, Some(server_loop));
 
+        // The event loop returned: the server is shutting down cleanly
+        // (server_loop decided to exit, or proc_exit set the flag). Log why at
+        // debug level - this is a normal exit, so it must NOT write a
+        // server-crash file (those are reserved for actual faults: fatal/fatalx
+        // and the SIGSEGV/SIGBUS/SIGABRT handler).
+        let server_exit = (&raw const SERVER_EXIT).read();
+        log_debug!("server event loop exited cleanly (SERVER_EXIT={})", server_exit);
+
         job_kill_all();
         status_prompt_save_history();
 
@@ -343,6 +404,17 @@ pub unsafe fn server_loop() -> i32 {
         if job_still_running() {
             return 0;
         }
+
+        // Returning non-zero here breaks proc_loop and shuts the server down.
+        // Log why so an "unexpected" exit is traceable: no attached clients
+        // remain and exit-empty/exit-unattached let us go.
+        log_debug!(
+            "{}: exiting - SERVER_EXIT={}, no attached clients, exit-empty={}, exit-unattached={}",
+            "server_loop",
+            (&raw const SERVER_EXIT).read(),
+            options_get_number_(GLOBAL_OPTIONS, "exit-empty"),
+            options_get_number_(GLOBAL_OPTIONS, "exit-unattached"),
+        );
 
         1
     }

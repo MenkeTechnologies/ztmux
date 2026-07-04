@@ -2906,7 +2906,7 @@ pub unsafe fn server_client_dispatch(imsg: *mut imsg, arg: *mut c_void) {
             return;
         }
 
-        let datalen = (*imsg).hdr.len - IMSG_HEADER_SIZE as u16;
+        let datalen = ((*imsg).hdr.len - IMSG_HEADER_SIZE as u32) as u16;
 
         match msgtype::try_from((*imsg).hdr.type_).expect("unexpected msgtype") {
             msgtype::MSG_IDENTIFY_CLIENTPID
@@ -3121,7 +3121,7 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
         }
 
         let data = (*imsg).data;
-        let datalen = (*imsg).hdr.len - IMSG_HEADER_SIZE as u16;
+        let datalen = ((*imsg).hdr.len - IMSG_HEADER_SIZE as u32) as u16;
 
         match msgtype::try_from((*imsg).hdr.type_).expect("unexpectd msgtype") {
             msgtype::MSG_IDENTIFY_FEATURES => {

@@ -5,12 +5,12 @@ use ::core::{
     ptr::{NonNull, null_mut},
 };
 use ::libc::{
-    CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_SPACE, EAGAIN, EBADMSG, EINTR, EINVAL, ENOBUFS,
-    ERANGE, SCM_RIGHTS, SOL_SOCKET, abort, c_uchar, calloc, close, cmsghdr, free, iovec, memcpy,
-    memset, msghdr, sendmsg, writev,
+    CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE, EAGAIN, EBADMSG, EINTR, EINVAL,
+    EMSGSIZE, ENOBUFS, ERANGE, SCM_RIGHTS, SOL_SOCKET, abort, c_uchar, calloc, close, cmsghdr, free,
+    iovec, malloc, memcpy, memmove, memset, msghdr, readv, recvmsg, sendmsg, writev,
 };
 
-use super::imsg::{ibuf, msgbuf};
+use super::imsg::{IBUF_READ_SIZE, ibuf, ibufqueue, msgbuf, readhdr_fn};
 use super::queue::{
     tailq_first, tailq_foreach, tailq_init, tailq_insert_tail, tailq_next, tailq_remove,
 };
@@ -18,6 +18,11 @@ use super::{freezero, recallocarray::recallocarray};
 use crate::errno;
 
 const IOV_MAX: usize = 1024; // TODO find where IOV_MAX is defined
+
+/// C `vendor/tmux/compat/imsg-buffer.c:67`: sentinel `ibuf.fd` value marking a
+/// stack-backed (non-owning) ibuf, e.g. from `ibuf_from_buffer`. Such buffers
+/// must never be freed, enqueued, or grown.
+const IBUF_FD_MARK_ON_STACK: c_int = -2;
 
 /// C `vendor/tmux/compat/imsg-buffer.c:70`: `struct ibuf *ibuf_open(size_t len)`
 pub unsafe fn ibuf_open(len: usize) -> *mut ibuf {
@@ -96,8 +101,13 @@ pub unsafe fn ibuf_realloc(buf: *mut ibuf, len: usize) -> i32 {
 /// C `vendor/tmux/compat/imsg-buffer.c:114`: `void *ibuf_reserve(struct ibuf *buf, size_t len)`
 pub unsafe fn ibuf_reserve(buf: *mut ibuf, len: usize) -> *mut c_void {
     unsafe {
-        if len > usize::MAX - (*buf).wpos || (*buf).max == 0 {
+        if len > usize::MAX - (*buf).wpos {
             errno!() = ERANGE;
+            return null_mut();
+        }
+        if (*buf).fd == IBUF_FD_MARK_ON_STACK {
+            // can not grow stack buffers
+            errno!() = EINVAL;
             return null_mut();
         }
 
@@ -337,7 +347,8 @@ pub unsafe fn ibuf_size(buf: *const ibuf) -> usize {
 /// C `vendor/tmux/compat/imsg-buffer.c:415`: `size_t ibuf_left(const struct ibuf *buf)`
 pub unsafe fn ibuf_left(buf: *const ibuf) -> usize {
     unsafe {
-        if (*buf).max == 0 {
+        // on stack buffers have no space left
+        if (*buf).fd == IBUF_FD_MARK_ON_STACK {
             return 0;
         }
         (*buf).max - (*buf).wpos
@@ -351,8 +362,8 @@ pub unsafe fn ibuf_truncate(buf: *mut ibuf, len: usize) -> c_int {
             (*buf).wpos = (*buf).rpos + len;
             return 0;
         }
-        if (*buf).max == 0 {
-            // only allow to truncate down
+        if (*buf).fd == IBUF_FD_MARK_ON_STACK {
+            // only allow to truncate down for stack buffers
             errno!() = ERANGE;
             return -1;
         }
@@ -370,7 +381,7 @@ pub unsafe fn ibuf_rewind(buf: *mut ibuf) {
 /// C `vendor/tmux/compat/imsg-buffer.c:445`: `void ibuf_close(struct msgbuf *msgbuf, struct ibuf *buf)`
 pub unsafe fn ibuf_close(msgbuf: *mut msgbuf, buf: *mut ibuf) {
     unsafe {
-        ibuf_enqueue(msgbuf, buf);
+        ibufq_push(&raw mut (*msgbuf).bufs, buf);
     }
 }
 
@@ -381,7 +392,7 @@ pub unsafe fn ibuf_from_buffer(buf: *mut ibuf, data: *mut c_void, len: usize) {
         (*buf).buf = data as _;
         (*buf).wpos = len;
         (*buf).size = len;
-        (*buf).fd = -1;
+        (*buf).fd = IBUF_FD_MARK_ON_STACK;
     }
 }
 
@@ -480,32 +491,55 @@ pub unsafe fn ibuf_skip(buf: *mut ibuf, len: usize) -> c_int {
     }
 }
 
+/// C `vendor/tmux/compat/imsg-buffer.c:386`: `int ibuf_set_maxsize(struct ibuf *buf, size_t max)`
+pub unsafe fn ibuf_set_maxsize(buf: *mut ibuf, max: usize) -> c_int {
+    unsafe {
+        if (*buf).fd == IBUF_FD_MARK_ON_STACK {
+            // can't fiddle with stack buffers
+            errno!() = EINVAL;
+            return -1;
+        }
+        if max > (*buf).max {
+            errno!() = ERANGE;
+            return -1;
+        }
+        (*buf).max = max;
+        0
+    }
+}
+
 /// C `vendor/tmux/compat/imsg-buffer.c:593`: `void ibuf_free(struct ibuf *buf)`
 pub unsafe fn ibuf_free(buf: *mut ibuf) {
     unsafe {
+        let save_errno = errno!();
         if buf.is_null() {
             return;
         }
-        if (*buf).max == 0 {
-            // if buf lives on the stack
-            abort(); /* abort before causing more harm */
+        // if buf lives on the stack abort before causing more harm
+        if (*buf).fd == IBUF_FD_MARK_ON_STACK {
+            abort();
         }
-        if (*buf).fd != -1 {
+        if (*buf).fd >= 0 {
             close((*buf).fd);
         }
         freezero((*buf).buf.cast(), (*buf).size);
         free(buf as *mut c_void);
+        errno!() = save_errno;
     }
 }
 
 /// C `vendor/tmux/compat/imsg-buffer.c:610`: `int ibuf_fd_avail(struct ibuf *buf)`
 pub unsafe fn ibuf_fd_avail(buf: *mut ibuf) -> c_int {
-    unsafe { ((*buf).fd != -1) as c_int }
+    unsafe { ((*buf).fd >= 0) as c_int }
 }
 
 /// C `vendor/tmux/compat/imsg-buffer.c:616`: `int ibuf_fd_get(struct ibuf *buf)`
 pub unsafe fn ibuf_fd_get(buf: *mut ibuf) -> c_int {
     unsafe {
+        // negative fds are internal use and equivalent to -1
+        if (*buf).fd < 0 {
+            return -1;
+        }
         let fd = (*buf).fd;
         (*buf).fd = -1;
         fd
@@ -515,29 +549,112 @@ pub unsafe fn ibuf_fd_get(buf: *mut ibuf) -> c_int {
 /// C `vendor/tmux/compat/imsg-buffer.c:629`: `void ibuf_fd_set(struct ibuf *buf, int fd)`
 pub unsafe fn ibuf_fd_set(buf: *mut ibuf, fd: c_int) {
     unsafe {
-        if (*buf).max == 0 {
-            // if buf lives on the stack
-            abort(); /* abort before causing more harm */
+        // if buf lives on the stack abort before causing more harm
+        if (*buf).fd == IBUF_FD_MARK_ON_STACK {
+            abort();
         }
-        if (*buf).fd != -1 {
+        if (*buf).fd >= 0 {
             close((*buf).fd);
         }
-        (*buf).fd = fd;
+        (*buf).fd = -1;
+        if fd >= 0 {
+            (*buf).fd = fd;
+        }
     }
 }
 
-/// C `vendor/tmux/compat/imsg-buffer.c:725`: `int ibuf_write(int fd, struct msgbuf *msgbuf)`
-pub unsafe fn ibuf_write(msgbuf: *mut msgbuf) -> c_int {
+/// C `vendor/tmux/compat/imsg-buffer.c:641`: `struct msgbuf *msgbuf_new(void)`
+pub unsafe fn msgbuf_new() -> *mut msgbuf {
     unsafe {
+        let m = calloc(1, size_of::<msgbuf>()) as *mut msgbuf;
+        if m.is_null() {
+            return null_mut();
+        }
+        ibufq_init(&raw mut (*m).bufs);
+        ibufq_init(&raw mut (*m).rbufs);
+        m
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:654`: `struct msgbuf *msgbuf_new_reader(size_t, ...)`
+pub unsafe fn msgbuf_new_reader(
+    hdrsz: usize,
+    readhdr: readhdr_fn,
+    arg: *mut c_void,
+) -> *mut msgbuf {
+    unsafe {
+        if hdrsz == 0 || hdrsz > IBUF_READ_SIZE / 2 {
+            errno!() = EINVAL;
+            return null_mut();
+        }
+
+        let buf = malloc(IBUF_READ_SIZE) as *mut c_uchar;
+        if buf.is_null() {
+            return null_mut();
+        }
+
+        let msgbuf = msgbuf_new();
+        if msgbuf.is_null() {
+            free(buf as *mut c_void);
+            return null_mut();
+        }
+
+        (*msgbuf).rbuf = buf;
+        (*msgbuf).hdrsize = hdrsz;
+        (*msgbuf).readhdr = readhdr;
+        (*msgbuf).rarg = arg;
+
+        msgbuf
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:683`: `void msgbuf_free(struct msgbuf *msgbuf)`
+pub unsafe fn msgbuf_free(msgbuf: *mut msgbuf) {
+    unsafe {
+        if msgbuf.is_null() {
+            return;
+        }
+        msgbuf_clear(msgbuf);
+        free((*msgbuf).rbuf as *mut c_void);
+        free(msgbuf as *mut c_void);
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:693`: `uint32_t msgbuf_queuelen(struct msgbuf *msgbuf)`
+pub unsafe fn msgbuf_queuelen(msgbuf: *mut msgbuf) -> u32 {
+    unsafe { ibufq_queuelen(&raw mut (*msgbuf).bufs) }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:699`: `void msgbuf_clear(struct msgbuf *msgbuf)`
+pub unsafe fn msgbuf_clear(msgbuf: *mut msgbuf) {
+    unsafe {
+        // write side
+        ibufq_flush(&raw mut (*msgbuf).bufs);
+        // read side
+        ibufq_flush(&raw mut (*msgbuf).rbufs);
+        (*msgbuf).roff = 0;
+        ibuf_free((*msgbuf).rpmsg);
+        (*msgbuf).rpmsg = null_mut();
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:712`: `struct ibuf *msgbuf_get(struct msgbuf *msgbuf)`
+pub unsafe fn msgbuf_get(msgbuf: *mut msgbuf) -> *mut ibuf {
+    unsafe { ibufq_pop(&raw mut (*msgbuf).rbufs) }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:718`: `void msgbuf_concat(struct msgbuf *msgbuf, struct ibufqueue *from)`
+pub unsafe fn msgbuf_concat(msgbuf: *mut msgbuf, from: *mut ibufqueue) {
+    unsafe { ibufq_concat(&raw mut (*msgbuf).bufs, from) }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:724`: `int ibuf_write(int fd, struct msgbuf *msgbuf)`
+pub unsafe fn ibuf_write(fd: c_int, msgbuf: *mut msgbuf) -> c_int {
+    unsafe {
+        let mut iov: [iovec; IOV_MAX] = std::mem::zeroed();
         let mut i: u32 = 0;
 
-        let mut iov: [iovec; IOV_MAX] = [const {
-            iovec {
-                iov_base: null_mut(),
-                iov_len: 0,
-            }
-        }; IOV_MAX];
-        for buf in tailq_foreach(&raw mut (*msgbuf).bufs).map(NonNull::as_ptr) {
+        for buf in tailq_foreach(&raw mut (*msgbuf).bufs.bufs).map(NonNull::as_ptr) {
             if i as usize >= IOV_MAX {
                 break;
             }
@@ -546,79 +663,32 @@ pub unsafe fn ibuf_write(msgbuf: *mut msgbuf) -> c_int {
             i += 1;
         }
         if i == 0 {
-            return 0;
+            return 0; // nothing queued
         }
 
         let mut n: isize;
         'again: loop {
-            n = writev((*msgbuf).fd, iov.as_ptr(), i as i32);
+            n = writev(fd, iov.as_ptr(), i as i32);
             if n == -1 {
                 if errno!() == EINTR {
                     continue 'again;
                 }
-                if errno!() == ENOBUFS {
-                    errno!() = EAGAIN;
+                if errno!() == EAGAIN || errno!() == ENOBUFS {
+                    // lets retry later again
+                    return 0;
                 }
                 return -1;
             }
-
-            break 'again; // need a break here to emulate goto
-        }
-
-        if n == 0 {
-            // connection closed
-            errno!() = 0;
-            return 0;
+            break 'again;
         }
 
         msgbuf_drain(msgbuf, n as usize);
-
-        1
+        0
     }
 }
 
-pub unsafe fn msgbuf_init(msgbuf: *mut msgbuf) {
-    unsafe {
-        (*msgbuf).queued = 0;
-        (*msgbuf).fd = -1;
-        tailq_init(&raw mut (*msgbuf).bufs);
-    }
-}
-
-/// C `vendor/tmux/compat/imsg-buffer.c:986`: `static void msgbuf_drain(struct msgbuf *msgbuf, size_t n)`
-unsafe fn msgbuf_drain(msgbuf: *mut msgbuf, mut n: usize) {
-    unsafe {
-        let mut buf = tailq_first(&raw mut (*msgbuf).bufs);
-
-        while !buf.is_null() && n > 0 {
-            let next = tailq_next(buf);
-            if n >= ibuf_size(buf) {
-                n -= ibuf_size(buf);
-                ibuf_dequeue(msgbuf, buf);
-            } else {
-                (*buf).rpos += n;
-                n = 0;
-            }
-            buf = next;
-        }
-    }
-}
-
-/// C `vendor/tmux/compat/imsg-buffer.c:700`: `void msgbuf_clear(struct msgbuf *msgbuf)`
-pub unsafe fn msgbuf_clear(msgbuf: *mut msgbuf) {
-    unsafe {
-        let mut buf;
-        while {
-            buf = tailq_first(&raw mut (*msgbuf).bufs);
-            !buf.is_null()
-        } {
-            ibuf_dequeue(msgbuf, buf);
-        }
-    }
-}
-
-/// C `vendor/tmux/compat/imsg-buffer.c:758`: `int msgbuf_write(int fd, struct msgbuf *msgbuf)`
-pub unsafe fn msgbuf_write(msgbuf: *mut msgbuf) -> c_int {
+/// C `vendor/tmux/compat/imsg-buffer.c:757`: `int msgbuf_write(int fd, struct msgbuf *msgbuf)`
+pub unsafe fn msgbuf_write(fd: c_int, msgbuf: *mut msgbuf) -> c_int {
     unsafe {
         let mut iov: [iovec; IOV_MAX] = std::mem::zeroed();
         let mut buf0: *mut ibuf = null_mut();
@@ -630,7 +700,7 @@ pub unsafe fn msgbuf_write(msgbuf: *mut msgbuf) -> c_int {
             buf: [u8; unsafe { CMSG_SPACE(size_of::<c_int>() as _) as usize }],
         }
 
-        for buf in tailq_foreach(&raw mut (*msgbuf).bufs).map(NonNull::as_ptr) {
+        for buf in tailq_foreach(&raw mut (*msgbuf).bufs.bufs).map(NonNull::as_ptr) {
             if i as usize >= IOV_MAX {
                 break;
             }
@@ -643,6 +713,10 @@ pub unsafe fn msgbuf_write(msgbuf: *mut msgbuf) -> c_int {
             if (*buf).fd != -1 {
                 buf0 = buf;
             }
+        }
+
+        if i == 0 {
+            return 0; // nothing queued
         }
 
         msg.msg_iov = iov.as_mut_ptr();
@@ -660,56 +734,318 @@ pub unsafe fn msgbuf_write(msgbuf: *mut msgbuf) -> c_int {
 
         let mut n: isize;
         'again: loop {
-            n = sendmsg((*msgbuf).fd, &raw const msg, 0);
+            n = sendmsg(fd, &raw const msg, 0);
             if n == -1 {
                 if errno!() == EINTR {
                     continue 'again;
                 }
-                if errno!() == ENOBUFS {
-                    errno!() = EAGAIN;
+                if errno!() == EAGAIN || errno!() == ENOBUFS {
+                    // lets retry later again
+                    return 0;
                 }
                 return -1;
             }
             break 'again;
         }
 
-        if n == 0 {
-            errno!() = 0;
-            return 0;
-        }
-
+        // assumption: fd got sent if sendmsg sent anything
         if !buf0.is_null() {
             close((*buf0).fd);
             (*buf0).fd = -1;
         }
 
         msgbuf_drain(msgbuf, n as usize);
-
-        1
+        0
     }
 }
 
-/// C `vendor/tmux/compat/imsg-buffer.c:694`: `uint32_t msgbuf_queuelen(struct msgbuf *msgbuf)`
-pub unsafe fn msgbuf_queuelen(msgbuf: *mut msgbuf) -> u32 {
-    unsafe { (*msgbuf).queued }
-}
-
-unsafe fn ibuf_enqueue(msgbuf: *mut msgbuf, buf: *mut ibuf) {
+/// C `vendor/tmux/compat/imsg-buffer.c:826`: `static int ibuf_read_process(struct msgbuf *msgbuf, int fd)`
+unsafe fn ibuf_read_process(msgbuf: *mut msgbuf, mut fd: c_int) -> c_int {
     unsafe {
-        if (*buf).max == 0 {
-            // if buf lives on the stack
-            abort(); /* abort before causing more harm */
+        let mut rbuf: ibuf = std::mem::zeroed();
+        let mut msg: ibuf = std::mem::zeroed();
+
+        ibuf_from_buffer(&raw mut rbuf, (*msgbuf).rbuf.cast(), (*msgbuf).roff);
+
+        // C is a do/while over the read buffer; `'process` is the goto-fail
+        // target and yields false on a framing error, true on success.
+        let ok = 'process: {
+            loop {
+                if (*msgbuf).rpmsg.is_null() {
+                    if ibuf_size(&raw const rbuf) < (*msgbuf).hdrsize {
+                        break; // not enough for a header yet -> success tail
+                    }
+                    // get size from header
+                    ibuf_from_buffer(&raw mut msg, ibuf_data(&raw const rbuf), (*msgbuf).hdrsize);
+                    (*msgbuf).rpmsg =
+                        ((*msgbuf).readhdr.unwrap())(&raw mut msg, (*msgbuf).rarg, &raw mut fd);
+                    if (*msgbuf).rpmsg.is_null() {
+                        break 'process false; // goto fail
+                    }
+                }
+
+                let sz = if ibuf_left((*msgbuf).rpmsg) <= ibuf_size(&raw const rbuf) {
+                    ibuf_left((*msgbuf).rpmsg)
+                } else {
+                    ibuf_size(&raw const rbuf)
+                };
+
+                // neither call below can fail in practice
+                if ibuf_get_ibuf(&raw mut rbuf, sz, &raw mut msg) == -1
+                    || ibuf_add_ibuf((*msgbuf).rpmsg, &raw const msg) == -1
+                {
+                    break 'process false; // goto fail
+                }
+
+                if ibuf_left((*msgbuf).rpmsg) == 0 {
+                    ibufq_push(&raw mut (*msgbuf).rbufs, (*msgbuf).rpmsg);
+                    (*msgbuf).rpmsg = null_mut();
+                }
+
+                if ibuf_size(&raw const rbuf) == 0 {
+                    break; // do/while terminating condition -> success tail
+                }
+            }
+            true
+        };
+
+        if ok {
+            if ibuf_size(&raw const rbuf) > 0 {
+                memmove(
+                    (*msgbuf).rbuf.cast(),
+                    ibuf_data(&raw const rbuf),
+                    ibuf_size(&raw const rbuf),
+                );
+            }
+            (*msgbuf).roff = ibuf_size(&raw const rbuf);
         }
-        tailq_insert_tail::<_, _>(&raw mut (*msgbuf).bufs, buf);
-        (*msgbuf).queued += 1;
+
+        if fd != -1 {
+            close(fd);
+        }
+        if ok { 1 } else { -1 }
     }
 }
 
-unsafe fn ibuf_dequeue(msgbuf: *mut msgbuf, buf: *mut ibuf) {
+/// C `vendor/tmux/compat/imsg-buffer.c:877`: `int ibuf_read(int fd, struct msgbuf *msgbuf)`
+pub unsafe fn ibuf_read(fd: c_int, msgbuf: *mut msgbuf) -> c_int {
     unsafe {
-        tailq_remove(&raw mut (*msgbuf).bufs, buf);
-        (*msgbuf).queued -= 1;
-        ibuf_free(buf);
+        if (*msgbuf).rbuf.is_null() {
+            errno!() = EINVAL;
+            return -1;
+        }
+
+        let mut iov: iovec = std::mem::zeroed();
+        iov.iov_base = (*msgbuf).rbuf.add((*msgbuf).roff).cast();
+        iov.iov_len = IBUF_READ_SIZE - (*msgbuf).roff;
+
+        let mut n: isize;
+        'again: loop {
+            n = readv(fd, &raw const iov, 1);
+            if n == -1 {
+                if errno!() == EINTR {
+                    continue 'again;
+                }
+                if errno!() == EAGAIN {
+                    return 1; // lets retry later again
+                }
+                return -1;
+            }
+            break 'again;
+        }
+        if n == 0 {
+            return 0; // connection closed
+        }
+
+        (*msgbuf).roff += n as usize;
+        ibuf_read_process(msgbuf, -1)
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:908`: `int msgbuf_read(int fd, struct msgbuf *msgbuf)`
+pub unsafe fn msgbuf_read(fd: c_int, msgbuf: *mut msgbuf) -> c_int {
+    unsafe {
+        let mut msg: msghdr = std::mem::zeroed();
+        let mut cmsgbuf: cmsgbuf = std::mem::zeroed();
+        union cmsgbuf {
+            _hdr: cmsghdr,
+            buf: [u8; unsafe { CMSG_SPACE(size_of::<c_int>() as _) as usize }],
+        }
+        let mut iov: iovec = std::mem::zeroed();
+        let mut fdpass: c_int = -1;
+
+        if (*msgbuf).rbuf.is_null() {
+            errno!() = EINVAL;
+            return -1;
+        }
+
+        iov.iov_base = (*msgbuf).rbuf.add((*msgbuf).roff).cast();
+        iov.iov_len = IBUF_READ_SIZE - (*msgbuf).roff;
+        msg.msg_iov = &raw mut iov;
+        msg.msg_iovlen = 1;
+        msg.msg_control = &raw mut cmsgbuf.buf as _;
+        msg.msg_controllen = size_of_val(&cmsgbuf.buf) as _;
+
+        let mut n: isize;
+        'again: loop {
+            n = recvmsg(fd, &raw mut msg, 0);
+            if n == -1 {
+                if errno!() == EINTR {
+                    continue 'again;
+                }
+                if errno!() == EMSGSIZE {
+                    // Not enough fd slots: retry to receive without the fd.
+                    continue 'again;
+                }
+                if errno!() == EAGAIN {
+                    return 1; // lets retry later again
+                }
+                return -1;
+            }
+            break 'again;
+        }
+        if n == 0 {
+            return 0; // connection closed
+        }
+
+        (*msgbuf).roff += n as usize;
+
+        let mut cmsg: *mut cmsghdr = CMSG_FIRSTHDR(&raw const msg);
+        while !cmsg.is_null() {
+            if (*cmsg).cmsg_level == SOL_SOCKET && (*cmsg).cmsg_type == SCM_RIGHTS {
+                // We only accept one fd; padding may leave more, which we close.
+                let j = ((cmsg as *mut u8).add((*cmsg).cmsg_len as usize).addr()
+                    - CMSG_DATA(cmsg).addr())
+                    / size_of::<c_int>();
+                for k in 0..j {
+                    let f = *(CMSG_DATA(cmsg) as *mut c_int).add(k);
+                    if k == 0 {
+                        fdpass = f;
+                    } else {
+                        close(f);
+                    }
+                }
+            }
+            cmsg = CMSG_NXTHDR(&raw const msg, cmsg);
+        }
+
+        ibuf_read_process(msgbuf, fdpass)
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:985`: `static void msgbuf_drain(struct msgbuf *msgbuf, size_t n)`
+unsafe fn msgbuf_drain(msgbuf: *mut msgbuf, mut n: usize) {
+    unsafe {
+        let mut buf;
+        while {
+            buf = tailq_first(&raw mut (*msgbuf).bufs.bufs);
+            !buf.is_null()
+        } {
+            if n >= ibuf_size(buf) {
+                n -= ibuf_size(buf);
+                tailq_remove(&raw mut (*msgbuf).bufs.bufs, buf);
+                (*msgbuf).bufs.queued -= 1;
+                ibuf_free(buf);
+            } else {
+                (*buf).rpos += n;
+                return;
+            }
+        }
+    }
+}
+
+// --- ibufqueue: a queue of ibufs plus its length (imsg-buffer.c:1003) ---
+
+/// C `vendor/tmux/compat/imsg-buffer.c:1003`: `static void ibufq_init(struct ibufqueue *bufq)`
+unsafe fn ibufq_init(bufq: *mut ibufqueue) {
+    unsafe {
+        tailq_init(&raw mut (*bufq).bufs);
+        (*bufq).queued = 0;
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:1010`: `struct ibufqueue *ibufq_new(void)`
+pub unsafe fn ibufq_new() -> *mut ibufqueue {
+    unsafe {
+        let bufq = calloc(1, size_of::<ibufqueue>()) as *mut ibufqueue;
+        if bufq.is_null() {
+            return null_mut();
+        }
+        ibufq_init(bufq);
+        bufq
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:1021`: `void ibufq_free(struct ibufqueue *bufq)`
+pub unsafe fn ibufq_free(bufq: *mut ibufqueue) {
+    unsafe {
+        if bufq.is_null() {
+            return;
+        }
+        ibufq_flush(bufq);
+        free(bufq as *mut c_void);
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:1030`: `struct ibuf *ibufq_pop(struct ibufqueue *bufq)`
+pub unsafe fn ibufq_pop(bufq: *mut ibufqueue) -> *mut ibuf {
+    unsafe {
+        let buf = tailq_first(&raw mut (*bufq).bufs);
+        if buf.is_null() {
+            return null_mut();
+        }
+        tailq_remove(&raw mut (*bufq).bufs, buf);
+        (*bufq).queued -= 1;
+        buf
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:1042`: `void ibufq_push(struct ibufqueue *bufq, struct ibuf *buf)`
+pub unsafe fn ibufq_push(bufq: *mut ibufqueue, buf: *mut ibuf) {
+    unsafe {
+        // if buf lives on the stack abort before causing more harm
+        if (*buf).fd == IBUF_FD_MARK_ON_STACK {
+            abort();
+        }
+        tailq_insert_tail::<_, _>(&raw mut (*bufq).bufs, buf);
+        (*bufq).queued += 1;
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:1052`: `uint32_t ibufq_queuelen(struct ibufqueue *bufq)`
+pub unsafe fn ibufq_queuelen(bufq: *mut ibufqueue) -> u32 {
+    unsafe { (*bufq).queued }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:1058`: `void ibufq_concat(struct ibufqueue *to, struct ibufqueue *from)`
+pub unsafe fn ibufq_concat(to: *mut ibufqueue, from: *mut ibufqueue) {
+    unsafe {
+        (*to).queued += (*from).queued;
+        // TAILQ_CONCAT: move every element of `from` onto the tail of `to`.
+        let mut buf;
+        while {
+            buf = tailq_first(&raw mut (*from).bufs);
+            !buf.is_null()
+        } {
+            tailq_remove(&raw mut (*from).bufs, buf);
+            tailq_insert_tail::<_, _>(&raw mut (*to).bufs, buf);
+        }
+        (*from).queued = 0;
+    }
+}
+
+/// C `vendor/tmux/compat/imsg-buffer.c:1066`: `void ibufq_flush(struct ibufqueue *bufq)`
+pub unsafe fn ibufq_flush(bufq: *mut ibufqueue) {
+    unsafe {
+        let mut buf;
+        while {
+            buf = tailq_first(&raw mut (*bufq).bufs);
+            !buf.is_null()
+        } {
+            tailq_remove(&raw mut (*bufq).bufs, buf);
+            ibuf_free(buf);
+        }
+        (*bufq).queued = 0;
     }
 }
 
@@ -724,6 +1060,31 @@ mod tests {
             let p = ibuf_data(buf) as *const u8;
             let n = ibuf_size(buf);
             std::slice::from_raw_parts(p, n).to_vec()
+        }
+    }
+
+    // ibufq_push then ibufq_pop returns buffers FIFO and tracks queuelen; a
+    // stack buffer (fd == IBUF_FD_MARK_ON_STACK) must never be enqueued.
+    #[test]
+    fn test_ibufq_push_pop_fifo() {
+        unsafe {
+            let mut q: ibufqueue = std::mem::zeroed();
+            ibufq_init(&raw mut q);
+            assert_eq!(ibufq_queuelen(&raw mut q), 0);
+
+            let a = ibuf_dynamic(4, 64);
+            let b = ibuf_dynamic(4, 64);
+            ibufq_push(&raw mut q, a);
+            ibufq_push(&raw mut q, b);
+            assert_eq!(ibufq_queuelen(&raw mut q), 2);
+
+            assert_eq!(ibufq_pop(&raw mut q), a);
+            assert_eq!(ibufq_pop(&raw mut q), b);
+            assert_eq!(ibufq_queuelen(&raw mut q), 0);
+            assert!(ibufq_pop(&raw mut q).is_null());
+
+            ibuf_free(a);
+            ibuf_free(b);
         }
     }
 
@@ -1191,7 +1552,8 @@ mod tests {
     fn test_msgbuf_enqueue_queuelen_clear() {
         unsafe {
             let mut mb: msgbuf = std::mem::zeroed();
-            msgbuf_init(&raw mut mb);
+            ibufq_init(&raw mut mb.bufs);
+            ibufq_init(&raw mut mb.rbufs);
             assert_eq!(msgbuf_queuelen(&raw mut mb), 0);
             for k in 0..3u8 {
                 let b = ibuf_dynamic(4, 4);
@@ -1199,15 +1561,15 @@ mod tests {
                 assert_eq!(ibuf_add(b, [k, k, k, k].as_ptr() as *const c_void, 4), 0);
                 ibuf_close(&raw mut mb, b);
             }
-            assert_eq!(mb.queued, 3);
+            assert_eq!(mb.bufs.queued, 3);
             assert_eq!(msgbuf_queuelen(&raw mut mb), 3);
             // FIFO: first enqueued sits at the front.
-            let first = tailq_first(&raw mut mb.bufs);
+            let first = tailq_first(&raw mut mb.bufs.bufs);
             assert!(!first.is_null());
             assert_eq!(readable(first), [0, 0, 0, 0]);
             msgbuf_clear(&raw mut mb);
-            assert_eq!(mb.queued, 0);
-            assert!(tailq_first(&raw mut mb.bufs).is_null());
+            assert_eq!(mb.bufs.queued, 0);
+            assert!(tailq_first(&raw mut mb.bufs.bufs).is_null());
         }
     }
 
@@ -1296,7 +1658,8 @@ mod tests {
     }
 
     // C `ibuf_from_buffer` (imsg-buffer.c:451) wraps external memory as a stack
-    // buffer: max == 0, fd == -1, wpos == size == len, rpos == 0, no space left.
+    // buffer: max == 0, fd == IBUF_FD_MARK_ON_STACK (-2), wpos == size == len,
+    // rpos == 0, no space left.
     #[test]
     fn test_ibuf_from_buffer_stack_props() {
         unsafe {
@@ -1304,7 +1667,7 @@ mod tests {
             let mut b: ibuf = std::mem::zeroed();
             ibuf_from_buffer(&raw mut b, backing.as_mut_ptr() as *mut c_void, 3);
             assert_eq!(b.max, 0);
-            assert_eq!(b.fd, -1);
+            assert_eq!(b.fd, IBUF_FD_MARK_ON_STACK);
             assert_eq!(b.wpos, 3);
             assert_eq!(b.size, 3);
             assert_eq!(b.rpos, 0);
