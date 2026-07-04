@@ -230,9 +230,13 @@ They fall into a few families:
 - **Ratatui UI** (opt-in, `ZTMUX_RATATUI=1`) — original interactive surfaces rendered with
   ratatui rather than tmux's server draw: a which-key **hint bar** on the prefix, a floating
   **command palette** with inline Tab/arrow completion, ratatui **clock** and **display-panes**,
-  **edit-scrollback-in-`$EDITOR`** (`prefix e`), and **multi-pane selective sync** — mark panes
-  (`prefix C-s`), sync the set (`prefix M`), with rounded frames marking synced (red), selected
-  (orange) and trigger-armed (cyan) panes. The whole surface is gated behind the flag, so the
+  **edit-scrollback-in-`$EDITOR`** (`prefix e`), zellij-style **pane-name frames** (the pane's
+  name drawn in the rounded top border, so it costs no extra row), and **multi-pane selective
+  sync** — mark panes (`prefix C-s`), sync the set (`prefix M`), with the frame recoloured for
+  synced (red), selected (orange) and trigger-armed (cyan) panes. Settings (all `set -g`):
+  `@ztmux-hint off` hides the hint bar; `@ztmux-pane-names off` hides the name frames;
+  `@ztmux-pane-name-format` overrides the frame name with a tmux format (e.g.
+  `#{pane_index}: #{pane_current_command}`). The whole surface is gated behind the flag, so the
   default path and the byte-for-byte parity suite are untouched.
 
 Run `ztmux --help` for the current list, or `man ztmux` for the full reference — each

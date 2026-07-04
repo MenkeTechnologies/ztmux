@@ -993,21 +993,14 @@ unsafe fn hint_draw(c: *mut client, data: *mut core::ffi::c_void, _rctx: *mut sc
 }
 
 /// True if the `@ztmux-hint` user option is explicitly turned off. Unset means
-/// the bar is on (whenever the ratatui UI is enabled). Read through the public
-/// option accessors so an unset option never fatals: presence is probed with
-/// `options_get_only_const` (session scope and global `set -g` scope), and only
-/// then is the inheriting string read.
-unsafe fn hint_option_off(c: *mut client) -> bool {
+/// the bar is on (whenever the ratatui UI is enabled). Checks every global scope
+/// so `set -g @ztmux-hint off` is found wherever it lands.
+unsafe fn hint_option_off(_c: *mut client) -> bool {
     unsafe {
-        let sopts = (*(*c).session).options;
-        let set_here = !crate::options_::options_get_only_const(sopts, "@ztmux-hint").is_null();
-        let set_global =
-            !crate::options_::options_get_only_const(GLOBAL_S_OPTIONS, "@ztmux-hint").is_null();
-        if !set_here && !set_global {
-            return false; // unset -> default on
+        match global_user_opt("@ztmux-hint") {
+            Some(v) => matches!(v.trim(), "off" | "0" | "false" | "no" | ""),
+            None => false, // unset -> default on
         }
-        let v = crate::cstr_to_str(crate::options_::options_get_string_(sopts, "@ztmux-hint"));
-        matches!(v.trim(), "off" | "0" | "false" | "no" | "")
     }
 }
 
@@ -1072,11 +1065,72 @@ unsafe fn pane_marked_for_sync(po: *mut options) -> bool {
     }
 }
 
-/// Draw ztmux's own rounded ratatui frame around a synced (or sync-marked)
-/// pane: a zellij-style coloured box overlaid on the pane's outer ring with a
-/// title badge, kept separate from tmux's plain border recolour. Drawn at the
-/// end of every pane redraw (full or partial) so it survives the pane's output.
-pub(crate) unsafe fn draw_sync_frame_pane(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) {
+/// Read a global user option (`set -g @name ...`) as a string, checking every
+/// global scope so it is found wherever `-g` routed it (server/session/window),
+/// never fataling on an unset option. `None` if unset everywhere.
+unsafe fn global_user_opt(name: &str) -> Option<String> {
+    unsafe {
+        for oo in [GLOBAL_S_OPTIONS, GLOBAL_OPTIONS, GLOBAL_W_OPTIONS] {
+            if !oo.is_null() && !crate::options_::options_get_only_const(oo, name).is_null() {
+                return Some(
+                    crate::cstr_to_str(crate::options_::options_get_string_(oo, name)).to_string(),
+                );
+            }
+        }
+        None
+    }
+}
+
+/// Whether to draw a named frame on ordinary (unsynced) panes too - zellij's
+/// per-pane name frames. `@ztmux-pane-names` (global, default on); `off`/`0`/
+/// `false`/`no` disables it, leaving only the sync/select/trigger state frames.
+unsafe fn pane_names_on() -> bool {
+    unsafe {
+        match global_user_opt("@ztmux-pane-names") {
+            Some(v) => !matches!(v.trim(), "off" | "0" | "false" | "no"),
+            None => true, // default on
+        }
+    }
+}
+
+/// The name shown in a pane's frame. `@ztmux-pane-name-format` (global) is a
+/// tmux format expanded per pane if set (e.g. `#{pane_index}: #{pane_current_command}`);
+/// otherwise the pane's title, falling back to `pane N`.
+unsafe fn pane_display_name(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) -> String {
+    unsafe {
+        if let Some(fmt) = global_user_opt("@ztmux-pane-name-format")
+            && !fmt.trim().is_empty()
+            && let Ok(cfmt) = std::ffi::CString::new(fmt.trim())
+        {
+            let c = (*ctx).c;
+            let s = (*c).session;
+            let wl = if s.is_null() { null_mut() } else { (*s).curw };
+            let ft = format_create_defaults(null_mut(), c, s, wl, wp);
+            let out = format_expand(ft, cfmt.as_ptr().cast());
+            let name = crate::cstr_to_str(out).trim().to_string();
+            crate::free_(out);
+            format_free(ft);
+            if !name.is_empty() {
+                return name;
+            }
+        }
+        let title = crate::cstr_to_str((*wp).base.title).trim().to_string();
+        if !title.is_empty() {
+            return title;
+        }
+        let mut idx: u32 = 0;
+        window_pane_index(wp, &raw mut idx);
+        format!("pane {idx}")
+    }
+}
+
+/// Draw ztmux's own rounded ratatui frame around a pane, with the pane's name in
+/// the top border (zellij-style, so it costs no extra row). Synced (red),
+/// selected (orange) and trigger-armed (cyan) panes get a loud state badge;
+/// ordinary panes get a subtle name-only frame when `@ztmux-pane-names` is on.
+/// Drawn at the end of every pane redraw (full or partial) so it survives the
+/// pane's own output.
+pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) {
     unsafe {
         if !enabled() || wp.is_null() {
             return;
@@ -1085,15 +1139,20 @@ pub(crate) unsafe fn draw_sync_frame_pane(ctx: *mut screen_redraw_ctx, wp: *mut 
         // The pane states ztmux frames, most-urgent first: actively broadcasting
         // (synced), selected to be synced next (marked), or watched by an armed
         // content-trigger (`pipe_fd` is the `#{pane_pipe}` signal).
-        let (color, label) = if crate::options_::options_get_number_(po, "synchronize-panes") != 0 {
-            (Color::Indexed(196), " \u{27f2} SYNCED ") // bright red
+        let state = if crate::options_::options_get_number_(po, "synchronize-panes") != 0 {
+            Some((Color::Indexed(196), "\u{27f2} SYNCED")) // bright red
         } else if pane_marked_for_sync(po) {
-            (Color::Indexed(214), " \u{25c6} SELECTED ") // orange
+            Some((Color::Indexed(214), "\u{25c6} SELECTED")) // orange
         } else if (*wp).pipe_fd != -1 {
-            (Color::Indexed(51), " \u{26a1} TRIGGER ") // cyan
+            Some((Color::Indexed(51), "\u{26a1} TRIGGER")) // cyan
         } else {
-            return;
+            None
         };
+        let names = pane_names_on();
+        if state.is_none() && !names {
+            return; // nothing to show on this pane
+        }
+
         let sx = (*wp).sx as u16;
         let sy = (*wp).sy as u16;
         if sx < 4 || sy < 3 {
@@ -1109,14 +1168,37 @@ pub(crate) unsafe fn draw_sync_frame_pane(ctx: *mut screen_redraw_ctx, wp: *mut 
             return;
         }
 
+        let name = if names {
+            pane_display_name(ctx, wp)
+        } else {
+            String::new()
+        };
+        let (color, title, bold) = match state {
+            Some((col, lbl)) => {
+                let t = if name.is_empty() {
+                    format!(" {lbl} ")
+                } else {
+                    format!(" {lbl} \u{b7} {name} ")
+                };
+                (col, t, true)
+            }
+            // Subtle grey for an ordinary named pane, so it reads as a label
+            // rather than an alert.
+            None => (Color::Indexed(244), format!(" {name} "), false),
+        };
+
         let c = (*ctx).c;
         let tty = &raw mut (*c).tty;
         let area = Rect::new(0, 0, sx, sy);
         let mut buf = Buffer::empty(area);
+        let mut style = Style::default().fg(color);
+        if bold {
+            style = style.add_modifier(Modifier::BOLD);
+        }
         Block::bordered()
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
-            .title(Line::from(label))
+            .border_style(style)
+            .title(Line::from(title))
             .render(area, &mut buf);
 
         let yoff = (*wp).yoff - (*ctx).oy
