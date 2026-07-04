@@ -162,7 +162,20 @@ fn log_vwrite_rs(args: std::fmt::Arguments, prefix: &str) {
             return;
         }
 
-        let msg = CString::new(format!("{args}")).unwrap();
+        // Mirror C string semantics. The C original (`log_vwrite`) formats via
+        // vasprintf then passes the result to stravis, where an embedded NUL —
+        // e.g. a raw C0 control byte logged through `%c` in `input_c0_dispatch`
+        // — simply terminates the string. `CString::new(..).unwrap()` instead
+        // aborts the whole server on that NUL, so truncate at the first NUL to
+        // match C and guarantee the conversion can never fail.
+        let raw = format!("{args}");
+        let end = raw
+            .as_bytes()
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(raw.len());
+        let msg = CString::new(&raw.as_bytes()[..end])
+            .expect("slice ends at first NUL, so it is NUL-free");
         let mut out = null_mut();
         if stravis(
             &mut out,
