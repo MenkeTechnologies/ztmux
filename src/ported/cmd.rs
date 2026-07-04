@@ -552,15 +552,19 @@ pub unsafe fn cmd_get_alias(name: *const u8) -> *mut u8 {
         // own socket. (Real commands and user aliases are matched first above.)
         let name_str = cstr_to_str(name);
         if crate::extensions::EXTENSION_COMMANDS.contains(&name_str) && cmd_find(name_str).is_err() {
-            let sock = if crate::SOCKET_PATH.is_null() {
-                String::new()
-            } else {
-                CStr::from_ptr(crate::SOCKET_PATH.cast())
-                    .to_string_lossy()
-                    .into_owned()
-            };
-            let expanded =
-                format!("display-popup -E -w 90% -h 90% 'ztmux -S \"{sock}\" {name_str}'\0");
+            // Point the nested ztmux at THIS server. display-popup runs the
+            // command through /bin/sh with $TMUX set, so `${TMUX%%,*}` (the
+            // socket path, up to the first comma) is the exact socket string the
+            // current client connected with. Use that rather than the server's
+            // stored SOCKET_PATH: the two can differ under path canonicalisation
+            // (e.g. macOS /tmp vs /private/tmp), which makes the baked absolute
+            // path read as "no server". This mirrors the ztmux extension key
+            // bindings, so `:name`, a bound key, and `ztmux name` all behave the
+            // same. (display-popup does not format-expand its command, so a
+            // `#{socket_path}` cannot be used here.)
+            let expanded = format!(
+                "display-popup -E -w 90% -h 90% 'ztmux -S \"${{TMUX%%,*}}\" {name_str}'\0"
+            );
             return xstrdup(expanded.as_bytes().as_ptr()).as_ptr();
         }
 
