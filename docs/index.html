@@ -88,7 +88,7 @@
     <div class="hub-cards">
       <a class="hub-card" href="report.html#"><h3>Structured output</h3><p><code>list-* -o json|jsonl|csv|tsv|table</code> &mdash; typed, machine-readable output for every list command, from the same <code>#{&hellip;}</code> format engine.</p></a>
       <a class="hub-card" href="report.html#"><h3>ztmux dashboard</h3><p>A ratatui TUI: the live session&rarr;window&rarr;pane tree, per-pane detail, server stats + sparkline, kill-with-confirm.</p></a>
-      <a class="hub-card" href="report.html#"><h3>ztmux switch</h3><p>A fuzzy picker over every session, window, and pane &mdash; type to filter, Enter to jump.</p></a>
+      <a class="hub-card" href="report.html#"><h3>ztmux switcher</h3><p>A fuzzy picker over every session, window, and pane &mdash; type to filter, Enter to jump.</p></a>
     </div>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>CLIENT EXTENSIONS</h2>
@@ -131,7 +131,7 @@
         <tr><td><code>ztmux env</code></td><td>Per-session environment overrides.</td></tr>
         <tr><td><code>ztmux events</code></td><td>Stream server lifecycle events as JSONL.</td></tr>
         <tr><td><code>ztmux fanout</code></td><td>Sessions ranked by total pane count.</td></tr>
-        <tr><td><code>ztmux find</code></td><td>Search panes by command/path/title/window.</td></tr>
+        <tr><td><code>ztmux finder</code></td><td>Search panes by command/path/title/window.</td></tr>
         <tr><td><code>ztmux focus</code></td><td>The active pane of every window.</td></tr>
         <tr><td><code>ztmux git</code></td><td>Git branch + dirty state of every pane's repo.</td></tr>
         <tr><td><code>ztmux gone</code></td><td>Panes whose working directory no longer exists.</td></tr>
@@ -148,7 +148,7 @@
         <tr><td><code>ztmux layouts</code></td><td>The current layout string of every window.</td></tr>
         <tr><td><code>ztmux limit</code></td><td>Each session's scrollback capacity, largest first.</td></tr>
         <tr><td><code>ztmux linked</code></td><td>Windows linked into more than one session.</td></tr>
-        <tr><td><code>ztmux lock</code></td><td>Sessions set to lock themselves after idle time.</td></tr>
+        <tr><td><code>ztmux autolock</code></td><td>Sessions set to lock themselves after idle time.</td></tr>
         <tr><td><code>ztmux marks</code></td><td>The marked pane(s).</td></tr>
         <tr><td><code>ztmux mem</code></td><td>Panes ranked by process resident memory.</td></tr>
         <tr><td><code>ztmux mode</code></td><td>Panes currently frozen in a mode.</td></tr>
@@ -172,7 +172,7 @@
         <tr><td><code>ztmux snapshot</code></td><td>Dump the whole server as one nested JSON document.</td></tr>
         <tr><td><code>ztmux solo</code></td><td>Windows holding a single, unsplit pane.</td></tr>
         <tr><td><code>ztmux ssh</code></td><td>Which panes hold an SSH connection, and where.</td></tr>
-        <tr><td><code>ztmux start</code></td><td>The command line each pane was launched with.</td></tr>
+        <tr><td><code>ztmux startcmd</code></td><td>The command line each pane was launched with.</td></tr>
         <tr><td><code>ztmux stash</code></td><td>Repositories with stashed work behind a pane.</td></tr>
         <tr><td><code>ztmux state</code></td><td>Panes whose process is in an abnormal state.</td></tr>
         <tr><td><code>ztmux stats</code></td><td>One-shot server summary report.</td></tr>
@@ -204,11 +204,12 @@
       <thead><tr><th>Command</th><th>Does</th></tr></thead>
       <tbody>
         <tr><td><code>ztmux bcast</code></td><td>Broadcast a command to many panes at once.</td></tr>
-        <tr><td><code>ztmux clear</code></td><td>Free the scrollback of every pane.</td></tr>
+        <tr><td><code>ztmux clearall</code></td><td>Free the scrollback of every pane.</td></tr>
         <tr><td><code>ztmux equalize</code></td><td>Re-balance every multi-pane window's layout.</td></tr>
         <tr><td><code>ztmux layout</code></td><td>Apply a named layout preset to a window.</td></tr>
+        <tr><td><code>ztmux pick</code></td><td>Batch ops over the multi-pane mark set (sync/unmark/clear/list).</td></tr>
         <tr><td><code>ztmux prune</code></td><td>Remove dead/empty/idle server objects.</td></tr>
-        <tr><td><code>ztmux respawn</code></td><td>Revive every dead pane in place.</td></tr>
+        <tr><td><code>ztmux revive</code></td><td>Revive every dead pane in place.</td></tr>
         <tr><td><code>ztmux retitle</code></td><td>Label every pane with its running command.</td></tr>
         <tr><td><code>ztmux triggers</code></td><td>Run a ztmux command when a regex matches a pane's output (arm/disarm/list/test).</td></tr>
       </tbody>
@@ -230,7 +231,7 @@
         <tr><td><code>ztmux new-session -s work</code></td><td>Start a session &mdash; identical to tmux.</td></tr>
         <tr><td><code>ztmux list-panes -a -o table</code></td><td>Every pane as an aligned table (swap <code>-o json</code> for scripts).</td></tr>
         <tr><td><code>ztmux dashboard</code></td><td>Open the live server dashboard.</td></tr>
-        <tr><td><code>ztmux switch</code></td><td>Fuzzy-jump to any session/window/pane.</td></tr>
+        <tr><td><code>ztmux switcher</code></td><td>Fuzzy-jump to any session/window/pane.</td></tr>
       </tbody>
     </table>
 

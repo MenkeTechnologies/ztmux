@@ -29,7 +29,7 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR socket-name ]
 .RB [ \-S
 .IR socket-path ]
-.B switch
+.B switcher
 .br
 .B ztmux
 .RB [ \-L
@@ -135,7 +135,7 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR socket-name ]
 .RB [ \-S
 .IR socket-path ]
-.B find
+.B finder
 .I query
 .RB [ \-o
 .IR json ]
@@ -382,7 +382,7 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR socket-name ]
 .RB [ \-S
 .IR socket-path ]
-.B respawn
+.B revive
 .RB [ \-s
 .IR session ]
 .RB [ \-f ]
@@ -392,7 +392,7 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR socket-name ]
 .RB [ \-S
 .IR socket-path ]
-.B clear
+.B clearall
 .RB [ \-s
 .IR session ]
 .RB [ \-f ]
@@ -718,7 +718,7 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR socket-name ]
 .RB [ \-S
 .IR socket-path ]
-.B start
+.B startcmd
 .RB [ \-o
 .IR json ]
 .br
@@ -739,6 +739,14 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .B sync
 .RB [ \-o
 .IR json ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
+.B pick
+.RB [ sync | unmark | clear | list ]
 .br
 .B ztmux
 .RB [ \-L
@@ -898,7 +906,7 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR socket-name ]
 .RB [ \-S
 .IR socket-path ]
-.B lock
+.B autolock
 .RB [ \-o
 .IR json ]
 .br
@@ -1164,8 +1172,8 @@ the cursor.
 It is a client subcommand that reads the server through the structured output
 above and targets the socket selected by
 .BR \-L / \-S .
-.SS ztmux switch
-.B ztmux switch
+.SS ztmux switcher
+.B ztmux switcher
 opens an interactive fuzzy picker over every session, window, and pane. Type
 to filter (case-insensitive subsequence match); the selection is applied with
 .BR switch-client ", " select-window ,
@@ -1342,8 +1350,8 @@ lists the presets. It is
 or
 .B \-\-apply
 to run them.
-.SS ztmux find
-.B ztmux find
+.SS ztmux finder
+.B ztmux finder
 .I query
 searches every pane in the server and prints the ones whose command, current
 path, title, or enclosing window name contains
@@ -1382,7 +1390,7 @@ captures every pane and prints the lines whose contents contain
 (a case-insensitive substring), one
 .RI ( location : line : " text)"
 per match. Where
-.B find
+.B finder
 matches pane metadata,
 .B grep
 matches what is actually on the screen. By default only the visible screen is
@@ -1478,7 +1486,7 @@ prints only the groups with two or more members \(em the redundant panes you can
 close. Where
 .B prune
 reclaims dead or empty objects and
-.B find
+.B finder
 searches metadata for a query,
 .B dedup
 computes the duplicate relation the others do not. Each group is given a stable
@@ -1672,8 +1680,8 @@ applies a preset to one window, this sweeps them all. Like
 .BR prune ,
 it is dry-run by default and only applies with
 .BR \-f / \-\-force .
-.SS ztmux respawn
-.B ztmux respawn
+.SS ztmux revive
+.B ztmux revive
 restarts every dead pane in place (running
 .B respawn\-pane
 on each), across the whole server or one session with
@@ -1681,13 +1689,13 @@ on each), across the whole server or one session with
 Where
 .B prune
 removes dead panes,
-.B respawn
+.B revive
 revives them. Like
 .BR prune ,
 it is dry-run by default and only acts with
 .BR \-f / \-\-force .
-.SS ztmux clear
-.B ztmux clear
+.SS ztmux clearall
+.B ztmux clearall
 runs
 .B clear\-history
 on every pane that holds scrollback, across the whole server or one session with
@@ -1780,7 +1788,7 @@ reports every dead pane \(en a pane whose process exited while
 kept it in place. Where
 .B ztmux prune
 reclaims dead panes and
-.B ztmux respawn
+.B ztmux revive
 revives them (both mutating),
 .B dead
 only lists them: the read-only inventory to look at before pruning or
@@ -2343,8 +2351,8 @@ to know who is on it. Ordered most-common first. With
 (or
 .BR \-\-json )
 it emits the same rows as a machine-readable array.
-.SS ztmux start
-.B ztmux start
+.SS ztmux startcmd
+.B ztmux startcmd
 reports the full command line each pane's root process was launched with \(en
 its
 .BR pane_pid \(en
@@ -2397,6 +2405,22 @@ omitted. With
 (or
 .BR \-\-json )
 it emits the same rows as a machine-readable array.
+.SS ztmux pick
+.B ztmux pick
+runs batch operations over a multi-pane mark set. Panes are marked with
+.B prefix+C\-s
+or the pane border menu, building up a set you can then act on all at once. The
+subcommand selects the operation:
+.B sync
+turns on per-pane
+.B synchronize\-panes
+for the marked panes,
+.B unmark
+drops the marks,
+.B clear
+unmarks and unsyncs everything, and
+.B list
+(the default) prints the marked set.
 .SS ztmux piped
 .B ztmux piped
 lists the panes with an active
@@ -2459,7 +2483,7 @@ always,
 only on a non-zero exit). Where
 .B ztmux dead
 lists the panes that have already died and
-.B ztmux respawn
+.B ztmux revive
 revives them,
 .B remain
 shows which windows are configured to hold their dead panes in the first place.
@@ -2695,15 +2719,15 @@ are omitted. With
 (or
 .BR \-\-json )
 it emits the same rows as a machine-readable array.
-.SS ztmux lock
-.B ztmux lock
+.SS ztmux autolock
+.B ztmux autolock
 reports the sessions with
 .B lock-after-time
 set \(en which lock their screen (running
 .BR lock-command )
 after that many seconds with no input, a small security measure for a session
 left on a shared or unattended machine. It is off by default and easy to forget.
-.B lock
+.B autolock
 lists the armed sessions and after how long, soonest-locking first. Sessions with
 no lock timeout are omitted. With
 .B \-o
