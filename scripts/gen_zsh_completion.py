@@ -25,7 +25,7 @@ OUT = "completions/_ztmux"
 # base's helper functions, which are renamed __tmux-* -> __ztmux-* below.
 EXTENSIONS = [
     ("dashboard", [], "live ratatui server dashboard (ztmux extension)"),
-    ("switch", [], "interactive session/window/pane picker (ztmux extension)"),
+    ("switcher", [], "interactive session/window/pane picker (ztmux extension)"),
     ("tree", [], "print the session/window/pane tree (ztmux extension)"),
     (
         "doctor",
@@ -50,7 +50,7 @@ EXTENSIONS = [
     ),
     (
         "triggers",
-        [":subcommand:(list arm disarm test)"],
+        [":subcommand:(list arm disarm add wizard test)"],
         "run a ztmux command when a regex matches pane output (ztmux extension)",
     ),
     (
@@ -83,7 +83,7 @@ EXTENSIONS = [
         "apply a named layout preset to a window (ztmux extension)",
     ),
     (
-        "find",
+        "finder",
         [
             ":query:",
             "-o[output format]:format:(json)",
@@ -244,7 +244,7 @@ EXTENSIONS = [
         "re-balance every multi-pane window's layout (ztmux extension)",
     ),
     (
-        "respawn",
+        "revive",
         [
             "-s[only dead panes in SESSION]:session:__ztmux-sessions",
             "-f[respawn (default: dry-run)]",
@@ -253,7 +253,7 @@ EXTENSIONS = [
         "revive every dead pane in place (ztmux extension)",
     ),
     (
-        "clear",
+        "clearall",
         [
             "-s[only panes in SESSION]:session:__ztmux-sessions",
             "-f[clear (default: dry-run)]",
@@ -441,7 +441,7 @@ EXTENSIONS = [
         "histogram of attached client terminal types (ztmux extension)",
     ),
     (
-        "start",
+        "startcmd",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "the command line each pane was launched with (ztmux extension)",
     ),
@@ -541,7 +541,7 @@ EXTENSIONS = [
         "windows that draw a status line on their pane borders (ztmux extension)",
     ),
     (
-        "lock",
+        "autolock",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "sessions set to lock themselves after idle time (ztmux extension)",
     ),
@@ -554,6 +554,31 @@ EXTENSIONS = [
         "visual",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "sessions that show alerts visually instead of just beeping (ztmux extension)",
+    ),
+    (
+        "pick",
+        [":subcommand:(sync unmark clear list)"],
+        "batch sync/unmark/clear over the multi-pane mark set (ztmux extension)",
+    ),
+    (
+        "control",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "clients attached in control mode (-CC) (ztmux extension)",
+    ),
+    (
+        "keytable",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "clients parked on a non-root key table (ztmux extension)",
+    ),
+    (
+        "mouse",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "which sessions have mouse mode enabled (ztmux extension)",
+    ),
+    (
+        "utf8",
+        ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
+        "the UTF-8 state of every attached client (ztmux extension)",
     ),
 ]
 

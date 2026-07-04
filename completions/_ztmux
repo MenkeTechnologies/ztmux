@@ -1830,7 +1830,7 @@ _ztmux-dashboard() {
   [[ -n ${tmux_describe} ]] && print "live ratatui server dashboard (ztmux extension)" && return
 }
 
-_ztmux-switch() {
+_ztmux-switcher() {
   [[ -n ${tmux_describe} ]] && print "interactive session/window/pane picker (ztmux extension)" && return
 }
 
@@ -1872,7 +1872,7 @@ _ztmux-events() {
 _ztmux-triggers() {
   [[ -n ${tmux_describe} ]] && print "run a ztmux command when a regex matches pane output (ztmux extension)" && return
   _arguments -s \
-    ':subcommand:(list arm disarm test)'
+    ':subcommand:(list arm disarm add wizard test)'
 }
 
 _ztmux-ps() {
@@ -1907,7 +1907,7 @@ _ztmux-layout() {
     '--apply[apply (default: dry-run)]'
 }
 
-_ztmux-find() {
+_ztmux-finder() {
   [[ -n ${tmux_describe} ]] && print "search panes by command/path/title/window (ztmux extension)" && return
   _arguments -s \
     ':query:' \
@@ -2102,7 +2102,7 @@ _ztmux-equalize() {
     '--force[apply (default: dry-run)]'
 }
 
-_ztmux-respawn() {
+_ztmux-revive() {
   [[ -n ${tmux_describe} ]] && print "revive every dead pane in place (ztmux extension)" && return
   _arguments -s \
     '-s[only dead panes in SESSION]:session:__ztmux-sessions' \
@@ -2110,7 +2110,7 @@ _ztmux-respawn() {
     '--force[respawn (default: dry-run)]'
 }
 
-_ztmux-clear() {
+_ztmux-clearall() {
   [[ -n ${tmux_describe} ]] && print "free the scrollback of every pane (ztmux extension)" && return
   _arguments -s \
     '-s[only panes in SESSION]:session:__ztmux-sessions' \
@@ -2364,7 +2364,7 @@ _ztmux-term() {
     '--json[machine-readable JSON output]'
 }
 
-_ztmux-start() {
+_ztmux-startcmd() {
   [[ -n ${tmux_describe} ]] && print "the command line each pane was launched with (ztmux extension)" && return
   _arguments -s \
     '-o[output format]:format:(json)' \
@@ -2504,7 +2504,7 @@ _ztmux-borders() {
     '--json[machine-readable JSON output]'
 }
 
-_ztmux-lock() {
+_ztmux-autolock() {
   [[ -n ${tmux_describe} ]] && print "sessions set to lock themselves after idle time (ztmux extension)" && return
   _arguments -s \
     '-o[output format]:format:(json)' \
@@ -2520,6 +2520,40 @@ _ztmux-titlebar() {
 
 _ztmux-visual() {
   [[ -n ${tmux_describe} ]] && print "sessions that show alerts visually instead of just beeping (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-pick() {
+  [[ -n ${tmux_describe} ]] && print "batch sync/unmark/clear over the multi-pane mark set (ztmux extension)" && return
+  _arguments -s \
+    ':subcommand:(sync unmark clear list)'
+}
+
+_ztmux-control() {
+  [[ -n ${tmux_describe} ]] && print "clients attached in control mode (-CC) (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-keytable() {
+  [[ -n ${tmux_describe} ]] && print "clients parked on a non-root key table (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-mouse() {
+  [[ -n ${tmux_describe} ]] && print "which sessions have mouse mode enabled (ztmux extension)" && return
+  _arguments -s \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
+_ztmux-utf8() {
+  [[ -n ${tmux_describe} ]] && print "the UTF-8 state of every attached client (ztmux extension)" && return
   _arguments -s \
     '-o[output format]:format:(json)' \
     '--json[machine-readable JSON output]'

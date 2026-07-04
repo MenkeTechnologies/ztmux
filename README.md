@@ -219,12 +219,21 @@ They fall into a few families:
   `net`, `ports`), clients (`who`, `readonly`, `idle`, `viewers`, `connected`, `constrain`,
   `keytable`, `control`, `utf8`), and configuration (`hooks`, `keys`, `monitor`, `remain`,
   `sync`, `limit`, `visual`, `mouse`, …).
-- **Live TUIs** — `dashboard` (full-screen server monitor), `switch` (fuzzy session/window/
+- **Live TUIs** — `dashboard` (full-screen server monitor), `switcher` (fuzzy session/window/
   pane picker), `watch` (top-like per-pane process monitor).
-- **Actions** — `prune`, `equalize`, `respawn`, `clear`, `retitle`, `bcast`, `layout`.
+- **Actions** — `prune`, `equalize`, `revive`, `clearall`, `retitle`, `bcast`, `layout`, and
+  `pick` (batch sync/unmark/clear over a multi-pane mark set).
 - **Automation** — `triggers` runs any ztmux command when a regex matches a pane's output
   (rules in `~/.ztmux/triggers.json`, armed with `ztmux triggers arm`), reviving tmux's removed
-  `monitor-content` as a general sense→act loop.
+  `monitor-content` as a general sense→act loop. Add rules without touching the JSON via the
+  inline wizard: `ztmux triggers wizard` (or `ztmux triggers add <name> <pane> <match> <action>`).
+- **Ratatui UI** (opt-in, `ZTMUX_RATATUI=1`) — original interactive surfaces rendered with
+  ratatui rather than tmux's server draw: a which-key **hint bar** on the prefix, a floating
+  **command palette** with inline Tab/arrow completion, ratatui **clock** and **display-panes**,
+  **edit-scrollback-in-`$EDITOR`** (`prefix e`), and **multi-pane selective sync** — mark panes
+  (`prefix C-s`), sync the set (`prefix M`), with rounded frames marking synced (red), selected
+  (orange) and trigger-armed (cyan) panes. The whole surface is gated behind the flag, so the
+  default path and the byte-for-byte parity suite are untouched.
 
 Run `ztmux --help` for the current list, or `man ztmux` for the full reference — each
 extension has its own entry under the EXTENSIONS section, and the zsh completion
