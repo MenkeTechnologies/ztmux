@@ -88,6 +88,14 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR socket-name ]
 .RB [ \-S
 .IR socket-path ]
+.B triggers
+.RB [ list | arm | disarm | test ]
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
 .B ps
 .RB [ \-o
 .IR json ]
@@ -1238,6 +1246,42 @@ sets the poll interval (default 500) and
 .B \-\-count
 .I N
 exits after N events. It runs until interrupted otherwise.
+.SS ztmux triggers
+.B ztmux triggers
+runs a ztmux command when a regular expression matches a pane's output \(en
+reviving and generalising tmux's removed
+.B monitor-content
+from "raise an alert" to "run any command". Rules live in
+.I ~/.ztmux/triggers.json
+as an array of
+.RB { name , match , action }
+objects, each optionally scoped to a pane glob
+.RB ( pane ,
+default
+.BR * ),
+case-folded
+.RB ( ignore_case ),
+and rate-limited
+.RB ( debounce_ms ,
+default 3000). The
+.B match
+value is a POSIX extended regular expression tested against each
+(escape-stripped) output line; the
+.B action
+is any ztmux command (for example
+.BR "split-window -h 'less +F ~/.ztmux/triggers.log'" ).
+.B ztmux triggers arm
+pipes every in-scope pane's output (via
+.BR pipe-pane )
+into a per-pane matcher, so sensing is real-time and poll-free;
+.B ztmux triggers disarm
+stops it. Fires are logged to
+.IR ~/.ztmux/triggers.log .
+.B ztmux triggers list
+prints the parsed rules and
+.B ztmux triggers test
+.I text
+reports which rules match a line without running anything.
 .SS ztmux ps
 .B ztmux ps
 prints a one-shot, pipeable table of every pane's process \(en pane id,

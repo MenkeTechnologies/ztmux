@@ -49,6 +49,11 @@ EXTENSIONS = [
         "stream server lifecycle events as JSONL (ztmux extension)",
     ),
     (
+        "triggers",
+        [":subcommand:(list arm disarm test)"],
+        "run a ztmux command when a regex matches pane output (ztmux extension)",
+    ),
+    (
         "ps",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "one-shot pipeable per-pane process table (ztmux extension)",

@@ -222,6 +222,9 @@ They fall into a few families:
 - **Live TUIs** — `dashboard` (full-screen server monitor), `switch` (fuzzy session/window/
   pane picker), `watch` (top-like per-pane process monitor).
 - **Actions** — `prune`, `equalize`, `respawn`, `clear`, `retitle`, `bcast`, `layout`.
+- **Automation** — `triggers` runs any ztmux command when a regex matches a pane's output
+  (rules in `~/.ztmux/triggers.json`, armed with `ztmux triggers arm`), reviving tmux's removed
+  `monitor-content` as a general sense→act loop.
 
 Run `ztmux --help` for the current list, or `man ztmux` for the full reference — each
 extension has its own entry under the EXTENSIONS section, and the zsh completion

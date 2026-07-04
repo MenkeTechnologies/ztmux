@@ -1869,6 +1869,12 @@ _ztmux-events() {
     '--count[exit after N events]:count'
 }
 
+_ztmux-triggers() {
+  [[ -n ${tmux_describe} ]] && print "run a ztmux command when a regex matches pane output (ztmux extension)" && return
+  _arguments -s \
+    ':subcommand:(list arm disarm test)'
+}
+
 _ztmux-ps() {
   [[ -n ${tmux_describe} ]] && print "one-shot pipeable per-pane process table (ztmux extension)" && return
   _arguments -s \
@@ -2514,34 +2520,6 @@ _ztmux-titlebar() {
 
 _ztmux-visual() {
   [[ -n ${tmux_describe} ]] && print "sessions that show alerts visually instead of just beeping (ztmux extension)" && return
-  _arguments -s \
-    '-o[output format]:format:(json)' \
-    '--json[machine-readable JSON output]'
-}
-
-_ztmux-keytable() {
-  [[ -n ${tmux_describe} ]] && print "clients parked on a non-root key table (ztmux extension)" && return
-  _arguments -s \
-    '-o[output format]:format:(json)' \
-    '--json[machine-readable JSON output]'
-}
-
-_ztmux-control() {
-  [[ -n ${tmux_describe} ]] && print "clients attached in control mode (-CC) (ztmux extension)" && return
-  _arguments -s \
-    '-o[output format]:format:(json)' \
-    '--json[machine-readable JSON output]'
-}
-
-_ztmux-utf8() {
-  [[ -n ${tmux_describe} ]] && print "the UTF-8 state of every attached client (ztmux extension)" && return
-  _arguments -s \
-    '-o[output format]:format:(json)' \
-    '--json[machine-readable JSON output]'
-}
-
-_ztmux-mouse() {
-  [[ -n ${tmux_describe} ]] && print "which sessions have mouse mode enabled (ztmux extension)" && return
   _arguments -s \
     '-o[output format]:format:(json)' \
     '--json[machine-readable JSON output]'
