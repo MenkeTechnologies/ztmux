@@ -123,10 +123,7 @@ mod tests {
 
     #[test]
     fn both_states_are_listed_sorted() {
-        let lines = vec![
-            "b\u{1f}0".to_string(),
-            "a\u{1f}1".to_string(),
-        ];
+        let lines = vec!["b\u{1f}0".to_string(), "a\u{1f}1".to_string()];
         let rows = build_rows(&lines);
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].session, "a");

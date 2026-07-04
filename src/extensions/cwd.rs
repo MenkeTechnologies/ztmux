@@ -58,10 +58,10 @@ fn abbreviate(path: &str, home: Option<&str>) -> String {
         if path == h {
             return "~".to_string();
         }
-        if let Some(rest) = path.strip_prefix(h) {
-            if rest.starts_with('/') {
-                return format!("~{rest}");
-            }
+        if let Some(rest) = path.strip_prefix(h)
+            && rest.starts_with('/')
+        {
+            return format!("~{rest}");
         }
     }
     path.to_string()

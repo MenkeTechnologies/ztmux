@@ -17,8 +17,7 @@ use std::io::IsTerminal;
 use super::tmux_query::query_lines;
 
 /// The `\x1f`-delimited per-client format the fields are read through.
-const FORMAT: &str =
-    "#{client_name}\u{1f}#{client_session}\u{1f}#{client_tty}\u{1f}#{client_utf8}";
+const FORMAT: &str = "#{client_name}\u{1f}#{client_session}\u{1f}#{client_tty}\u{1f}#{client_utf8}";
 
 /// One output row: a client and whether tmux treats it as UTF-8.
 struct Row {
@@ -88,7 +87,10 @@ fn render_text(rows: &[Row], color: bool) -> String {
     out.push_str(&format!(
         "{}\n",
         paint(
-            &format!("{:<12} {:<12} {:<14} {}", "CLIENT", "SESSION", "TTY", "UTF8"),
+            &format!(
+                "{:<12} {:<12} {:<14} {}",
+                "CLIENT", "SESSION", "TTY", "UTF8"
+            ),
             "1"
         )
     ));

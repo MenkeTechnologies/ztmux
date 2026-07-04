@@ -86,7 +86,7 @@ fn resolve_all(panes: &[Pane]) -> HashMap<String, Option<VcsInfo>> {
 
 /// Walk up from `start` to the nearest VCS marker, against the real filesystem.
 fn detect(start: &str) -> Option<VcsInfo> {
-    detect_with(start, |p| p.exists())
+    detect_with(start, std::path::Path::exists)
 }
 
 /// The marker walk, parameterised over an existence check so it is testable
@@ -198,7 +198,10 @@ mod tests {
     use std::collections::HashSet;
 
     fn fake_fs(present: &[&str]) -> impl Fn(&Path) -> bool {
-        let set: HashSet<String> = present.iter().map(|s| s.to_string()).collect();
+        let set: HashSet<String> = present
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
         move |p: &Path| set.contains(p.to_string_lossy().as_ref())
     }
 

@@ -200,6 +200,7 @@ mod tests {
         }
     }
 
+    #[expect(clippy::type_complexity)]
     fn info(
         pairs: &[(&str, Option<(&str, &str, &str, &str)>)],
     ) -> HashMap<String, Option<DiskInfo>> {

@@ -97,7 +97,7 @@ fn resolve_all(panes: &[Pane]) -> HashMap<String, Option<ProjectInfo>> {
 /// Walk up from `start` to the nearest directory holding a project marker,
 /// against the real filesystem.
 fn detect(start: &str) -> Option<ProjectInfo> {
-    detect_with(start, |p| p.exists())
+    detect_with(start, std::path::Path::exists)
 }
 
 /// The marker walk, parameterised over an existence check so it is testable
@@ -211,7 +211,10 @@ mod tests {
 
     /// Build an existence predicate over a fixed set of paths.
     fn fake_fs(present: &[&str]) -> impl Fn(&Path) -> bool {
-        let set: HashSet<String> = present.iter().map(|s| s.to_string()).collect();
+        let set: HashSet<String> = present
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
         move |p: &Path| set.contains(p.to_string_lossy().as_ref())
     }
 

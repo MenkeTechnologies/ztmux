@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn blank_sessions_are_skipped() {
-        let lines = vec!["".to_string(), "a".to_string()];
+        let lines = vec![String::new(), "a".to_string()];
         let rows = build_rows(&lines);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].session, "a");

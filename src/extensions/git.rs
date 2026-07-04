@@ -190,6 +190,7 @@ mod tests {
         }
     }
 
+    #[expect(clippy::type_complexity)]
     fn info(pairs: &[(&str, Option<(&str, &str, bool)>)]) -> HashMap<String, Option<GitInfo>> {
         pairs
             .iter()

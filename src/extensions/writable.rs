@@ -65,9 +65,7 @@ fn access(path: &str) -> Access {
     if !Path::new(path).exists() {
         return Access::Missing;
     }
-    let ok = CString::new(path)
-        .map(|c| unsafe { libc::access(c.as_ptr(), libc::W_OK) == 0 })
-        .unwrap_or(false);
+    let ok = CString::new(path).is_ok_and(|c| unsafe { libc::access(c.as_ptr(), libc::W_OK) == 0 });
     if ok {
         Access::Writable
     } else {

@@ -180,6 +180,7 @@ pub const OPTIONS_TABLE_STATUS_FORMAT2: *const u8 = concat!(
 .as_ptr()
 .cast();
 
+#[expect(clippy::disallowed_methods)]
 pub const OPTIONS_TABLE_STATUS_FORMAT3: *const u8 = concat!(
     "#[align=left]#{R: ,#{n:#{session_name}}}S: ",
     "#[norange default]",

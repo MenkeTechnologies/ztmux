@@ -28,6 +28,7 @@ pub(crate) mod dedup;
 pub(crate) mod density;
 pub(crate) mod destroy;
 pub(crate) mod detached;
+pub(crate) mod diagnostics;
 pub(crate) mod disk;
 pub(crate) mod doctor;
 pub(crate) mod elapsed;

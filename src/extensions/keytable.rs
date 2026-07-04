@@ -87,7 +87,10 @@ fn render_text(rows: &[Row], color: bool) -> String {
     out.push_str(&format!(
         "{}\n",
         paint(
-            &format!("{:<12} {:<12} {:<14} {}", "CLIENT", "SESSION", "TTY", "TABLE"),
+            &format!(
+                "{:<12} {:<12} {:<14} {}",
+                "CLIENT", "SESSION", "TTY", "TABLE"
+            ),
             "1"
         )
     ));

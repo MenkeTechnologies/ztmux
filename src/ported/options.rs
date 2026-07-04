@@ -248,6 +248,13 @@ pub unsafe fn options_next(o: *mut options_entry) -> *mut options_entry {
 /// C `vendor/tmux/options.c:216`: `struct options_entry *options_get_only(struct options *oo, const char *name)`
 pub unsafe fn options_get_only(oo: *mut options, name: &str) -> *mut options_entry {
     unsafe {
+        // A lookup in a not-yet-created option set is simply "not found". This
+        // guards the startup/option-default ordering where a COMMAND option's
+        // default value is parsed (cmd_parse -> cmd_get_alias -> options_get_only
+        // on GLOBAL_OPTIONS) before GLOBAL_OPTIONS has been published.
+        if oo.is_null() {
+            return null_mut();
+        }
         let name = std::mem::transmute::<&str, &'static str>(name);
         let mut o = options_entry {
             name: Cow::Borrowed(name),
@@ -1391,22 +1398,22 @@ pub unsafe fn options_from_string(
                     return Err(err);
                 }
                 free_(old);
-                return Ok(());
+                Ok(())
             }
 
             options_table_type::OPTIONS_TABLE_NUMBER => {
                 match strtonum(value, (*oe).minimum as i64, (*oe).maximum as i64) {
                     Ok(number) => {
                         options_set_number(oo, name, number);
-                        return Ok(());
+                        Ok(())
                     }
                     Err(errstr) => {
-                        return Err(CString::new(format!(
+                        Err(CString::new(format!(
                             "value is {}: {}",
                             _s(errstr.as_ptr()),
                             _s(value)
                         ))
-                        .unwrap());
+                        .unwrap())
                     }
                 }
             }
@@ -1417,7 +1424,7 @@ pub unsafe fn options_from_string(
                     return Err(CString::new(format!("bad key: {}", _s(value))).unwrap());
                 }
                 options_set_number(oo, name, key as i64);
-                return Ok(());
+                Ok(())
             }
 
             options_table_type::OPTIONS_TABLE_COLOUR => {
@@ -1426,15 +1433,15 @@ pub unsafe fn options_from_string(
                     return Err(CString::new(format!("bad colour: {}", _s(value))).unwrap());
                 }
                 options_set_number(oo, name, number);
-                return Ok(());
+                Ok(())
             }
 
             options_table_type::OPTIONS_TABLE_FLAG => {
-                return options_from_string_flag(oo, name, value);
+                options_from_string_flag(oo, name, value)
             }
 
             options_table_type::OPTIONS_TABLE_CHOICE => {
-                return options_from_string_choice(oe, oo, name, value);
+                options_from_string_choice(oe, oo, name, value)
             }
 
             options_table_type::OPTIONS_TABLE_COMMAND => {
@@ -1444,9 +1451,9 @@ pub unsafe fn options_from_string(
                 match cmd_parse_from_string(s, None) {
                     Ok(cmdlist) => {
                         options_set_command(oo, name, cmdlist);
-                        return Ok(());
+                        Ok(())
                     }
-                    Err(error) => return Err(CString::from_raw(error.cast())),
+                    Err(error) => Err(CString::from_raw(error.cast())),
                 }
             }
         }

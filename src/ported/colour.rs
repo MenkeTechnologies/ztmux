@@ -1354,10 +1354,10 @@ mod tests {
 
         // Theme colour: name -> index|COLOUR_FLAG_THEME -> name (C colour.c:424/234).
         assert_eq!(colour_fromstring("themered"), 6 | COLOUR_FLAG_THEME);
-        assert_eq!(colour_fromstring("themeblack"), 0 | COLOUR_FLAG_THEME);
+        assert_eq!(colour_fromstring("themeblack"), COLOUR_FLAG_THEME);
         assert_eq!(colour_fromstring("thememagenta"), 9 | COLOUR_FLAG_THEME);
         assert_eq!(colour_tostring(6 | COLOUR_FLAG_THEME).as_ref(), "themered");
-        assert_eq!(colour_tostring(0 | COLOUR_FLAG_THEME).as_ref(), "themeblack");
+        assert_eq!(colour_tostring(COLOUR_FLAG_THEME).as_ref(), "themeblack");
         // Case-insensitive parse, like the ANSI names.
         assert_eq!(colour_fromstring("ThemeCyan"), 8 | COLOUR_FLAG_THEME);
         // Not a theme colour: falls through unchanged.

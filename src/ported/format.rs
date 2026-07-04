@@ -673,7 +673,10 @@ pub unsafe fn format_cb_session_alerts(ft: *mut format_tree) -> format_table_typ
 pub unsafe fn format_cb_session_activity_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
-            for _wl in rb_foreach(&raw mut (*(*ft).s).windows).map(NonNull::as_ptr) {
+            // Mirrors vendor/tmux/format.c: RB_FOREACH here returns on its first
+            // iteration (checking ft->wl, not the loop element), so only the
+            // first winlink is inspected. `.next()` preserves that exactly.
+            if rb_foreach(&raw mut (*(*ft).s).windows).next().is_some() {
                 if (*(*ft).wl).flags.intersects(winlink_flags::WINLINK_ACTIVITY) {
                     return "1".into();
                 }
@@ -689,7 +692,12 @@ pub unsafe fn format_cb_session_activity_flag(ft: *mut format_tree) -> format_ta
 pub unsafe fn format_cb_session_bell_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
-            for wl in rb_foreach(&raw mut (*(*ft).s).windows).map(NonNull::as_ptr) {
+            // Mirrors vendor/tmux/format.c: only the first winlink is inspected
+            // (the C loop body returns unconditionally). `.next()` preserves it.
+            if let Some(wl) = rb_foreach(&raw mut (*(*ft).s).windows)
+                .map(NonNull::as_ptr)
+                .next()
+            {
                 if (*wl).flags.intersects(winlink_flags::WINLINK_BELL) {
                     return "1".into();
                 }
@@ -705,7 +713,10 @@ pub unsafe fn format_cb_session_bell_flag(ft: *mut format_tree) -> format_table_
 pub unsafe fn format_cb_session_silence_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
-            for _wl in rb_foreach(&raw mut (*(*ft).s).windows).map(NonNull::as_ptr) {
+            // Mirrors vendor/tmux/format.c: RB_FOREACH here returns on its first
+            // iteration (checking ft->wl, not the loop element). `.next()` keeps
+            // that behavior.
+            if rb_foreach(&raw mut (*(*ft).s).windows).next().is_some() {
                 if (*(*ft).wl).flags.intersects(winlink_flags::WINLINK_SILENCE) {
                     return "1".into();
                 }

@@ -75,10 +75,10 @@ fn origin_url(path: &str) -> Option<String> {
 fn short_remote(url: &str) -> String {
     let trimmed = url.trim();
     // scp-like SSH: git@host:owner/repo(.git)
-    if let Some(rest) = trimmed.strip_prefix("git@") {
-        if let Some((host, path)) = rest.split_once(':') {
-            return format!("{host}/{}", strip_git(path));
-        }
+    if let Some(rest) = trimmed.strip_prefix("git@")
+        && let Some((host, path)) = rest.split_once(':')
+    {
+        return format!("{host}/{}", strip_git(path));
     }
     // scheme://[user@]host[:port]/owner/repo(.git)
     for scheme in ["ssh://", "https://", "http://", "git://"] {

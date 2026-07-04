@@ -84,7 +84,10 @@ fn render_text(rows: &[Row], color: bool) -> String {
     let mut out = String::new();
     out.push_str(&format!(
         "{}\n",
-        paint(&format!("{:<12} {:<12} {}", "CLIENT", "SESSION", "TTY"), "1")
+        paint(
+            &format!("{:<12} {:<12} {}", "CLIENT", "SESSION", "TTY"),
+            "1"
+        )
     ));
     for r in rows {
         out.push_str(&format!("{:<12} {:<12} {}\n", r.client, r.session, r.tty));

@@ -42,7 +42,7 @@ pub(crate) fn run(socket: &str) -> i32 {
 fn table_of(line: &str) -> Option<String> {
     let toks: Vec<&str> = line.split_whitespace().collect();
     let i = toks.iter().position(|t| *t == "-T")?;
-    toks.get(i + 1).map(|t| t.to_string())
+    toks.get(i + 1).map(std::string::ToString::to_string)
 }
 
 /// Count bindings per table, busiest table first; ties break by table name.
