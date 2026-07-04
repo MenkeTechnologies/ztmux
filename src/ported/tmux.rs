@@ -658,6 +658,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"groups"
                     | b"tty"
                     | b"git"
+                    | b"pick"
                     | b"active"
                     | b"ssh"
                     | b"disk"
@@ -734,6 +735,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"control"
                     | b"utf8"
                     | b"mouse"
+                    | b"triggers"
             ) {
                 let sock = if SOCKET_PATH.is_null() {
                     String::new()
@@ -743,6 +745,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                 let code = match cmd {
                     b"switcher" => crate::extensions::switch::run(&sock),
                     b"tree" => crate::extensions::tree::run(&sock),
+                    b"triggers" => crate::extensions::triggers::run(&sock),
                     b"doctor" => crate::extensions::doctor::run(&sock),
                     b"stats" => crate::extensions::stats::run(&sock),
                     b"graph" => crate::extensions::graph::run(&sock),
@@ -766,6 +769,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"groups" => crate::extensions::groups::run(&sock),
                     b"tty" => crate::extensions::tty::run(&sock),
                     b"git" => crate::extensions::git::run(&sock),
+                    b"pick" => crate::extensions::pick::run(&sock),
                     b"active" => crate::extensions::active::run(&sock),
                     b"ssh" => crate::extensions::ssh::run(&sock),
                     b"disk" => crate::extensions::disk::run(&sock),

@@ -68,6 +68,7 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "nested",
     "net",
     "peek",
+    "pick",
     "piped",
     "ports",
     "project",
@@ -98,6 +99,7 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "titlebar",
     "titles",
     "tree",
+    "triggers",
     "tty",
     "usage",
     "user",
@@ -174,6 +176,7 @@ pub(crate) mod named;
 pub(crate) mod nested;
 pub(crate) mod net;
 pub(crate) mod peek;
+pub(crate) mod pick;
 pub(crate) mod piped;
 pub(crate) mod ports;
 pub(crate) mod procstat;
@@ -209,6 +212,7 @@ pub(crate) mod titlebar;
 pub(crate) mod titles;
 pub(crate) mod tmux_query;
 pub(crate) mod tree;
+pub(crate) mod triggers;
 pub(crate) mod tty;
 pub(crate) mod usage;
 pub(crate) mod user;
