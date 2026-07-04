@@ -633,7 +633,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
             if matches!(
                 cmd,
                 b"dashboard"
-                    | b"switch"
+                    | b"switcher"
                     | b"tree"
                     | b"doctor"
                     | b"stats"
@@ -644,7 +644,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"snapshot"
                     | b"prune"
                     | b"layout"
-                    | b"find"
+                    | b"finder"
                     | b"recent"
                     | b"usage"
                     | b"grep"
@@ -670,8 +670,8 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"alerts"
                     | b"titles"
                     | b"equalize"
-                    | b"respawn"
-                    | b"clear"
+                    | b"revive"
+                    | b"clearall"
                     | b"retitle"
                     | b"cwd"
                     | b"who"
@@ -707,7 +707,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"worktree"
                     | b"submodules"
                     | b"term"
-                    | b"start"
+                    | b"startcmd"
                     | b"writable"
                     | b"sync"
                     | b"piped"
@@ -727,7 +727,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"limit"
                     | b"winsize"
                     | b"borders"
-                    | b"lock"
+                    | b"autolock"
                     | b"titlebar"
                     | b"visual"
                     | b"keytable"
@@ -741,7 +741,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     CStr::from_ptr(SOCKET_PATH.cast()).to_string_lossy().into_owned()
                 };
                 let code = match cmd {
-                    b"switch" => crate::extensions::switch::run(&sock),
+                    b"switcher" => crate::extensions::switch::run(&sock),
                     b"tree" => crate::extensions::tree::run(&sock),
                     b"doctor" => crate::extensions::doctor::run(&sock),
                     b"stats" => crate::extensions::stats::run(&sock),
@@ -752,7 +752,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"snapshot" => crate::extensions::snapshot::run(&sock),
                     b"prune" => crate::extensions::prune::run(&sock),
                     b"layout" => crate::extensions::layout::run(&sock),
-                    b"find" => crate::extensions::find::run(&sock),
+                    b"finder" => crate::extensions::find::run(&sock),
                     b"recent" => crate::extensions::recent::run(&sock),
                     b"usage" => crate::extensions::usage::run(&sock),
                     b"grep" => crate::extensions::grep::run(&sock),
@@ -778,8 +778,8 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"alerts" => crate::extensions::alerts::run(&sock),
                     b"titles" => crate::extensions::titles::run(&sock),
                     b"equalize" => crate::extensions::equalize::run(&sock),
-                    b"respawn" => crate::extensions::respawn::run(&sock),
-                    b"clear" => crate::extensions::clear::run(&sock),
+                    b"revive" => crate::extensions::respawn::run(&sock),
+                    b"clearall" => crate::extensions::clear::run(&sock),
                     b"retitle" => crate::extensions::retitle::run(&sock),
                     b"cwd" => crate::extensions::cwd::run(&sock),
                     b"who" => crate::extensions::who::run(&sock),
@@ -815,7 +815,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"worktree" => crate::extensions::worktree::run(&sock),
                     b"submodules" => crate::extensions::submodules::run(&sock),
                     b"term" => crate::extensions::term::run(&sock),
-                    b"start" => crate::extensions::start::run(&sock),
+                    b"startcmd" => crate::extensions::start::run(&sock),
                     b"writable" => crate::extensions::writable::run(&sock),
                     b"sync" => crate::extensions::sync::run(&sock),
                     b"piped" => crate::extensions::piped::run(&sock),
@@ -835,7 +835,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"limit" => crate::extensions::limit::run(&sock),
                     b"winsize" => crate::extensions::winsize::run(&sock),
                     b"borders" => crate::extensions::borders::run(&sock),
-                    b"lock" => crate::extensions::lock::run(&sock),
+                    b"autolock" => crate::extensions::lock::run(&sock),
                     b"titlebar" => crate::extensions::titlebar::run(&sock),
                     b"visual" => crate::extensions::visual::run(&sock),
                     b"keytable" => crate::extensions::keytable::run(&sock),

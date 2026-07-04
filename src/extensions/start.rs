@@ -1,4 +1,4 @@
-//! `ztmux start` — the command line each pane's root process was launched with.
+//! `ztmux startcmd` — the command line each pane's root process was launched with.
 //!
 //! A pane's `pane_current_command` (what [`super::ps`] and most views show) is
 //! the *foreground* process name — `vim`, `zsh`. `start` shows something

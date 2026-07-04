@@ -1,4 +1,4 @@
-//! `ztmux clear` — free the scrollback buffer of every pane at once.
+//! `ztmux clearall` — free the scrollback buffer of every pane at once.
 //!
 //! The write-side companion to [`super::history`]: where `history` shows which
 //! panes are hoarding scrollback, `clear` runs `clear-history` on every pane

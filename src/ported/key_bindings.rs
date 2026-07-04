@@ -678,7 +678,7 @@ pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
     static ZTMUX_EXTENSION_BINDINGS: [&str; 7] = [
         "bind -N 'ztmux: live server dashboard' C-d { display-popup -E -w 90% -h 90% 'ztmux -S \"${TMUX%%,*}\" dashboard' }",
-        "bind -N 'ztmux: session/window/pane picker' S { display-popup -E -w 80% -h 70% 'ztmux -S \"${TMUX%%,*}\" switch' }",
+        "bind -N 'ztmux: session/window/pane picker' S { display-popup -E -w 80% -h 70% 'ztmux -S \"${TMUX%%,*}\" switcher' }",
         "bind -N 'ztmux: server tree' T { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" tree | less -R' }",
         "bind -N 'ztmux: environment/server health check' H { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" doctor | less -R' }",
         "bind -N 'ztmux: live process monitor' W { display-popup -E -w 90% -h 90% 'ztmux -S \"${TMUX%%,*}\" watch' }",

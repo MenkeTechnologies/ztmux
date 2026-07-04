@@ -525,25 +525,45 @@ pub unsafe fn cmd_get_source(cmd: *mut cmd, file: *mut *const u8, line: &AtomicU
 pub unsafe fn cmd_get_alias(name: *const u8) -> *mut u8 {
     unsafe {
         let o = options_get_only(GLOBAL_OPTIONS, "command-alias");
-        if o.is_null() {
-            return null_mut();
-        }
-        let wanted = strlen(name);
+        if !o.is_null() {
+            let wanted = strlen(name);
 
-        let mut a = options_array_first(o);
-        while !a.is_null() {
-            let ov = options_array_item_value(a);
+            let mut a = options_array_first(o);
+            while !a.is_null() {
+                let ov = options_array_item_value(a);
 
-            let equals = strchr((*ov).string, b'=' as i32);
-            if !equals.is_null() {
-                let n = equals.addr() - (*ov).string.addr();
-                if n == wanted && strncmp(name, (*ov).string, n) == 0 {
-                    return xstrdup(equals.add(1)).as_ptr();
+                let equals = strchr((*ov).string, b'=' as i32);
+                if !equals.is_null() {
+                    let n = equals.addr() - (*ov).string.addr();
+                    if n == wanted && strncmp(name, (*ov).string, n) == 0 {
+                        return xstrdup(equals.add(1)).as_ptr();
+                    }
                 }
-            }
 
-            a = options_array_next(a);
+                a = options_array_next(a);
+            }
         }
+
+        // ztmux: the original extensions (dashboard, switch, ...) are client
+        // subcommands, not server commands - so `: dashboard` / a key binding
+        // would otherwise be "unknown command". Make them invocable the same
+        // three ways as any tmux command by expanding an unknown extension name
+        // into a display-popup that launches `ztmux <name>` against THIS server's
+        // own socket. (Real commands and user aliases are matched first above.)
+        let name_str = cstr_to_str(name);
+        if crate::extensions::EXTENSION_COMMANDS.contains(&name_str) && cmd_find(name_str).is_err() {
+            let sock = if crate::SOCKET_PATH.is_null() {
+                String::new()
+            } else {
+                CStr::from_ptr(crate::SOCKET_PATH.cast())
+                    .to_string_lossy()
+                    .into_owned()
+            };
+            let expanded =
+                format!("display-popup -E -w 90% -h 90% 'ztmux -S \"{sock}\" {name_str}'\0");
+            return xstrdup(expanded.as_bytes().as_ptr()).as_ptr();
+        }
+
         null_mut()
     }
 }

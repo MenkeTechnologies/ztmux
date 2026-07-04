@@ -1,4 +1,4 @@
-//! `ztmux respawn` — bring every dead pane back to life in place.
+//! `ztmux revive` — bring every dead pane back to life in place.
 //!
 //! With `remain-on-exit` set, a pane whose command exits stays open but dead,
 //! showing its last output. Where [`super::prune`] *removes* those dead panes,

@@ -1,4 +1,4 @@
-//! `ztmux lock` — sessions set to lock themselves after idle time.
+//! `ztmux autolock` — sessions set to lock themselves after idle time.
 //!
 //! With `lock-after-time` set to N seconds, a session locks its screen (running
 //! `lock-command`) after that long with no input — a small security measure for

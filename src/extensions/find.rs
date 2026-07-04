@@ -1,4 +1,4 @@
-//! `ztmux find` — a one-shot, pipeable search across the whole server.
+//! `ztmux finder` — a one-shot, pipeable search across the whole server.
 //!
 //! The non-interactive complement to the [`super::switch`] picker: it scans
 //! every pane (via the `list-* -o json` query layer) and prints the panes whose

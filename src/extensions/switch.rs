@@ -1,4 +1,4 @@
-//! `ztmux switch` — an interactive fuzzy picker to jump to any session, window,
+//! `ztmux switcher` — an interactive fuzzy picker to jump to any session, window,
 //! or pane. Type to filter; Enter runs the matching `switch-client` /
 //! `select-window` / `select-pane` against the selected socket; Esc cancels.
 //!
