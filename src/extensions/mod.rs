@@ -74,6 +74,7 @@ pub(crate) mod project;
 pub(crate) mod prune;
 pub(crate) mod ps;
 pub(crate) mod pstree;
+pub(crate) mod ratatui_ui;
 pub(crate) mod readonly;
 pub(crate) mod recent;
 pub(crate) mod remain;

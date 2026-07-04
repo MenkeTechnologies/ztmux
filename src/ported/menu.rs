@@ -249,27 +249,36 @@ pub unsafe fn menu_draw_cb(c: *mut client, data: *mut c_void, _rctx: *mut screen
         screen_write_start(ctx, s);
         screen_write_clearscreen(ctx, 8);
 
-        if (*md).border_lines != box_lines::BOX_LINES_NONE {
-            screen_write_box(
-                ctx,
-                (*menu).width + 4,
-                (*menu).items.len() as u32 + 2,
-                (*md).border_lines,
-                &raw mut (*md).border_style,
-                Some(&(*menu).title),
-            );
-        }
+        // ztmux: opt-in ratatui renderer for the overlay menu. Draws the same
+        // md.s screen the tty_draw_line blit below composites, so it slots in
+        // transparently. Off by default (ZTMUX_RATATUI_MENU) to keep the
+        // byte-for-byte parity path untouched.
+        if crate::extensions::ratatui_ui::enabled() {
+            crate::extensions::ratatui_ui::draw(md, ctx);
+            screen_write_stop(ctx);
+        } else {
+            if (*md).border_lines != box_lines::BOX_LINES_NONE {
+                screen_write_box(
+                    ctx,
+                    (*menu).width + 4,
+                    (*menu).items.len() as u32 + 2,
+                    (*md).border_lines,
+                    &raw mut (*md).border_style,
+                    Some(&(*menu).title),
+                );
+            }
 
-        screen_write_menu(
-            ctx,
-            menu,
-            (*md).choice,
-            (*md).border_lines,
-            &raw mut (*md).style,
-            &raw mut (*md).border_style,
-            &raw mut (*md).selected_style,
-        );
-        screen_write_stop(ctx);
+            screen_write_menu(
+                ctx,
+                menu,
+                (*md).choice,
+                (*md).border_lines,
+                &raw mut (*md).style,
+                &raw mut (*md).border_style,
+                &raw mut (*md).selected_style,
+            );
+            screen_write_stop(ctx);
+        }
 
         for i in 0..screen_size_y(&raw mut (*md).s) {
             tty_draw_line(

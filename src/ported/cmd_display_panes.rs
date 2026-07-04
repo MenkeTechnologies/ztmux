@@ -240,9 +240,14 @@ unsafe fn cmd_display_panes_draw(c: *mut client, _data: *mut c_void, ctx: *mut s
             (*w).id
         );
 
+        let ratatui = crate::extensions::ratatui_ui::enabled();
         for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
             if window_pane_visible(wp) {
-                cmd_display_panes_draw_pane(ctx, wp);
+                if ratatui {
+                    crate::extensions::ratatui_ui::draw_pane_number(ctx, wp);
+                } else {
+                    cmd_display_panes_draw_pane(ctx, wp);
+                }
             }
         }
     }

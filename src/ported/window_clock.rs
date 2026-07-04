@@ -255,6 +255,12 @@ pub unsafe fn window_clock_draw_screen(wme: NonNull<window_mode_entry>) {
         let data = (*wme.as_ptr()).data as *mut window_clock_mode_data;
         let mut ctx: screen_write_ctx = zeroed();
         let s = &raw mut (*data).screen;
+
+        // ztmux: opt-in ratatui clock renderer (draws into the mode screen `s`).
+        if crate::extensions::ratatui_ui::enabled() {
+            crate::extensions::ratatui_ui::draw_clock(wp, s);
+            return;
+        }
         const SIZEOF_TIM: usize = 64;
         let mut tim: [u8; 64] = [0; 64];
         let mut x: u32;

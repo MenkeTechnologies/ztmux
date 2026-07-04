@@ -373,7 +373,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
 /// C `vendor/tmux/key-bindings.c:349`: `void key_bindings_init(void)`
 pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
-    static DEFAULTS: [&str; 262] = [
+    static DEFAULTS: [&str; 263] = [
         // Prefix keys.
         "bind -N 'Send the prefix key' C-b { send-prefix }",
         "bind -N 'Rotate through the panes' C-o { rotate-window }",
@@ -477,6 +477,11 @@ pub unsafe fn key_bindings_init() {
         "bind -n TripleClick1Pane { select-pane -t=; if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -H; send -X select-line; run -d0.3; send -X copy-pipe-and-cancel } }",
         /* Mouse button 1 drag on border. */
         "bind -n MouseDrag1Border { resize-pane -M }",
+        /* ztmux: right-click a pane BORDER for the pane context menu. Bound to
+         * the border (not the pane body) so a TUI running inside the pane keeps
+         * all its own right-click/mouse events - the menu never shadows it. `-O`
+         * keeps the menu open on release (click-to-select, no hold-and-drag). */
+        concat!("bind -n MouseDown3Border { display-menu -O -t= -xM -yM -T '#[align=centre]#{pane_index} (#{pane_id})' ", DEFAULT_PANE_MENU!(), " }"),
         /* Mouse button 1 down on status line. */
         "bind -n MouseDown1Status { select-window -t= }",
         /* Mouse wheel down on status line. */
@@ -484,11 +489,11 @@ pub unsafe fn key_bindings_init() {
         /* Mouse wheel up on status line. */
         "bind -n WheelUpStatus { previous-window }",
         /* Mouse button 3 down on status left. */
-        concat!("bind -n MouseDown3StatusLeft { display-menu -t= -xM -yW -T '#[align=centre]#{session_name}' ", DEFAULT_SESSION_MENU!(), " }"),
-        concat!("bind -n M-MouseDown3StatusLeft { display-menu -t= -xM -yW -T '#[align=centre]#{session_name}' ", DEFAULT_SESSION_MENU!(), " }"),
+        concat!("bind -n MouseDown3StatusLeft { display-menu -O -t= -xM -yW -T '#[align=centre]#{session_name}' ", DEFAULT_SESSION_MENU!(), " }"),
+        concat!("bind -n M-MouseDown3StatusLeft { display-menu -O -t= -xM -yW -T '#[align=centre]#{session_name}' ", DEFAULT_SESSION_MENU!(), " }"),
         /* Mouse button 3 down on status line. */
-        concat!( "bind -n MouseDown3Status { display-menu -t= -xW -yW -T '#[align=centre]#{window_index}:#{window_name}' ", DEFAULT_WINDOW_MENU!(), "}"),
-        concat!( "bind -n M-MouseDown3Status { display-menu -t= -xW -yW -T '#[align=centre]#{window_index}:#{window_name}' ", DEFAULT_WINDOW_MENU!(), "}"),
+        concat!( "bind -n MouseDown3Status { display-menu -O -t= -xW -yW -T '#[align=centre]#{window_index}:#{window_name}' ", DEFAULT_WINDOW_MENU!(), "}"),
+        concat!( "bind -n M-MouseDown3Status { display-menu -O -t= -xW -yW -T '#[align=centre]#{window_index}:#{window_name}' ", DEFAULT_WINDOW_MENU!(), "}"),
         /* Mouse button 3 down on pane. */
         concat!( "bind -n MouseDown3Pane { if -Ft= '#{||:#{mouse_any_flag},#{&&:#{pane_in_mode},#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}}}' { select-pane -t=; send -M } { display-menu -t= -xM -yM -T '#[align=centre]#{pane_index} (#{pane_id})' ", DEFAULT_PANE_MENU!(), " } }"),
         concat!( "bind -n M-MouseDown3Pane { display-menu -t= -xM -yM -T '#[align=centre]#{pane_index} (#{pane_id})' ", DEFAULT_PANE_MENU!(), " }"),

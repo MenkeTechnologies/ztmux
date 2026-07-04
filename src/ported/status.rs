@@ -262,7 +262,7 @@ pub unsafe fn status_line_size(c: *mut client) -> u32 {
 
 /// Get the prompt line number for client's session. 1 means at the bottom.
 /// C `vendor/tmux/status.c:126`: `u_int status_prompt_line_at(struct client *c)`
-unsafe fn status_prompt_line_at(c: *mut client) -> u32 {
+pub(crate) unsafe fn status_prompt_line_at(c: *mut client) -> u32 {
     unsafe {
         let s = (*c).session;
 
@@ -711,7 +711,11 @@ pub unsafe fn status_prompt_set<T>(
 
         status_message_clear(NonNull::new_unchecked(c));
         status_prompt_clear(c);
-        status_push_screen(c);
+        // ztmux: the floating overlay prompt doesn't take over the status row,
+        // so the powerline status bar stays visible - skip the screen push.
+        if !crate::extensions::ratatui_ui::enabled() {
+            status_push_screen(c);
+        }
 
         (*c).prompt_string = format_expand_time(ft, msg);
 
@@ -745,9 +749,21 @@ pub unsafe fn status_prompt_set<T>(
         (*c).prompt_mode = prompt_mode::PROMPT_ENTRY;
 
         if !flags.intersects(prompt_flags::PROMPT_INCREMENTAL) {
-            (*c).tty.flags |= tty_flags::TTY_NOCURSOR | tty_flags::TTY_FREEZE;
+            (*c).tty.flags |= tty_flags::TTY_NOCURSOR;
+            // ztmux: never freeze the whole window for the overlay prompt - the
+            // panes and status bar must keep redrawing (freezing also ghosts the
+            // shrinking completion box). We draw our own block cursor, so keep
+            // NOCURSOR to hide the pane's hardware cursor.
+            if !crate::extensions::ratatui_ui::enabled() {
+                (*c).tty.flags |= tty_flags::TTY_FREEZE;
+            }
         }
         (*c).flags |= client_flag::REDRAWSTATUS;
+
+        // ztmux: float the prompt as a ratatui overlay instead of the status row.
+        if crate::extensions::ratatui_ui::enabled() {
+            crate::extensions::ratatui_ui::set_prompt_overlay(c);
+        }
 
         if flags.intersects(prompt_flags::PROMPT_INCREMENTAL) {
             (*c).prompt_inputcb.unwrap()(c, NonNull::new((*c).prompt_data).unwrap(), c!("="), 0);
@@ -764,6 +780,11 @@ pub unsafe fn status_prompt_clear(c: *mut client) {
     unsafe {
         if (*c).prompt_string.is_null() {
             return;
+        }
+
+        // ztmux: tear down the floating prompt overlay if we put one up.
+        if crate::extensions::ratatui_ui::enabled() {
+            crate::extensions::ratatui_ui::clear_prompt_overlay(c);
         }
 
         if let (Some(prompt_freecb), Some(prompt_data)) =
@@ -787,7 +808,10 @@ pub unsafe fn status_prompt_clear(c: *mut client) {
         (*c).tty.flags &= !(tty_flags::TTY_NOCURSOR | tty_flags::TTY_FREEZE);
         (*c).flags |= CLIENT_ALLREDRAWFLAGS; /* was frozen and may have changed */
 
-        status_pop_screen(c);
+        // ztmux: no status screen was pushed for the overlay prompt (see set).
+        if !crate::extensions::ratatui_ui::enabled() {
+            status_pop_screen(c);
+        }
     }
 }
 
@@ -824,6 +848,13 @@ pub unsafe fn status_prompt_update(c: *mut client, msg: *const u8, input: *const
 /// C `vendor/tmux/status.c:657`: `int status_prompt_redraw(struct client *c)`
 pub unsafe fn status_prompt_redraw(c: *mut client) -> i32 {
     unsafe {
+        // ztmux: the ratatui prompt is drawn as a floating overlay (registered
+        // by status_prompt_set), not on the status line, so the powerline status
+        // bar stays visible. Nothing to draw here.
+        if crate::extensions::ratatui_ui::enabled() {
+            return 0;
+        }
+
         let sl = &raw mut (*c).status;
         let mut ctx: screen_write_ctx = zeroed();
 
@@ -1914,7 +1945,7 @@ fn status_prompt_add_list(list: &mut Vec<String>, s: &str) {
 }
 
 /// Build completion list.
-unsafe fn status_prompt_complete_list(s: *const u8, at_start: i32) -> Vec<String> {
+pub(crate) unsafe fn status_prompt_complete_list(s: *const u8, at_start: i32) -> Vec<String> {
     unsafe {
         let mut list = Vec::new();
         let s = cstr_to_str(s);
@@ -2040,7 +2071,7 @@ unsafe fn status_prompt_menu_callback(
 }
 
 /// Show complete word menu.
-unsafe fn status_prompt_complete_list_menu(
+pub(crate) unsafe fn status_prompt_complete_list_menu(
     c: *mut client,
     list: Vec<String>,
     mut offset: u32,
