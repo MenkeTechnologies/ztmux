@@ -562,9 +562,21 @@ pub unsafe fn cmd_get_alias(name: *const u8) -> *mut u8 {
             // bindings, so `:name`, a bound key, and `ztmux name` all behave the
             // same. (display-popup does not format-expand its command, so a
             // `#{socket_path}` cannot be used here.)
-            let expanded = format!(
-                "display-popup -E -w 90% -h 90% 'ztmux -S \"${{TMUX%%,*}}\" {name_str}'\0"
-            );
+            // Full-screen ratatui TUIs (and the `events` stream) drive their own
+            // terminal, so they run bare and the popup lives as long as they do.
+            // Everything else is a one-shot *printer* — it writes text and exits,
+            // which would make `-E` close the popup instantly (a flash that loses
+            // the output). Pipe those through a pager so the popup stays as a
+            // scrollable floating overlay until the user quits (`q`), matching the
+            // `prefix T`/`H`/`I`/`G` bindings.
+            const BARE: &[&str] = &["dashboard", "sessions", "switcher", "watch", "events"];
+            let expanded = if BARE.contains(&name_str) {
+                format!("display-popup -E -w 90% -h 90% 'ztmux -S \"${{TMUX%%,*}}\" {name_str}'\0")
+            } else {
+                format!(
+                    "display-popup -E -w 90% -h 90% 'ztmux -S \"${{TMUX%%,*}}\" {name_str} | less -R'\0"
+                )
+            };
             return xstrdup(expanded.as_bytes().as_ptr()).as_ptr();
         }
 
