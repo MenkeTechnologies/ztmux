@@ -668,6 +668,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"modal"
                     | b"disk"
                     | b"net"
+                    | b"open"
                     | b"env"
                     | b"history"
                     | b"mode"
@@ -784,6 +785,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"modal" => crate::extensions::modal::run(&sock),
                     b"disk" => crate::extensions::disk::run(&sock),
                     b"net" => crate::extensions::net::run(&sock),
+                    b"open" => crate::extensions::open::run(&sock),
                     b"env" => crate::extensions::env::run(&sock),
                     b"history" => crate::extensions::history::run(&sock),
                     b"mode" => crate::extensions::mode::run(&sock),

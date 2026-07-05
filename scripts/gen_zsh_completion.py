@@ -577,6 +577,11 @@ EXTENSIONS = [
         "save/restore all sessions across restarts (ztmux extension)",
     ),
     (
+        "open",
+        [],
+        "pick a URL or file path out of the current pane and open it (ztmux extension)",
+    ),
+    (
         "control",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "clients attached in control mode (-CC) (ztmux extension)",

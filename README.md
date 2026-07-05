@@ -255,6 +255,10 @@ They fall into a few families:
   command — to `~/.ztmux/resurrect/`, and `restore` recreates them (windows, panes and exact tiled
   geometry; shell panes come back in their cwd, `--run` also re-runs saved commands). Existing
   sessions are never clobbered; `resurrect list` shows saved snapshots.
+  `ztmux open` / `:open` (also in the pane menu) scans the current pane for URLs and file paths
+  and shows a ratatui picker — Enter opens the selection (a URL in `open`/`xdg-open`, a file in
+  `$EDITOR` at its `file:line`, a directory revealed), `y` copies it (tmux buffer + OS clipboard).
+  Like tmux-open / tmux-urlview, built in.
   Settings (all `set -g`):
   `@ztmux-ratatui off` disables the whole ratatui renderer for a classic plain-tmux server (on by
   default; takes effect on the next redraw); `@ztmux-hint on` shows the prefix hint bar (off by

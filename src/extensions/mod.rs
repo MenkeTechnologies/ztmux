@@ -68,6 +68,7 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "named",
     "nested",
     "net",
+    "open",
     "peek",
     "pick",
     "piped",
@@ -181,6 +182,7 @@ pub(crate) mod mouse;
 pub(crate) mod named;
 pub(crate) mod nested;
 pub(crate) mod net;
+pub(crate) mod open;
 pub(crate) mod peek;
 pub(crate) mod pick;
 pub(crate) mod piped;
