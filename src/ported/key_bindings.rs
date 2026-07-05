@@ -80,6 +80,8 @@ macro_rules! DEFAULT_PANE_MENU {
             " '#{?@ztmux_sel,Deselect This Pane,Select This Pane for Sync}' 'g' {set -pF @ztmux_sel '#{?@ztmux_sel,,1}'}",
             " 'Sync Selected Panes' 'y' {run-shell \"ztmux -S #{socket_path} pick sync\"}",
             " '#{?synchronize-panes,,-}Unsync All Panes' 'U' {run-shell \"ztmux -S #{socket_path} pick clear\"}",
+            " ''",
+            " '#{?@ztmux-stacked,Unstack Panes,Stack Panes (zellij)}' 'k' {if -F '#{@ztmux-stacked}' {set -uw @ztmux-stacked ; select-layout even-vertical} {set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 85%}}",
         )
     };
 }
@@ -688,7 +690,7 @@ pub unsafe fn key_bindings_init() {
     // (scrollback-to-$EDITOR, the multi-pane selection). They may use `#{...}`
     // formats freely; only the `display-popup` *command* above cannot.
     #[rustfmt::skip]
-    static ZTMUX_EXTENSION_BINDINGS: [&str; 11] = [
+    static ZTMUX_EXTENSION_BINDINGS: [&str; 13] = [
         "bind -N 'ztmux: live server dashboard' C-d { display-popup -E -w 90% -h 90% 'ztmux -S \"${TMUX%%,*}\" dashboard' }",
         "bind -N 'ztmux: session/window/pane picker' S { display-popup -E -w 80% -h 70% 'ztmux -S \"${TMUX%%,*}\" switcher' }",
         "bind -N 'ztmux: server tree' T { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" tree | less -R' }",
@@ -711,6 +713,13 @@ pub unsafe fn key_bindings_init() {
         // Inline trigger wizard: chain four command-prompts (name, pane glob,
         // match regex, action) straight into `triggers add` - no JSON editing.
         "bind -N 'ztmux: add a content-trigger (inline wizard)' R { command-prompt -p 'trigger name:,pane glob (*):,match regex:,action:' { run-shell \"ztmux -S '#{socket_path}' triggers add '%1' '%2' '%3' '%4'\" } }",
+        // Zellij-style pane stacks: `prefix +` stacks the window's panes into a
+        // vertical stack (only the focused pane expanded, the rest 1-row title
+        // bars); pressing it again unstacks. The window-pane-changed hook
+        // re-collapses on focus change so navigating expands the newly-focused
+        // pane. All pure tmux - no per-focus process spawn.
+        "set-hook -ga window-pane-changed { if -F '#{@ztmux-stacked}' 'select-layout even-vertical ; resize-pane -y 85%' }",
+        "bind -N 'ztmux: toggle zellij pane stack' + { if -F '#{@ztmux-stacked}' { set -uw @ztmux-stacked ; select-layout even-vertical } { set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 85% } }",
     ];
 
     unsafe {

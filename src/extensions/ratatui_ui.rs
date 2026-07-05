@@ -1217,6 +1217,51 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
             None
         };
 
+        // Collapsed pane in a stack (zellij's fixed(1) title bar): too short for
+        // a box, so draw a single-row name bar instead of a frame.
+        if (*wp).sy <= 2 {
+            let width = (*wp).sx as u16;
+            if width < 2
+                || (*wp).yoff < (*ctx).oy
+                || (*wp).yoff >= (*ctx).oy + (*ctx).sy
+                || (*wp).xoff < (*ctx).ox
+                || (*wp).xoff + (*wp).sx > (*ctx).ox + (*ctx).sx
+            {
+                return;
+            }
+            let active = std::ptr::eq(wp, (*(*wp).window).active);
+            let (fg, bg) = match state {
+                Some((col, _)) => (Color::Black, col),
+                None if active => (Color::Black, Color::Green),
+                None => (Color::Indexed(252), Color::Indexed(238)),
+            };
+            let st = Style::default().fg(fg).bg(bg);
+            let label = format!(" \u{25b8} {} ", pane_display_name(ctx, wp));
+            let area = Rect::new(0, 0, width, 1);
+            let mut buf = Buffer::empty(area);
+            for x in 0..width {
+                buf[(x, 0)].set_char(' ').set_style(st);
+            }
+            let mut cx = 0u16;
+            for ch in label.chars() {
+                if cx >= width {
+                    break;
+                }
+                buf[(cx, 0)].set_char(ch).set_style(st);
+                cx += 1;
+            }
+            let yoff = (*wp).yoff - (*ctx).oy
+                + if (*ctx).statustop != 0 {
+                    (*ctx).statuslines
+                } else {
+                    0
+                };
+            let xoff = (*wp).xoff - (*ctx).ox;
+            let tty = &raw mut (*(*ctx).c).tty;
+            blit_tty(tty, &buf, xoff, yoff);
+            return;
+        }
+
         // The frame occupies the reserved ring: the full layout cell, one inset
         // cell out from the content on each side.
         let cell_x = (*wp).xoff.saturating_sub(inset);
