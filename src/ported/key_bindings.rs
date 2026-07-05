@@ -81,7 +81,7 @@ macro_rules! DEFAULT_PANE_MENU {
             " 'Sync Selected Panes' 'y' {run-shell \"ztmux -S #{socket_path} pick sync\"}",
             " '#{?synchronize-panes,,-}Unsync All Panes' 'U' {run-shell \"ztmux -S #{socket_path} pick clear\"}",
             " ''",
-            " '#{?@ztmux-stacked,Unstack Panes,Stack Panes (zellij)}' 'k' {if -F '#{@ztmux-stacked}' {set -uw @ztmux-stacked ; select-layout even-vertical} {set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 85%}}",
+            " '#{?@ztmux-stacked,Unstack Panes,Stack Panes (zellij)}' 'k' {if -F '#{@ztmux-stacked}' {set -uw @ztmux-stacked ; select-layout even-vertical} {set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 999}}",
         )
     };
 }
@@ -713,13 +713,19 @@ pub unsafe fn key_bindings_init() {
         // Inline trigger wizard: chain four command-prompts (name, pane glob,
         // match regex, action) straight into `triggers add` - no JSON editing.
         "bind -N 'ztmux: add a content-trigger (inline wizard)' R { command-prompt -p 'trigger name:,pane glob (*):,match regex:,action:' { run-shell \"ztmux -S '#{socket_path}' triggers add '%1' '%2' '%3' '%4'\" } }",
-        // Zellij-style pane stacks: `prefix +` stacks the window's panes into a
-        // vertical stack (only the focused pane expanded, the rest 1-row title
-        // bars); pressing it again unstacks. The window-pane-changed hook
-        // re-collapses on focus change so navigating expands the newly-focused
-        // pane. All pure tmux - no per-focus process spawn.
-        "set-hook -ga window-pane-changed { if -F '#{@ztmux-stacked}' 'select-layout even-vertical ; resize-pane -y 85%' }",
-        "bind -N 'ztmux: toggle zellij pane stack' + { if -F '#{@ztmux-stacked}' { set -uw @ztmux-stacked ; select-layout even-vertical } { set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 85% } }",
+        // Zellij-style pane stacks (the reference port lives in
+        // src/extensions/stack.rs, reachable as `ztmux stack` / `:stack`). The
+        // geometry is realised in pure tmux here — equalise the column then grow
+        // the active pane to full height (resize-pane -y 999), which squeezes the
+        // rest to 1-row title bars, matching zellij. It is done inline rather than
+        // shelling out to `ztmux stack` because these run from a hook / key
+        // binding: a run-shell subprocess would connect back into the server
+        // mid-command (reentrant) and its nested queries fail. `prefix +` toggles
+        // the stack; the window-pane-changed hook re-collapses on focus change so
+        // navigating expands the newly-focused pane. Both guard on @ztmux-stacked
+        // so unstacked windows are untouched.
+        "set-hook -ga window-pane-changed { if -F '#{@ztmux-stacked}' 'select-layout even-vertical ; resize-pane -y 999' }",
+        "bind -N 'ztmux: toggle zellij pane stack' + { if -F '#{@ztmux-stacked}' { set -uw @ztmux-stacked ; select-layout even-vertical } { set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 999 } }",
     ];
 
     unsafe {
