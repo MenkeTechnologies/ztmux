@@ -715,6 +715,18 @@ pub unsafe fn screen_redraw_screen(c: *mut client) {
             log_debug!("{}: redrawing panes", _s((*c).name));
             screen_redraw_draw_panes(ctx);
         }
+        // ztmux: draw our rounded pane frames LAST, after borders and panes, so a
+        // border-only redraw (e.g. changing focus) repaints them too — otherwise
+        // they vanish the moment another pane is focused. No-op unless the ratatui
+        // UI + `@ztmux-pane-names` are on.
+        if flags.intersects(client_flag::REDRAWWINDOW | client_flag::REDRAWBORDERS) {
+            let w = (*(*(*c).session).curw).window;
+            for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
+                if window_pane_visible(wp) {
+                    crate::extensions::ratatui_ui::draw_pane_frame(ctx, wp);
+                }
+            }
+        }
         if (*ctx).statuslines != 0
             && flags.intersects(client_flag::REDRAWSTATUS | client_flag::REDRAWSTATUSALWAYS)
         {
@@ -1054,11 +1066,6 @@ pub unsafe fn screen_redraw_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
             tty_default_colours(&raw mut defaults, wp);
             tty_draw_line(tty, s, i, j, width, x, y, &raw mut defaults, palette);
         }
-
-        // ztmux: our own rounded ratatui frame with the pane's name in the top
-        // border (plus a loud badge on synced/selected/trigger panes), drawn on
-        // top of the freshly-painted content (no-op unless the ratatui UI is on).
-        crate::extensions::ratatui_ui::draw_pane_frame(ctx, wp);
 
         #[cfg(feature = "sixel")]
         crate::tty_::tty_draw_images(c, wp, s);

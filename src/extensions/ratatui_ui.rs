@@ -1235,9 +1235,17 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
                 };
                 (col, t, true)
             }
-            // Subtle grey for an ordinary named pane, so it reads as a label
-            // rather than an alert.
-            None => (Color::Indexed(244), format!(" {name} "), false),
+            // No sync state: the active pane's frame is green (like zellij),
+            // inactive panes a subtle grey so they read as labels.
+            None => {
+                let active = std::ptr::eq(wp, (*(*wp).window).active);
+                let col = if active {
+                    Color::Green
+                } else {
+                    Color::Indexed(244)
+                };
+                (col, format!(" {name} "), active)
+            }
         };
 
         let c = (*ctx).c;
