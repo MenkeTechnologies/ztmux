@@ -567,6 +567,11 @@ EXTENSIONS = [
         "zellij-style top tab bar of windows (ztmux extension)",
     ),
     (
+        "modal",
+        [":subcommand:(toggle on off)"],
+        "zellij-style modal keybindings: pane/tab/resize/session/lock modes (ztmux extension)",
+    ),
+    (
         "control",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "clients attached in control mode (-CC) (ztmux extension)",

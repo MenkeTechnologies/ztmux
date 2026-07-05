@@ -70,6 +70,11 @@ unsafe fn cmd_switch_client_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
             (*table).references += 1;
             key_bindings_unref_table((*tc).keytable);
             (*tc).keytable = table;
+            // ztmux: refresh the ratatui hint bar for the new table, so entering
+            // a zellij-style mode (`switch-client -T pane` &c.) shows that mode's
+            // keys. server_client_set_key_table does this on the prefix path; the
+            // -T path sets the table directly, so mirror it here.
+            crate::extensions::ratatui_ui::reconcile_hint(tc);
             return cmd_retval::CMD_RETURN_NORMAL;
         }
 

@@ -61,6 +61,7 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "autolock",
     "marks",
     "mem",
+    "modal",
     "mode",
     "monitor",
     "mouse",
@@ -172,6 +173,7 @@ pub(crate) mod linked;
 pub(crate) mod lock;
 pub(crate) mod marks;
 pub(crate) mod mem;
+pub(crate) mod modal;
 pub(crate) mod mode;
 pub(crate) mod monitor;
 pub(crate) mod mouse;

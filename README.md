@@ -245,6 +245,11 @@ They fall into a few families:
   `Ctrl-n` makes a new one. `prefix C-f` toggles a zellij-style **floating pane** — a persistent
   pane that floats above the tiled layout in a popup (kept live in a hidden holding session, so
   its state survives between toggles; press `prefix C-f` again to hide it).
+  `ztmux modal on` (opt-in) installs zellij-style **modal keybindings**: `Ctrl-p` pane mode,
+  `Ctrl-t` tab, `Ctrl-n` resize, `Ctrl-s` scroll, `Ctrl-o` session, `Ctrl-g` lock — each a sticky
+  key table entered without a prefix; the hint bar (turned on automatically) shows the current
+  mode's keys. `modal off` removes the entry keys and restores the prefix. Since the `Ctrl-*` keys
+  are intercepted globally (the zellij trade-off), it is off by default.
   Settings (all `set -g`):
   `@ztmux-ratatui off` disables the whole ratatui renderer for a classic plain-tmux server (on by
   default; takes effect on the next redraw); `@ztmux-hint on` shows the prefix hint bar (off by
