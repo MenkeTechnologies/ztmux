@@ -2531,6 +2531,12 @@ _ztmux-pick() {
     ':subcommand:(sync unmark clear list)'
 }
 
+_ztmux-tabs() {
+  [[ -n ${tmux_describe} ]] && print "zellij-style top tab bar of windows (ztmux extension)" && return
+  _arguments -s \
+    ':subcommand:(toggle on off)'
+}
+
 _ztmux-control() {
   [[ -n ${tmux_describe} ]] && print "clients attached in control mode (-CC) (ztmux extension)" && return
   _arguments -s \

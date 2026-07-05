@@ -237,9 +237,13 @@ They fall into a few families:
   is *inset* by a one-cell ring (like zellij, so a program can never draw on the frame) and gets a
   rounded box with its name in the top border; the box recolours for sync state. In this mode
   `prefix +` toggles a zellij-style **pane stack** — the focused pane fills the column, the rest
-  collapse to one-row title bars (`ztmux stack` / `:stack`). Settings (all `set -g`):
+  collapse to one-row title bars (`ztmux stack` / `:stack`). A zellij-style **tab bar** of windows
+  along the top (session badge, active tab highlighted) is a separate toggle — `ztmux tabs on` /
+  `:tabs` — which restyles the status line and restores your prior status settings on `tabs off`.
+  Settings (all `set -g`):
   `@ztmux-ratatui off` disables the whole ratatui renderer for a classic plain-tmux server (on by
-  default; takes effect on the next redraw); `@ztmux-hint off` hides the hint bar;
+  default; takes effect on the next redraw); `@ztmux-hint on` shows the prefix hint bar (off by
+  default);
   `@ztmux-zellij-mode on` enables the framed/inset mode (off by default; `@ztmux-pane-names` is a
   back-compat alias); `@ztmux-pane-name-format` overrides the frame name with a tmux format (e.g.
   `#{pane_index}: #{pane_current_command}`). With `@ztmux-ratatui off` the default draw path and

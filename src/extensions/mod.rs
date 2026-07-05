@@ -95,6 +95,7 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "submodules",
     "switcher",
     "sync",
+    "tabs",
     "tag",
     "term",
     "titlebar",
@@ -208,6 +209,7 @@ pub(crate) mod structured;
 pub(crate) mod submodules;
 pub(crate) mod switch;
 pub(crate) mod sync;
+pub(crate) mod tabs;
 pub(crate) mod tag;
 pub(crate) mod term;
 pub(crate) mod titlebar;

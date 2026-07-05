@@ -561,6 +561,11 @@ EXTENSIONS = [
         "batch sync/unmark/clear over the multi-pane mark set (ztmux extension)",
     ),
     (
+        "tabs",
+        [":subcommand:(toggle on off)"],
+        "zellij-style top tab bar of windows (ztmux extension)",
+    ),
+    (
         "control",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "clients attached in control mode (-CC) (ztmux extension)",
