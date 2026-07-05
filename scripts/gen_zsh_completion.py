@@ -572,6 +572,11 @@ EXTENSIONS = [
         "zellij-style modal keybindings: pane/tab/resize/session/lock modes (ztmux extension)",
     ),
     (
+        "resurrect",
+        [":subcommand:(save restore list)", "--run[re-run each pane's saved command]"],
+        "save/restore all sessions across restarts (ztmux extension)",
+    ),
+    (
         "control",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "clients attached in control mode (-CC) (ztmux extension)",

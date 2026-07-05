@@ -2547,6 +2547,13 @@ _ztmux-modal() {
     ':subcommand:(toggle on off)'
 }
 
+_ztmux-resurrect() {
+  [[ -n ${tmux_describe} ]] && print "save/restore all sessions across restarts (ztmux extension)" && return
+  _arguments -s \
+    ':subcommand:(save restore list)' \
+    '--run[re-run each pane's saved command]'
+}
+
 _ztmux-control() {
   [[ -n ${tmux_describe} ]] && print "clients attached in control mode (-CC) (ztmux extension)" && return
   _arguments -s \

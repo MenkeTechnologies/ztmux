@@ -80,6 +80,7 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "recent",
     "remain",
     "remote",
+    "resurrect",
     "revive",
     "retitle",
     "shells",
@@ -196,6 +197,7 @@ pub(crate) mod recent;
 pub(crate) mod remain;
 pub(crate) mod remote;
 pub(crate) mod respawn;
+pub(crate) mod resurrect;
 pub(crate) mod retitle;
 pub(crate) mod sessions;
 pub(crate) mod shells;

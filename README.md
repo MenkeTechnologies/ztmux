@@ -250,6 +250,11 @@ They fall into a few families:
   key table entered without a prefix; the hint bar (turned on automatically) shows the current
   mode's keys. `modal off` removes the entry keys and restores the prefix. Since the `Ctrl-*` keys
   are intercepted globally (the zellij trade-off), it is off by default.
+  `ztmux resurrect save` / `ztmux resurrect restore` persist the whole server across restarts
+  (zellij-style resurrectable sessions): `save` writes every session/window/pane — layout, cwd and
+  command — to `~/.ztmux/resurrect/`, and `restore` recreates them (windows, panes and exact tiled
+  geometry; shell panes come back in their cwd, `--run` also re-runs saved commands). Existing
+  sessions are never clobbered; `resurrect list` shows saved snapshots.
   Settings (all `set -g`):
   `@ztmux-ratatui off` disables the whole ratatui renderer for a classic plain-tmux server (on by
   default; takes effect on the next redraw); `@ztmux-hint on` shows the prefix hint bar (off by
