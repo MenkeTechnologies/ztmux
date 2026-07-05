@@ -85,6 +85,7 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "size",
     "snapshot",
     "solo",
+    "sessions",
     "ssh",
     "stack",
     "stash",
@@ -194,6 +195,7 @@ pub(crate) mod remain;
 pub(crate) mod remote;
 pub(crate) mod respawn;
 pub(crate) mod retitle;
+pub(crate) mod sessions;
 pub(crate) mod shells;
 pub(crate) mod size;
 pub(crate) mod snapshot;

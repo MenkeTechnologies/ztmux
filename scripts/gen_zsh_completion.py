@@ -26,6 +26,7 @@ OUT = "completions/_ztmux"
 EXTENSIONS = [
     ("dashboard", [], "live ratatui server dashboard (ztmux extension)"),
     ("switcher", [], "interactive session/window/pane picker (ztmux extension)"),
+    ("sessions", [], "zellij-style session manager: switch/rename/kill/new (ztmux extension)"),
     ("tree", [], "print the session/window/pane tree (ztmux extension)"),
     (
         "doctor",

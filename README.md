@@ -240,6 +240,9 @@ They fall into a few families:
   collapse to one-row title bars (`ztmux stack` / `:stack`). A zellij-style **tab bar** of windows
   along the top (session badge, active tab highlighted) is a separate toggle — `ztmux tabs on` /
   `:tabs` — which restyles the status line and restores your prior status settings on `tabs off`.
+  A zellij-style **session manager** (`ztmux sessions` / `:sessions`) opens a ratatui list of
+  sessions: type to filter, Enter switches, `Ctrl-r` renames, `Ctrl-x` kills (with confirm),
+  `Ctrl-n` makes a new one.
   Settings (all `set -g`):
   `@ztmux-ratatui off` disables the whole ratatui renderer for a classic plain-tmux server (on by
   default; takes effect on the next redraw); `@ztmux-hint on` shows the prefix hint bar (off by

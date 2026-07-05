@@ -1834,6 +1834,10 @@ _ztmux-switcher() {
   [[ -n ${tmux_describe} ]] && print "interactive session/window/pane picker (ztmux extension)" && return
 }
 
+_ztmux-sessions() {
+  [[ -n ${tmux_describe} ]] && print "zellij-style session manager: switch/rename/kill/new (ztmux extension)" && return
+}
+
 _ztmux-tree() {
   [[ -n ${tmux_describe} ]] && print "print the session/window/pane tree (ztmux extension)" && return
 }
