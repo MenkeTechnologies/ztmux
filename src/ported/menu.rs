@@ -249,10 +249,10 @@ pub unsafe fn menu_draw_cb(c: *mut client, data: *mut c_void, _rctx: *mut screen
         screen_write_start(ctx, s);
         screen_write_clearscreen(ctx, 8);
 
-        // ztmux: opt-in ratatui renderer for the overlay menu. Draws the same
-        // md.s screen the tty_draw_line blit below composites, so it slots in
-        // transparently. Off by default (ZTMUX_RATATUI_MENU) to keep the
-        // byte-for-byte parity path untouched.
+        // ztmux: ratatui renderer for the overlay menu (on by default). Draws
+        // the same md.s screen the tty_draw_line blit below composites, so it
+        // slots in transparently. Disable with `@ztmux-ratatui off` to restore
+        // the byte-for-byte parity path.
         if crate::extensions::ratatui_ui::enabled() {
             crate::extensions::ratatui_ui::draw(md, ctx);
             screen_write_stop(ctx);

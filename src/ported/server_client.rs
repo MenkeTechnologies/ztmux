@@ -218,7 +218,7 @@ pub unsafe fn server_client_set_key_table(c: *mut client, mut name: *const u8) {
         }
 
         // ztmux: reconcile the ratatui keybinding hint bar with the new table
-        // (no-op unless ZTMUX_RATATUI is set, so the default path is untouched).
+        // (no-op when the renderer is off, i.e. `@ztmux-ratatui off`).
         crate::extensions::ratatui_ui::reconcile_hint(c);
     }
 }

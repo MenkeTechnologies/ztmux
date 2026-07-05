@@ -227,19 +227,23 @@ They fall into a few families:
   (rules in `~/.ztmux/triggers.json`, armed with `ztmux triggers arm`), reviving tmux's removed
   `monitor-content` as a general sense→act loop. Add rules without touching the JSON via the
   inline wizard: `ztmux triggers wizard` (or `ztmux triggers add <name> <pane> <match> <action>`).
-- **Ratatui UI** (opt-in, `ZTMUX_RATATUI=1`) — original interactive surfaces rendered with
+- **Ratatui UI** (on by default) — original interactive surfaces rendered with
   ratatui rather than tmux's server draw: a which-key **hint bar** on the prefix, a floating
   **command palette** with inline Tab/arrow completion, ratatui **clock** and **display-panes**,
   **edit-scrollback-in-`$EDITOR`** (`prefix e`), and **multi-pane selective sync** — mark panes
   (`prefix C-s`), sync the set (`prefix M`). Sync state is shown on the pane **border** — synced
   (red), selected (orange), trigger-armed (cyan) — which output can never overwrite.
-  Opt into zellij-style **pane frames** with `@ztmux-pane-names on`: every pane is *inset* by a
-  one-cell ring (like zellij, so a program can never draw on the frame) and gets a rounded box
-  with its name in the top border; the box recolours for sync state. Settings (all `set -g`):
-  `@ztmux-hint off` hides the hint bar; `@ztmux-pane-names on` enables the framed/inset mode (off
-  by default; takes effect on the next layout change); `@ztmux-pane-name-format` overrides the
-  frame name with a tmux format (e.g. `#{pane_index}: #{pane_current_command}`). The whole surface is gated behind the flag, so the
-  default path and the byte-for-byte parity suite are untouched.
+  Opt into zellij-style **pane frames** with `@ztmux-zellij-mode on` (off by default): every pane
+  is *inset* by a one-cell ring (like zellij, so a program can never draw on the frame) and gets a
+  rounded box with its name in the top border; the box recolours for sync state. In this mode
+  `prefix +` toggles a zellij-style **pane stack** — the focused pane fills the column, the rest
+  collapse to one-row title bars (`ztmux stack` / `:stack`). Settings (all `set -g`):
+  `@ztmux-ratatui off` disables the whole ratatui renderer for a classic plain-tmux server (on by
+  default; takes effect on the next redraw); `@ztmux-hint off` hides the hint bar;
+  `@ztmux-zellij-mode on` enables the framed/inset mode (off by default; `@ztmux-pane-names` is a
+  back-compat alias); `@ztmux-pane-name-format` overrides the frame name with a tmux format (e.g.
+  `#{pane_index}: #{pane_current_command}`). With `@ztmux-ratatui off` the default draw path and
+  the byte-for-byte parity suite are untouched.
 
 Run `ztmux --help` for the current list, or `man ztmux` for the full reference — each
 extension has its own entry under the EXTENSIONS section, and the zsh completion

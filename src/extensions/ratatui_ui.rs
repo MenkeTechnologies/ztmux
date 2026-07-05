@@ -11,8 +11,8 @@
 //! Surfaces bridged so far: overlay menus ([`draw`]), clock-mode
 //! ([`draw_clock`]), display-panes ([`draw_pane_number`]).
 //!
-//! Opt-in via `ZTMUX_RATATUI` (alias `ZTMUX_RATATUI_MENU`) so the default path
-//! and the byte-for-byte parity suite are untouched.
+//! On by default; opt OUT with the global option `@ztmux-ratatui off` for a
+//! classic plain-tmux server (see [`enabled`]).
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -21,16 +21,18 @@ use ratatui::widgets::{Block, BorderType, List, ListItem, ListState, StatefulWid
 
 use crate::*;
 
-/// True if the ratatui UI renderer is enabled for this server (`ZTMUX_RATATUI`;
-/// `ZTMUX_RATATUI_MENU` kept as an alias for the earlier menu-only flag). The env
-/// check is cached — it can't change over a server's life, and `enabled()` is
-/// called on hot paths (per border cell, per pane redraw).
+/// True if the ratatui UI renderer is enabled for this server. It is ON by
+/// default (the `:` command palette, ratatui menus, clock, hint bar); opt OUT
+/// with the global option `@ztmux-ratatui off` (or `0`/`false`/`no`) for a
+/// classic plain-tmux server. Read live from the option table (no env, no cache)
+/// so `set -g @ztmux-ratatui off` takes effect on the next redraw — the reader
+/// is allocation-free because `enabled()` is on hot paths (per border cell, per
+/// pane redraw).
+///
+/// Note this only turns on the ratatui *chrome*; the more invasive zellij look
+/// (pane frames, inset, stacks) is a separate opt-in via `@ztmux-zellij-mode`.
 pub(crate) fn enabled() -> bool {
-    static E: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *E.get_or_init(|| {
-        std::env::var_os("ZTMUX_RATATUI").is_some()
-            || std::env::var_os("ZTMUX_RATATUI_MENU").is_some()
-    })
+    unsafe { global_user_flag("@ztmux-ratatui", true) }
 }
 
 /// 3x5 block-font rows for the clock glyphs (`0`-`9`, `:`, space, AM/PM `A P M`).
@@ -998,14 +1000,14 @@ unsafe fn hint_draw(c: *mut client, data: *mut core::ffi::c_void, _rctx: *mut sc
     }
 }
 
-/// True if the `@ztmux-hint` user option is explicitly turned off. Unset means
-/// the bar is on (whenever the ratatui UI is enabled). Checks every global scope
-/// so `set -g @ztmux-hint off` is found wherever it lands.
+/// True if the hint bar is suppressed. It is OFF by default (opt in with
+/// `set -g @ztmux-hint on`); any other value, or unset, leaves it hidden. Checks
+/// every global scope so the option is found wherever it lands.
 unsafe fn hint_option_off(_c: *mut client) -> bool {
     unsafe {
         match global_user_opt("@ztmux-hint") {
-            Some(v) => matches!(v.trim(), "off" | "0" | "false" | "no" | ""),
-            None => false, // unset -> default on
+            Some(v) => !matches!(v.trim(), "on" | "1" | "true" | "yes"),
+            None => true, // unset -> default OFF
         }
     }
 }
@@ -1121,6 +1123,25 @@ unsafe fn global_user_opt(name: &str) -> Option<String> {
     }
 }
 
+/// Read a boolean-ish global user option without allocating (for hot paths). An
+/// option that is set and holds a falsy value (`0`/`off`/`false`/`no`) reads
+/// false; set to anything else reads true; unset falls back to `default`.
+unsafe fn global_user_flag(name: &str, default: bool) -> bool {
+    unsafe {
+        for oo in [GLOBAL_S_OPTIONS, GLOBAL_OPTIONS, GLOBAL_W_OPTIONS] {
+            if !oo.is_null() && !crate::options_::options_get_only_const(oo, name).is_null() {
+                let s = crate::cstr_to_str(crate::options_::options_get_string_(oo, name)).trim();
+                let off = s.eq_ignore_ascii_case("0")
+                    || s.eq_ignore_ascii_case("off")
+                    || s.eq_ignore_ascii_case("false")
+                    || s.eq_ignore_ascii_case("no");
+                return !off;
+            }
+        }
+        default
+    }
+}
+
 /// Whether "zellij mode" is on: every pane gets a named, inset rounded frame,
 /// the active pane's frame is green, sync/select/trigger recolour it, and tmux's
 /// own borders are hidden. Opt-in via `@ztmux-zellij-mode` (global), with
@@ -1172,6 +1193,36 @@ unsafe fn pane_display_name(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) -
         let mut idx: u32 = 0;
         window_pane_index(wp, &raw mut idx);
         format!("pane {idx}")
+    }
+}
+
+/// A zellij-style `SCROLL: off/total` indicator for a collapsed pane's title
+/// bar: `total` is the scrollback depth (`history_size`), `off` the current
+/// copy-mode scroll offset (0 when not scrolled). Empty if the pane has no
+/// history yet, so a fresh shell reads as a clean bar.
+unsafe fn scroll_indicator(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) -> String {
+    unsafe {
+        // Expand scroll offset and history depth separated by a unit-separator
+        // byte; both are per-pane. scroll_position is empty outside copy mode.
+        let Ok(cfmt) = std::ffi::CString::new("#{scroll_position}\u{1f}#{history_size}") else {
+            return String::new();
+        };
+        let c = (*ctx).c;
+        let s = (*c).session;
+        let wl = if s.is_null() { null_mut() } else { (*s).curw };
+        let ft = format_create_defaults(null_mut(), c, s, wl, wp);
+        let out = format_expand(ft, cfmt.as_ptr().cast());
+        let raw = crate::cstr_to_str(out).to_string();
+        crate::free_(out);
+        format_free(ft);
+        let (pos, total) = raw.split_once('\u{1f}').unwrap_or(("", "0"));
+        let total = total.trim();
+        if total.is_empty() || total == "0" {
+            return String::new(); // fresh pane, no scrollback yet
+        }
+        let pos = pos.trim();
+        let pos = if pos.is_empty() { "0" } else { pos };
+        format!("SCROLL: {pos}/{total}")
     }
 }
 
@@ -1241,6 +1292,19 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
             {
                 if 2 + i < width - 1 {
                     row[2 + i] = ch;
+                }
+            }
+            // Right-aligned scroll indicator (zellij shows `SCROLL: 0/N`): the
+            // pane's scrollback depth, and the current copy-mode offset if any.
+            let scroll = scroll_indicator(ctx, wp);
+            if !scroll.is_empty() {
+                let label: Vec<char> = format!(" {scroll} ").chars().collect();
+                // Sit just left of the ╮, but never overwrite the name or corner.
+                let start = width.saturating_sub(1 + label.len());
+                if start > 3 {
+                    for (i, ch) in label.iter().enumerate() {
+                        row[start + i] = *ch;
+                    }
                 }
             }
             let st = Style::default().fg(color);
