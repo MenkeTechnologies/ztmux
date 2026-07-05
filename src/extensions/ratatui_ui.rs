@@ -1151,10 +1151,12 @@ pub(crate) unsafe fn frame_inset() -> u32 {
 /// otherwise the pane's title, falling back to `pane N`.
 unsafe fn pane_display_name(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) -> String {
     unsafe {
-        if let Some(fmt) = global_user_opt("@ztmux-pane-name-format")
-            && !fmt.trim().is_empty()
-            && let Ok(cfmt) = std::ffi::CString::new(fmt.trim())
-        {
+        // Custom format if set, else a clean default of "index: command" (the
+        // pane title is usually the tty/host, which reads badly in a frame).
+        let fmt = global_user_opt("@ztmux-pane-name-format")
+            .filter(|f| !f.trim().is_empty())
+            .unwrap_or_else(|| "#{pane_index}: #{pane_current_command}".to_string());
+        if let Ok(cfmt) = std::ffi::CString::new(fmt.trim()) {
             let c = (*ctx).c;
             let s = (*c).session;
             let wl = if s.is_null() { null_mut() } else { (*s).curw };
@@ -1166,10 +1168,6 @@ unsafe fn pane_display_name(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) -
             if !name.is_empty() {
                 return name;
             }
-        }
-        let title = crate::cstr_to_str((*wp).base.title).trim().to_string();
-        if !title.is_empty() {
-            return title;
         }
         let mut idx: u32 = 0;
         window_pane_index(wp, &raw mut idx);
@@ -1217,11 +1215,12 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
             None
         };
 
-        // Collapsed pane in a stack (zellij's fixed(1) title bar): too short for
-        // a box, so draw a single-row name bar instead of a frame.
+        // Collapsed pane in a stack (zellij's fixed(1) row): draw the box TOP
+        // border with the name, so a stack reads as a set of stacked boxes
+        // (╭─ name ─────╮) rather than a flat list.
         if (*wp).sy <= 2 {
-            let width = (*wp).sx as u16;
-            if width < 2
+            let width = (*wp).sx as usize;
+            if width < 4
                 || (*wp).yoff < (*ctx).oy
                 || (*wp).yoff >= (*ctx).oy + (*ctx).sy
                 || (*wp).xoff < (*ctx).ox
@@ -1229,26 +1228,26 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
             {
                 return;
             }
-            let active = std::ptr::eq(wp, (*(*wp).window).active);
-            let (fg, bg) = match state {
-                Some((col, _)) => (Color::Black, col),
-                None if active => (Color::Black, Color::Green),
-                None => (Color::Indexed(252), Color::Indexed(238)),
+            let color = match state {
+                Some((col, _)) => col,
+                None => Color::Indexed(244),
             };
-            let st = Style::default().fg(fg).bg(bg);
-            let label = format!(" \u{25b8} {} ", pane_display_name(ctx, wp));
-            let area = Rect::new(0, 0, width, 1);
-            let mut buf = Buffer::empty(area);
-            for x in 0..width {
-                buf[(x, 0)].set_char(' ').set_style(st);
-            }
-            let mut cx = 0u16;
-            for ch in label.chars() {
-                if cx >= width {
-                    break;
+            let mut row: Vec<char> = vec!['\u{2500}'; width]; // ─
+            row[0] = '\u{256d}'; // ╭
+            row[width - 1] = '\u{256e}'; // ╮
+            for (i, ch) in format!(" {} ", pane_display_name(ctx, wp))
+                .chars()
+                .enumerate()
+            {
+                if 2 + i < width - 1 {
+                    row[2 + i] = ch;
                 }
-                buf[(cx, 0)].set_char(ch).set_style(st);
-                cx += 1;
+            }
+            let st = Style::default().fg(color);
+            let area = Rect::new(0, 0, width as u16, 1);
+            let mut buf = Buffer::empty(area);
+            for (x, ch) in row.iter().enumerate() {
+                buf[(x as u16, 0)].set_char(*ch).set_style(st);
             }
             let yoff = (*wp).yoff - (*ctx).oy
                 + if (*ctx).statustop != 0 {
