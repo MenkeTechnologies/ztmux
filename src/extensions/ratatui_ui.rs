@@ -1315,6 +1315,54 @@ unsafe fn blit_tty_frame(tty: *mut tty, buf: &Buffer, px: u32, py: u32) {
     }
 }
 
+/// A zellij-style info bar on the last pane row (just above the status line):
+/// context hints for the framed mode. Only in zellij mode - it overwrites the
+/// bottommost frames' bottom edge, so it costs no reserved row and pane output
+/// can't reach it (panes are inset). Drawn after the frame pass, on the same
+/// window/border redraws.
+pub(crate) unsafe fn draw_info_bar(ctx: *mut screen_redraw_ctx) {
+    unsafe {
+        if frame_inset() == 0 {
+            return;
+        }
+        let c = (*ctx).c;
+        if c.is_null() || (*c).overlay_draw.is_some() {
+            return;
+        }
+        let width = (*ctx).sx as u16;
+        if width < 24 || (*ctx).sy < 3 {
+            return;
+        }
+        let tty = &raw mut (*c).tty;
+
+        let hints = "  \u{2b21} zellij   C-s mark \u{b7} M sync \u{b7} : cmd \u{b7} ? keys \u{b7} d detach  ";
+        let area = Rect::new(0, 0, width, 1);
+        let mut buf = Buffer::empty(area);
+        let bar = Style::default()
+            .bg(Color::Indexed(236))
+            .fg(Color::Indexed(250));
+        for x in 0..width {
+            buf[(x, 0)].set_char(' ').set_style(bar);
+        }
+        let mut cx = 0u16;
+        for ch in hints.chars() {
+            if cx >= width {
+                break;
+            }
+            buf[(cx, 0)].set_char(ch).set_style(bar);
+            cx += 1;
+        }
+
+        let srow = (*ctx).sy - 1
+            + if (*ctx).statustop != 0 {
+                (*ctx).statuslines
+            } else {
+                0
+            };
+        blit_tty(tty, &buf, 0, srow);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -726,6 +726,7 @@ pub unsafe fn screen_redraw_screen(c: *mut client) {
                     crate::extensions::ratatui_ui::draw_pane_frame(ctx, wp);
                 }
             }
+            crate::extensions::ratatui_ui::draw_info_bar(ctx);
         }
         if (*ctx).statuslines != 0
             && flags.intersects(client_flag::REDRAWSTATUS | client_flag::REDRAWSTATUSALWAYS)
