@@ -1121,25 +1121,29 @@ unsafe fn global_user_opt(name: &str) -> Option<String> {
     }
 }
 
-/// Whether the always-on zellij-style pane frames are enabled - opt-in via
-/// `@ztmux-pane-names` (global, default OFF); `on`/`1`/`true`/`yes` enables it.
-/// In this mode *every* pane gets a named, inset frame; sync/select/trigger just
-/// recolour it. When off there are no frames (sync shows via the border colour).
-unsafe fn pane_names_on() -> bool {
+/// Whether "zellij mode" is on: every pane gets a named, inset rounded frame,
+/// the active pane's frame is green, sync/select/trigger recolour it, and tmux's
+/// own borders are hidden. Opt-in via `@ztmux-zellij-mode` (global), with
+/// `@ztmux-pane-names` kept as a back-compat alias; `on`/`1`/`true`/`yes`
+/// enables it, default OFF. When off there are no frames (sync shows on the
+/// pane border colour instead).
+unsafe fn zellij_mode_on() -> bool {
     unsafe {
-        match global_user_opt("@ztmux-pane-names") {
+        let v =
+            global_user_opt("@ztmux-zellij-mode").or_else(|| global_user_opt("@ztmux-pane-names"));
+        match v {
             Some(v) => matches!(v.trim(), "on" | "1" | "true" | "yes"),
-            None => false, // default off - most people don't want every pane framed
+            None => false, // default off
         }
     }
 }
 
-/// The 1-cell ring reserved around every pane for its frame when the always-on
-/// pane frames are enabled, else 0. Read by BOTH `layout_fix_panes` (to shrink
-/// the pane's content so a program can never draw on the frame) and the frame
-/// draw (to place the ring), so the two always agree.
+/// The 1-cell ring reserved around every pane for its frame in zellij mode, else
+/// 0. Read by BOTH `layout_fix_panes` (to shrink the pane's content so a program
+/// can never draw on the frame) and the frame draw (to place the ring), so the
+/// two always agree.
 pub(crate) unsafe fn frame_inset() -> u32 {
-    unsafe { u32::from(enabled() && pane_names_on()) }
+    unsafe { u32::from(enabled() && zellij_mode_on()) }
 }
 
 /// The name shown in a pane's frame. `@ztmux-pane-name-format` (global) is a

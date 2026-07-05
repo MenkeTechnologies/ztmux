@@ -245,6 +245,16 @@ pub unsafe fn cmd_set_option_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
                 }
 
                 options_push_changes(&name);
+
+                // ztmux: toggling zellij mode changes pane sizes (the frame
+                // inset), so relayout every window immediately - the window size
+                // is unchanged, so recalculate_sizes() alone would not re-fix it.
+                if name == "@ztmux-zellij-mode" || name == "@ztmux-pane-names" {
+                    for w in rb_foreach(&raw mut WINDOWS).map(NonNull::as_ptr) {
+                        layout_fix_panes(w, null_mut());
+                        server_redraw_window(w);
+                    }
+                }
             }
             // out:
             free_(argument);
