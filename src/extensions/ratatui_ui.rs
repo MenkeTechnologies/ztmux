@@ -22,9 +22,15 @@ use ratatui::widgets::{Block, BorderType, List, ListItem, ListState, StatefulWid
 use crate::*;
 
 /// True if the ratatui UI renderer is enabled for this server (`ZTMUX_RATATUI`;
-/// `ZTMUX_RATATUI_MENU` kept as an alias for the earlier menu-only flag).
+/// `ZTMUX_RATATUI_MENU` kept as an alias for the earlier menu-only flag). The env
+/// check is cached — it can't change over a server's life, and `enabled()` is
+/// called on hot paths (per border cell, per pane redraw).
 pub(crate) fn enabled() -> bool {
-    std::env::var_os("ZTMUX_RATATUI").is_some() || std::env::var_os("ZTMUX_RATATUI_MENU").is_some()
+    static E: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *E.get_or_init(|| {
+        std::env::var_os("ZTMUX_RATATUI").is_some()
+            || std::env::var_os("ZTMUX_RATATUI_MENU").is_some()
+    })
 }
 
 /// 3x5 block-font rows for the clock glyphs (`0`-`9`, `:`, space, AM/PM `A P M`).

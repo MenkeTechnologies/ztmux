@@ -855,6 +855,13 @@ pub unsafe fn screen_redraw_draw_borders_cell(ctx: *mut screen_redraw_ctx, i: u3
         }
         screen_redraw_border_set(w, wp, (*ctx).pane_lines, cell_type, &raw mut gc);
 
+        // ztmux: in the framed (inset) mode our ratatui pane frames ARE the
+        // borders, so blank tmux's own border cells — otherwise the leftover
+        // border column between two panes' frames shows as a stray dotted line.
+        if crate::extensions::ratatui_ui::frame_inset() != 0 {
+            memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
+        }
+
         let isolates = cell_type == cell_type::CELL_TOPBOTTOM
             && (*c).flags.intersects(client_flag::UTF8)
             && tty_term_has((*tty).term, tty_code_code::TTYC_BIDI);
