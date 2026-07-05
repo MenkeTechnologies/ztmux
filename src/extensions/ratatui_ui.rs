@@ -1082,13 +1082,14 @@ unsafe fn global_user_opt(name: &str) -> Option<String> {
 }
 
 /// Whether to draw a named frame on ordinary (unsynced) panes too - zellij's
-/// per-pane name frames. `@ztmux-pane-names` (global, default on); `off`/`0`/
-/// `false`/`no` disables it, leaving only the sync/select/trigger state frames.
+/// always-on per-pane name frames. Opt-in via `@ztmux-pane-names` (global,
+/// default OFF); `on`/`1`/`true`/`yes` enables it. The sync/select/trigger state
+/// frames are unaffected by this - they always show.
 unsafe fn pane_names_on() -> bool {
     unsafe {
         match global_user_opt("@ztmux-pane-names") {
-            Some(v) => !matches!(v.trim(), "off" | "0" | "false" | "no"),
-            None => true, // default on
+            Some(v) => matches!(v.trim(), "on" | "1" | "true" | "yes"),
+            None => false, // default off - most people don't want every pane framed
         }
     }
 }
@@ -1133,6 +1134,13 @@ unsafe fn pane_display_name(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) -
 pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut window_pane) {
     unsafe {
         if !enabled() || wp.is_null() {
+            return;
+        }
+        // Don't paint frames while an overlay (command palette, menu, popup,
+        // display-panes, hint bar) owns the screen: our per-pane blit ignores the
+        // overlay clip, so a pane redraw would scribble over the floating box and
+        // wipe it. Frames come back when the overlay closes.
+        if (*ctx).c.is_null() || (*(*ctx).c).overlay_draw.is_some() {
             return;
         }
         let po = (*wp).options;

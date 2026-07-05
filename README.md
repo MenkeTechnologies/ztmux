@@ -234,9 +234,9 @@ They fall into a few families:
   name drawn in the rounded top border, so it costs no extra row), and **multi-pane selective
   sync** — mark panes (`prefix C-s`), sync the set (`prefix M`), with the frame recoloured for
   synced (red), selected (orange) and trigger-armed (cyan) panes. Settings (all `set -g`):
-  `@ztmux-hint off` hides the hint bar; `@ztmux-pane-names off` hides the name frames;
-  `@ztmux-pane-name-format` overrides the frame name with a tmux format (e.g.
-  `#{pane_index}: #{pane_current_command}`). The whole surface is gated behind the flag, so the
+  `@ztmux-hint off` hides the hint bar; `@ztmux-pane-names on` opts into always-on per-pane
+  name frames (off by default); `@ztmux-pane-name-format` overrides the frame name with a tmux
+  format (e.g. `#{pane_index}: #{pane_current_command}`). The whole surface is gated behind the flag, so the
   default path and the byte-for-byte parity suite are untouched.
 
 Run `ztmux --help` for the current list, or `man ztmux` for the full reference — each
