@@ -82,6 +82,7 @@ macro_rules! DEFAULT_PANE_MENU {
             " '#{?synchronize-panes,,-}Unsync All Panes' 'U' {run-shell \"ztmux -S #{socket_path} pick clear\"}",
             " ''",
             " '#{?@ztmux-stacked,Unstack Panes,Stack Panes (zellij)}' 'k' {if -F '#{@ztmux-stacked}' {set -uw @ztmux-stacked ; select-layout even-vertical} {set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 999}}",
+            " 'Floating Pane (zellij)' 'f' {if -F '#{==:#{session_name},_ztmux_float}' {detach-client} {display-popup -E -w 80% -h 70% -T ' floating pane (prefix C-f to close) ' 'ztmux -S \"${TMUX%%,*}\" new-session -A -s _ztmux_float'}}",
         )
     };
 }
@@ -690,8 +691,15 @@ pub unsafe fn key_bindings_init() {
     // (scrollback-to-$EDITOR, the multi-pane selection). They may use `#{...}`
     // formats freely; only the `display-popup` *command* above cannot.
     #[rustfmt::skip]
-    static ZTMUX_EXTENSION_BINDINGS: [&str; 13] = [
+    static ZTMUX_EXTENSION_BINDINGS: [&str; 14] = [
         "bind -N 'ztmux: live server dashboard' C-d { display-popup -E -w 90% -h 90% 'ztmux -S \"${TMUX%%,*}\" dashboard' }",
+        // Zellij-style floating pane: a persistent pane that floats above the
+        // tiled layout in a popup. It lives in a hidden `_ztmux_float` holding
+        // session (state kept between toggles); `new-session -A` attaches it or
+        // creates it on first use. Pressing the key again *inside* the float
+        // (its session name matches) detaches, closing the popup. So `prefix C-f`
+        // both opens and closes it.
+        "bind -N 'ztmux: toggle floating pane' C-f { if -F '#{==:#{session_name},_ztmux_float}' { detach-client } { display-popup -E -w 80% -h 70% -T ' floating pane (prefix C-f to close) ' 'ztmux -S \"${TMUX%%,*}\" new-session -A -s _ztmux_float' } }",
         "bind -N 'ztmux: session/window/pane picker' S { display-popup -E -w 80% -h 70% 'ztmux -S \"${TMUX%%,*}\" switcher' }",
         "bind -N 'ztmux: server tree' T { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" tree | less -R' }",
         "bind -N 'ztmux: environment/server health check' H { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" doctor | less -R' }",

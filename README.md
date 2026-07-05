@@ -242,7 +242,9 @@ They fall into a few families:
   `:tabs` — which restyles the status line and restores your prior status settings on `tabs off`.
   A zellij-style **session manager** (`ztmux sessions` / `:sessions`) opens a ratatui list of
   sessions: type to filter, Enter switches, `Ctrl-r` renames, `Ctrl-x` kills (with confirm),
-  `Ctrl-n` makes a new one.
+  `Ctrl-n` makes a new one. `prefix C-f` toggles a zellij-style **floating pane** — a persistent
+  pane that floats above the tiled layout in a popup (kept live in a hidden holding session, so
+  its state survives between toggles; press `prefix C-f` again to hide it).
   Settings (all `set -g`):
   `@ztmux-ratatui off` disables the whole ratatui renderer for a classic plain-tmux server (on by
   default; takes effect on the next redraw); `@ztmux-hint on` shows the prefix hint bar (off by
