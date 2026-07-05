@@ -230,13 +230,15 @@ They fall into a few families:
 - **Ratatui UI** (opt-in, `ZTMUX_RATATUI=1`) — original interactive surfaces rendered with
   ratatui rather than tmux's server draw: a which-key **hint bar** on the prefix, a floating
   **command palette** with inline Tab/arrow completion, ratatui **clock** and **display-panes**,
-  **edit-scrollback-in-`$EDITOR`** (`prefix e`), zellij-style **pane-name frames** (the pane's
-  name drawn in the rounded top border, so it costs no extra row), and **multi-pane selective
-  sync** — mark panes (`prefix C-s`), sync the set (`prefix M`), with the frame recoloured for
-  synced (red), selected (orange) and trigger-armed (cyan) panes. Settings (all `set -g`):
-  `@ztmux-hint off` hides the hint bar; `@ztmux-pane-names on` opts into always-on per-pane
-  name frames (off by default); `@ztmux-pane-name-format` overrides the frame name with a tmux
-  format (e.g. `#{pane_index}: #{pane_current_command}`). The whole surface is gated behind the flag, so the
+  **edit-scrollback-in-`$EDITOR`** (`prefix e`), and **multi-pane selective sync** — mark panes
+  (`prefix C-s`), sync the set (`prefix M`). Sync state is shown on the pane **border** — synced
+  (red), selected (orange), trigger-armed (cyan) — which output can never overwrite.
+  Opt into zellij-style **pane frames** with `@ztmux-pane-names on`: every pane is *inset* by a
+  one-cell ring (like zellij, so a program can never draw on the frame) and gets a rounded box
+  with its name in the top border; the box recolours for sync state. Settings (all `set -g`):
+  `@ztmux-hint off` hides the hint bar; `@ztmux-pane-names on` enables the framed/inset mode (off
+  by default; takes effect on the next layout change); `@ztmux-pane-name-format` overrides the
+  frame name with a tmux format (e.g. `#{pane_index}: #{pane_current_command}`). The whole surface is gated behind the flag, so the
   default path and the byte-for-byte parity suite are untouched.
 
 Run `ztmux --help` for the current list, or `man ztmux` for the full reference — each

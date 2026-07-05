@@ -1065,6 +1065,40 @@ unsafe fn pane_marked_for_sync(po: *mut options) -> bool {
     }
 }
 
+/// The `#{?synchronize-panes}`-style colour for a pane's sync state, or `None`
+/// if it has none. Synced red, selected orange, trigger-armed cyan (the same
+/// palette as the frames).
+unsafe fn pane_state_colour(wp: *mut window_pane) -> Option<i32> {
+    unsafe {
+        let po = (*wp).options;
+        if crate::options_::options_get_number_(po, "synchronize-panes") != 0 {
+            Some(196)
+        } else if pane_marked_for_sync(po) {
+            Some(214)
+        } else if (*wp).pipe_fd != -1 {
+            Some(51)
+        } else {
+            None
+        }
+    }
+}
+
+/// Colour a pane's *border* for its sync state. Unlike an overlaid frame, the
+/// border is never repainted by the pane's own output, so this is the robust
+/// sync indicator in the default (no-frame) mode. Layered on the resolved
+/// `pane-border-style`; a no-op unless the ratatui UI is enabled.
+pub(crate) unsafe fn apply_sync_border(gc: *mut grid_cell, wp: *mut window_pane) {
+    unsafe {
+        if !enabled() || wp.is_null() {
+            return;
+        }
+        if let Some(fg) = pane_state_colour(wp) {
+            (*gc).fg = fg;
+            (*gc).attr |= grid_attr::GRID_ATTR_BRIGHT;
+        }
+    }
+}
+
 /// Read a global user option (`set -g @name ...`) as a string, checking every
 /// global scope so it is found wherever `-g` routed it (server/session/window),
 /// never fataling on an unset option. `None` if unset everywhere.
@@ -1081,10 +1115,10 @@ unsafe fn global_user_opt(name: &str) -> Option<String> {
     }
 }
 
-/// Whether to draw a named frame on ordinary (unsynced) panes too - zellij's
-/// always-on per-pane name frames. Opt-in via `@ztmux-pane-names` (global,
-/// default OFF); `on`/`1`/`true`/`yes` enables it. The sync/select/trigger state
-/// frames are unaffected by this - they always show.
+/// Whether the always-on zellij-style pane frames are enabled - opt-in via
+/// `@ztmux-pane-names` (global, default OFF); `on`/`1`/`true`/`yes` enables it.
+/// In this mode *every* pane gets a named, inset frame; sync/select/trigger just
+/// recolour it. When off there are no frames (sync shows via the border colour).
 unsafe fn pane_names_on() -> bool {
     unsafe {
         match global_user_opt("@ztmux-pane-names") {
@@ -1092,6 +1126,14 @@ unsafe fn pane_names_on() -> bool {
             None => false, // default off - most people don't want every pane framed
         }
     }
+}
+
+/// The 1-cell ring reserved around every pane for its frame when the always-on
+/// pane frames are enabled, else 0. Read by BOTH `layout_fix_panes` (to shrink
+/// the pane's content so a program can never draw on the frame) and the frame
+/// draw (to place the ring), so the two always agree.
+pub(crate) unsafe fn frame_inset() -> u32 {
+    unsafe { u32::from(enabled() && pane_names_on()) }
 }
 
 /// The name shown in a pane's frame. `@ztmux-pane-name-format` (global) is a
@@ -1143,10 +1185,18 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
         if (*ctx).c.is_null() || (*(*ctx).c).overlay_draw.is_some() {
             return;
         }
+        // Frames only exist in the always-on mode, where the layout has inset
+        // every pane by this ring so the frame has reserved space (content can
+        // never draw on it). Off => no frames; sync shows via the border colour.
+        let inset = frame_inset();
+        if inset == 0 {
+            return;
+        }
         let po = (*wp).options;
-        // The pane states ztmux frames, most-urgent first: actively broadcasting
-        // (synced), selected to be synced next (marked), or watched by an armed
-        // content-trigger (`pipe_fd` is the `#{pane_pipe}` signal).
+        // The pane states, most-urgent first: actively broadcasting (synced),
+        // selected to be synced next (marked), or watched by an armed
+        // content-trigger (`pipe_fd` is the `#{pane_pipe}` signal). State just
+        // recolours the (always present) frame.
         let state = if crate::options_::options_get_number_(po, "synchronize-panes") != 0 {
             Some((Color::Indexed(196), "\u{27f2} SYNCED")) // bright red
         } else if pane_marked_for_sync(po) {
@@ -1156,31 +1206,26 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
         } else {
             None
         };
-        let names = pane_names_on();
-        if state.is_none() && !names {
-            return; // nothing to show on this pane
-        }
 
-        let sx = (*wp).sx as u16;
-        let sy = (*wp).sy as u16;
-        if sx < 4 || sy < 3 {
+        // The frame occupies the reserved ring: the full layout cell, one inset
+        // cell out from the content on each side.
+        let cell_x = (*wp).xoff.saturating_sub(inset);
+        let cell_y = (*wp).yoff.saturating_sub(inset);
+        let cell_sx = ((*wp).sx + 2 * inset) as u16;
+        let cell_sy = ((*wp).sy + 2 * inset) as u16;
+        if cell_sx < 4 || cell_sy < 3 {
             return;
         }
-        // Only frame panes that sit fully inside the viewport (keep it simple;
-        // partials are skipped rather than clipped).
-        if (*wp).xoff < (*ctx).ox
-            || (*wp).yoff < (*ctx).oy
-            || (*wp).xoff + (*wp).sx > (*ctx).ox + (*ctx).sx
-            || (*wp).yoff + (*wp).sy > (*ctx).oy + (*ctx).sy
+        // Only frame cells fully inside the viewport (skip partials).
+        if cell_x < (*ctx).ox
+            || cell_y < (*ctx).oy
+            || cell_x + cell_sx as u32 > (*ctx).ox + (*ctx).sx
+            || cell_y + cell_sy as u32 > (*ctx).oy + (*ctx).sy
         {
             return;
         }
 
-        let name = if names {
-            pane_display_name(ctx, wp)
-        } else {
-            String::new()
-        };
+        let name = pane_display_name(ctx, wp);
         let (color, title, bold) = match state {
             Some((col, lbl)) => {
                 let t = if name.is_empty() {
@@ -1197,7 +1242,7 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
 
         let c = (*ctx).c;
         let tty = &raw mut (*c).tty;
-        let area = Rect::new(0, 0, sx, sy);
+        let area = Rect::new(0, 0, cell_sx, cell_sy);
         let mut buf = Buffer::empty(area);
         let mut style = Style::default().fg(color);
         if bold {
@@ -1209,13 +1254,13 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
             .title(Line::from(title))
             .render(area, &mut buf);
 
-        let yoff = (*wp).yoff - (*ctx).oy
+        let yoff = cell_y - (*ctx).oy
             + if (*ctx).statustop != 0 {
                 (*ctx).statuslines
             } else {
                 0
             };
-        let xoff = (*wp).xoff - (*ctx).ox;
+        let xoff = cell_x - (*ctx).ox;
         blit_tty_frame(tty, &buf, xoff, yoff);
     }
 }

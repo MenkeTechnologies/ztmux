@@ -781,6 +781,9 @@ pub unsafe fn screen_redraw_draw_borders_style(
         } else {
             style_apply(&raw mut (*wp).border_gc, oo, c!("pane-border-style"), ft);
         }
+        // ztmux: robust sync-state border colour (never overwritten by output);
+        // no-op unless the ratatui UI is on and the pane has a sync state.
+        crate::extensions::ratatui_ui::apply_sync_border(&raw mut (*wp).border_gc, wp);
         format_free(ft);
 
         &raw const (*wp).border_gc

@@ -305,11 +305,20 @@ pub unsafe fn layout_fix_panes(w: *mut window, skip: *mut window_pane) {
             (*wp).xoff = (*lc).xoff;
             (*wp).yoff = (*lc).yoff;
 
+            // ztmux: reserve a 1-cell ring around the pane for its zellij-style
+            // frame, so a program can never draw on the frame (inset == 0 unless
+            // `@ztmux-pane-names on`, leaving the parity path untouched).
+            let inset = crate::extensions::ratatui_ui::frame_inset();
+
             if layout_add_border(w, lc, status) {
                 if status == pane_status::PANE_STATUS_TOP {
                     (*wp).yoff += 1;
                 }
                 window_pane_resize(wp, (*lc).sx, (*lc).sy - 1);
+            } else if inset != 0 && (*lc).sx > 2 * inset && (*lc).sy > 2 * inset {
+                (*wp).xoff += inset;
+                (*wp).yoff += inset;
+                window_pane_resize(wp, (*lc).sx - 2 * inset, (*lc).sy - 2 * inset);
             } else {
                 window_pane_resize(wp, (*lc).sx, (*lc).sy);
             }
