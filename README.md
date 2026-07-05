@@ -254,7 +254,11 @@ They fall into a few families:
   (zellij-style resurrectable sessions): `save` writes every session/window/pane — layout, cwd and
   command — to `~/.ztmux/resurrect/`, and `restore` recreates them (windows, panes and exact tiled
   geometry; shell panes come back in their cwd, `--run` also re-runs saved commands). Existing
-  sessions are never clobbered; `resurrect list` shows saved snapshots.
+  sessions are never clobbered; `resurrect list` shows saved snapshots. For continuum-style
+  automatic persistence, `set -g @ztmux-resurrect-auto on`: the first client to attach spawns a
+  detached daemon that re-saves every 15 minutes (pidfile-guarded, one per server); add
+  `set -g @ztmux-resurrect-restore on` and it also restores the last snapshot once on a fresh
+  server start.
   `ztmux open` / `:open` (also in the pane menu) scans the current pane for URLs and file paths
   and shows a ratatui picker — Enter opens the selection (a URL in `open`/`xdg-open`, a file in
   `$EDITOR` at its `file:line`, a directory revealed), `y` copies it (tmux buffer + OS clipboard).

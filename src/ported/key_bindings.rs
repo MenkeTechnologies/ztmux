@@ -692,7 +692,7 @@ pub unsafe fn key_bindings_init() {
     // (scrollback-to-$EDITOR, the multi-pane selection). They may use `#{...}`
     // formats freely; only the `display-popup` *command* above cannot.
     #[rustfmt::skip]
-    static ZTMUX_EXTENSION_BINDINGS: [&str; 14] = [
+    static ZTMUX_EXTENSION_BINDINGS: [&str; 15] = [
         "bind -N 'ztmux: live server dashboard' C-d { display-popup -E -w 90% -h 90% 'ztmux -S \"${TMUX%%,*}\" dashboard' }",
         // Zellij-style floating pane: a persistent pane that floats above the
         // tiled layout in a popup. It lives in a hidden `_ztmux_float` holding
@@ -735,6 +735,13 @@ pub unsafe fn key_bindings_init() {
         // so unstacked windows are untouched.
         "set-hook -ga window-pane-changed { if -F '#{@ztmux-stacked}' 'select-layout even-vertical ; resize-pane -y 999' }",
         "bind -N 'ztmux: toggle zellij pane stack' + { if -F '#{@ztmux-stacked}' { set -uw @ztmux-stacked ; select-layout even-vertical } { set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 999 } }",
+        // Continuum-style session persistence: when `@ztmux-resurrect-auto on`,
+        // the first client to attach spawns a detached background daemon that
+        // re-saves the whole server every 15 minutes (`ztmux resurrect autosave`,
+        // pidfile-guarded so re-attaching never starts a second). If
+        // `@ztmux-resurrect-restore on` too, that daemon also restores the last
+        // snapshot once on start. No-op unless the option is set.
+        "set-hook -ga client-attached { if -F '#{@ztmux-resurrect-auto}' 'run-shell -b \"ztmux -S #{socket_path} resurrect autosave\"' }",
     ];
 
     unsafe {

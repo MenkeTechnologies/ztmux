@@ -42,6 +42,7 @@ pub(crate) fn run(socket: &str) -> i32 {
     match op_arg().as_deref() {
         Some("restore") => restore(socket),
         Some("list") => list(),
+        Some("autosave") => autosave(socket),
         _ => save(socket),
     }
 }
@@ -63,7 +64,8 @@ fn dir() -> Option<PathBuf> {
 
 // ---- save ----------------------------------------------------------------
 
-fn save(socket: &str) -> i32 {
+/// Capture the whole server as the save-file text (window + pane lines).
+fn capture(socket: &str) -> String {
     let wfmt = format!(
         "win{SEP}#{{session_name}}{SEP}#{{window_index}}{SEP}#{{window_name}}{SEP}#{{window_layout}}{SEP}#{{window_active}}"
     );
@@ -79,27 +81,112 @@ fn save(socket: &str) -> i32 {
         out.push_str(&line);
         out.push('\n');
     }
-    if out.is_empty() {
-        eprintln!("resurrect: nothing to save (no server?)");
-        return 1;
-    }
-    let Some(d) = dir() else {
-        eprintln!("resurrect: cannot find $HOME/.ztmux/resurrect");
-        return 1;
-    };
-    // Timestamped snapshot + a stable `last` the restore reads by default.
+    out
+}
+
+/// Write `text` as a timestamped snapshot plus the stable `last.txt` restore
+/// reads by default. Returns the snapshot path.
+fn write_snapshot(text: &str) -> Option<PathBuf> {
+    let d = dir()?;
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());
     let snap = d.join(format!("{stamp}.txt"));
-    if std::fs::write(&snap, &out).is_err() || std::fs::write(d.join("last.txt"), &out).is_err() {
-        eprintln!("resurrect: write failed");
+    std::fs::write(&snap, text).ok()?;
+    std::fs::write(d.join("last.txt"), text).ok()?;
+    Some(snap)
+}
+
+fn save(socket: &str) -> i32 {
+    let out = capture(socket);
+    if out.is_empty() {
+        eprintln!("resurrect: nothing to save (no server?)");
         return 1;
     }
+    let Some(snap) = write_snapshot(&out) else {
+        eprintln!("resurrect: write failed");
+        return 1;
+    };
     let wins = out.lines().filter(|l| l.starts_with("win")).count();
     let panes = out.lines().filter(|l| l.starts_with("pane")).count();
     println!("saved {wins} windows, {panes} panes -> {}", snap.display());
     0
+}
+
+// ---- autosave daemon -----------------------------------------------------
+
+/// Background loop that re-saves every `interval` seconds (continuum-style).
+/// Runs top-level (the only context where the nested `list-*` queries work),
+/// so it is spawned detached — from `@ztmux-resurrect-auto`'s client-attached
+/// hook, or by hand. A per-socket pidfile keeps a single daemon per server.
+fn autosave(socket: &str) -> i32 {
+    let interval = std::env::args()
+        .collect::<Vec<_>>()
+        .iter()
+        .position(|a| a == "autosave")
+        .and_then(|i| std::env::args().nth(i + 1))
+        .and_then(|s| s.parse::<u64>().ok())
+        .filter(|n| *n >= 5)
+        .unwrap_or(900);
+
+    let Some(d) = dir() else {
+        return 1;
+    };
+    let pidfile = d.join(format!("autosave-{}.pid", socket.replace(['/', ':'], "_")));
+    if daemon_alive(&pidfile) {
+        return 0; // one already running for this socket
+    }
+    let _ = std::fs::write(&pidfile, std::process::id().to_string());
+
+    // Restore-on-start: the pidfile guard means this daemon is the first for this
+    // server, so this runs once — at the first attach after the server started
+    // (continuum's "restore on fresh server start"). restore() only fills in
+    // sessions that aren't already live, so it never clobbers anything.
+    let restore_on_start = query_lines(
+        socket,
+        &["show-options", "-gqv", "@ztmux-resurrect-restore"],
+    )
+    .first()
+    .is_some_and(|v| matches!(v.trim(), "on" | "1" | "true" | "yes"));
+    if restore_on_start {
+        restore(socket);
+    }
+
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(interval));
+        // Stop if a newer daemon took over the pidfile, or the server is gone.
+        if !owns_pidfile(&pidfile) {
+            return 0;
+        }
+        let out = capture(socket);
+        if out.is_empty() {
+            let _ = std::fs::remove_file(&pidfile);
+            return 0; // server exited
+        }
+        let _ = write_snapshot(&out);
+    }
+}
+
+/// Whether a live autosave daemon (other than us) holds the pidfile.
+fn daemon_alive(pidfile: &std::path::Path) -> bool {
+    match std::fs::read_to_string(pidfile)
+        .ok()
+        .and_then(|s| s.trim().parse::<i32>().ok())
+    {
+        Some(pid) if pid != std::process::id() as i32 => {
+            // kill(pid, 0): 0 means the process exists.
+            unsafe { libc::kill(pid, 0) == 0 }
+        }
+        _ => false,
+    }
+}
+
+/// Whether the pidfile still names us (a newer daemon overwrites it).
+fn owns_pidfile(pidfile: &std::path::Path) -> bool {
+    std::fs::read_to_string(pidfile)
+        .ok()
+        .and_then(|s| s.trim().parse::<u32>().ok())
+        == Some(std::process::id())
 }
 
 // ---- restore -------------------------------------------------------------
