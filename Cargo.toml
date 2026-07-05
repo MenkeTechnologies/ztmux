@@ -14,7 +14,7 @@ exclude = ["vendor"]
 [package]
 name         = "ztmux"
 version      = "3.7.10"
-authors      = ["MenkeTechnologies"]
+authors = ["MenkeTechnologies <linux.dev25@gmail.com>"]
 categories   = ["command-line-utilities"]
 edition      = "2024"
 include      = ["/src", "COPYING", "README.md", "build.rs"]
