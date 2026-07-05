@@ -82,6 +82,7 @@ macro_rules! DEFAULT_PANE_MENU {
             " '#{?synchronize-panes,,-}Unsync All Panes' 'U' {run-shell \"ztmux -S #{socket_path} pick clear\"}",
             " ''",
             " '#{?@ztmux-stacked,Unstack Panes,Stack Panes (zellij)}' 'k' {if -F '#{@ztmux-stacked}' {set -uw @ztmux-stacked ; select-layout even-vertical} {set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 999}}",
+            " '#{?@ztmux-tab-bar,Hide Tab Bar,Tab Bar (zellij)}' 'T' {run-shell \"ztmux -S #{socket_path} tabs toggle\"}",
             " 'Floating Pane (zellij)' 'f' {if -F '#{==:#{session_name},_ztmux_float}' {detach-client} {display-popup -E -w 80% -h 70% -T ' floating pane (prefix C-f to close) ' 'ztmux -S \"${TMUX%%,*}\" new-session -A -s _ztmux_float'}}",
             " 'Open URL / Path from Pane' 'o' {display-popup -E -w 80% -h 60% 'ztmux -S \"${TMUX%%,*}\" open'}",
         )
