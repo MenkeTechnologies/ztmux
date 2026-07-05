@@ -60,7 +60,7 @@ pub(crate) fn help() -> ! {
     );
     println!();
     println!(
-        "\x1b[35m  ztmux {} \x1b[0m// \x1b[33m(c) Jacob Menke and contributors\x1b[0m",
+        "\x1b[35m  ztmux {} \x1b[0m// \x1b[33m(c) MenkeTechnologies\x1b[0m",
         getversion()
     );
     println!("\x1b[33m  >>> JACK IN. SPLIT YOUR PANES. OWN YOUR SESSIONS. <<<\x1b[0m");
