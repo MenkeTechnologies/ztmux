@@ -826,15 +826,33 @@ unsafe fn hint_bindings(c: *mut client) -> Vec<(String, String)> {
         while !bd.is_null() {
             let key = (*bd).key;
             let note = (*bd).note;
-            if !KEYC_IS_MOUSE(key) && !note.is_null() && *note != 0 {
+            // Label: the binding's `-N` note if it has one, else the bound
+            // command itself (like `list-keys`), so a key the user rebound
+            // WITHOUT a note still shows up instead of vanishing.
+            let (label, owned) = if !note.is_null() && *note != 0 {
+                (note, false)
+            } else if !(*bd).cmdlist.is_null() {
+                (cmd_list_print(&*(*bd).cmdlist, 1), true)
+            } else {
+                (null_mut(), false)
+            };
+            if !KEYC_IS_MOUSE(key) && !label.is_null() && *label != 0 {
                 let ks = key_string_lookup_key(key, 0);
                 if !ks.is_null() {
                     // key_string_lookup_key hands back a reused static buffer, so
                     // copy both strings out before the next call clobbers it.
                     let keystr = crate::cstr_to_str(ks).to_string();
-                    let notestr = crate::cstr_to_str(note).to_string();
+                    let mut notestr = crate::cstr_to_str(label).to_string();
+                    // A command-derived label can be an arbitrarily long command
+                    // line; keep chips compact (notes are already terse).
+                    if owned && notestr.chars().count() > 24 {
+                        notestr = notestr.chars().take(23).collect::<String>() + "\u{2026}";
+                    }
                     out.push((keystr, notestr));
                 }
+            }
+            if owned && !label.is_null() {
+                crate::free_(label);
             }
             bd = key_bindings_next(table, bd);
         }
