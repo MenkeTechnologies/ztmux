@@ -529,7 +529,11 @@ pub unsafe fn status_message_set_(
         }
 
         status_message_clear(NonNull::new_unchecked(c));
-        status_push_screen(c);
+        // ztmux: the floating message overlay doesn't take over the status row,
+        // so the powerline status bar stays visible - skip the screen push.
+        if !crate::extensions::ratatui_ui::enabled() {
+            status_push_screen(c);
+        }
         s.push('\0');
         let s = s.leak().as_mut_ptr().cast();
         (*c).message_string = s;
@@ -561,6 +565,17 @@ pub unsafe fn status_message_set_(
         }
         (*c).message_ignore_styles = ignore_styles;
 
+        // ztmux: float the message as a ratatui overlay instead of freezing the
+        // whole window and painting over the status row. The panes and status
+        // bar keep redrawing underneath; the display-time timer (or the next
+        // key) tears the overlay down via status_message_clear.
+        if crate::extensions::ratatui_ui::enabled() {
+            (*c).tty.flags |= tty_flags::TTY_NOCURSOR;
+            (*c).flags |= client_flag::REDRAWSTATUS;
+            crate::extensions::ratatui_ui::set_message_overlay(c);
+            return;
+        }
+
         if no_freeze == 0 {
             (*c).tty.flags |= tty_flags::TTY_FREEZE;
         }
@@ -578,6 +593,11 @@ pub unsafe fn status_message_clear(c: NonNull<client>) {
             return;
         }
 
+        // ztmux: tear down the floating message overlay if we put one up.
+        if crate::extensions::ratatui_ui::enabled() {
+            crate::extensions::ratatui_ui::clear_message_overlay(c);
+        }
+
         free_((*c).message_string);
         (*c).message_string = null_mut();
 
@@ -586,7 +606,10 @@ pub unsafe fn status_message_clear(c: NonNull<client>) {
         }
         (*c).flags |= CLIENT_ALLREDRAWFLAGS; /* was frozen and may have changed */
 
-        status_pop_screen(c);
+        // ztmux: no status screen was pushed for the overlay message (see set).
+        if !crate::extensions::ratatui_ui::enabled() {
+            status_pop_screen(c);
+        }
     }
 }
 
@@ -602,6 +625,13 @@ unsafe extern "C-unwind" fn status_message_callback(_fd: i32, _event: i16, data:
 /// C `vendor/tmux/status.c:462`: `int status_message_redraw(struct client *c)`
 pub unsafe fn status_message_redraw(c: *mut client) -> i32 {
     unsafe {
+        // ztmux: the message is drawn as a floating overlay (registered by
+        // status_message_set), not on the status line, so the powerline status
+        // bar stays visible. Nothing to draw here.
+        if crate::extensions::ratatui_ui::enabled() {
+            return 0;
+        }
+
         let sl = &raw mut (*c).status;
         let mut ctx: screen_write_ctx = zeroed();
         let s = (*c).session;

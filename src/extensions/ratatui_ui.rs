@@ -155,6 +155,56 @@ fn map_color(c: Option<Color>) -> i32 {
     }
 }
 
+/// Convert a tmux colour integer (as stored in `grid_cell.fg`/`.bg`) into a
+/// ratatui [`Color`]. Returns `None` for the terminal default (`8`/`-1`) so the
+/// caller can leave that channel unset. The inverse of [`map_color`].
+fn tmux_colour_to_ratatui(c: i32) -> Option<Color> {
+    const COLOUR_FLAG_256: i32 = 0x0100_0000;
+    const COLOUR_FLAG_RGB: i32 = 0x0200_0000;
+    if c == -1 || c == 8 {
+        return None; // terminal default
+    }
+    if c & COLOUR_FLAG_RGB != 0 {
+        let (r, g, b) = crate::colour::colour_split_rgb(c);
+        return Some(Color::Rgb(r, g, b));
+    }
+    if c & COLOUR_FLAG_256 != 0 {
+        return Some(Color::Indexed((c & 0xff) as u8));
+    }
+    match c {
+        0..=7 => Some(Color::Indexed(c as u8)),
+        90..=97 => Some(Color::Indexed((c - 90 + 8) as u8)), // aixterm bright
+        100..=107 => Some(Color::Indexed((c - 100 + 8) as u8)),
+        _ => None,
+    }
+}
+
+/// Resolve the client's `message-style` option into `(fg, bg)` ratatui colours,
+/// honouring a `reverse` attribute (swaps fg/bg). Both the floating status
+/// message and the `:` command prompt are drawn with `message-style` in tmux, so
+/// both overlays tint themselves from this - a user's `message-style bg=purple`
+/// recolours the boxes instead of them being hardcoded. Falls back to `(None,
+/// None)` when there is no session.
+unsafe fn message_style_colors(c: *mut client) -> (Option<Color>, Option<Color>) {
+    unsafe {
+        let s = (*c).session;
+        if s.is_null() {
+            return (None, None);
+        }
+        let ft = format_create_defaults(null_mut(), c, null_mut(), null_mut(), null_mut());
+        let mut gc = std::mem::MaybeUninit::<grid_cell>::uninit();
+        style_apply(gc.as_mut_ptr(), (*s).options, c!("message-style"), ft);
+        let gc = gc.assume_init();
+        format_free(ft);
+
+        let (mut fg, mut bg) = (gc.fg, gc.bg);
+        if gc.attr.contains(grid_attr::GRID_ATTR_REVERSE) {
+            std::mem::swap(&mut fg, &mut bg);
+        }
+        (tmux_colour_to_ratatui(fg), tmux_colour_to_ratatui(bg))
+    }
+}
+
 /// Map ratatui [`Modifier`] bits to tmux `grid_attr` flags.
 fn map_modifier(m: Modifier) -> grid_attr {
     let mut a = grid_attr::empty();
@@ -482,6 +532,229 @@ pub(crate) unsafe fn clear_prompt_overlay(c: *mut client) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Floating status *message* (errors, notices). Classic tmux paints these over
+// the status row, hiding it. ztmux instead floats the message as a rounded
+// overlay box - the same treatment as the `:` command prompt - so the status
+// bar stays visible underneath. It carries a check callback (panes clip around
+// it, no freeze) but NO key callback: the message-key handling in
+// `server_client_handle_key` already clears the message (and hence this
+// overlay) on the next key, and the `display-time` timer auto-dismisses it
+// otherwise - exactly the transient toast behaviour. The draw reads
+// `c.message_string` live each frame, so no owned data is needed; the sentinel
+// mark just lets `clear_message_overlay` recognise our own overlay.
+// ---------------------------------------------------------------------------
+
+static MESSAGE_OVERLAY_MARK: u8 = 0;
+
+fn message_mark() -> *mut core::ffi::c_void {
+    (&raw const MESSAGE_OVERLAY_MARK).cast_mut().cast()
+}
+
+/// Float the status message as an overlay box (from `status_message_set`).
+pub(crate) unsafe fn set_message_overlay(c: *mut client) {
+    unsafe {
+        server_client_set_overlay(
+            c,
+            0,
+            Some(message_check_cb),
+            None,
+            Some(message_overlay_draw),
+            None,
+            None,
+            None,
+            message_mark(),
+        );
+    }
+}
+
+/// Tear down the message overlay if it is ours (from `status_message_clear`).
+pub(crate) unsafe fn clear_message_overlay(c: *mut client) {
+    unsafe {
+        if (*c).overlay_data == message_mark() {
+            server_client_clear_overlay(c);
+        }
+    }
+}
+
+/// Geometry + wrapped lines of the floating message box, computed fresh from the
+/// current `message_string` so the draw and the pane-clipping check callback
+/// always agree.
+struct MessageLayout {
+    px: u16,
+    py: u16,
+    w: u16,
+    h: u16,
+    lines: Vec<String>,
+}
+
+unsafe fn message_layout(c: *mut client) -> Option<MessageLayout> {
+    unsafe {
+        if (*c).message_string.is_null() {
+            return None;
+        }
+        let sx = (*c).tty.sx as u16;
+        let sy = (*c).tty.sy as u16;
+        if sx < 12 || sy < 4 {
+            return None;
+        }
+
+        // Strip status markup (`#[...]`) - the overlay renders plain text - and
+        // fold any embedded newlines / tabs into spaces so wrapping is clean.
+        let text = strip_markup(crate::cstr_to_str((*c).message_string));
+        let text = text.replace(['\n', '\r', '\t'], " ");
+        let text = text.trim();
+        if text.is_empty() {
+            return None;
+        }
+
+        // Wrap to an inner width bounded by the terminal, word-first with a
+        // hard break for over-long tokens, at most 6 rows.
+        let inner = (sx.saturating_sub(6) as usize).clamp(8, 100);
+        let mut lines: Vec<String> = Vec::new();
+        let mut cur = String::new();
+        for word in text.split(' ').filter(|w| !w.is_empty()) {
+            if word.chars().count() > inner {
+                if !cur.is_empty() {
+                    lines.push(std::mem::take(&mut cur));
+                }
+                let mut chunk = String::new();
+                for ch in word.chars() {
+                    if chunk.chars().count() >= inner {
+                        lines.push(std::mem::take(&mut chunk));
+                    }
+                    chunk.push(ch);
+                }
+                cur = chunk;
+                continue;
+            }
+            let extra = if cur.is_empty() { 0 } else { 1 };
+            if !cur.is_empty() && cur.chars().count() + extra + word.chars().count() > inner {
+                lines.push(std::mem::take(&mut cur));
+            }
+            if !cur.is_empty() {
+                cur.push(' ');
+            }
+            cur.push_str(word);
+        }
+        if !cur.is_empty() {
+            lines.push(cur);
+        }
+        if lines.len() > 6 {
+            lines.truncate(6);
+            if let Some(last) = lines.last_mut() {
+                let mut t: String = last.chars().take(inner.saturating_sub(1)).collect();
+                t.push('\u{2026}');
+                *last = t;
+            }
+        }
+
+        let widest = lines.iter().map(|l| l.chars().count()).max().unwrap_or(0) as u16;
+        let title_w = " message ".chars().count() as u16;
+        let w = (widest + 4).max(title_w + 2).min(sx.saturating_sub(2));
+        let h = lines.len() as u16 + 2;
+
+        // Anchor a quarter of the way up from the bottom - the same height the
+        // `:` command-prompt box floats at - horizontally centred, but never
+        // let a tall box run off the bottom edge.
+        let py = sy
+            .saturating_sub(sy / 4)
+            .saturating_sub(1)
+            .min(sy.saturating_sub(h));
+        let px = sx.saturating_sub(w) / 2;
+
+        Some(MessageLayout {
+            px,
+            py,
+            w,
+            h,
+            lines,
+        })
+    }
+}
+
+/// Overlay check callback: report the box rect as covered so live panes are
+/// clipped around it (no freeze - the window keeps drawing underneath).
+unsafe fn message_check_cb(
+    c: *mut client,
+    _data: *mut core::ffi::c_void,
+    px: u32,
+    py: u32,
+    nx: u32,
+    r: *mut overlay_ranges,
+) {
+    unsafe {
+        if let Some(l) = message_layout(c) {
+            server_client_overlay_range(
+                l.px as u32,
+                l.py as u32,
+                l.w as u32,
+                l.h as u32,
+                px,
+                py,
+                nx,
+                r,
+            );
+        } else {
+            (*r).px[0] = px;
+            (*r).nx[0] = nx;
+            (*r).px[1] = 0;
+            (*r).nx[1] = 0;
+            (*r).px[2] = 0;
+            (*r).nx[2] = 0;
+        }
+    }
+}
+
+/// Draw the floating status-message overlay onto the tty: a rounded amber box
+/// titled " message " with the wrapped message text inside.
+unsafe fn message_overlay_draw(
+    c: *mut client,
+    _data: *mut core::ffi::c_void,
+    _rctx: *mut screen_redraw_ctx,
+) {
+    unsafe {
+        let Some(l) = message_layout(c) else {
+            return;
+        };
+        let tty = &raw mut (*c).tty;
+        let area = Rect::new(0, 0, l.w, l.h);
+        let mut buf = Buffer::empty(area);
+
+        // Tint from `message-style` (e.g. the user's `bg=purple`); fall back to
+        // amber when the style leaves a channel at the terminal default.
+        let (mfg, mbg) = message_style_colors(c);
+        let fg = mfg.unwrap_or(Color::Yellow);
+        let mut box_style = Style::default().fg(fg);
+        if let Some(bg) = mbg {
+            box_style = box_style.bg(bg);
+        }
+        Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(fg))
+            .style(box_style)
+            .title(Line::from(" message ").centered())
+            .render(area, &mut buf);
+
+        let mut text_style = Style::default().fg(fg).add_modifier(Modifier::BOLD);
+        if let Some(bg) = mbg {
+            text_style = text_style.bg(bg);
+        }
+        for (ri, line) in l.lines.iter().enumerate() {
+            let ry = 1 + ri as u16;
+            let mut cx = 2u16;
+            for ch in line.chars() {
+                if cx >= l.w - 1 {
+                    break;
+                }
+                buf[(cx, ry)].set_char(ch).set_style(text_style);
+                cx += 1;
+            }
+        }
+        blit_tty(tty, &buf, l.px as u32, l.py as u32);
+    }
+}
+
 /// Geometry + content of the floating prompt box, computed fresh from the
 /// current prompt state so the draw and the pane-clipping check callback always
 /// agree - no one-frame lag that would re-ghost a shrinking box.
@@ -697,11 +970,22 @@ unsafe fn prompt_overlay_draw(
         let cands = l.cands;
         let n_rows = boxh - 3;
 
+        // Tint from `message-style` (the same option tmux draws the prompt with)
+        // so a user's `bg=purple` recolours the box; fall back to cyan for the
+        // "command" identity when the style leaves a channel at the default.
+        let (mfg, mbg) = message_style_colors(c);
+        let accent = mfg.unwrap_or(Color::Cyan);
+        let with_bg = |s: Style| match mbg {
+            Some(bg) => s.bg(bg),
+            None => s,
+        };
+
         let area = Rect::new(0, 0, boxw, boxh);
         let mut buf = Buffer::empty(area);
         Block::bordered()
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(accent))
+            .style(with_bg(Style::default().fg(accent)))
             .title(Line::from(" command ").centered())
             .render(area, &mut buf);
 
@@ -712,11 +996,9 @@ unsafe fn prompt_overlay_draw(
             if col >= boxw - 1 {
                 break;
             }
-            buf[(col, row)].set_char(ch).set_style(
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            );
+            buf[(col, row)].set_char(ch).set_style(with_bg(
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            ));
             col += 1;
         }
         let start_col = col;
@@ -736,9 +1018,9 @@ unsafe fn prompt_overlay_draw(
                 let cx = start_col + (x - off);
                 if cx < boxw - 1 {
                     let st = if gi == cursor_i {
-                        Style::default().add_modifier(Modifier::REVERSED)
+                        with_bg(Style::default()).add_modifier(Modifier::REVERSED)
                     } else {
-                        Style::default()
+                        with_bg(Style::default())
                     };
                     buf[(cx, row)].set_symbol(text).set_style(st);
                 }
@@ -748,9 +1030,9 @@ unsafe fn prompt_overlay_draw(
         if cursor_i >= input.len() {
             let cx = start_col + x.saturating_sub(off);
             if cx < boxw - 1 {
-                buf[(cx, row)]
-                    .set_symbol(" ")
-                    .set_style(Style::default().add_modifier(Modifier::REVERSED));
+                buf[(cx, row)].set_symbol(" ").set_style(
+                    with_bg(Style::default().fg(accent)).add_modifier(Modifier::REVERSED),
+                );
             }
         }
 
@@ -759,11 +1041,10 @@ unsafe fn prompt_overlay_draw(
         for (i, cand) in cands.iter().take(n_rows as usize).enumerate() {
             let ry = 2 + i as u16;
             let style = if i as i32 == sel {
-                Style::default()
-                    .fg(Color::Cyan)
+                with_bg(Style::default().fg(accent))
                     .add_modifier(Modifier::REVERSED | Modifier::BOLD)
             } else {
-                Style::default().fg(Color::Gray)
+                with_bg(Style::default().fg(Color::Gray))
             };
             let mut cx = 2u16;
             for ch in cand.chars() {
