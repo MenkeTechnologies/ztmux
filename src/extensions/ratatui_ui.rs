@@ -628,7 +628,7 @@ unsafe fn message_layout(c: *mut client) -> Option<MessageLayout> {
                 cur = chunk;
                 continue;
             }
-            let extra = if cur.is_empty() { 0 } else { 1 };
+            let extra = usize::from(!cur.is_empty());
             if !cur.is_empty() && cur.chars().count() + extra + word.chars().count() > inner {
                 lines.push(std::mem::take(&mut cur));
             }
