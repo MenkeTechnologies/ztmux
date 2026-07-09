@@ -80,6 +80,22 @@ unsafe fn grid_store_cell(gce: *mut grid_cell_entry, gc: *const grid_cell, c: u8
     }
 }
 
+/// Set grid cell to a tab.
+/// C `vendor/tmux/grid.c:334`: `void grid_set_tab(struct grid_cell *gc, u_int width)`
+pub unsafe fn grid_set_tab(gc: *mut grid_cell, width: c_uint) {
+    unsafe {
+        (*gc).data.data = [0; UTF8_SIZE];
+        (*gc).flags |= grid_flag::TAB;
+        (*gc).flags &= !grid_flag::PADDING;
+        (*gc).data.width = width as u8;
+        (*gc).data.size = width as u8;
+        (*gc).data.have = width as u8;
+        for i in 0..width as usize {
+            (*gc).data.data[i] = b' ';
+        }
+    }
+}
+
 /// Check if a cell should be an extended cell.
 /// C `vendor/tmux/grid.c:139`: `static int grid_need_extended_cell(const struct grid_cell_entry *gce, const struct grid_cell *gc)`
 unsafe fn grid_need_extended_cell(gce: *const grid_cell_entry, gc: *const grid_cell) -> bool {
@@ -101,6 +117,9 @@ unsafe fn grid_need_extended_cell(gce: *const grid_cell_entry, gc: *const grid_c
             return true;
         }
         if (*gc).link != 0 {
+            return true;
+        }
+        if (*gc).flags.contains(grid_flag::TAB) {
             return true;
         }
         false
@@ -142,12 +161,19 @@ unsafe fn grid_extended_cell(
         }
         (*gl).flags |= grid_line_flag::EXTENDED;
 
-        let mut uc = MaybeUninit::<utf8_char>::uninit();
-        let uc = uc.as_mut_ptr();
-        utf8_from_data(&raw const (*gc).data, uc);
+        // A tab cell stores its width in the extended entry's `data` slot
+        // rather than an encoded utf8_char (grid_get_cell1 reconstructs it via
+        // grid_set_tab). C `vendor/tmux/grid.c:203`.
+        let uc = if (*gc).flags.contains(grid_flag::TAB) {
+            (*gc).data.width as utf8_char
+        } else {
+            let mut uc = MaybeUninit::<utf8_char>::uninit();
+            utf8_from_data(&raw const (*gc).data, uc.as_mut_ptr());
+            uc.assume_init()
+        };
 
         let gee = &mut *(*gl).extddata.offset((*gce).union_.offset as isize);
-        gee.data = *uc;
+        gee.data = uc;
         gee.attr = (*gc).attr.bits();
         gee.flags = flags.bits();
         gee.fg = (*gc).fg;
@@ -263,7 +289,12 @@ pub unsafe fn grid_cells_look_equal(gc1: *const grid_cell, gc2: *const grid_cell
         if (*gc1).fg != (*gc2).fg || (*gc1).bg != (*gc2).bg {
             return 0;
         }
-        if (*gc1).attr != (*gc2).attr || (*gc1).flags != (*gc2).flags {
+        if (*gc1).attr != (*gc2).attr {
+            return 0;
+        }
+        // Ignore the CLEARED flag: a cleared cell and a plain default cell look
+        // identical on screen. C `vendor/tmux/grid.c:311`.
+        if ((*gc1).flags & !grid_flag::CLEARED) != ((*gc2).flags & !grid_flag::CLEARED) {
             return 0;
         }
         if (*gc1).link != (*gc2).link {
@@ -577,7 +608,11 @@ unsafe fn grid_get_cell1(gl: *mut grid_line, px: c_uint, gc: *mut grid_cell) {
                 (*gc).bg = (*gee).bg;
                 (*gc).us = (*gee).us;
                 (*gc).link = (*gee).link;
-                (*gc).data = utf8_to_data((*gee).data);
+                if (*gc).flags.contains(grid_flag::TAB) {
+                    grid_set_tab(gc, (*gee).data);
+                } else {
+                    (*gc).data = utf8_to_data((*gee).data);
+                }
             }
             return;
         }
@@ -1297,14 +1332,19 @@ pub unsafe fn grid_string_cells(
                 codelen = 0;
             }
 
-            data = &raw const gc.data.data as *const u8;
-            size = gc.data.size as usize;
-            if flags.intersects(grid_string_flags::GRID_STRING_ESCAPE_SEQUENCES)
-                && size == 1
-                && *data == b'\\'
-            {
-                data = c!("\\\\");
-                size = 2;
+            if gc.flags.contains(grid_flag::TAB) {
+                data = c!("\t");
+                size = 1;
+            } else {
+                data = &raw const gc.data.data as *const u8;
+                size = gc.data.size as usize;
+                if flags.intersects(grid_string_flags::GRID_STRING_ESCAPE_SEQUENCES)
+                    && size == 1
+                    && *data == b'\\'
+                {
+                    data = c!("\\\\");
+                    size = 2;
+                }
             }
 
             while len < off + size + codelen + 1 {

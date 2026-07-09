@@ -1439,12 +1439,45 @@ unsafe fn input_c0_dispatch(ictx: *mut input_ctx) -> i32 {
             }
             BS => screen_write_backspace(sctx),
             HT => {
-                while (*s).cx < screen_size_x(s) - 1 {
-                    // Don't tab beyond the end of the line.
+                // Don't tab beyond the end of the line.
+                let cx = (*s).cx;
+                if cx < screen_size_x(s) - 1 {
                     // Find the next tab point, or use the last column if none.
-                    (*s).cx += 1;
-                    if (*s).tabs.as_ref().unwrap().borrow().bit_test((*s).cx) {
-                        break;
+                    // If the tabbed-over region is empty, store a single tab
+                    // cell (GRID_FLAG_TAB) so copy/capture reproduce a literal
+                    // '\t'; otherwise just advance the cursor.
+                    let line = (*s).cy + (*(*s).grid).hsize;
+                    let mut first_gc: grid_cell = zeroed();
+                    grid_get_cell((*s).grid, cx, line, &raw mut first_gc);
+                    let mut has_content = false;
+                    let mut ncx = cx;
+                    let mut gc: grid_cell = zeroed();
+                    loop {
+                        if !has_content {
+                            grid_get_cell((*s).grid, ncx, line, &raw mut gc);
+                            if gc.data.size != 1
+                                || gc.data.data[0] != b' '
+                                || grid_cells_look_equal(&raw const gc, &raw const first_gc) == 0
+                            {
+                                has_content = true;
+                            }
+                        }
+                        ncx += 1;
+                        if (*s).tabs.as_ref().unwrap().borrow().bit_test(ncx) {
+                            break;
+                        }
+                        if ncx >= screen_size_x(s) - 1 {
+                            break;
+                        }
+                    }
+
+                    let width = ncx - cx;
+                    if has_content || width as usize > gc.data.data.len() {
+                        (*s).cx = ncx;
+                    } else {
+                        grid_get_cell((*s).grid, cx, line, &raw mut gc);
+                        grid_set_tab(&raw mut gc, width);
+                        screen_write_collect_add(sctx, &raw const gc);
                     }
                 }
             }

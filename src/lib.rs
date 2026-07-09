@@ -875,6 +875,7 @@ bitflags::bitflags! {
         const SELECTED = 0x10;
         const NOPALETTE = 0x20;
         const CLEARED = 0x40;
+        const TAB = 0x80;
     }
 }
 
