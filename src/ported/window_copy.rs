@@ -5848,6 +5848,30 @@ pub unsafe fn window_copy_find_length(wme: *mut window_mode_entry, py: u32) -> u
     }
 }
 
+/// Return the highest column the cursor may occupy on line `py`. In vi mode the
+/// cursor sits on the last character (`len - 1`), not past it, unless
+/// `allow_onemore` is set (e.g. rectangle selection).
+/// C `vendor/tmux/window-copy.c:5949`: `static u_int window_copy_cursor_limit(struct window_mode_entry *wme, u_int py, int allow_onemore)`
+pub unsafe fn window_copy_cursor_limit(
+    wme: *mut window_mode_entry,
+    py: u32,
+    allow_onemore: i32,
+) -> u32 {
+    unsafe {
+        let oo = (*(*(*wme).wp).window).options;
+        let len = window_copy_find_length(wme, py);
+        if allow_onemore != 0
+            || options_get_number_(oo, "mode-keys") != modekey::MODEKEY_VI as i64
+        {
+            return len;
+        }
+        if len == 0 {
+            return 0;
+        }
+        len - 1
+    }
+}
+
 /// C `vendor/tmux/window-copy.c:5965`: `static void window_copy_cursor_start_of_line(struct window_mode_entry *wme)`
 pub unsafe fn window_copy_cursor_start_of_line(wme: *mut window_mode_entry) {
     unsafe {
@@ -5905,6 +5929,10 @@ pub unsafe fn window_copy_cursor_end_of_line(wme: *mut window_mode_entry) {
             grid_reader_cursor_end_of_line(&raw mut gr, 1, 0);
         }
         grid_reader_get_cursor(&raw mut gr, &raw mut px, &raw mut py);
+        // In vi mode the cursor rests on the last character, not past it.
+        if (*data).screen.sel.is_null() || !(*data).rectflag {
+            px = window_copy_cursor_limit(wme, py, 0);
+        }
         window_copy_acquire_cursor_down(
             wme,
             hsize,
