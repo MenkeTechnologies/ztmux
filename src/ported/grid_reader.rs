@@ -189,16 +189,10 @@ pub unsafe fn grid_reader_handle_wrap(gr: *mut grid_reader, xx: *mut u32, yy: *m
 
 /// C `vendor/tmux/grid-reader.c:186`: `int grid_reader_in_set(struct grid_reader *gr, const char *set)`
 pub unsafe fn grid_reader_in_set(gr: *mut grid_reader, set: *const u8) -> bool {
-    unsafe {
-        let mut gc = MaybeUninit::<grid_cell>::uninit();
-        let gc = gc.as_mut_ptr();
-
-        grid_get_cell((*gr).gd, (*gr).cx, (*gr).cy, gc);
-        if (*gc).flags.intersects(grid_flag::PADDING) {
-            return false;
-        }
-        utf8_cstrhas(set, &raw mut (*gc).data)
-    }
+    // grid_in_set returns the column span of the match (a tab reports its full
+    // width); the word-motion loops advance one column at a time, so a tab's
+    // padding cells all report as "in set" and the cursor steps past the tab.
+    unsafe { grid_in_set((*gr).gd, (*gr).cx, (*gr).cy, set) != 0 }
 }
 
 /// C `vendor/tmux/grid-reader.c:193`: `void grid_reader_cursor_next_word(struct grid_reader *gr, const char *separators)`

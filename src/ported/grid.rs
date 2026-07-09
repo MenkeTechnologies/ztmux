@@ -1836,6 +1836,41 @@ pub unsafe fn grid_line_length(gd: *mut grid, py: u32) -> u32 {
     }
 }
 
+/// Check if a character is in a set. Returns the number of columns the match
+/// spans (so a tab cell reports its full width, letting callers step past it),
+/// or 0 for no match / a padding cell.
+/// C `vendor/tmux/grid.c:1687`: `int grid_in_set(struct grid *gd, u_int px, u_int py, const char *set)`
+pub unsafe fn grid_in_set(gd: *mut grid, px: c_uint, py: c_uint, set: *const u8) -> u32 {
+    unsafe {
+        let mut gc: grid_cell = zeroed();
+        let mut tmp_gc: grid_cell = zeroed();
+
+        grid_get_cell(gd, px, py, &raw mut gc);
+        if !strchr(set, b'\t' as i32).is_null() {
+            if gc.flags.contains(grid_flag::TAB) {
+                return gc.data.width as u32;
+            }
+            if gc.flags.contains(grid_flag::PADDING) {
+                let mut pxx = px;
+                loop {
+                    pxx -= 1;
+                    grid_get_cell(gd, pxx, py, &raw mut tmp_gc);
+                    if !(pxx > 0 && tmp_gc.flags.contains(grid_flag::PADDING)) {
+                        break;
+                    }
+                }
+                if tmp_gc.flags.contains(grid_flag::TAB) {
+                    return tmp_gc.data.width as u32 - (px - pxx);
+                }
+            }
+        }
+        if gc.flags.contains(grid_flag::PADDING) {
+            return 0;
+        }
+        utf8_cstrhas(set, &raw const gc.data) as u32
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
