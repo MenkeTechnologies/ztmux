@@ -6024,15 +6024,17 @@ pub unsafe fn window_copy_cursor_right(wme: *mut window_mode_entry, all: i32) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
         let back_s: *mut screen = (*data).backing;
+        let oo: *mut options = (*(*(*wme).wp).window).options;
         let mut gr: grid_reader = zeroed();
 
         let mut px = (*data).cx;
         let hsize = screen_hsize(back_s);
         let mut py = hsize + (*data).cy - (*data).oy;
         let oldy = (*data).cy;
+        let onemore = (options_get_number_(oo, "mode-keys") != modekey::MODEKEY_VI as i64) as i32;
 
         grid_reader_start(&raw mut gr, (*back_s).grid, px, py);
-        grid_reader_cursor_right(&raw mut gr, 1, all);
+        grid_reader_cursor_right(&raw mut gr, 1, all, onemore);
         grid_reader_get_cursor(&raw mut gr, &raw mut px, &raw mut py);
         window_copy_acquire_cursor_down(
             wme,
@@ -6298,18 +6300,20 @@ pub unsafe fn window_copy_cursor_jump_to_back(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
         let back_s: *mut screen = (*data).backing;
+        let oo: *mut options = (*(*(*wme).wp).window).options;
         let mut gr: grid_reader = zeroed();
 
         let mut px = (*data).cx;
         let hsize = screen_hsize(back_s);
         let mut py = hsize + (*data).cy - (*data).oy;
         let oldy = (*data).cy;
+        let onemore = (options_get_number_(oo, "mode-keys") != modekey::MODEKEY_VI as i64) as i32;
 
         grid_reader_start(&raw mut gr, (*back_s).grid, px, py);
         grid_reader_cursor_left(&raw mut gr, 0);
         grid_reader_cursor_left(&raw mut gr, 0);
         if grid_reader_cursor_jump_back(&raw mut gr, (*data).jumpchar) != 0 {
-            grid_reader_cursor_right(&raw mut gr, 1, 0);
+            grid_reader_cursor_right(&raw mut gr, 1, 0, onemore);
             grid_reader_get_cursor(&raw mut gr, &raw mut px, &raw mut py);
             window_copy_acquire_cursor_up(wme, hsize, (*data).oy, oldy, px, py);
         }
@@ -6367,7 +6371,7 @@ pub unsafe fn window_copy_cursor_next_word_end_pos(
         if modekey::try_from(options_get_number_(oo, "mode-keys") as i32) == Ok(modekey::MODEKEY_VI)
         {
             if !grid_reader_in_set(&raw mut gr, WHITESPACE) {
-                grid_reader_cursor_right(&raw mut gr, 0, 0);
+                grid_reader_cursor_right(&raw mut gr, 0, 0, 0);
             }
             grid_reader_cursor_next_word_end(&raw mut gr, separators);
             grid_reader_cursor_left(&raw mut gr, 1);
@@ -6403,7 +6407,7 @@ pub unsafe fn window_copy_cursor_next_word_end(
         if modekey::try_from(options_get_number_(oo, "mode-keys") as i32) == Ok(modekey::MODEKEY_VI)
         {
             if !grid_reader_in_set(&raw mut gr, WHITESPACE) {
-                grid_reader_cursor_right(&raw mut gr, 0, 0);
+                grid_reader_cursor_right(&raw mut gr, 0, 0, 0);
             }
             grid_reader_cursor_next_word_end(&raw mut gr, separators);
             grid_reader_cursor_left(&raw mut gr, 1);

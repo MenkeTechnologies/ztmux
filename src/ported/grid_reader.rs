@@ -36,14 +36,19 @@ pub unsafe fn grid_reader_line_length(gr: *mut grid_reader) -> u32 {
 }
 
 /// C `vendor/tmux/grid-reader.c:48`: `void grid_reader_cursor_right(struct grid_reader *gr, int wrap, int all, int onemore)`
-pub unsafe fn grid_reader_cursor_right(gr: *mut grid_reader, wrap: u32, all: i32) {
+pub unsafe fn grid_reader_cursor_right(gr: *mut grid_reader, wrap: u32, all: i32, onemore: i32) {
     unsafe {
         let mut gc = MaybeUninit::<grid_cell>::uninit();
 
+        // In vi mode (onemore == 0) the cursor may not pass the last character,
+        // so the limit is line_length - 1; onemore/emacs allows one past.
         let px = if all != 0 {
             (*(*gr).gd).sx
-        } else {
+        } else if onemore != 0 {
             grid_reader_line_length(gr)
+        } else {
+            let len = grid_reader_line_length(gr);
+            if len != 0 { len - 1 } else { 0 }
         };
 
         if wrap != 0 && (*gr).cx >= px && (*gr).cy < (*(*gr).gd).hsize + (*(*gr).gd).sy - 1 {
@@ -559,9 +564,9 @@ mod tests {
         }
     }
 
-    // grid_reader_cursor_right: px is line length when all==0 (the Rust port
-    // folds the C `onemore` case in), or the grid width when all!=0. Cursor
-    // advances while below px (grid-reader.c:48).
+    // grid_reader_cursor_right: with onemore!=0 px is the line length, with
+    // all!=0 px is the grid width. (onemore==0 stops at line length - 1.)
+    // Cursor advances while below px (grid-reader.c:48).
     #[test]
     fn test_cursor_right_basic() {
         let gd = grid_create(20, 3, 0);
@@ -569,18 +574,18 @@ mod tests {
             set_line(gd, 0, b"abc"); // length 3
             let mut gr = reader(gd, 0, 0);
 
-            grid_reader_cursor_right(&mut gr, 0, 0);
+            grid_reader_cursor_right(&mut gr, 0, 0, 1);
             assert_eq!(gr.cx, 1);
-            grid_reader_cursor_right(&mut gr, 0, 0);
+            grid_reader_cursor_right(&mut gr, 0, 0, 1);
             assert_eq!(gr.cx, 2);
-            grid_reader_cursor_right(&mut gr, 0, 0);
+            grid_reader_cursor_right(&mut gr, 0, 0, 1);
             assert_eq!(gr.cx, 3); // reached px == line length
             // At px with no wrap: no movement.
-            grid_reader_cursor_right(&mut gr, 0, 0);
+            grid_reader_cursor_right(&mut gr, 0, 0, 1);
             assert_eq!(gr.cx, 3);
 
             // With all!=0, px becomes the grid width (20), so it advances again.
-            grid_reader_cursor_right(&mut gr, 0, 1);
+            grid_reader_cursor_right(&mut gr, 0, 1, 1);
             assert_eq!(gr.cx, 4);
 
             grid_destroy(gd);
@@ -596,7 +601,7 @@ mod tests {
             set_line(gd, 0, b"abc"); // length 3 == px
             let mut gr = reader(gd, 3, 0);
 
-            grid_reader_cursor_right(&mut gr, 1, 0);
+            grid_reader_cursor_right(&mut gr, 1, 0, 1);
             assert_eq!(gr.cx, 0);
             assert_eq!(gr.cy, 1);
 
@@ -995,7 +1000,7 @@ mod tests {
 
             let mut gr = reader(gd, 1, 0);
             // From the wide cell, right should skip the padding at 2 and reach 3.
-            grid_reader_cursor_right(&mut gr, 0, 1);
+            grid_reader_cursor_right(&mut gr, 0, 1, 1);
             assert_eq!(gr.cx, 3);
 
             grid_destroy(gd);
@@ -1152,11 +1157,11 @@ mod tests {
         unsafe {
             set_line(gd, 0, b"abc");
             let mut gr = reader(gd, 3, 0);
-            grid_reader_cursor_right(&mut gr, 0, 1);
+            grid_reader_cursor_right(&mut gr, 0, 1, 1);
             assert_eq!(gr.cx, 4);
-            grid_reader_cursor_right(&mut gr, 0, 1);
+            grid_reader_cursor_right(&mut gr, 0, 1, 1);
             assert_eq!(gr.cx, 5); // reached grid width
-            grid_reader_cursor_right(&mut gr, 0, 1);
+            grid_reader_cursor_right(&mut gr, 0, 1, 1);
             assert_eq!(gr.cx, 5); // clamped: no wrap, no further motion
             grid_destroy(gd);
         }
