@@ -470,7 +470,10 @@ pub unsafe fn grid_reader_cursor_back_to_indentation(gr: *mut grid_reader) {
             let xx = grid_line_length((*gr).gd, py);
             for px in 0..xx {
                 grid_get_cell((*gr).gd, px, py, gc);
-                if (*gc).data.size != 1 || (*gc).data.data[0] != b' ' {
+                if ((*gc).data.size != 1 || (*gc).data.data[0] != b' ')
+                    && !(*gc).flags.contains(grid_flag::TAB)
+                    && !(*gc).flags.contains(grid_flag::PADDING)
+                {
                     (*gr).cx = px;
                     (*gr).cy = py;
                     return;
