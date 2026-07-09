@@ -11,14 +11,12 @@
 // WHATSOEVER RESULTING FROM LOSS OF MIND, USE, DATA OR PROFITS, WHETHER
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-use std::path::Path;
-
 use crate::compat::{closefrom, fdforkpty::fdforkpty};
 use crate::libc::{
     AF_UNIX, O_RDWR, PF_UNSPEC, SHUT_WR, SIG_BLOCK, SIG_SETMASK, SIGCONT, SIGTERM, SIGTTIN,
     SIGTTOU, SOCK_STREAM, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, TIOCSWINSZ, WIFSTOPPED,
-    WSTOPSIG, close, dup2, execl, execvp, fork, ioctl, kill, killpg, memset, open, shutdown,
-    sigfillset, sigprocmask, sigset_t, socketpair, winsize,
+    WSTOPSIG, chdir, close, dup2, execl, execvp, fork, ioctl, kill, killpg, memset, open, setenv,
+    shutdown, sigfillset, sigprocmask, sigset_t, socketpair, winsize,
 };
 use crate::*;
 use crate::options_::{options, options_get_string_};
@@ -95,7 +93,9 @@ pub unsafe fn job_run(
         let mut set = MaybeUninit::<sigset_t>::uninit();
         let mut oldset = MaybeUninit::<sigset_t>::uninit();
         let mut ws = MaybeUninit::<winsize>::uninit();
-        let argvp: *mut *mut u8;
+        // Copied argv for the child's execvp; allocated in the parent before
+        // fork and freed in the parent afterwards (null when cmd is set).
+        let mut argvp: *mut *mut u8 = null_mut();
         // let mut tty = MaybeUninit::<[c_char; TTY_NAME_MAX]>::uninit();
         let mut tty = [0i8; 64];
         let argv0: *mut u8;
@@ -121,6 +121,15 @@ pub unsafe fn job_run(
                 }
             }
             argv0 = shell_argv0(shell, 0);
+
+            // Resolve everything the forked child needs *before* fork, so the
+            // child only calls async-signal-safe libc functions before exec.
+            // find_home() reads $HOME under std's ENV_LOCK (not fork-safe) and
+            // cmd_copy_argv allocates; doing both here keeps the child clean.
+            let home: *const u8 = find_home().map_or(null(), |h| h.as_ptr().cast());
+            if cmd.is_null() {
+                argvp = cmd_copy_argv(argc, argv);
+            }
 
             sigfillset(set.as_mut_ptr());
             sigprocmask(SIG_BLOCK, set.as_mut_ptr(), oldset.as_mut_ptr());
@@ -173,17 +182,21 @@ pub unsafe fn job_run(
                     proc_clear_signals(SERVER_PROC, 1);
                     sigprocmask(SIG_SETMASK, oldset.as_mut_ptr(), null_mut());
 
-                    if (cwd.is_null() || std::env::set_current_dir(cstr_to_str(cwd)).is_err())
-                        && find_home().is_none_or(|home| {
-                            std::env::set_current_dir(home.to_str().expect("TODO")).is_err()
-                        })
-                        && std::env::set_current_dir(Path::new("/")).is_err()
+                    // Async-signal-safe chdir only: libc chdir, not
+                    // std::env::set_current_dir (which allocates a CString). The
+                    // home path was resolved in the parent above.
+                    if (cwd.is_null() || chdir(cwd.cast()) != 0)
+                        && (home.is_null() || chdir(home.cast()) != 0)
+                        && chdir(c!("/").cast()) != 0
                     {
                         fatal("chdir failed");
                     }
 
+                    // environ_push uses libc setenv; do not environ_free() here -
+                    // the child is about to exec, so freeing the tree would be a
+                    // pointless (and non-fork-safe) run of free() calls. The
+                    // parent frees env after fork.
                     environ_push(env);
-                    environ_free(env);
 
                     if !flags.intersects(job_flag::JOB_PTY) {
                         if dup2(out[1], STDIN_FILENO) == -1 {
@@ -211,7 +224,7 @@ pub unsafe fn job_run(
                     closefrom(STDERR_FILENO + 1);
 
                     if !cmd.is_null() {
-                        std::env::set_var("SHELL", cstr_to_str(shell));
+                        setenv(c!("SHELL").cast(), shell.cast(), 1);
                         execl(
                             shell.cast(),
                             argv0.cast(),
@@ -221,7 +234,7 @@ pub unsafe fn job_run(
                         );
                         fatal("execl failed");
                     } else {
-                        argvp = cmd_copy_argv(argc, argv);
+                        // argvp was copied in the parent (see above).
                         execvp((*argvp).cast(), argvp.cast());
                         fatal("execvp failed");
                     }
@@ -232,6 +245,9 @@ pub unsafe fn job_run(
             sigprocmask(SIG_SETMASK, oldset.as_ptr(), null_mut());
             environ_free(env);
             free_(argv0);
+            if !argvp.is_null() {
+                cmd_free_argv(argc, argvp);
+            }
 
             job = Box::leak(Box::new(job {
                 state: job_state::JOB_RUNNING,
@@ -285,6 +301,9 @@ pub unsafe fn job_run(
         sigprocmask(SIG_SETMASK, oldset.as_ptr(), null_mut());
         environ_free(env);
         free_(argv0);
+        if !argvp.is_null() {
+            cmd_free_argv(argc, argvp);
+        }
         null_mut()
     }
 }

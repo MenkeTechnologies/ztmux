@@ -11,12 +11,10 @@
 // WHATSOEVER RESULTING FROM LOSS OF MIND, USE, DATA OR PROFITS, WHETHER
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-use std::path::Path;
-
 use crate::compat::{closefrom, fdforkpty::fdforkpty};
 use crate::libc::{
-    _exit, SIG_BLOCK, SIG_SETMASK, STDERR_FILENO, STDIN_FILENO, TCSANOW, VERASE, close, execl,
-    execvp, sigfillset, sigprocmask, strrchr, tcgetattr, tcsetattr,
+    _exit, SIG_BLOCK, SIG_SETMASK, STDERR_FILENO, STDIN_FILENO, TCSANOW, VERASE, chdir, close,
+    execl, execvp, sigfillset, sigprocmask, strrchr, tcgetattr, tcsetattr,
 };
 #[cfg(feature = "utempter")]
 use crate::utempter::utempter_add_record;
@@ -430,6 +428,11 @@ pub unsafe fn spawn_pane(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut wi
             ws.ws_xpixel = ((*w).xpixel * ws.ws_col as u32) as u16;
             ws.ws_ypixel = ((*w).ypixel * ws.ws_row as u32) as u16;
 
+            // Resolve $HOME before fork: find_home() reads the environment
+            // under std's ENV_LOCK, which is not safe to touch in the forked
+            // child (see job.rs). The child chdir()s to this if cwd fails.
+            let home: *const u8 = find_home().map_or(null(), |h| h.as_ptr().cast());
+
             // Block signals until fork has completed.
             sigfillset(&raw mut set);
             sigprocmask(SIG_BLOCK, &raw mut set, &raw mut oldset);
@@ -483,7 +486,10 @@ pub unsafe fn spawn_pane(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut wi
 
             // Child process. Change to the working directory or home if that
             // fails.
-            if std::env::set_current_dir(cstr_to_str((*new_wp).cwd)).is_ok() {
+            // Async-signal-safe chdir only (libc chdir, not
+            // std::env::set_current_dir which allocates); home was resolved in
+            // the parent before fork.
+            if chdir((*new_wp).cwd.cast()) == 0 {
                 environ_set!(
                     child,
                     c!("PWD"),
@@ -491,17 +497,15 @@ pub unsafe fn spawn_pane(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut wi
                     "{}",
                     _s((*new_wp).cwd)
                 );
-            } else if let Some(tmp) = find_home()
-                && std::env::set_current_dir(tmp.to_str().expect("TODO")).is_ok()
-            {
+            } else if !home.is_null() && chdir(home.cast()) == 0 {
                 environ_set!(
                     child,
                     c!("PWD"),
                     environ_flags::empty(),
                     "{}",
-                    tmp.to_str().unwrap()
+                    _s(home)
                 );
-            } else if std::env::set_current_dir(Path::new("/")).is_ok() {
+            } else if chdir(c!("/").cast()) == 0 {
                 environ_set!(child, c!("PWD"), environ_flags::empty(), "/");
             } else {
                 fatal("chdir failed");

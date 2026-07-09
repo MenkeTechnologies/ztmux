@@ -23,7 +23,7 @@ use crate::libc::{
     SIGCHLD, SIGCONT, SIGHUP, SIGTERM, SIGTSTP, SIGWINCH, SOCK_STREAM, STDERR_FILENO, STDIN_FILENO,
     STDOUT_FILENO, TCSAFLUSH, TCSANOW, VMIN, VTIME, WNOHANG, cfgetispeed, cfgetospeed, cfmakeraw,
     cfsetispeed, cfsetospeed, close, connect, dup, execl, flock, getppid, isatty, kill, memcpy,
-    memset, open, sigaction, sigemptyset, sockaddr, sockaddr_un, socket, strerror, strlen,
+    memset, open, setenv, sigaction, sigemptyset, sockaddr, sockaddr_un, socket, strerror, strlen,
     strsignal, system, tcgetattr, tcsetattr, unlink, waitpid,
 };
 use crate::*;
@@ -574,8 +574,9 @@ unsafe fn client_exec(shell: *mut u8, shellcmd: *mut u8) {
             (*&raw const CLIENT_FLAGS).intersects(client_flag::LOGIN) as c_int,
         );
 
-        let shell_str = cstr_to_str(shell);
-        std::env::set_var("SHELL", shell_str);
+        // libc setenv, not std::env::set_var: this runs just before execl and
+        // std's ENV_LOCK is not fork/exec-safe.
+        setenv(c!("SHELL").cast(), shell.cast(), 1);
 
         proc_clear_signals(CLIENT_PROC, 1);
 

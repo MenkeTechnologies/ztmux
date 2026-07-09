@@ -217,9 +217,14 @@ pub unsafe fn environ_push(env: *mut environ) {
                 && *(*envent).name.unwrap().as_ptr() != b'\0'
                 && !(*envent).flags.intersects(ENVIRON_HIDDEN)
             {
-                std::env::set_var(
-                    cstr_to_str(transmute_ptr((*envent).name)),
-                    cstr_to_str(transmute_ptr((*envent).value)),
+                // Called only in the forked child before exec (job.rs, spawn.rs).
+                // Use libc setenv (as upstream tmux does) rather than
+                // std::env::set_var, which takes std's ENV_LOCK - a lock that is
+                // not reset across fork() and would deadlock/abort the child.
+                ::libc::setenv(
+                    (*envent).name.unwrap().as_ptr().cast(),
+                    (*envent).value.unwrap().as_ptr().cast(),
+                    1,
                 );
             }
         }
