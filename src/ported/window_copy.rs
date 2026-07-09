@@ -5299,12 +5299,23 @@ pub unsafe fn window_copy_synchronize_cursor(wme: *mut window_mode_entry, no_res
 }
 
 /// C `vendor/tmux/window-copy.c:5413`: `static void window_copy_update_cursor(struct window_mode_entry *wme, u_int cx, u_int cy)`
-pub unsafe fn window_copy_update_cursor(wme: *mut window_mode_entry, cx: u32, cy: u32) {
+pub unsafe fn window_copy_update_cursor(wme: *mut window_mode_entry, mut cx: u32, cy: u32) {
     unsafe {
         let wp: *mut window_pane = (*wme).wp;
         let data: *mut window_copy_mode_data = (*wme).data.cast();
         let s: *mut screen = &raw mut (*data).screen;
         let mut ctx: screen_write_ctx = zeroed();
+
+        // Clamp the cursor to the last character of the line (vi mode) unless a
+        // rectangle selection allows it to extend past the line end.
+        if !(*data).rectflag && cy < screen_size_y(s) {
+            let allow_onemore = !(*data).screen.sel.is_null() && (*data).rectflag;
+            let py = screen_hsize((*data).backing) + cy - (*data).oy;
+            let maxx = window_copy_cursor_limit(wme, py, allow_onemore as i32);
+            if cx > maxx {
+                cx = maxx;
+            }
+        }
 
         let old_cx = (*data).cx;
         let old_cy = (*data).cy;
