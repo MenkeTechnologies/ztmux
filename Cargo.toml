@@ -155,6 +155,7 @@ wildcard_imports                    = "allow"
 # against. Revisit per-module as the code is brought to idiomatic Rust.
 explicit_counter_loop               = "allow" # match upstream C index-loop structure
 manual_checked_ops                  = "allow" # match upstream C manual bounds/division guards
+byte_char_slices                    = "allow" # mirror tmux C char arrays ({' ','x','q',...}) element-for-element
 
 # Keep line-number debug info in release builds (`pnpm build`, `cargo install`)
 # so the crash backtraces written by the server's fatal/signal handlers

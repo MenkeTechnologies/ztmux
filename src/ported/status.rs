@@ -2256,7 +2256,7 @@ unsafe fn status_prompt_complete_window_menu(
         if list.len() == 1 {
             menu_free(menu);
             let result = if flag != b'\0' {
-                format!("-{}{}", flag as char, &list[0])
+                format!("-{}{}", flag as char, list[0])
             } else {
                 list[0].clone()
             };
@@ -2380,7 +2380,7 @@ unsafe fn status_prompt_complete(c: *mut client, word: *const u8, mut offset: u3
                 out = if list.is_empty() {
                     None
                 } else if list.len() == 1 {
-                    Some(format!("{} ", &list[0]))
+                    Some(format!("{} ", list[0]))
                 } else {
                     Some(status_prompt_complete_prefix(&list))
                 };
