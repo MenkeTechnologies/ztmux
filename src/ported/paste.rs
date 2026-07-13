@@ -175,8 +175,10 @@ pub unsafe fn paste_free(pb: NonNull<paste_buffer>) {
         }
 
         free_((*pb).data);
-        (*pb).name = Cow::Borrowed("");
-        free_(pb);
+        // Reclaim the Box allocated in paste_add / paste_set. Dropping it frees the
+        // owned name; C freed pb->name by hand, and free_(pb) here skipped Drop
+        // entirely, which is why the name had to be cleared by assignment first.
+        drop(Box::from_raw(pb));
     }
 }
 
@@ -202,7 +204,7 @@ pub unsafe fn paste_add(mut prefix: *const u8, data: *mut u8, size: usize) {
             }
         }
 
-        let pb = Box::leak(Box::new(paste_buffer {
+        let pb = Box::into_raw(Box::new(paste_buffer {
             data,
             size,
             name: Cow::Borrowed(""),
@@ -211,7 +213,7 @@ pub unsafe fn paste_add(mut prefix: *const u8, data: *mut u8, size: usize) {
             order: PASTE_NEXT_ORDER,
             name_entry: zeroed(),
             time_entry: zeroed(),
-        })) as *mut paste_buffer;
+        }));
         PASTE_NUM_AUTOMATIC += 1;
         PASTE_NEXT_ORDER += 1;
 
@@ -311,7 +313,7 @@ pub unsafe fn paste_set(
             return -1;
         }
 
-        let pb = Box::leak(Box::new(paste_buffer {
+        let pb = Box::into_raw(Box::new(paste_buffer {
             data,
             size,
             name: Cow::Owned(name.to_string()),
