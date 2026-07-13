@@ -2,6 +2,134 @@
 
 Fixes to the ztmux port, most recent first.
 
+## 2026-07-13
+
+A memory-ownership round: convert C `char *` struct fields to owned Rust types and
+delete the hand-rolled `free()` calls. Doing so surfaced a family of faults that all
+share one shape — **a C idiom that is silently unsafe once the struct holds a Rust
+type**. Two new build gates were added so each class fails the build if it returns.
+
+The crash surface was found by driving the whole command set against a private
+socket and, for the client-only paths (modes, redraw, status), against a real client
+on a pty. Aborts were keyed on crash reports rather than on "is the server still up",
+since a dying client can legitimately take the server with it.
+
+### 1. `new-session -t <new-group>` killed the server
+
+- **Symptom:** `ztmux new-session -t ggg`, where no session `ggg` exists, exited the
+  server (`server exited unexpectedly`). tmux instead creates session `ggg-0` in a new
+  session group named `ggg`.
+- **Root cause:** two independent faults on the same line of execution.
+  1. `session_group_find` (`src/ported/session.rs`) mirrored C's throwaway stack struct
+     used as the `RB_FIND` key: `struct session_group sg; sg.name = name;`. In Rust
+     `(*sg).name = …` is a *place assignment*, so it **drops the previous value** — and
+     the previous value was uninitialized stack garbage. The garbage happened to look
+     like a `Cow::Owned`, so it called `free()` on a pointer Rust never allocated
+     (`POINTER_BEING_FREED_WAS_NOT_ALLOCATED`, SIGABRT).
+  2. `session_group_synchronize_to` then hit the `TAILQ_FOREACH` semantic below.
+- **Fix:** search by key with `rb_find_by` — the same O(log n) descent with no
+  fabricated key node and no `transmute`. Pinned by `session_group_find` unit test
+  (mutation-checked: reversing the comparator fails it).
+
+### 2. `TAILQ_FOREACH`/`RB_FOREACH` "not found" returned an arbitrary element
+
+C's `TAILQ_FOREACH` leaves the loop variable **NULL** when the loop runs to completion,
+and every caller branches on that NULL. A Rust `for` loop that assigns each element
+instead retains the **last one visited**, so "not found" silently became "some arbitrary
+element". Five ports had it:
+
+- **`cmd_find_client`** — `lock-client -t nosuch` returned a **session-less** client, and
+  `server_lock_client` dereferenced `c->session`: **server dead**. Worse than the crash,
+  every `CMD_CLIENT_TFLAG` command shared it, so `detach-client -t <typo>` silently acted
+  on the *wrong client* instead of erroring.
+- **`session_group_synchronize_to`** — a group whose only member is `s` selected `s`
+  itself, so the session was synchronized *from itself*, wiping its own window list;
+  `RB_MIN(&s->windows)` then returned NULL. This is the second half of bug 1.
+- **`window_pane_set_mode`** — a pane already in some other mode **reused that entry**
+  instead of creating a new one, binding the new mode to the previous mode's `data`: a
+  type confusion.
+- **`cmd_find_inside_pane`** — returned an unrelated pane, so the `TMUX_PANE` fallback
+  never ran.
+- **`format.c` window-stack index** — reported the full stack length instead of `0` when
+  the winlink is not in the stack.
+
+- **Fix:** `.find(…)` / `.any(…)`, which reproduce C's "first match, else none".
+
+### 3. Destroying a pane in a mode rebuilt the mode against the dead window
+
+- **Symptom:** a null dereference under
+  `window_destroy → window_pane_destroy → … → window_customize_build`.
+- **Root cause:** `window_pane_destroy` called `window_pane_reset_mode_all`. C calls
+  **`window_pane_free_modes`**, which the port was missing entirely. `reset_mode_all` is
+  the *interactive* path: for each mode popped it resizes the next mode, redraws and
+  notifies — so tearing down a pane rebuilt the customize-mode tree against a window that
+  was already gone. C's only `reset_mode_all` callers are spawn / capture-pane /
+  copy-mode, which the port already matched.
+- **Fix:** port `window_pane_free_modes` (frees each entry, resets `wp->screen`, no
+  resize/redraw/notify) and call it from `window_pane_destroy`.
+
+### 4. C-allocated structs that hold a Rust type (new gate)
+
+- **Symptom:** `choose-client` with a client attached killed the server.
+- **Root cause:** `Vec`, `String`, `CString` and `Box` all require a **non-null** data
+  pointer. `xcalloc` (libc `calloc`) returns all-zero bytes, so such a field comes out
+  with a NULL pointer — a value the type system says cannot exist. Nothing complains at
+  the allocation; it detonates later, far from the cause. `window_client_modedata` holds
+  `item_list: Vec`, so the first `item_list.drain(..)` in `window_client_build`
+  dereferenced null. `window_buffer_itemdata` (`name: String`) and `sixel_image`
+  (`colours: Vec`) had the same defect, papered over by assigning a fresh empty value
+  before use.
+- **Fix:** build each through `Box::new(…)` with every field a valid Rust value and
+  reclaim with `Box::from_raw`, so `Drop` frees them.
+- **Why it matters for the rest of the migration:** the moment a `char *` field becomes an
+  owned `CString`, every existing C-style allocation of its struct silently becomes UB.
+  That is exactly how `window_client_modedata` broke. `tests/no_c_alloc_for_rust_types.rs`
+  now **fails the build** when a struct holding a `Vec`/`String`/`CString`/`Box` is
+  allocated via `xcalloc` / `zeroed` / `MaybeUninit`.
+
+### 5. Truncated `key_code` let a mouse event kill a window (new gate)
+
+- **Symptom:** none observed in normal keyboard use — found by reading the dispatch.
+- **Root cause:** tmux dispatches keys with `switch (key)` over the full 64-bit
+  `key_code`. Five ported handlers (`window_tree`, `window_customize`, `window_client`,
+  `window_buffer`, `popup`) matched **`key as u8`** against byte literals, discarding the
+  top bits. `KEYC_*` codes run sequentially from `KEYC_BASE` (0x10e000), so **18 real keys
+  alias an ASCII command letter**:
+
+  | key | truncates to | command it runs |
+  | --- | --- | --- |
+  | `KEYC_MOUSEUP11_STATUS_DEFAULT` (0x10e078) | `'x'` | **Kill** prompt |
+  | `KEYC_TRIPLECLICK7_STATUS_LEFT` (0x10e178) | `'x'` | **Kill** prompt |
+  | `KEYC_DOUBLECLICK11_PANE` (0x10e158) | `'X'` | **Kill Tagged** |
+  | `KEYC_MOUSEMOVE_BORDER` (0x10e00d) | `CR` | run the command on the row |
+
+  i.e. a mouse event reaching those handlers could kill a window or a session.
+- **Fix:** gate each dispatch on `key < 0x80`, so only a genuine bare ASCII byte reaches
+  the byte-literal arms — what C's full-width `switch` does. (`mode_tree.rs` already had
+  the other correct shape: compare against `u64` constants.)
+  `tests/no_key_code_truncation.rs` now fails the build on any `match key as u<N>`.
+
+### Memory ownership converted this round
+
+`wait_channel` (+ `wait_item`), `window_client_modedata`, `window_buffer_modedata` (+
+`window_buffer_itemdata`), `window_tree_modedata`, `window_customize_modedata`,
+`sixel_image`. Owned `char *` fields became `CString`; the structs are built with
+`Box::into_raw` and reclaimed with `Box::from_raw`, so `Drop` frees them instead of the
+hand-rolled `free()` calls. `cmd_wait_for.rs` no longer contains a single `free_`,
+`xcalloc` or `xstrdup`.
+
+Note: `wait_channel` was `Box::leak`'d but freed with libc `free_`. That only worked
+because the global allocator (`MyAlloc`, `src/main.rs`) is hardwired to libc
+`malloc`/`free` — and it skipped `Drop` entirely, so it would have leaked the `CString`
+the instant the field was converted.
+
+### Known open
+
+A non-deterministic server exit remains, reachable by driving tree-mode with keys. It is
+**not** a memory fault — no abort, no crash report, no panic; the server exits cleanly —
+and it is **pre-existing** (`HEAD` before this round fails identically). It has not been
+isolated and is not claimed fixed.
+
 ## 2026-07-02
 
 This round paired three harnesses — a parity-case expansion (689 → 1080 cases),

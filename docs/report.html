@@ -58,7 +58,7 @@
   </header>
 
   <main class="tutorial-main">
-    <div class="status-banner"><strong>Status: 100% functional &mdash; building, running, and self-hosting its own tooling.</strong> ztmux is the tmux program itself &mdash; server and client &mdash; reimplemented from the C in Rust. It builds and runs (<code>ztmux new-session</code>, <code>ztmux attach</code>), passes its <strong>1107-case parity suite at 100% (byte-for-byte vs upstream tmux, zero known divergences)</strong>, has every harness-found bug fixed, and ships original extensions the C tmux has no equivalent for.</div>
+    <div class="status-banner"><strong>Status: 100% functional &mdash; building, running, and self-hosting its own tooling.</strong> ztmux is the tmux program itself &mdash; server and client &mdash; reimplemented from the C in Rust. It builds and runs (<code>ztmux new-session</code>, <code>ztmux attach</code>), passes its <strong>1107-case parity suite at 100% (byte-for-byte vs upstream tmux, zero known divergences)</strong>, logs every bug its harnesses catch in <a href="BUGS.md">BUGS.md</a> &mdash; fixed, or still open and named &mdash; and ships original extensions the C tmux has no equivalent for.</div>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>PARITY VS tmux</h2>
     <div class="stat-grid">
@@ -226,8 +226,13 @@
     <p class="prose">Every ported function carries a back-link to its C origin as a doc comment, e.g. <code>/// C <code>vendor/tmux/grid.c:320</code>: <code>grid_create()</code></code>. The <a href="port_report.html">port report</a> tracks per-function C&rarr;Rust coverage: <strong>2,127</strong> of tmux's <strong>2,696</strong> functions ported so far.</p>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>BUGS THE HARNESS CAUGHT</h2>
-    <p class="prose">Verifying against C at every step turns "looks right" into "is right." A sample of faults the parity suite and unit tests root-caused to a single line &mdash; each now locked by a regression test (the full log is in <a href="BUGS.md">BUGS.md</a>):</p>
+    <p class="prose">Verifying against C at every step turns "looks right" into "is right." A sample of faults the harnesses root-caused to a single line &mdash; the parity suite and unit tests, plus a sweep that drives every command against a private socket and, for the paths that only run with a client attached (modes, redraw, status), against a real client on a pty. Aborts are keyed on crash reports rather than on "is the server still up," since a dying client can legitimately take the server with it. Each fault below is now locked by a regression test or a build gate (the full log, including what is still open, is in <a href="BUGS.md">BUGS.md</a>):</p>
     <ol class="steps">
+      <li><b>A mouse event could kill a window</b> &mdash; tmux dispatches keys with <code>switch (key)</code> over the full 64-bit <code>key_code</code>. Five ported handlers matched <code>key as u8</code> against byte literals, discarding the top bits. <code>KEYC_*</code> codes run sequentially from <code>KEYC_BASE</code> (0x10e000), so <strong>18 real keys alias an ASCII command letter</strong>: <code>KEYC_MOUSEUP11_STATUS_DEFAULT</code> (0x10e078) truncates to <code>'x'</code> &mdash; the <b>Kill</b> prompt &mdash; and <code>KEYC_DOUBLECLICK11_PANE</code> to <code>'X'</code>, <b>Kill Tagged</b>. Each dispatch now gates on <code>key &lt; 0x80</code>, so only a bare ASCII byte reaches those arms; a build gate fails on any <code>match key as u&lt;N&gt;</code>.</li>
+      <li><b>"Not found" returned an arbitrary element</b> &mdash; C's <code>TAILQ_FOREACH</code> leaves the loop variable <b>NULL</b> when it runs to completion, and callers branch on that NULL; a Rust <code>for</code> loop that assigns each element retains the <b>last one visited</b>. Five ports had it. <code>cmd_find_client</code> returned a session-less client, so <code>lock-client -t nosuch</code> dereferenced <code>c-&gt;session</code> and killed the server &mdash; and every <code>CMD_CLIENT_TFLAG</code> command shared it, so <code>detach-client -t &lt;typo&gt;</code> silently acted on the <em>wrong client</em> instead of erroring. <code>window_pane_set_mode</code> reused a wrong-mode entry (type confusion on its <code>data</code>); <code>session_group_synchronize_to</code> synced a lone session from itself and wiped its own window list.</li>
+      <li><b>Zeroing a struct that holds a Rust type</b> &mdash; <code>Vec</code>, <code>String</code>, <code>CString</code> and <code>Box</code> all need a non-null data pointer, but <code>xcalloc</code> hands back all-zero bytes. <code>window_client_modedata</code> holds <code>item_list: Vec</code>, so the first <code>drain(..)</code> in <code>window_client_build</code> dereferenced null and <code>choose-client</code> killed the server. Nothing complains at the allocation; it detonates later, far from the cause. Now built with <code>Box::new</code> and reclaimed with <code>Box::from_raw</code> so <code>Drop</code> frees them &mdash; and a build gate fails when any struct with such a field is <code>xcalloc</code>'d, because converting a <code>char *</code> field to an owned <code>CString</code> turns every C-style allocation of its struct into UB.</li>
+      <li><b>Destroying a pane rebuilt its mode against the dead window</b> &mdash; <code>window_pane_destroy</code> called <code>window_pane_reset_mode_all</code>, the <em>interactive</em> teardown that resizes the next mode, redraws and notifies. C calls <code>window_pane_free_modes</code>, which the port was missing entirely, so tearing down a pane rebuilt the customize-mode tree against a window that was already gone.</li>
+      <li><b>Freeing a pointer Rust never allocated</b> &mdash; <code>session_group_find</code> mirrored C's throwaway stack struct used as the <code>RB_FIND</code> key. In Rust <code>(*sg).name = &hellip;</code> is a <em>place assignment</em>, so it <b>drops the previous value</b> &mdash; uninitialized stack garbage that happened to look like an owned string. <code>ztmux new-session -t ggg</code> called <code>free()</code> on a junk pointer and aborted the server. Fixed by searching with <code>rb_find_by</code>: same descent, no fabricated key node.</li>
       <li><b>Mouse-driven TUIs froze mid-pane</b> &mdash; a stale <code>- 1</code> in the SGR-mouse encoder (<code>input_keys.rs</code>) dropped the sequence's <code>M</code>/<code>m</code> terminator after <code>xsnprintf</code> was corrected to exclude the NUL. ztmux wrote <code>\033[&lt;35;69;44</code> with no terminator; crossterm blocked in <code>read()</code> waiting for an end byte that never came, so rich ratatui/crossterm panes locked up on any click or focus change while keyboard input still worked.</li>
       <li><b>ztmux hijacked real tmux's socket</b> &mdash; it resolved its default socket from <code>$TMUX</code>, so launched inside a tmux pane it connected to tmux's server and spoke protocol 8 at it (<code>server exited unexpectedly</code>). Fixed to resolve only from <code>$ZTMUX</code> and advertise both <code>$TMUX</code> and <code>$ZTMUX</code> to panes, so the two multiplexers run side by side.</li>
       <li><b>Server crash on <code>bind-key h</code> then <code>l</code></b> &mdash; the red-black tree's delete rebalance (<code>rb_remove_color</code>, <code>compat/tree.rs</code>) rotated around the wrong node. Rebinding a key that already had a default removed the old node first, corrupting the key-bindings tree and segfaulting the server on startup.</li>
@@ -236,7 +241,7 @@
       <li><b>Pane spawn hung on macOS</b> &mdash; the ported <code>closefrom</code> looped <code>close()</code> up to the server-raised <code>RLIMIT_NOFILE</code>; replaced with the <code>libproc</code> <code>PROC_PIDLISTFDS</code> path tmux actually compiles on macOS, so the forked child reaches <code>execvp</code>.</li>
     </ol>
 
-    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>ANTI-DRIFT GATE</h2>
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>ANTI-DRIFT GATES</h2>
     <p class="prose">
       A port can be faked by inventing Rust-only "helper" functions that don't exist in tmux, inflating apparent
       completeness. <code>tests/ported_fn_names_match_c.rs</code> <strong>fails the build</strong> when a free
@@ -245,15 +250,33 @@
       <code>#[cfg(test)]</code> blocks are skipped. Pre-existing exceptions (libc/libevent wrappers, Rust glue) are
       frozen in an allowlist: an audit trail to burn down, not a free pass.
     </p>
+    <p class="prose">
+      Two more gates grew out of the bugs above, because each was a <em>class</em> rather than a one-off &mdash; the
+      kind that the C&rarr;Rust ownership migration keeps re-creating:
+    </p>
+    <ul class="steps">
+      <li><code>tests/no_c_alloc_for_rust_types.rs</code> &mdash; fails the build when a struct holding a
+        <code>Vec</code>/<code>String</code>/<code>CString</code>/<code>Box</code> is allocated with
+        <code>xcalloc</code>/<code>zeroed</code>/<code>MaybeUninit</code>. Zeroed bytes give those types a null data
+        pointer, which they are not allowed to hold. This matters most <em>during</em> the migration: the moment a
+        <code>char *</code> field becomes an owned <code>CString</code>, every C-style allocation of its struct silently
+        becomes UB.</li>
+      <li><code>tests/no_key_code_truncation.rs</code> &mdash; fails the build on any <code>match key as u&lt;N&gt;</code>,
+        which is what let a mouse event alias the <b>Kill</b> prompt.</li>
+    </ul>
+    <p class="prose">
+      Both were verified by mutation: reintroducing the defect makes the gate fail with the offending
+      <code>file:line</code> and the fix.
+    </p>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>TESTING</h2>
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-val green">1107/1107</div><div class="stat-label">Parity cases (100%)</div></div>
-      <div class="stat-card"><div class="stat-val">1710</div><div class="stat-label">Unit tests</div></div>
+      <div class="stat-card"><div class="stat-val">1708</div><div class="stat-label">Unit tests</div></div>
       <div class="stat-card"><div class="stat-val">2189</div><div class="stat-label">C fns ported</div></div>
       <div class="stat-card"><div class="stat-val">125k</div><div class="stat-label">Lines of Rust</div></div>
     </div>
-    <p class="prose">Three layers stack: byte-for-byte <strong>parity</strong> against the vendored tmux; in-tree <strong>unit tests</strong> for pure logic (red-black tree invariants under randomized insert/delete, UTF-8 round-trips, layout arithmetic, and the extensions' rendering via ratatui's headless backend); and the <strong>anti-drift gate</strong> that fails the build on invented functions.</p>
+    <p class="prose">Four layers stack: byte-for-byte <strong>parity</strong> against the vendored tmux; in-tree <strong>unit tests</strong> for pure logic (red-black tree invariants under randomized insert/delete, UTF-8 round-trips, layout arithmetic, and the extensions' rendering via ratatui's headless backend); a <strong>crash gate</strong> (<code>tests/server_survives_bad_targets.rs</code>) that drives the real binary on a private socket and asserts the server survives commands whose target resolves to nothing; and the <strong>anti-drift gates</strong> above.</p>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>"DONE RIGHT"</h2>
     <ol class="steps">
