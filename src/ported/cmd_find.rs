@@ -55,13 +55,14 @@ pub unsafe fn cmd_find_inside_pane(c: *mut client) -> *mut window_pane {
             return null_mut();
         }
 
-        let mut wp: *mut window_pane = null_mut();
-        for wp_ in rb_foreach(&raw mut ALL_WINDOW_PANES) {
-            wp = wp_.as_ptr();
-            if (*wp).fd != -1 && strcmp((*wp).tty.as_ptr(), (*c).ttyname_ptr()) == 0 {
-                break;
-            }
-        }
+        // C's RB_FOREACH leaves `wp` NULL when no pane matches, which is what selects
+        // the TMUX_PANE fallback below. Assigning each element in a Rust `for` would
+        // retain the last pane visited, so the fallback never ran and an unrelated
+        // pane was returned.
+        let mut wp = rb_foreach(&raw mut ALL_WINDOW_PANES)
+            .map(NonNull::as_ptr)
+            .find(|&wp| (*wp).fd != -1 && strcmp((*wp).tty.as_ptr(), (*c).ttyname_ptr()) == 0)
+            .unwrap_or(null_mut());
 
         if wp.is_null() {
             let envent = environ_find((*c).environ, c!("TMUX_PANE"));
@@ -1402,32 +1403,32 @@ pub unsafe fn cmd_find_client(
         // Trim a single trailing colon if any.
         let copy = target.strip_suffix(':').unwrap_or(target);
 
-        let mut c = null_mut();
-        // Check name and path of each client.
-        for c_ in tailq_foreach(&raw mut CLIENTS) {
-            c = c_.as_ptr();
-            if (*c).session.is_null() {
-                continue;
-            }
-            if streq_((*c).name, copy) {
-                break;
-            }
+        // Check name and path of each client. C's TAILQ_FOREACH leaves the loop
+        // variable NULL when nothing matches; a Rust `for` loop that assigns each
+        // element would instead retain the last one visited, so an unknown target
+        // returned an arbitrary (possibly session-less) client instead of erroring.
+        let c = tailq_foreach(&raw mut CLIENTS)
+            .map(NonNull::as_ptr)
+            .find(|&c| {
+                if (*c).session.is_null() {
+                    return false;
+                }
+                if streq_((*c).name, copy) {
+                    return true;
+                }
 
-            if *(*c).ttyname_ptr() == b'\0' {
-                continue;
-            }
-            if streq_((*c).ttyname_ptr(), copy) {
-                break;
-            }
-            if libc::strncmp((*c).ttyname_ptr(), _PATH_DEV, SIZEOF_PATH_DEV - 1) != 0 {
-                continue;
-            }
-            if streq_((*c).ttyname_ptr().add(SIZEOF_PATH_DEV - 1), copy) {
-                break;
-            }
-
-            continue;
-        }
+                if *(*c).ttyname_ptr() == b'\0' {
+                    return false;
+                }
+                if streq_((*c).ttyname_ptr(), copy) {
+                    return true;
+                }
+                if libc::strncmp((*c).ttyname_ptr(), _PATH_DEV, SIZEOF_PATH_DEV - 1) != 0 {
+                    return false;
+                }
+                streq_((*c).ttyname_ptr().add(SIZEOF_PATH_DEV - 1), copy)
+            })
+            .unwrap_or(null_mut());
 
         if c.is_null() && quiet == 0 {
             cmdq_error!(item, "can't find client: {}", copy);

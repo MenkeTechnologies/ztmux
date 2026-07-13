@@ -821,15 +821,14 @@ pub unsafe fn format_cb_window_stack_index(ft: *mut format_tree) -> format_table
         let s = (*(*ft).wl).session;
 
         let mut idx: u32 = 0;
-        let mut wl = null_mut();
-        for wl_ in tailq_foreach::<_, discr_sentry>(&raw mut (*s).lastw).map(NonNull::as_ptr) {
-            wl = wl_;
-            idx += 1;
-            if wl == (*ft).wl {
-                break;
-            }
-        }
-        if wl.is_null() {
+        // C's TAILQ_FOREACH leaves `wl` NULL when ft->wl is not in the stack, giving "0".
+        // A Rust `for` loop assigning each element would retain the last winlink and
+        // report the full stack length instead.
+        let wl = tailq_foreach::<_, discr_sentry>(&raw mut (*s).lastw)
+            .map(NonNull::as_ptr)
+            .inspect(|_| idx += 1)
+            .find(|&wl| wl == (*ft).wl);
+        if wl.is_none() {
             return "0".into();
         }
         format!("{idx}").into()

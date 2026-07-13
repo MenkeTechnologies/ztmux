@@ -2234,14 +2234,13 @@ pub unsafe fn server_client_check_window_resize(w: *mut window) {
             return;
         }
 
-        let mut wl = null_mut();
-        for wl_ in tailq_foreach::<_, discr_wentry>(&raw mut (*w).winlinks) {
-            wl = wl_.as_ptr();
-            if (*(*wl).session).attached != 0 && (*(*wl).session).curw == wl {
-                break;
-            }
-        }
-        if wl.is_null() {
+        // C's TAILQ_FOREACH leaves `wl` NULL when no attached session has this window
+        // current, and that NULL is what aborts the resize. A Rust `for` loop assigning
+        // each element would retain the last winlink and resize off an unrelated one.
+        let attached = tailq_foreach::<_, discr_wentry>(&raw mut (*w).winlinks)
+            .map(NonNull::as_ptr)
+            .any(|wl| (*(*wl).session).attached != 0 && (*(*wl).session).curw == wl);
+        if !attached {
             return;
         }
 

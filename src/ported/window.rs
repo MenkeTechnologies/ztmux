@@ -1233,7 +1233,11 @@ impl window_pane {
 /// C `vendor/tmux/window.c:1205`: `static void window_pane_destroy(struct window_pane *wp)`
 unsafe fn window_pane_destroy(wp: *mut window_pane) {
     unsafe {
-        window_pane_reset_mode_all(wp);
+        // C frees the modes outright here rather than resetting them one by one:
+        // window_pane_reset_mode resizes the next mode and notifies, and doing that
+        // while the pane's window is being destroyed rebuilt the customize-mode tree
+        // against a window that was already gone, dereferencing a null session.
+        window_pane_free_modes(wp);
         (*wp).searchstr = None;
 
         if (*wp).fd != -1 {
@@ -1397,13 +1401,14 @@ pub unsafe fn window_pane_set_mode(
             return 1;
         }
 
-        let mut wme: *mut window_mode_entry = null_mut();
-        for wme_ in tailq_foreach(&raw mut (*wp).modes).map(NonNull::as_ptr) {
-            wme = wme_;
-            if (*wme).mode == mode {
-                break;
-            }
-        }
+        // C's TAILQ_FOREACH leaves `wme` NULL when the pane has no entry for this mode,
+        // which is what makes a new entry below. A Rust `for` loop that assigns each
+        // element would retain the last entry visited, so a pane already in some other
+        // mode would reuse that entry — binding this mode to the other mode's `data`.
+        let mut wme = tailq_foreach(&raw mut (*wp).modes)
+            .map(NonNull::as_ptr)
+            .find(|&wme| (*wme).mode == mode)
+            .unwrap_or(null_mut());
 
         if !wme.is_null() {
             tailq_remove::<_, ()>(&raw mut (*wp).modes, wme);
@@ -1465,6 +1470,23 @@ pub unsafe fn window_pane_reset_mode_all(wp: *mut window_pane) {
         while !tailq_empty(&raw mut (*wp).modes) {
             window_pane_reset_mode(wp);
         }
+    }
+}
+
+/// Free all modes without running the interactive teardown: no resize of the next
+/// mode, no redraw, no notify. Used when the pane itself is going away, where those
+/// callbacks would rebuild a mode against a window that no longer exists.
+/// C `vendor/tmux/window.c:1148`: `static void window_pane_free_modes(struct window_pane *wp)`
+pub unsafe fn window_pane_free_modes(wp: *mut window_pane) {
+    unsafe {
+        while !tailq_empty(&raw mut (*wp).modes) {
+            let wme = tailq_first(&raw mut (*wp).modes);
+            tailq_remove::<_, ()>(&raw mut (*wp).modes, wme);
+            ((*(*wme).mode).free)(NonNull::new(wme).unwrap());
+            free(wme as _);
+        }
+
+        (*wp).screen = &raw mut (*wp).base;
     }
 }
 

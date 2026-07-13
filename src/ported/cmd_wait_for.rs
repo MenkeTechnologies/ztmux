@@ -13,10 +13,11 @@
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 use std::cmp::Ordering;
+use std::ffi::{CStr, CString};
 
 use crate::compat::{
     queue::{tailq_empty, tailq_first, tailq_foreach, tailq_init, tailq_insert_tail, tailq_remove},
-    tree::{rb_find, rb_foreach, rb_initializer, rb_insert, rb_remove},
+    tree::{rb_find_by, rb_foreach, rb_initializer, rb_insert, rb_remove},
 };
 use crate::*;
 
@@ -43,7 +44,9 @@ pub struct wait_item {
 
 #[repr(C)]
 pub struct wait_channel {
-    pub name: *mut u8,
+    /// Owned channel name (always set). Dropped with the struct in
+    /// `cmd_wait_for_remove`; C freed `wc->name` separately. Read via `n()`.
+    pub name: CString,
     pub locked: bool,
     pub woken: bool,
 
@@ -51,6 +54,12 @@ pub struct wait_channel {
     pub lockers: tailq_head<wait_item>,
 
     pub entry: rb_entry<wait_channel>,
+}
+
+impl wait_channel {
+    pub(crate) fn n(&self) -> *const u8 {
+        self.name.as_ptr().cast()
+    }
 }
 
 pub type wait_channels = rb_head<wait_channel>;
@@ -67,27 +76,29 @@ RB_GENERATE!(
 
 /// C `vendor/tmux/cmd-wait-for.c:66`: `static int wait_channel_cmp(struct wait_channel *wc1, struct wait_channel *wc2)`
 pub fn wait_channel_cmp(wc1: &wait_channel, wc2: &wait_channel) -> Ordering {
-    unsafe { i32_to_ordering(libc::strcmp(wc1.name, wc2.name)) }
+    // strcmp orders by unsigned byte, and treats a prefix as less than the longer
+    // string (the NUL compares low). Comparing the byte slices reproduces both.
+    wc1.name.as_bytes().cmp(wc2.name.as_bytes())
 }
 
 /// C `vendor/tmux/cmd-wait-for.c:84`: `static struct wait_channel *cmd_wait_for_add(const char *name)`
 pub unsafe fn cmd_wait_for_add(name: *const u8) -> *mut wait_channel {
     unsafe {
-        let wc = Box::leak(Box::new(wait_channel {
-            name: xstrdup(name).as_ptr(),
+        let wc = Box::into_raw(Box::new(wait_channel {
+            name: CStr::from_ptr(name.cast()).to_owned(),
             locked: false,
             woken: false,
             waiters: zeroed(),
             lockers: zeroed(),
             entry: zeroed(),
-        })) as *mut wait_channel;
+        }));
 
         tailq_init(&raw mut (*wc).waiters);
         tailq_init(&raw mut (*wc).lockers);
 
         rb_insert(&raw mut WAIT_CHANNELS, wc);
 
-        log_debug!("add wait channel {}", _s((*wc).name));
+        log_debug!("add wait channel {}", _s((*wc).n()));
 
         wc
     }
@@ -103,12 +114,13 @@ pub unsafe fn cmd_wait_for_remove(wc: *mut wait_channel) {
             return;
         }
 
-        log_debug!("remove wait channel {}", _s((*wc).name));
+        log_debug!("remove wait channel {}", _s((*wc).n()));
 
         rb_remove(&raw mut WAIT_CHANNELS, wc);
 
-        free_((*wc).name);
-        free_(wc);
+        // Reclaim the Box from cmd_wait_for_add. Dropping it frees the owned name,
+        // which C did by hand (`free(wc->name); free(wc);`).
+        drop(Box::from_raw(wc));
     }
 }
 
@@ -117,11 +129,14 @@ pub unsafe fn cmd_wait_for_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
     unsafe {
         let args = cmd_get_args(self_);
         let name = args_string(args, 0);
-        // struct wait_channel *wc, find;
 
-        let mut find: wait_channel = zeroed();
-        find.name = name as *mut u8; // TODO casting away const
-        let wc = rb_find(&raw mut WAIT_CHANNELS, &raw mut find);
+        // C builds a throwaway stack `struct wait_channel` as the RB_FIND key. With an
+        // owned name that is unsound in Rust — a partially-initialized wait_channel
+        // would drop garbage. Search by key instead; same descent, no key node.
+        let key = CStr::from_ptr(name.cast());
+        let wc = rb_find_by(&raw mut WAIT_CHANNELS, |wc| {
+            key.to_bytes().cmp(wc.name.as_bytes())
+        });
 
         if args_has(args, 'S') {
             return cmd_wait_for_signal(item, name, wc);
@@ -149,17 +164,17 @@ pub unsafe fn cmd_wait_for_signal(
         }
 
         if tailq_empty(&raw mut (*wc).waiters) && !(*wc).woken {
-            log_debug!("signal wait channel {}, no waiters", _s((*wc).name));
+            log_debug!("signal wait channel {}, no waiters", _s((*wc).n()));
             (*wc).woken = true;
             return cmd_retval::CMD_RETURN_NORMAL;
         }
-        log_debug!("signal wait channel {}, with waiters", _s((*wc).name));
+        log_debug!("signal wait channel {}, with waiters", _s((*wc).n()));
 
         for wi in tailq_foreach::<_, ()>(&raw mut (*wc).waiters).map(NonNull::as_ptr) {
             cmdq_continue((*wi).item);
 
             tailq_remove::<_, ()>(&raw mut (*wc).waiters, wi);
-            free_(wi);
+            drop(Box::from_raw(wi));
         }
 
         cmd_wait_for_remove(wc);
@@ -187,14 +202,16 @@ pub unsafe fn cmd_wait_for_wait(
         }
 
         if (*wc).woken {
-            log_debug!("wait channel {} already woken ({:p})", _s((*wc).name), c);
+            log_debug!("wait channel {} already woken ({:p})", _s((*wc).n()), c);
             cmd_wait_for_remove(wc);
             return cmd_retval::CMD_RETURN_NORMAL;
         }
-        log_debug!("wait channel {} not woken ({:p})", _s((*wc).name), c);
+        log_debug!("wait channel {} not woken ({:p})", _s((*wc).n()), c);
 
-        let wi: *mut wait_item = xcalloc1();
-        (*wi).item = item;
+        let wi = Box::into_raw(Box::new(wait_item {
+            item,
+            entry: zeroed(),
+        }));
         tailq_insert_tail(&raw mut (*wc).waiters, wi);
     }
     cmd_retval::CMD_RETURN_WAIT
@@ -217,8 +234,10 @@ pub unsafe fn cmd_wait_for_lock(
         }
 
         if (*wc).locked {
-            let wi = xcalloc1::<wait_item>();
-            wi.item = item;
+            let wi = Box::into_raw(Box::new(wait_item {
+                item,
+                entry: zeroed(),
+            }));
             tailq_insert_tail(&raw mut (*wc).lockers, wi);
             return cmd_retval::CMD_RETURN_WAIT;
         }
@@ -243,7 +262,7 @@ pub unsafe fn cmd_wait_for_unlock(
         if !wi.is_null() {
             cmdq_continue((*wi).item);
             tailq_remove(&raw mut (*wc).lockers, wi);
-            free_(wi);
+            drop(Box::from_raw(wi));
         } else {
             (*wc).locked = false;
             cmd_wait_for_remove(wc);
@@ -259,13 +278,13 @@ pub unsafe fn cmd_wait_for_flush() {
             for wi in tailq_foreach(&raw mut (*wc).waiters).map(NonNull::as_ptr) {
                 cmdq_continue((*wi).item);
                 tailq_remove(&raw mut (*wc).waiters, wi);
-                free_(wi);
+                drop(Box::from_raw(wi));
             }
             (*wc).woken = true;
             for wi in tailq_foreach(&raw mut (*wc).lockers).map(NonNull::as_ptr) {
                 cmdq_continue((*wi).item);
                 tailq_remove(&raw mut (*wc).lockers, wi);
-                free_(wi);
+                drop(Box::from_raw(wi));
             }
             (*wc).locked = false;
             cmd_wait_for_remove(wc);
