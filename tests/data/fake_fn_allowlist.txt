@@ -72,6 +72,7 @@ control_write_
 create_temp_file
 cstr_to_str
 cstr_to_str_
+cstring_truncating
 encode_cstyle
 encode_cstyle_
 encode_octal
