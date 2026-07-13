@@ -356,7 +356,7 @@ pub unsafe fn status_free(c: *mut client) {
 
         for i in 0..(*sl).entries.len() {
             status_free_ranges(&raw mut (*sl).entries[i].ranges);
-            free_((*sl).entries[i].expanded);
+            (*sl).entries[i].expanded = None;
         }
 
         if event_initialized(&raw mut (*sl).timer) != 0 {
@@ -462,8 +462,8 @@ pub unsafe fn status_redraw(c: *mut client) -> i32 {
 
                 let expanded = format_expand_time(ft, (*ov).string);
                 if !force
-                    && !(*sle).expanded.is_null()
-                    && libc::strcmp(expanded, (*sle).expanded) == 0
+                    && (*sle).expanded.is_some()
+                    && libc::strcmp(expanded, (*sle).expanded_ptr()) == 0
                 {
                     free_(expanded);
                     continue;
@@ -485,8 +485,8 @@ pub unsafe fn status_redraw(c: *mut client) -> i32 {
                     0,
                 );
 
-                free_((*sle).expanded);
-                (*sle).expanded = expanded;
+                // Adopt the owned expansion; assigning drops the old one.
+                (*sle).expanded = Some(std::ffi::CString::from_raw(expanded.cast()));
             }
         }
         screen_write_stop(&raw mut ctx);

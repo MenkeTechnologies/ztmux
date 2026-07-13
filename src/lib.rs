@@ -2331,8 +2331,21 @@ struct cmd_entry {
 const STATUS_LINES_LIMIT: usize = 5;
 #[repr(C)]
 struct status_line_entry {
-    expanded: *mut u8,
+    /// Owned cached expansion of this status line; `None` until drawn. Dropped
+    /// in `status_free`. Read via `expanded_ptr()`.
+    expanded: Option<std::ffi::CString>,
     ranges: style_ranges,
+}
+
+impl status_line_entry {
+    /// Borrowed `char *` to the cached expansion, or NULL when unset.
+    #[inline]
+    pub(crate) fn expanded_ptr(&self) -> *const u8 {
+        match &self.expanded {
+            Some(c) => c.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
 }
 #[repr(C)]
 struct status_line {
