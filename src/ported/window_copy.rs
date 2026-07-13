@@ -6005,6 +6005,11 @@ pub unsafe fn window_copy_other_end(wme: *mut window_mode_entry) {
         } else {
             (*data).cy = cy + sely - yy;
         }
+        let yy = screen_hsize((*data).backing) + (*data).cy - (*data).oy;
+        let hsize = window_copy_cursor_limit(wme, yy, (*data).rectflag as i32);
+        if (*data).cx > hsize {
+            (*data).cx = hsize;
+        }
 
         window_copy_update_selection(wme, 1, 1);
         window_copy_redraw_screen(wme);
