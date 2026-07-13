@@ -37,8 +37,20 @@ pub struct args {
 #[repr(C)]
 pub struct args_command_state<'a> {
     pub cmdlist: *mut cmd_list,
-    pub cmd: *mut u8,
+    /// Owned command string; `None` when the argument was already a parsed command list
+    /// (`cmdlist` is set instead). Dropped with the struct in `args_make_commands_free`,
+    /// where C freed it by hand.
+    pub cmd: Option<CString>,
     pub pi: cmd_parse_input<'a>,
+}
+
+impl args_command_state<'_> {
+    pub(crate) fn cmd_ptr(&self) -> *const u8 {
+        match &self.cmd {
+            Some(cmd) => cmd.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
 }
 
 RB_GENERATE!(args_tree, args_entry, entry, discr_entry, args_cmp);
@@ -831,7 +843,13 @@ pub unsafe fn args_make_commands_prepare<'a>(
         let target = cmdq_get_target(item);
         let tc = cmdq_get_target_client(item);
 
-        let state = xcalloc1::<args_command_state>() as *mut args_command_state;
+        // xcalloc would leave `cmd` an all-zero Option<CString>; build it through Box so
+        // every field starts out a valid Rust value.
+        let state = Box::into_raw(Box::new(args_command_state {
+            cmdlist: null_mut(),
+            cmd: None,
+            pi: zeroed(),
+        }));
 
         let cmd = if idx < (*args).count {
             let value = (*args).values.add(idx as usize);
@@ -848,12 +866,16 @@ pub unsafe fn args_make_commands_prepare<'a>(
             default_command
         };
 
+        // C xstrdup's (or format-expands) the command and frees it in
+        // args_make_commands_free; take ownership so Drop does that instead.
         if expand {
-            (*state).cmd = format_single_from_target(item, cmd);
+            let expanded = format_single_from_target(item, cmd);
+            (*state).cmd = Some(CStr::from_ptr(expanded.cast()).to_owned());
+            free_(expanded);
         } else {
-            (*state).cmd = xstrdup(cmd).as_ptr();
+            (*state).cmd = Some(CStr::from_ptr(cmd.cast()).to_owned());
         }
-        log_debug!("{}: {}", __func__, _s((*state).cmd));
+        log_debug!("{}: {}", __func__, _s((*state).cmd_ptr()));
 
         if wait {
             (*state).pi.item = item;
@@ -890,7 +912,7 @@ pub unsafe fn args_make_commands(
             return cmd_list_copy(&*(*state).cmdlist, argc, argv);
         }
 
-        let mut cmd = xstrdup((*state).cmd).as_ptr();
+        let mut cmd = xstrdup((*state).cmd_ptr()).as_ptr();
         log_debug!("{}: {}", __func__, _s(cmd));
         cmd_log_argv!(argc, argv, "args_make_commands");
         for i in 0..argc {
@@ -942,8 +964,8 @@ pub unsafe fn args_make_commands_free(state: *mut args_command_state) {
                 .unwrap_or_default()
                 .cast_mut(),
         ); // TODO casting away const
-        free_((*state).cmd);
-        free_(state);
+        // Dropping the Box frees the owned command, which C did with free(state->cmd).
+        drop(Box::from_raw(state));
     }
 }
 
@@ -958,8 +980,8 @@ pub unsafe fn args_make_commands_get_command(state: *mut args_command_state) -> 
             }
             return xstrdup__(cmd_get_entry(first).name);
         }
-        let n = libc::strcspn((*state).cmd, c!(" ,"));
-        format_nul!("{1:0$}", n, _s((*state).cmd))
+        let n = libc::strcspn((*state).cmd_ptr(), c!(" ,"));
+        format_nul!("{1:0$}", n, _s((*state).cmd_ptr()))
     }
 }
 
