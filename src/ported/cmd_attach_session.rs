@@ -97,8 +97,8 @@ pub unsafe fn cmd_attach_session(
 
         if !cflag.is_null() {
             cwd = format_single(item, cstr_to_str(cflag), c, s, wl, wp);
-            free_((*s).cwd);
-            (*s).cwd = cwd;
+            // Adopt the owned format_single result; assigning drops the old cwd.
+            (*s).cwd = Some(std::ffi::CString::from_raw(cwd.cast()));
         }
         if !fflag.is_null() {
             server_client_set_flags(c, fflag);

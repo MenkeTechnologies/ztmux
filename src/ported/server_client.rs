@@ -3299,14 +3299,14 @@ pub unsafe fn server_client_get_cwd(c: *const client, s: *const session) -> *con
             (*CFG_CLIENT).cwd
         } else if !c.is_null() && (*c).session.is_null() && !(*c).cwd.is_null() {
             (*c).cwd
-        } else if !s.is_null() && !(*s).cwd.is_null() {
-            (*s).cwd
+        } else if !s.is_null() && (*s).cwd.is_some() {
+            (*s).cwd_ptr()
         } else if !c.is_null()
             && let session = (*c).session
             && !session.is_null()
-            && !(*session).cwd.is_null()
+            && (*session).cwd.is_some()
         {
-            (*session).cwd
+            (*session).cwd_ptr()
         } else if let Some(home) = find_home() {
             home.as_ptr().cast()
         } else {

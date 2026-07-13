@@ -1762,7 +1762,9 @@ const SESSION_ALERTED: i32 = 0x2;
 struct session {
     id: u32,
     name: Cow<'static, str>,
-    cwd: *mut u8,
+    /// Owned working directory; `None` only transiently (zeroed on create,
+    /// set immediately). Dropped in session teardown before the struct is freed.
+    cwd: Option<std::ffi::CString>,
 
     creation_time: timeval,
     last_attached_time: timeval,

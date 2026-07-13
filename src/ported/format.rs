@@ -2806,7 +2806,7 @@ pub unsafe fn format_cb_session_name(ft: *mut format_tree) -> format_table_type 
 pub unsafe fn format_cb_session_path(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).s.is_null() {
-            return format!("{}", _s((*(*ft).s).cwd)).into();
+            return format!("{}", _s((*(*ft).s).cwd_ptr())).into();
         }
         format_table_type::None
     }

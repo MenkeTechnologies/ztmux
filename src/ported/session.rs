@@ -91,7 +91,7 @@ impl session {
             s.references = 1;
             s.flags = 0;
 
-            s.cwd = xstrdup(cwd).as_ptr();
+            s.cwd = Some(std::ffi::CStr::from_ptr(cwd.cast()).to_owned());
 
             tailq_init(&raw mut s.lastw);
             rb_init(&raw mut s.windows);
@@ -186,6 +186,17 @@ pub unsafe fn session_remove_ref(s: *mut session, from: *const u8) {
     }
 }
 
+impl session {
+    /// Borrowed `char *` to the working directory, or NULL if unset.
+    #[inline]
+    pub(crate) fn cwd_ptr(&self) -> *const u8 {
+        match &self.cwd {
+            Some(c) => c.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+}
+
 /// Free session.
 /// C `vendor/tmux/session.c:180`: `static void session_free(__unused int fd, __unused short events, void *arg)`
 pub unsafe extern "C-unwind" fn session_free(_fd: i32, _events: i16, arg: *mut c_void) {
@@ -241,7 +252,7 @@ pub unsafe fn session_destroy(s: *mut session, notify: i32, from: *const u8) {
             winlink_remove(&raw mut (*s).windows, wl);
         }
 
-        free_((*s).cwd);
+        (*s).cwd = None;
 
         session_remove_ref(s, __func__);
     }
