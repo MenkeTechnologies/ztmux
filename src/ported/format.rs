@@ -144,11 +144,25 @@ pub enum format_type {
 // Entry in format tree.
 #[repr(C)]
 pub struct format_entry {
-    pub key: *mut u8,
-    pub value: *mut u8,
+    /// Owned key (always set) and value (`None` until filled, possibly by `cb`). Both
+    /// dropped with the struct in `format_free`, where C freed each by hand.
+    pub key: CString,
+    pub value: Option<CString>,
     pub time: time_t,
     pub cb: Option<format_cb>,
     pub entry: rb_entry<format_entry>,
+}
+
+impl format_entry {
+    pub(crate) fn key_ptr(&self) -> *const u8 {
+        self.key.as_ptr().cast()
+    }
+    pub(crate) fn value_ptr(&self) -> *const u8 {
+        match &self.value {
+            Some(value) => value.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
 }
 
 #[repr(C)]
@@ -204,7 +218,9 @@ pub struct format_modifier {
 /// Format entry tree comparison function.
 /// C `vendor/tmux/format.c:203`: `static int format_entry_cmp(struct format_entry *fe1, struct format_entry *fe2)`
 fn format_entry_cmp(fe1: &format_entry, fe2: &format_entry) -> cmp::Ordering {
-    unsafe { i32_to_ordering(strcmp(fe1.key, fe2.key)) }
+    // strcmp orders by unsigned byte and treats a prefix as less than the longer string;
+    // comparing the byte slices reproduces both.
+    fe1.key.as_bytes().cmp(fe2.key.as_bytes())
 }
 
 /// Single-character uppercase aliases.
@@ -3593,8 +3609,8 @@ pub unsafe fn format_table_get(key: *const u8) -> Option<&'static format_table_e
 pub unsafe fn format_merge(ft: *mut format_tree, from: *mut format_tree) {
     unsafe {
         for fe in rb_foreach(&raw mut (*from).tree).map(NonNull::as_ptr) {
-            if !(*fe).value.is_null() {
-                format_add!(ft, cstr_to_str((*fe).key), "{}", _s((*fe).value));
+            if (*fe).value.is_some() {
+                format_add!(ft, cstr_to_str((*fe).key_ptr()), "{}", _s((*fe).value_ptr()));
             }
         }
     }
@@ -3648,9 +3664,8 @@ pub unsafe fn format_free(ft: *mut format_tree) {
     unsafe {
         for fe in rb_foreach(&raw mut (*ft).tree).map(NonNull::as_ptr) {
             rb_remove(&raw mut (*ft).tree, fe);
-            free_((*fe).value);
-            free_((*fe).key);
-            free_(fe);
+            // Dropping the Box frees the owned key and value, which C freed by hand.
+            drop(Box::from_raw(fe));
         }
 
         if !(*ft).client.is_null() {
@@ -3694,20 +3709,18 @@ pub unsafe fn format_each<T>(ft: *mut format_tree, cb: unsafe fn(&str, &str, *mu
         for fe in rb_foreach(&raw mut (*ft).tree).map(NonNull::as_ptr) {
             if (*fe).time != 0 {
                 let s = format!("{}", (*fe).time);
-                cb(cstr_to_str((*fe).key), &s, arg);
+                cb(cstr_to_str((*fe).key_ptr()), &s, arg);
             } else {
                 if let Some(fe_cb) = (*fe).cb
-                    && (*fe).value.is_null()
+                    && (*fe).value.is_none()
                 {
-                    (*fe).value = match fe_cb(ft) {
-                        format_table_type::None => CString::default().into_raw().cast(),
-                        format_table_type::String(cow) => {
-                            CString::new(cow.into_owned()).unwrap().into_raw().cast()
-                        }
+                    (*fe).value = Some(match fe_cb(ft) {
+                        format_table_type::None => CString::default(),
+                        format_table_type::String(cow) => cstring_truncating(cow.into_owned()),
                         format_table_type::Time(_timeval) => unreachable!("unreachable?"),
-                    }
+                    });
                 }
-                cb(cstr_to_str((*fe).key), cstr_to_str((*fe).value), arg);
+                cb(cstr_to_str((*fe).key_ptr()), cstr_to_str((*fe).value_ptr()), arg);
             }
         }
     }
@@ -3723,27 +3736,26 @@ pub(crate) use format_add;
 /// Add a key-value pair.
 pub unsafe fn format_add_(ft: *mut format_tree, key: &str, args: std::fmt::Arguments) {
     unsafe {
-        let fe = Box::leak(Box::new(format_entry {
-            key: xstrdup__(key),
-            value: null_mut(),
+        let fe = Box::into_raw(Box::new(format_entry {
+            key: cstring_truncating(key.to_owned()),
+            value: None,
             time: 0,
             cb: None,
             entry: zeroed(),
-        })) as *mut format_entry;
+        }));
 
         let fe = match rb_insert(&raw mut (*ft).tree, fe) {
             fe_now if !fe_now.is_null() => {
-                free_((*fe).key);
-                free_(fe);
-                free_((*fe_now).value);
+                // The key already exists: discard the entry we just built (its Drop frees
+                // the duplicate key) and replace the existing value.
+                drop(Box::from_raw(fe));
+                (*fe_now).value = None;
                 fe_now
             }
             _ => fe,
         };
 
-        let mut value = args.to_string();
-        value.push('\0');
-        (*fe).value = value.leak().as_mut_ptr().cast();
+        (*fe).value = Some(cstring_truncating(args.to_string()));
     }
 }
 
@@ -3751,19 +3763,18 @@ pub unsafe fn format_add_(ft: *mut format_tree, key: &str, args: std::fmt::Argum
 /// C `vendor/tmux/format.c:3968`: `void format_add_tv(struct format_tree *ft, const char *key, struct timeval *tv)`
 pub unsafe fn format_add_tv(ft: *mut format_tree, key: *const u8, tv: *const timeval) {
     unsafe {
-        let fe = Box::leak(Box::new(format_entry {
-            key: xstrdup(key).as_ptr(),
-            value: null_mut(),
+        let fe = Box::into_raw(Box::new(format_entry {
+            key: CStr::from_ptr(key.cast()).to_owned(),
+            value: None,
             time: (*tv).tv_sec,
             cb: None,
             entry: zeroed(),
-        })) as *mut format_entry;
+        }));
 
         let fe_now = rb_insert(&raw mut (*ft).tree, fe);
         if !fe_now.is_null() {
-            free_((*fe).key);
-            free_(fe);
-            free_((*fe_now).value);
+            drop(Box::from_raw(fe));
+            (*fe_now).value = None;
         }
     }
 }
@@ -3772,19 +3783,18 @@ pub unsafe fn format_add_tv(ft: *mut format_tree, key: *const u8, tv: *const tim
 /// C `vendor/tmux/format.c:3991`: `void format_add_cb(struct format_tree *ft, const char *key, format_cb cb)`
 pub unsafe fn format_add_cb(ft: *mut format_tree, key: *const u8, cb: format_cb) {
     unsafe {
-        let fe = Box::leak(Box::new(format_entry {
-            key: xstrdup(key).as_ptr(),
-            value: null_mut(),
+        let fe = Box::into_raw(Box::new(format_entry {
+            key: CStr::from_ptr(key.cast()).to_owned(),
+            value: None,
             time: 0,
             cb: Some(cb),
             entry: zeroed(),
-        })) as *mut format_entry;
+        }));
 
         let fe_now = rb_insert(&raw mut (*ft).tree, fe);
         if !fe_now.is_null() {
-            free_((*fe).key);
-            free_(fe);
-            free_((*fe_now).value);
+            drop(Box::from_raw(fe));
+            (*fe_now).value = None;
         }
     }
 }
@@ -3895,7 +3905,6 @@ fn format_find(
     unsafe {
         let mut s = MaybeUninit::<[u8; 512]>::uninit();
         let s = s.as_mut_ptr() as *mut u8;
-        let mut fe_find = MaybeUninit::<format_entry>::uninit();
 
         const SIZEOF_S: usize = 512;
         let mut t: time_t = 0;
@@ -3942,25 +3951,27 @@ fn format_find(
                 break 'found;
             }
 
-            (*fe_find.as_mut_ptr()).key = key.cast_mut(); // TODO: check if this is correct casting away const
-            let fe = rb_find(&raw mut (*ft).tree, fe_find.as_mut_ptr());
+            // format_entry owns its key, so a fabricated MaybeUninit key struct would
+            // hold garbage where a valid CString must be. Search by key instead.
+            let key_c = CStr::from_ptr(key.cast());
+            let fe = rb_find_by(&raw mut (*ft).tree, |fe| {
+                key_c.to_bytes().cmp(fe.key.as_bytes())
+            });
             if !fe.is_null() {
                 if (*fe).time != 0 {
                     t = (*fe).time;
                     break 'found;
                 }
                 if let Some(cb) = (*fe).cb
-                    && (*fe).value.is_null()
+                    && (*fe).value.is_none()
                 {
-                    (*fe).value = match cb(ft) {
-                        format_table_type::None => CString::default().into_raw().cast(),
-                        format_table_type::String(cow) => {
-                            CString::new(cow.into_owned()).unwrap().into_raw().cast()
-                        }
+                    (*fe).value = Some(match cb(ft) {
+                        format_table_type::None => CString::default(),
+                        format_table_type::String(cow) => cstring_truncating(cow.into_owned()),
                         format_table_type::Time(_timeval) => unreachable!("unreachable?"),
-                    };
+                    });
                 }
-                found = xstrdup((*fe).value).as_ptr();
+                found = xstrdup((*fe).value_ptr()).as_ptr();
                 break 'found;
             }
 
