@@ -96,7 +96,13 @@ unsafe fn window_buffer_add_item(data: *mut window_buffer_modedata) -> *mut wind
     unsafe {
         (*data).item_list =
             xreallocarray_((*data).item_list, (*data).item_size as usize + 1).as_ptr();
-        let item = xcalloc1::<window_buffer_itemdata>();
+        // xcalloc would leave `name` as an all-zero String, whose null data pointer
+        // breaks String's non-null invariant. Box it so the field starts out valid.
+        let item = Box::into_raw(Box::new(window_buffer_itemdata {
+            name: String::new(),
+            order: 0,
+            size: 0,
+        }));
         *(*data).item_list.add((*data).item_size as usize) = item;
         (*data).item_size += 1;
         item
@@ -106,8 +112,8 @@ unsafe fn window_buffer_add_item(data: *mut window_buffer_modedata) -> *mut wind
 /// C `vendor/tmux/window-buffer.c:129`: `static void window_buffer_free_item(struct window_buffer_itemdata *item)`
 unsafe fn window_buffer_free_item(item: *mut window_buffer_itemdata) {
     unsafe {
-        (*item).name = String::new();
-        free_(item);
+        // Dropping the Box frees the owned name, which C did with `free(item->name)`.
+        drop(Box::from_raw(item));
     }
 }
 

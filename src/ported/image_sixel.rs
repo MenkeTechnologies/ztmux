@@ -295,9 +295,19 @@ pub unsafe fn sixel_parse(
             }
             cp = cp.add(1);
 
-            si = xcalloc1::<sixel_image>() as *mut sixel_image;
-            (*si).xpixel = xpixel;
-            (*si).ypixel = ypixel;
+            // xcalloc would leave `colours` as an all-zero Vec, whose null data pointer
+            // breaks Vec's non-null invariant. Box it so every field starts out valid.
+            si = Box::into_raw(Box::new(sixel_image {
+                x: 0,
+                y: 0,
+                xpixel,
+                ypixel,
+                colours: Vec::new(),
+                dx: 0,
+                dy: 0,
+                dc: 0,
+                lines: null_mut(),
+            }));
 
             while cp != end {
                 let ch = *cp;
@@ -360,8 +370,9 @@ pub unsafe fn sixel_free(si: *mut sixel_image) {
         }
         free_((*si).lines);
 
-        (*si).colours = Vec::new();
-        free_(si);
+        // Dropping the Box frees the owned colour table; `lines` is a C array and is
+        // still freed by hand above.
+        drop(Box::from_raw(si));
     }
 }
 
@@ -447,9 +458,17 @@ pub unsafe fn sixel_scale(
         let tsx = sx * xpixel;
         let tsy = ((sy * ypixel) / 6) * 6;
 
-        let new = xcalloc1::<sixel_image>() as *mut sixel_image;
-        (*new).xpixel = xpixel;
-        (*new).ypixel = ypixel;
+        let new = Box::into_raw(Box::new(sixel_image {
+            x: 0,
+            y: 0,
+            xpixel,
+            ypixel,
+            colours: Vec::new(),
+            dx: 0,
+            dy: 0,
+            dc: 0,
+            lines: null_mut(),
+        }));
 
         for y in 0..tsy {
             let py: u32 = poy + ((y as f64) * psy as f64 / tsy as f64) as u32;

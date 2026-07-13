@@ -64,11 +64,25 @@ pub struct window_client_modedata {
     wp: *mut window_pane,
 
     data: *mut mode_tree_data,
-    format: *mut u8,
-    key_format: *mut u8,
-    command: *mut u8,
+    /// Owned format strings. Dropped with the struct in `window_client_free`, where C
+    /// freed each by hand. Read via the `*_ptr` accessors.
+    format: CString,
+    key_format: CString,
+    command: CString,
 
     item_list: Vec<*mut window_client_itemdata>,
+}
+
+impl window_client_modedata {
+    fn format_ptr(&self) -> *const u8 {
+        self.format.as_ptr().cast()
+    }
+    fn key_format_ptr(&self) -> *const u8 {
+        self.key_format.as_ptr().cast()
+    }
+    fn command_ptr(&self) -> *const u8 {
+        self.command.as_ptr().cast()
+    }
 }
 
 /// C `vendor/tmux/window-client.c:193`: `static struct window_client_itemdata *window_client_add_item(struct window_client_modedata *data)`
@@ -174,7 +188,7 @@ pub unsafe fn window_client_build(
 
             let text = format_single(
                 null_mut(),
-                cstr_to_str((*data).format),
+                cstr_to_str((*data).format_ptr()),
                 c,
                 null_mut(),
                 null_mut(),
@@ -268,7 +282,7 @@ pub unsafe fn window_client_get_key(
         format_defaults(ft, (*item.as_ptr()).c, None, None, None);
         format_add!(ft, "line", "{line}");
 
-        let expanded = format_expand(ft, (*data.as_ptr()).key_format);
+        let expanded = format_expand(ft, (*data.as_ptr()).key_format_ptr());
         let key = key_string_lookup_string(expanded);
         free_(expanded);
         format_free(ft);
@@ -286,26 +300,34 @@ pub unsafe fn window_client_init(
         let wp: *mut window_pane = (*wme.as_ptr()).wp;
         let mut s: *mut screen = null_mut();
 
-        let data: *mut window_client_modedata =
-            xcalloc1::<window_client_modedata>() as *mut window_client_modedata;
-        (*wme.as_ptr()).data = data.cast();
-        (*data).wp = wp;
+        // C allocates this with xcalloc. That is not valid for a Rust `Vec`: an all-zero
+        // Vec has a null data pointer, which breaks its non-null invariant, so the very
+        // first `item_list.drain(..)` in window_client_build dereferenced null. Build the
+        // struct through Box so every field starts out a valid Rust value.
+        let arg_str = |flag: u8| -> Option<CString> {
+            if args.is_null() || !args_has(args, flag as char) {
+                return None;
+            }
+            Some(CStr::from_ptr(args_get_(args, flag as char).cast()).to_owned())
+        };
 
-        if args.is_null() || !args_has(args, 'F') {
-            (*data).format = xstrdup__(WINDOW_CLIENT_DEFAULT_FORMAT);
+        let command = if args.is_null() || args_count(args) == 0 {
+            cstring_truncating(WINDOW_CLIENT_DEFAULT_COMMAND.to_owned())
         } else {
-            (*data).format = xstrdup(args_get_(args, 'F')).as_ptr();
-        }
-        if args.is_null() || !args_has(args, 'K') {
-            (*data).key_format = xstrdup__(WINDOW_CLIENT_DEFAULT_KEY_FORMAT);
-        } else {
-            (*data).key_format = xstrdup(args_get_(args, 'K')).as_ptr();
-        }
-        if args.is_null() || args_count(args) == 0 {
-            (*data).command = xstrdup__(WINDOW_CLIENT_DEFAULT_COMMAND);
-        } else {
-            (*data).command = xstrdup(args_string(args, 0)).as_ptr();
-        }
+            CStr::from_ptr(args_string(args, 0).cast()).to_owned()
+        };
+
+        let data = Box::into_raw(Box::new(window_client_modedata {
+            wp,
+            data: null_mut(),
+            format: arg_str(b'F')
+                .unwrap_or_else(|| cstring_truncating(WINDOW_CLIENT_DEFAULT_FORMAT.to_owned())),
+            key_format: arg_str(b'K')
+                .unwrap_or_else(|| cstring_truncating(WINDOW_CLIENT_DEFAULT_KEY_FORMAT.to_owned())),
+            command,
+            item_list: Vec::new(),
+        }));
+        (*wme.as_ptr()).data = data.cast();
 
         (*data).data = mode_tree_start(
             wp,
@@ -341,16 +363,13 @@ pub unsafe fn window_client_free(wme: NonNull<window_mode_entry>) {
 
         mode_tree_free((*data).data);
 
+        // The items are raw C allocations, so they still need freeing by hand; the owned
+        // format strings and the Vec itself go with the Box.
         for item in (*data).item_list.drain(..) {
             window_client_free_item(item);
         }
-        (*data).item_list = Vec::new();
 
-        free_((*data).format);
-        free_((*data).key_format);
-        free_((*data).command);
-
-        free_(data);
+        drop(Box::from_raw(data));
     }
 }
 
@@ -430,7 +449,7 @@ pub unsafe fn window_client_key(
                 mode_tree_run_command(
                     c,
                     null_mut(),
-                    (*data).command,
+                    (*data).command_ptr(),
                     cstr_to_str_((*(*item.as_ptr()).c).ttyname_ptr()),
                 );
                 finished = true;
