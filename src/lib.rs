@@ -1466,8 +1466,12 @@ struct window_pane {
 
     argc: i32,
     argv: *mut *mut u8,
-    shell: *mut u8,
-    cwd: *mut u8,
+    /// Owned shell path / working dir; `None` until set (`xcalloc` zeroes them
+    /// to valid `None` via the null-pointer niche). Dropped in
+    /// `window_pane_destroy` before the pane is freed. Read via
+    /// `shell_ptr()`/`cwd_ptr()`.
+    shell: Option<std::ffi::CString>,
+    cwd: Option<std::ffi::CString>,
 
     pid: pid_t,
     tty: [u8; TTY_NAME_MAX],
@@ -1502,7 +1506,9 @@ struct window_pane {
 
     modes: tailq_head<window_mode_entry>,
 
-    searchstr: *mut u8,
+    /// Owned last copy-mode search string; `None` until set. Read via
+    /// `searchstr_ptr()`.
+    searchstr: Option<std::ffi::CString>,
     searchregex: i32,
 
     border_gc_set: i32,

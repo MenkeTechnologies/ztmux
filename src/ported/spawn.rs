@@ -343,8 +343,8 @@ pub unsafe fn spawn_pane(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut wi
                 argv = (*sc).argv;
             }
             if !cwd.is_null() {
-                free_((*new_wp).cwd);
-                (*new_wp).cwd = cwd;
+                // Adopt the owned cwd string; assigning drops the old one.
+                (*new_wp).cwd = Some(std::ffi::CString::from_raw(cwd.cast()));
             }
 
             // Replace the stored arguments if there are new ones. If not, the
@@ -400,24 +400,24 @@ pub unsafe fn spawn_pane(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut wi
                 if !checkshell_(tmp) {
                     tmp = _PATH_BSHELL;
                 }
-                free_((*new_wp).shell);
-                (*new_wp).shell = xstrdup(tmp).as_ptr();
+                // Assigning drops the old shell CString — no manual free.
+                (*new_wp).shell = Some(std::ffi::CStr::from_ptr(tmp.cast()).to_owned());
             }
             environ_set!(
                 child,
                 c!("SHELL"),
                 environ_flags::empty(),
                 "{}",
-                _s((*new_wp).shell)
+                _s((*new_wp).shell_ptr())
             );
 
             // Log the arguments we are going to use.
-            log_debug!("spawn_pane: shell={}", _s((*new_wp).shell));
+            log_debug!("spawn_pane: shell={}", _s((*new_wp).shell_ptr()));
             if (*new_wp).argc != 0 {
                 let cp = cmd_stringify_argv((*new_wp).argc, (*new_wp).argv);
                 log_debug!("spawn_pane: cmd={}", cp);
             }
-            log_debug!("spawn_pane: cwd={}", _s((*new_wp).cwd));
+            log_debug!("spawn_pane: cwd={}", _s((*new_wp).cwd_ptr()));
             cmd_log_argv!((*new_wp).argc, (*new_wp).argv, "spawn_pan");
             environ_log!(child, "spawn_pan: environment ");
 
@@ -489,13 +489,13 @@ pub unsafe fn spawn_pane(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut wi
             // Async-signal-safe chdir only (libc chdir, not
             // std::env::set_current_dir which allocates); home was resolved in
             // the parent before fork.
-            if chdir((*new_wp).cwd.cast()) == 0 {
+            if chdir((*new_wp).cwd_ptr().cast()) == 0 {
                 environ_set!(
                     child,
                     c!("PWD"),
                     environ_flags::empty(),
                     "{}",
-                    _s((*new_wp).cwd)
+                    _s((*new_wp).cwd_ptr())
                 );
             } else if !home.is_null() && chdir(home.cast()) == 0 {
                 environ_set!(
@@ -550,16 +550,16 @@ pub unsafe fn spawn_pane(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut wi
 
             // If one argument, pass it to $SHELL -c. Otherwise create a login
             // shell.
-            let cp = strrchr((*new_wp).shell, b'/' as i32);
+            let cp = strrchr((*new_wp).shell_ptr(), b'/' as i32);
             if (*new_wp).argc == 1 {
                 let tmp = *(*new_wp).argv;
                 argv0 = if !cp.is_null() && *cp.add(1) != b'\0' {
                     format_nul!("{}", _s(cp.add(1)))
                 } else {
-                    format_nul!("{}", _s((*new_wp).shell))
+                    format_nul!("{}", _s((*new_wp).shell_ptr()))
                 };
                 execl(
-                    (*new_wp).shell.cast(),
+                    (*new_wp).shell_ptr().cast(),
                     argv0.cast(),
                     c!("-c"),
                     tmp,
@@ -570,9 +570,9 @@ pub unsafe fn spawn_pane(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut wi
             argv0 = if !cp.is_null() && *cp.add(1) != b'\0' {
                 format_nul!("-{}", _s(cp.add(1)))
             } else {
-                format_nul!("-{}", _s((*new_wp).shell))
+                format_nul!("-{}", _s((*new_wp).shell_ptr()))
             };
-            execl((*new_wp).shell.cast(), argv0.cast(), null_mut::<u8>());
+            execl((*new_wp).shell_ptr().cast(), argv0.cast(), null_mut::<u8>());
             _exit(1);
         }
 

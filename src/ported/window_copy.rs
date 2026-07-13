@@ -321,10 +321,10 @@ pub unsafe fn window_copy_common_init(wme: *mut window_mode_entry) -> *mut windo
         (*data).lineflag = line_sel::LINE_SEL_NONE;
         (*data).selflag = selflag::SEL_CHAR;
 
-        if !(*wp).searchstr.is_null() {
+        if (*wp).searchstr.is_some() {
             (*data).searchtype = window_copy::WINDOW_COPY_SEARCHUP;
             (*data).searchregex = (*wp).searchregex;
-            (*data).searchstr = xstrdup((*wp).searchstr).as_ptr();
+            (*data).searchstr = xstrdup((*wp).searchstr_ptr()).as_ptr();
         } else {
             (*data).searchtype = window_copy::WINDOW_COPY_OFF;
             (*data).searchregex = 0;
@@ -4452,17 +4452,17 @@ pub unsafe fn window_copy_search(
             return false;
         }
 
-        if (*data).searchall != 0 || (*wp).searchstr.is_null() || (*wp).searchregex != regex {
+        if (*data).searchall != 0 || (*wp).searchstr.is_none() || (*wp).searchregex != regex {
             visible_only = 0;
             (*data).searchall = 0;
         } else {
-            visible_only = (libc::strcmp((*wp).searchstr, str) == 0) as i32;
+            visible_only = (libc::strcmp((*wp).searchstr_ptr(), str) == 0) as i32;
         }
         if visible_only == 0 && !(*data).searchmark.is_null() {
             window_copy_clear_marks(wme);
         }
-        free_((*wp).searchstr);
-        (*wp).searchstr = xstrdup(str).as_ptr();
+        // Assigning drops the old search CString — no manual free.
+        (*wp).searchstr = Some(std::ffi::CStr::from_ptr(str.cast()).to_owned());
         (*wp).searchregex = regex;
 
         let mut fx = (*data).cx;

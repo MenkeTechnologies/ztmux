@@ -1047,10 +1047,10 @@ pub unsafe fn format_cb_start_path(ft: *mut format_tree) -> format_table_type {
             return format_table_type::None;
         }
 
-        if (*wp).cwd.is_null() {
+        if (*wp).cwd.is_none() {
             return "".into();
         }
-        format!("{}", _s((*wp).cwd)).into()
+        format!("{}", _s((*wp).cwd_ptr())).into()
     }
 }
 
@@ -1060,7 +1060,7 @@ pub unsafe fn format_cb_current_command(ft: *mut format_tree) -> format_table_ty
     unsafe {
         let wp = (*ft).wp;
 
-        if wp.is_null() || (*wp).shell.is_null() {
+        if wp.is_null() || (*wp).shell.is_none() {
             return format_table_type::None;
         }
 
@@ -1073,7 +1073,7 @@ pub unsafe fn format_cb_current_command(ft: *mut format_tree) -> format_table_ty
                 .cast();
             if cmd.is_null() || *cmd == b'\0' {
                 free_(cmd);
-                cmd = xstrdup((*wp).shell).as_ptr().cast();
+                cmd = xstrdup((*wp).shell_ptr()).as_ptr().cast();
             }
         }
         let value = parse_window_name(cmd);
@@ -2558,10 +2558,10 @@ pub unsafe fn format_cb_pane_right(ft: *mut format_tree) -> format_table_type {
 pub unsafe fn format_cb_pane_search_string(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
-            if (*(*ft).wp).searchstr.is_null() {
+            if (*(*ft).wp).searchstr.is_none() {
                 return "".into();
             }
-            return format!("{}", _s((*(*ft).wp).searchstr)).into();
+            return format!("{}", _s((*(*ft).wp).searchstr_ptr())).into();
         }
         format_table_type::None
     }

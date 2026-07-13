@@ -1188,11 +1188,38 @@ pub unsafe fn window_pane_create(
     }
 }
 
+impl window_pane {
+    /// Borrowed `char *` to the shell path, or NULL if unset.
+    #[inline]
+    pub(crate) fn shell_ptr(&self) -> *const u8 {
+        match &self.shell {
+            Some(c) => c.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+    /// Borrowed `char *` to the working directory, or NULL if unset.
+    #[inline]
+    pub(crate) fn cwd_ptr(&self) -> *const u8 {
+        match &self.cwd {
+            Some(c) => c.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+    /// Borrowed `char *` to the last search string, or NULL if unset.
+    #[inline]
+    pub(crate) fn searchstr_ptr(&self) -> *const u8 {
+        match &self.searchstr {
+            Some(c) => c.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+}
+
 /// C `vendor/tmux/window.c:1205`: `static void window_pane_destroy(struct window_pane *wp)`
 unsafe fn window_pane_destroy(wp: *mut window_pane) {
     unsafe {
         window_pane_reset_mode_all(wp);
-        free((*wp).searchstr as _);
+        (*wp).searchstr = None;
 
         if (*wp).fd != -1 {
             #[cfg(feature = "utempter")]
@@ -1229,8 +1256,8 @@ unsafe fn window_pane_destroy(wp: *mut window_pane) {
         rb_remove(&raw mut ALL_WINDOW_PANES, wp);
 
         options_free((*wp).options);
-        free((*wp).cwd as _);
-        free((*wp).shell as _);
+        (*wp).cwd = None;
+        (*wp).shell = None;
         cmd_free_argv((*wp).argc, (*wp).argv);
         colour_palette_free(Some(&mut (*wp).palette));
         free(wp as _);

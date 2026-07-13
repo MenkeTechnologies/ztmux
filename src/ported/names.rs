@@ -123,7 +123,7 @@ pub unsafe fn default_window_name(w: *mut window) -> String {
         if !cmd.is_empty() {
             parse_window_name(cmd.as_ptr().cast())
         } else {
-            parse_window_name((*(*w).active).shell)
+            parse_window_name((*(*w).active).shell_ptr())
         }
     }
 }
