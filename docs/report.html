@@ -58,12 +58,12 @@
   </header>
 
   <main class="tutorial-main">
-    <div class="status-banner"><strong>Status: 100% functional &mdash; building, running, and self-hosting its own tooling.</strong> ztmux is the tmux program itself &mdash; server and client &mdash; reimplemented from the C in Rust. It builds and runs (<code>ztmux new-session</code>, <code>ztmux attach</code>), passes its <strong>1080-case parity suite at 100% (byte-for-byte vs upstream tmux, zero known divergences)</strong>, has every harness-found bug fixed, and ships original extensions the C tmux has no equivalent for.</div>
+    <div class="status-banner"><strong>Status: 100% functional &mdash; building, running, and self-hosting its own tooling.</strong> ztmux is the tmux program itself &mdash; server and client &mdash; reimplemented from the C in Rust. It builds and runs (<code>ztmux new-session</code>, <code>ztmux attach</code>), passes its <strong>1107-case parity suite at 100% (byte-for-byte vs upstream tmux, zero known divergences)</strong>, has every harness-found bug fixed, and ships original extensions the C tmux has no equivalent for.</div>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>PARITY VS tmux</h2>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-val green">1080</div><div class="stat-label">Cases passing</div></div>
-      <div class="stat-card"><div class="stat-val">1080</div><div class="stat-label">Total parity cases</div></div>
+      <div class="stat-card"><div class="stat-val green">1107</div><div class="stat-label">Cases passing</div></div>
+      <div class="stat-card"><div class="stat-val">1107</div><div class="stat-label">Total parity cases</div></div>
       <div class="stat-card"><div class="stat-val green">100%</div><div class="stat-label">vs tmux next-3.7</div></div>
       <div class="stat-card"><div class="stat-val green">0</div><div class="stat-label">Known divergences</div></div>
     </div>
@@ -72,7 +72,7 @@
       through the vendored <code>tmux</code> (reference) and <code>ztmux</code> (port) and compares byte-for-byte &mdash;
       the same shape as the sibling ports (<a href="https://github.com/MenkeTechnologies/zshrs">zshrs</a> vs
       <code>zsh</code>, <a href="https://github.com/MenkeTechnologies/strykelang">strykelang</a> vs <code>perl</code>).
-      The suite has grown from a handful of format cases to <strong>1080</strong> covering formats, arithmetic,
+      The suite has grown from a handful of format cases to <strong>1107</strong> covering formats, arithmetic,
       conditionals, string ops, options, buffers, windows, panes, and layouts &mdash; and every one now passes
       byte-for-byte, with zero known divergences.
     </p>
@@ -248,9 +248,9 @@
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>TESTING</h2>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-val green">1080/1080</div><div class="stat-label">Parity cases (100%)</div></div>
-      <div class="stat-card"><div class="stat-val">1253</div><div class="stat-label">Unit tests</div></div>
-      <div class="stat-card"><div class="stat-val">2127</div><div class="stat-label">C fns ported</div></div>
+      <div class="stat-card"><div class="stat-val green">1107/1107</div><div class="stat-label">Parity cases (100%)</div></div>
+      <div class="stat-card"><div class="stat-val">1710</div><div class="stat-label">Unit tests</div></div>
+      <div class="stat-card"><div class="stat-val">2189</div><div class="stat-label">C fns ported</div></div>
       <div class="stat-card"><div class="stat-val">125k</div><div class="stat-label">Lines of Rust</div></div>
     </div>
     <p class="prose">Three layers stack: byte-for-byte <strong>parity</strong> against the vendored tmux; in-tree <strong>unit tests</strong> for pure logic (red-black tree invariants under randomized insert/delete, UTF-8 round-trips, layout arithmetic, and the extensions' rendering via ratatui's headless backend); and the <strong>anti-drift gate</strong> that fails the build on invented functions.</p>

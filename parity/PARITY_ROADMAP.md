@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1080/1080 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 cases.
+**1107/1107 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 cases.
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
 (full-size split with a pre-existing split) crashed the server on a u32 underflow
@@ -276,7 +276,7 @@ The runner is an advisory tripwire — it exits non-zero only when a gap closes
 (the feature got ported and its case should move to `parity/cases/`), so it never
 reddens CI merely because the gaps still exist. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1080/1080 ported surface; they measure
+proof. These gaps do not count against the 1107/1107 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite
