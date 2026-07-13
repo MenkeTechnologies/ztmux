@@ -1,6 +1,6 @@
 {
   "name": "ztmux",
-  "version": "3.7.14",
+  "version": "3.7.15",
   "private": true,
   "description": "ztmux — a from-source Rust port of tmux (the whole server + client). pnpm task runner over the cargo workflow (matches the sibling repos' dev/build/test interface). ztmux is a pure Rust CLI with no frontend, so these scripts wrap cargo, the parity suite (ztmux vs the vendored tmux), and the port-report tooling.",
   "packageManager": "pnpm@10.33.0",
