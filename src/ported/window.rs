@@ -370,7 +370,7 @@ unsafe fn window_destroy(w: *mut window) {
         if !(*w).saved_layout_root.is_null() {
             layout_free_cell((*w).saved_layout_root, 0);
         }
-        free((*w).old_layout as _);
+        (*w).old_layout = None;
 
         window_destroy_panes(w);
 

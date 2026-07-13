@@ -1589,7 +1589,9 @@ struct window {
     lastlayout: i32,
     layout_root: *mut layout_cell,
     saved_layout_root: *mut layout_cell,
-    old_layout: *mut u8,
+    /// Owned serialized layout saved for `select-layout -o` (undo); `None` when
+    /// unset. Dropped in `window_destroy` before the struct is freed.
+    old_layout: Option<std::ffi::CString>,
 
     sx: u32,
     sy: u32,

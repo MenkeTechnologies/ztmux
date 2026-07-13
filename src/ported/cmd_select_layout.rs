@@ -86,10 +86,15 @@ unsafe fn cmd_select_layout_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
                     previous = true;
                 }
 
-                oldlayout = (*w).old_layout;
-                (*w).old_layout = layout_dump(w, (*w).layout_root)
-                    .map(|s| CString::new(s).unwrap().into_raw().cast())
-                    .unwrap_or_default();
+                // Take the previous saved layout (owned); `oldlayout_ptr`
+                // borrows its buffer for the `-o` (undo) read below. The buffer
+                // stays put even if `oldlayout` is later moved back into the
+                // field on the error path.
+                oldlayout = (*w).old_layout.take();
+                let oldlayout_ptr = oldlayout
+                    .as_deref()
+                    .map_or(null(), |c| c.as_ptr().cast::<u8>());
+                (*w).old_layout = layout_dump(w, (*w).layout_root).map(crate::cstring_truncating);
 
                 if next || previous {
                     if next {
@@ -108,7 +113,7 @@ unsafe fn cmd_select_layout_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
                 let layoutname = if args_count(args) != 0 {
                     args_string(args, 0)
                 } else if args_has(args, 'o') {
-                    oldlayout
+                    oldlayout_ptr
                 } else {
                     null()
                 };
@@ -135,20 +140,19 @@ unsafe fn cmd_select_layout_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
                     break 'changed;
                 }
 
-                free_(oldlayout);
+                // oldlayout drops here (owned, unused on this success path).
                 return cmd_retval::CMD_RETURN_NORMAL;
             }
 
             // changed:
-            free_(oldlayout);
+            // oldlayout drops here (owned, unused on this success path).
             recalculate_sizes();
             server_redraw_window(w);
             notify_window(c"window-layout-changed", w);
             return cmd_retval::CMD_RETURN_NORMAL;
         }
 
-        // error:
-        free_((*w).old_layout);
+        // error: restore the saved layout (moving it back drops the new dump).
         (*w).old_layout = oldlayout;
         cmd_retval::CMD_RETURN_ERROR
     }
