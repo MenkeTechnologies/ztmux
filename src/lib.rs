@@ -1566,7 +1566,10 @@ struct window {
     id: u32,
     latest: *mut c_void,
 
-    name: *mut u8,
+    /// Owned window name (always set — `""` at create); `None` only transiently
+    /// during rename. Dropped in `window_destroy` before the struct is freed.
+    /// Read via `name_ptr()`.
+    name: Option<std::ffi::CString>,
     name_event: event,
     name_time: timeval,
 

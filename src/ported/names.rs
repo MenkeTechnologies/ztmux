@@ -98,13 +98,13 @@ pub unsafe fn check_window_name(w: *mut window) {
         (*(*w).active).flags &= !window_pane_flags::PANE_CHANGED;
 
         let name = format_window_name(w);
-        if strcmp(name, (*w).name) != 0 {
-            log_debug!("@{} name {} (was {})", (*w).id, _s(name), _s((*w).name));
+        if strcmp(name, (*w).name_ptr()) != 0 {
+            log_debug!("@{} name {} (was {})", (*w).id, _s(name), _s((*w).name_ptr()));
             window_set_name(w, name);
             server_redraw_window_borders(w);
             server_status_window(w);
         } else {
-            log_debug!("@{} not changed (still {})", (*w).id, _s((*w).name));
+            log_debug!("@{} not changed (still {})", (*w).id, _s((*w).name_ptr()));
         }
 
         free(name as _);

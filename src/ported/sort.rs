@@ -197,7 +197,7 @@ unsafe fn sort_winlink_cmp(a: *mut winlink, b: *mut winlink, sc: sort_criteria) 
     unsafe {
         let wa = (*a).window;
         let wb = (*b).window;
-        let ncmp = strcmp((*wa).name, (*wb).name);
+        let ncmp = strcmp((*wa).name_ptr(), (*wb).name_ptr());
         let mut result = match sc.order {
             sort_order::SORT_INDEX => (*a).idx.wrapping_sub((*b).idx),
             sort_order::SORT_CREATION => {

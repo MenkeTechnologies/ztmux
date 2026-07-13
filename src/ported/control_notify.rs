@@ -142,9 +142,9 @@ pub unsafe fn control_notify_window_renamed(w: *mut window) {
                 let cs = (*c).session;
 
                 if !winlink_find_by_window_id(&raw mut (*cs).windows, (*w).id).is_null() {
-                    control_write!(c, "%window-renamed @{} {}", (*w).id, _s((*w).name));
+                    control_write!(c, "%window-renamed @{} {}", (*w).id, _s((*w).name_ptr()));
                 } else {
-                    control_write!(c, "%unlinked-window-renamed @{} {}", (*w).id, _s((*w).name),);
+                    control_write!(c, "%unlinked-window-renamed @{} {}", (*w).id, _s((*w).name_ptr()),);
                 }
             }
         }

@@ -3070,7 +3070,7 @@ pub unsafe fn format_cb_window_marked_flag(ft: *mut format_tree) -> format_table
 pub unsafe fn format_cb_window_name(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
-            return format!("{}", _s((*(*ft).w).name)).into();
+            return format!("{}", _s((*(*ft).w).name_ptr())).into();
         }
         format_table_type::None
     }
@@ -4572,7 +4572,7 @@ pub unsafe fn format_window_name(es: *mut format_expand_state, fmt: *const u8) -
 
         let name = format_expand1(es, fmt);
         for wl in rb_foreach(&raw mut (*(*ft).s).windows).map(NonNull::as_ptr) {
-            if strcmp((*(*wl).window).name, name) == 0 {
+            if strcmp((*(*wl).window).name_ptr(), name) == 0 {
                 free_(name);
                 return xstrdup(c!("1")).as_ptr();
             }

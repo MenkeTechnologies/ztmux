@@ -445,7 +445,7 @@ unsafe fn window_tree_build_session(
                     // (most-recent-first); tie-break strcmp(wa,wb) ascending.
                     timer::new(&raw const (*wb).activity_time)
                         .cmp(&timer::new(&raw const (*wa).activity_time))
-                        .then_with(|| i32_to_ordering(libc::strcmp((*wa).name, (*wb).name)))
+                        .then_with(|| i32_to_ordering(libc::strcmp((*wa).name_ptr(), (*wb).name_ptr())))
                         .maybe_reverse((*sort_crit).reversed)
                 });
             }
@@ -453,7 +453,7 @@ unsafe fn window_tree_build_session(
                 winlink_list.sort_by(|a, b| {
                     let wa = (**a).window;
                     let wb = (**b).window;
-                    i32_to_ordering(libc::strcmp((*wa).name, (*wb).name))
+                    i32_to_ordering(libc::strcmp((*wa).name_ptr(), (*wb).name_ptr()))
                         .maybe_reverse((*sort_crit).reversed)
                 });
             }
@@ -747,7 +747,7 @@ unsafe fn window_tree_draw_session(
             screen_write_cursormove(ctx, (cx + offset) as i32, cy as i32, 0);
             screen_write_preview(ctx, &raw mut (*(*w).active).base, width, sy);
 
-            label = format_nul!(" {}:{} ", (*wl).idx, _s((*w).name));
+            label = format_nul!(" {}:{} ", (*wl).idx, _s((*w).name_ptr()));
             if strlen(label) > width as usize {
                 label = format_nul!(" {} ", (*wl).idx);
             }
@@ -985,7 +985,7 @@ unsafe fn window_tree_search(
             }
             window_tree_type::WINDOW_TREE_WINDOW => {
                 if let (Some(_s), Some(wl)) = (s, wl) {
-                    return !libc::strstr((*(*wl.as_ptr()).window).name, ss).is_null();
+                    return !libc::strstr((*(*wl.as_ptr()).window).name_ptr(), ss).is_null();
                 }
             }
             window_tree_type::WINDOW_TREE_PANE => {

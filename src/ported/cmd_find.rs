@@ -469,7 +469,7 @@ pub unsafe fn cmd_find_get_window_with_session(fs: *mut cmd_find_state, window: 
 
         (*fs).wl = null_mut();
         for wl in rb_foreach(&raw mut (*(*fs).s).windows).map(NonNull::as_ptr) {
-            if streq_((*(*wl).window).name, window) {
+            if streq_((*(*wl).window).name_ptr(), window) {
                 if !(*fs).wl.is_null() {
                     return -1;
                 }
@@ -491,7 +491,7 @@ pub unsafe fn cmd_find_get_window_with_session(fs: *mut cmd_find_state, window: 
         (*fs).wl = null_mut();
         for wl in rb_foreach(&raw mut (*(*fs).s).windows).map(NonNull::as_ptr) {
             #[expect(clippy::disallowed_methods)]
-            if libc::strncmp(window.as_ptr().cast(), (*(*wl).window).name, window.len()) == 0 {
+            if libc::strncmp(window.as_ptr().cast(), (*(*wl).window).name_ptr(), window.len()) == 0 {
                 if !(*fs).wl.is_null() {
                     return -1;
                 }
@@ -507,7 +507,7 @@ pub unsafe fn cmd_find_get_window_with_session(fs: *mut cmd_find_state, window: 
 
         (*fs).wl = null_mut();
         for wl in rb_foreach(&raw mut (*(*fs).s).windows).map(NonNull::as_ptr) {
-            if libc::fnmatch(window_c.as_ptr().cast(), (*(*wl).window).name, 0) == 0 {
+            if libc::fnmatch(window_c.as_ptr().cast(), (*(*wl).window).name_ptr(), 0) == 0 {
                 if !(*fs).wl.is_null() {
                     return -1;
                 }

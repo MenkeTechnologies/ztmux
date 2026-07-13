@@ -204,14 +204,15 @@ pub unsafe fn spawn_window(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut 
 
         // Set the name of the new window.
         if !(*sc).flags.intersects(SPAWN_RESPAWN) {
-            free_((*w).name);
+            // Assigning drops the old name CString — no manual free.
             if (*sc).name.is_null() || *(*sc).name == 0 {
-                (*w).name = CString::new(default_window_name(w))
-                    .unwrap()
-                    .into_raw()
-                    .cast();
+                (*w).name = Some(CString::new(default_window_name(w)).unwrap());
             } else {
-                (*w).name = format_single(item, cstr_to_str((*sc).name), c, s, null_mut(), null_mut());
+                // Adopt the owned format_single result.
+                (*w).name = Some(CString::from_raw(
+                    format_single(item, cstr_to_str((*sc).name), c, s, null_mut(), null_mut())
+                        .cast(),
+                ));
                 options_set_number((*w).options, "automatic-rename", 0);
             }
         }

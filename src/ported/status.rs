@@ -2232,10 +2232,10 @@ unsafe fn status_prompt_complete_window_menu(
             }
 
             if (*c).prompt_type == prompt_type::PROMPT_TYPE_WINDOW_TARGET {
-                tmp = format!("{} ({})", (*wl).idx, _s((*(*wl).window).name),);
+                tmp = format!("{} ({})", (*wl).idx, _s((*(*wl).window).name_ptr()),);
                 list.push(format!("{}", (*wl).idx));
             } else {
-                tmp = format!("{}:{} ({})", (*s).name, (*wl).idx, _s((*(*wl).window).name),);
+                tmp = format!("{}:{} ({})", (*s).name, (*wl).idx, _s((*(*wl).window).name_ptr()),);
                 list.push(format!("{}:{}", (*s).name, (*wl).idx));
             }
             item.name = Cow::Owned(tmp);

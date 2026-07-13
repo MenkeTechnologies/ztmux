@@ -283,6 +283,18 @@ pub unsafe fn window_update_activity(w: NonNull<window>) {
 }
 
 /// C `vendor/tmux/window.c:305`: `struct window *window_create(u_int sx, u_int sy, u_int xpixel, u_int ypixel)`
+impl window {
+    /// Borrowed `char *` to the window name, or NULL if transiently unset.
+    #[inline]
+    pub(crate) fn name_ptr(&self) -> *const u8 {
+        match &self.name {
+            Some(c) => c.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+}
+
+/// C `vendor/tmux/window.c:158`: `struct window *window_create(u_int sx, u_int sy, u_int xpixel, u_int ypixel)`
 pub unsafe fn window_create(sx: u32, sy: u32, mut xpixel: u32, mut ypixel: u32) -> *mut window {
     static NEXT_WINDOW_ID: AtomicU32 = AtomicU32::new(0);
 
@@ -294,7 +306,7 @@ pub unsafe fn window_create(sx: u32, sy: u32, mut xpixel: u32, mut ypixel: u32) 
     }
     unsafe {
         let w: *mut window = xcalloc_::<window>(1).as_ptr();
-        (*w).name = xstrdup(c!("")).as_ptr();
+        (*w).name = Some(c"".to_owned());
         (*w).flags = window_flag::empty();
 
         tailq_init(&raw mut (*w).panes);
@@ -376,7 +388,7 @@ unsafe fn window_destroy(w: *mut window) {
         options_free((*w).options);
         free((*w).fill_character as _);
 
-        free((*w).name as _);
+        (*w).name = None;
         free(w as _);
     }
 }
@@ -437,12 +449,15 @@ pub unsafe fn window_remove_ref(w: *mut window, from: *const u8) {
 /// C `vendor/tmux/window.c:423`: `void window_set_name(struct window *w, const char *new_name, int untrusted)`
 pub unsafe fn window_set_name(w: *mut window, new_name: *const u8) {
     unsafe {
-        free_((*w).name);
+        // utf8_stravis writes a freshly-allocated char* to the out-param;
+        // capture it and adopt into the owned field (dropping the old name).
+        let mut namebuf: *mut u8 = null_mut();
         utf8_stravis(
-            &raw mut (*w).name,
+            &raw mut namebuf,
             new_name,
             vis_flags::VIS_OCTAL | vis_flags::VIS_CSTYLE | vis_flags::VIS_TAB | vis_flags::VIS_NL,
         );
+        (*w).name = Some(std::ffi::CString::from_raw(namebuf.cast()));
         notify_window(c"window-renamed", w);
     }
 }
