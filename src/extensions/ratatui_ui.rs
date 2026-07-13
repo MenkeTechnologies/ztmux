@@ -590,9 +590,7 @@ struct MessageLayout {
 
 unsafe fn message_layout(c: *mut client) -> Option<MessageLayout> {
     unsafe {
-        if (*c).message_string.is_none() {
-            return None;
-        }
+        (*c).message_string.as_ref()?;
         let sx = (*c).tty.sx as u16;
         let sy = (*c).tty.sy as u16;
         if sx < 12 || sy < 4 {
@@ -771,9 +769,7 @@ struct PromptLayout {
 
 unsafe fn prompt_layout(c: *mut client) -> Option<PromptLayout> {
     unsafe {
-        if (*c).prompt_string.is_none() {
-            return None;
-        }
+        (*c).prompt_string.as_ref()?;
         let sx = (*c).tty.sx as u16;
         let sy = (*c).tty.sy as u16;
         if sx < 12 || sy < 6 {

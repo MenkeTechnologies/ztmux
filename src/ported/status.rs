@@ -753,7 +753,7 @@ pub unsafe fn status_prompt_set<T>(
         (*c).prompt_string = Some(std::ffi::CString::from_raw(format_expand_time(ft, msg).cast()));
 
         if flags.intersects(prompt_flags::PROMPT_INCREMENTAL) {
-            (*c).prompt_last = Some(std::ffi::CStr::from_ptr((tmp) as *const std::ffi::c_char).to_owned());
+            (*c).prompt_last = Some(std::ffi::CStr::from_ptr((tmp).cast()).to_owned());
             (*c).prompt_buffer = utf8_fromcstr(c!(""));
         } else {
             (*c).prompt_last = None;

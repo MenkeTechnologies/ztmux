@@ -10,9 +10,9 @@
 //!     from `cmd_find_client` (`lock-client -t nosuch` then dereferenced
 //!     `c->session` and killed the server), and made `session_group_synchronize_to`
 //!     sync a lone session from itself, wiping its own window list.
-//!   * C builds a throwaway stack struct as an RB_FIND key. In Rust, assigning into
+//!   * C builds a throwaway stack struct as an `RB_FIND` key. In Rust, assigning into
 //!     that uninitialized memory *drops* the garbage already there, so a lookup could
-//!     call free() on a pointer Rust never allocated.
+//!     call `free()` on a pointer Rust never allocated.
 //!
 //! These all present as a dead server, so that is what we assert. Every command runs
 //! on a private socket, so this never touches a real tmux/ztmux server.
@@ -58,7 +58,7 @@ fn kill(sock: &str) {
 ///
 /// `cmd_find_client` returned the last client in the list rather than NULL, so the
 /// command ran against a client with no session and `server_lock_client` dereferenced
-/// `c->session`. Any CMD_CLIENT_TFLAG command (detach-client, suspend-client, …) shared
+/// `c->session`. Any `CMD_CLIENT_TFLAG` command (detach-client, suspend-client, …) shared
 /// the bug, so they are checked too — a wrong-client match there is silent data loss,
 /// not just a crash.
 #[test]
@@ -88,7 +88,7 @@ fn unknown_client_target_errors_and_server_survives() {
 }
 
 /// `new-session -t <name>` with no such session groups the new session under that
-/// name (tmux creates `<name>-0`). This drove two separate crashes: the RB_FIND key
+/// name (tmux creates `<name>-0`). This drove two separate crashes: the `RB_FIND` key
 /// struct in `session_group_find` freed uninitialized garbage, and
 /// `session_group_synchronize_to` then synced the lone new session from itself and
 /// emptied its window list, so `RB_MIN(&s->windows)` returned NULL.

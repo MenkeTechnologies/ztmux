@@ -2894,7 +2894,7 @@ pub unsafe fn server_client_set_title(c: *mut client) {
         let title = format_expand_time(ft, template);
         if (*c).title.is_none() || libc::strcmp(title, (*c).title_ptr()) != 0 {
             (*c).title = None;
-            (*c).title = Some(std::ffi::CStr::from_ptr((title) as *const std::ffi::c_char).to_owned());
+            (*c).title = Some(std::ffi::CStr::from_ptr((title).cast()).to_owned());
             tty_set_title(&raw mut (*c).tty, (*c).title_ptr());
         }
         free_(title);
@@ -2919,7 +2919,7 @@ pub unsafe fn server_client_set_path(c: *mut client) {
         };
         if (*c).path.is_none() || libc::strcmp(path, (*c).path_ptr()) != 0 {
             (*c).path = None;
-            (*c).path = Some(std::ffi::CStr::from_ptr((path) as *const std::ffi::c_char).to_owned());
+            (*c).path = Some(std::ffi::CStr::from_ptr((path).cast()).to_owned());
             tty_set_path(&raw mut (*c).tty, (*c).path_ptr());
         }
     }
@@ -3188,9 +3188,9 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
                     fatalx("bad MSG_IDENTIFY_TERM string");
                 }
                 if *data.cast::<u8>() == b'\0' {
-                    (*c).term_name = Some(std::ffi::CStr::from_ptr((c!("unknown")) as *const std::ffi::c_char).to_owned());
+                    (*c).term_name = Some(std::ffi::CStr::from_ptr((c!("unknown")).cast()).to_owned());
                 } else {
-                    (*c).term_name = Some(std::ffi::CStr::from_ptr((data.cast()) as *const std::ffi::c_char).to_owned());
+                    (*c).term_name = Some(std::ffi::CStr::from_ptr(data.cast()).to_owned());
                 }
                 // log_debug("client %p IDENTIFY_TERM %s", c, data);
             }
@@ -3208,7 +3208,7 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
                 if datalen == 0 || *data.cast::<u8>().add((datalen - 1) as usize) != b'\0' {
                     fatalx("bad MSG_IDENTIFY_TTYNAME string");
                 }
-                (*c).ttyname = Some(std::ffi::CStr::from_ptr((data.cast()) as *const std::ffi::c_char).to_owned());
+                (*c).ttyname = Some(std::ffi::CStr::from_ptr(data.cast()).to_owned());
                 // log_debug("client %p IDENTIFY_TTYNAME %s", c, data);
             }
             msgtype::MSG_IDENTIFY_CWD => {
@@ -3216,11 +3216,11 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
                     // fatalx("bad MSG_IDENTIFY_CWD string");
                 }
                 if libc::access(data.cast(), libc::X_OK) == 0 {
-                    (*c).cwd = Some(std::ffi::CStr::from_ptr((data.cast()) as *const std::ffi::c_char).to_owned());
+                    (*c).cwd = Some(std::ffi::CStr::from_ptr(data.cast()).to_owned());
                 } else if let Some(home) = find_home() {
                     (*c).cwd = Some(home.to_owned());
                 } else {
-                    (*c).cwd = Some(std::ffi::CStr::from_ptr((c!("/")) as *const std::ffi::c_char).to_owned());
+                    (*c).cwd = Some(std::ffi::CStr::from_ptr((c!("/")).cast()).to_owned());
                 }
                 // log_debug("client %p IDENTIFY_CWD %s", c, data);
             }

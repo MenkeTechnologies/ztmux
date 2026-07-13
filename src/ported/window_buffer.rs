@@ -404,10 +404,9 @@ pub unsafe fn window_buffer_init(
             item_size: 0,
         }));
         (*wme.as_ptr()).data = data.cast();
-        let data = &mut *data;
-        cmd_find_copy_state(&raw mut data.fs, fs);
+        cmd_find_copy_state(&raw mut (*data).fs, fs);
 
-        data.data = mode_tree_start(
+        (*data).data = mode_tree_start(
             wp,
             args,
             Some(window_buffer_build),
@@ -416,15 +415,15 @@ pub unsafe fn window_buffer_init(
             Some(window_buffer_menu),
             None,
             Some(window_buffer_get_key),
-            data as *mut window_buffer_modedata as *mut c_void,
+            data.cast(),
             WINDOW_BUFFER_MENU_ITEMS.as_slice(),
             &WINDOW_BUFFER_SORT_LIST,
             &raw mut s,
         );
-        mode_tree_zoom(data.data, args);
+        mode_tree_zoom((*data).data, args);
 
-        mode_tree_build(data.data);
-        mode_tree_draw(&mut *data.data);
+        mode_tree_build((*data).data);
+        mode_tree_draw(&mut *(*data).data);
 
         s
     }
