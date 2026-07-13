@@ -13,7 +13,7 @@ exclude = ["vendor"]
 
 [package]
 name         = "ztmux"
-version      = "3.7.20"
+version      = "3.7.21"
 authors = ["MenkeTechnologies <linux.dev25@gmail.com>"]
 categories   = ["command-line-utilities"]
 edition      = "2024"
