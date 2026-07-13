@@ -23,17 +23,27 @@ use crate::*;
 pub static FILE_NEXT_STREAM: atomic::AtomicI32 = atomic::AtomicI32::new(3);
 
 /// C `vendor/tmux/file.c:42`: `static char *file_get_path(struct client *c, const char *file)`
-pub unsafe fn file_get_path(c: *mut client, file: *const u8) -> NonNull<u8> {
+pub unsafe fn file_get_path(c: *mut client, file: *const u8) -> std::ffi::CString {
     unsafe {
         if *file == b'/' {
-            xstrdup(file)
+            std::ffi::CStr::from_ptr(file.cast()).to_owned()
         } else {
-            NonNull::new(format_nul!(
+            crate::cstring_truncating(format!(
                 "{}/{}",
                 _s(server_client_get_cwd(c, null_mut())),
                 _s(file)
             ))
-            .unwrap()
+        }
+    }
+}
+
+impl client_file {
+    /// Borrowed `char *` to the path, or NULL when unset (C `cf->path == NULL`).
+    #[inline]
+    pub(crate) fn path_ptr(&self) -> *const u8 {
+        match &self.path {
+            Some(p) => p.as_ptr().cast(),
+            None => std::ptr::null(),
         }
     }
 }
@@ -118,7 +128,7 @@ pub unsafe fn file_free(cf: *mut client_file) {
         }
 
         evbuffer_free((*cf).buffer);
-        free_((*cf).path);
+        (*cf).path = None;
 
         if !(*cf).tree.is_null() {
             rb_remove((*cf).tree, cf);
@@ -140,7 +150,7 @@ pub unsafe extern "C-unwind" fn file_fire_done_cb(_fd: i32, _events: i16, arg: *
         if let Some(cb) = (*cf).cb
             && ((*cf).closed != 0 || c.is_null() || !(*c).flags.intersects(client_flag::DEAD))
         {
-            cb(c, (*cf).path, (*cf).error, 1, (*cf).buffer, (*cf).data);
+            cb(c, (*cf).path_ptr().cast_mut(), (*cf).error, 1, (*cf).buffer, (*cf).data);
         }
         file_free(cf);
     }
@@ -159,7 +169,7 @@ pub unsafe fn file_fire_read(cf: *mut client_file) {
         if let Some(cb) = (*cf).cb {
             cb(
                 (*cf).c,
-                (*cf).path,
+                (*cf).path_ptr().cast_mut(),
                 (*cf).error,
                 0,
                 (*cf).buffer,
@@ -199,7 +209,7 @@ pub unsafe fn file_vprint(c: *mut client, args: std::fmt::Arguments) {
         let mut cf = rb_find(&raw mut (*c).files, &raw mut find);
         if cf.is_null() {
             cf = file_create_with_client(c, 1, None, null_mut());
-            (*cf).path = xstrdup(c!("-")).as_ptr();
+            (*cf).path = Some(c"-".to_owned());
 
             // TODO
             evbuffer_add_vprintf((*cf).buffer, args);
@@ -236,7 +246,7 @@ pub unsafe fn file_print_buffer(c: *mut client, data: *mut c_void, size: usize) 
         let mut cf = rb_find(&raw mut (*c).files, &raw mut find);
         if cf.is_null() {
             cf = file_create_with_client(c, 1, None, null_mut());
-            (*cf).path = xstrdup(c!("-")).as_ptr();
+            (*cf).path = Some(c"-".to_owned());
 
             evbuffer_add((*cf).buffer, data, size);
 
@@ -276,7 +286,7 @@ pub unsafe fn file_error_(c: *mut client, args: std::fmt::Arguments) {
         let mut cf = rb_find(&raw mut (*c).files, &raw mut find);
         if cf.is_null() {
             cf = file_create_with_client(c, 2, None, null_mut());
-            (*cf).path = xstrdup(c!("-")).as_ptr();
+            (*cf).path = Some(c"-".to_owned());
 
             evbuffer_add_vprintf((*cf).buffer, args);
 
@@ -320,7 +330,7 @@ pub unsafe fn file_write(
             'skip: {
                 if streq_(path, "-") {
                     cf = file_create_with_client(c, stream as i32, cb, cbdata);
-                    (*cf).path = xstrdup_(c"-").as_ptr();
+                    (*cf).path = Some(c"-".to_owned());
 
                     fd = STDOUT_FILENO;
                     if c.is_null()
@@ -334,7 +344,7 @@ pub unsafe fn file_write(
                 }
 
                 cf = file_create_with_client(c, stream as i32, cb, cbdata);
-                (*cf).path = file_get_path(c, path).as_ptr();
+                (*cf).path = Some(file_get_path(c, path));
 
                 if c.is_null() || (*c).flags.intersects(client_flag::ATTACHED) {
                     if flags & O_APPEND != 0 {
@@ -342,7 +352,7 @@ pub unsafe fn file_write(
                     } else {
                         mode = c!("wb");
                     }
-                    f = fopen((*cf).path, mode);
+                    f = fopen((*cf).path_ptr(), mode);
                     if f.is_null() {
                         (*cf).error = errno!();
                         break 'done;
@@ -360,7 +370,7 @@ pub unsafe fn file_write(
             // skip:
             evbuffer_add((*cf).buffer, bdata, bsize);
 
-            msglen = strlen((*cf).path) + 1 + size_of::<msg_write_open>();
+            msglen = strlen((*cf).path_ptr()) + 1 + size_of::<msg_write_open>();
             if msglen > MAX_IMSGSIZE - IMSG_HEADER_SIZE {
                 (*cf).error = E2BIG;
                 break 'done;
@@ -371,7 +381,7 @@ pub unsafe fn file_write(
             (*msg).flags = flags;
             memcpy(
                 msg.add(1).cast(),
-                (*cf).path.cast(),
+                (*cf).path_ptr().cast(),
                 msglen - size_of::<msg_write_open>(),
             );
             if proc_send((*cf).peer, msgtype::MSG_WRITE_OPEN, -1, msg.cast(), msglen) != 0 {
@@ -408,7 +418,7 @@ pub unsafe fn file_read(
             'skip: {
                 if streq_(path, "-") {
                     cf = file_create_with_client(c, stream as i32, cb, cbdata);
-                    (*cf).path = xstrdup_(c"-").as_ptr();
+                    (*cf).path = Some(c"-".to_owned());
 
                     fd = STDIN_FILENO;
                     if c.is_null()
@@ -422,10 +432,10 @@ pub unsafe fn file_read(
                 }
 
                 cf = file_create_with_client(c, stream as i32, cb, cbdata);
-                (*cf).path = file_get_path(c, path).as_ptr();
+                (*cf).path = Some(file_get_path(c, path));
 
                 if c.is_null() || (*c).flags.intersects(client_flag::ATTACHED) {
-                    f = fopen((*cf).path, c!("rb"));
+                    f = fopen((*cf).path_ptr(), c!("rb"));
                     if f.is_null() {
                         (*cf).error = errno!();
                         break 'done;
@@ -450,7 +460,7 @@ pub unsafe fn file_read(
             }
 
             // skip:
-            msglen = strlen((*cf).path) + 1 + size_of::<msg_read_open>();
+            msglen = strlen((*cf).path_ptr()) + 1 + size_of::<msg_read_open>();
             if msglen > MAX_IMSGSIZE - IMSG_HEADER_SIZE {
                 (*cf).error = E2BIG;
                 break 'done;
@@ -460,7 +470,7 @@ pub unsafe fn file_read(
             (*msg).fd = fd;
             memcpy(
                 msg.add(1).cast(),
-                (*cf).path.cast(),
+                (*cf).path_ptr().cast(),
                 msglen - size_of::<msg_read_open>(),
             );
             if proc_send((*cf).peer, msgtype::MSG_READ_OPEN, -1, msg.cast(), msglen) != 0 {

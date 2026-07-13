@@ -2351,7 +2351,9 @@ struct client_file {
     references: i32,
     stream: i32,
 
-    path: *mut u8,
+    /// Owned file path, `None` until set. `xcalloc` zeroes it to a valid `None`
+    /// (null-pointer niche); dropped in `file_free` before the struct is freed.
+    path: Option<std::ffi::CString>,
     buffer: *mut evbuffer,
     event: *mut bufferevent,
 
