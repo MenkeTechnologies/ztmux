@@ -77,12 +77,26 @@ struct window_buffer_modedata {
     fs: cmd_find_state,
 
     data: *mut mode_tree_data,
-    command: *mut u8,
-    format: *mut u8,
-    key_format: *mut u8,
+    /// Owned format strings. Dropped with the struct in `window_buffer_free`, where C
+    /// freed each by hand. Read via the `*_ptr` accessors.
+    command: CString,
+    format: CString,
+    key_format: CString,
 
     item_list: *mut *mut window_buffer_itemdata,
     item_size: u32,
+}
+
+impl window_buffer_modedata {
+    fn command_ptr(&self) -> *const u8 {
+        self.command.as_ptr().cast()
+    }
+    fn format_ptr(&self) -> *const u8 {
+        self.format.as_ptr().cast()
+    }
+    fn key_format_ptr(&self) -> *const u8 {
+        self.key_format.as_ptr().cast()
+    }
 }
 
 pub struct window_buffer_editdata {
@@ -209,7 +223,7 @@ pub unsafe fn window_buffer_build(
                 free_(cp);
             }
 
-            let text = format_expand(ft, (*data).format);
+            let text = format_expand(ft, (*data).format_ptr());
             mode_tree_add(
                 (*data).data.cast(),
                 null_mut(),
@@ -346,7 +360,7 @@ pub unsafe fn window_buffer_get_key(
         format_defaults_paste_buffer(ft, pb.as_ptr());
         format_add!(ft, "line", "{line}");
 
-        let expanded = format_expand(ft, (*data.as_ptr()).key_format);
+        let expanded = format_expand(ft, (*data.as_ptr()).key_format_ptr());
         let key = key_string_lookup_string(expanded);
         free_(expanded);
         format_free(ft);
@@ -363,26 +377,35 @@ pub unsafe fn window_buffer_init(
     unsafe {
         let mut s = null_mut();
         let wp = (*wme.as_ptr()).wp;
-        let data = xcalloc1::<window_buffer_modedata>();
-        (*wme.as_ptr()).data = data as *mut window_buffer_modedata as *mut c_void;
-        data.wp = wp;
-        cmd_find_copy_state(&raw mut data.fs, fs);
+        // Built through Box so the owned CString fields start out as valid Rust values;
+        // xcalloc would zero them, and a NULL CString is not a value CString can hold.
+        let arg_str = |flag: char| -> Option<CString> {
+            if args.is_null() || !args_has(args, flag) {
+                return None;
+            }
+            Some(CStr::from_ptr(args_get_(args, flag).cast()).to_owned())
+        };
+        let command = if args.is_null() || args_count(args) == 0 {
+            cstring_truncating(WINDOW_BUFFER_DEFAULT_COMMAND.to_owned())
+        } else {
+            CStr::from_ptr(args_string(args, 0).cast()).to_owned()
+        };
 
-        if args.is_null() || !args_has(args, 'F') {
-            data.format = xstrdup__(WINDOW_BUFFER_DEFAULT_FORMAT);
-        } else {
-            data.format = xstrdup(args_get_(args, 'F')).as_ptr();
-        }
-        if args.is_null() || !args_has(args, 'K') {
-            data.key_format = xstrdup__(WINDOW_BUFFER_DEFAULT_KEY_FORMAT);
-        } else {
-            data.key_format = xstrdup(args_get_(args, 'K')).as_ptr();
-        }
-        if args.is_null() || args_count(args) == 0 {
-            data.command = xstrdup__(WINDOW_BUFFER_DEFAULT_COMMAND);
-        } else {
-            data.command = xstrdup(args_string(args, 0)).as_ptr();
-        }
+        let data = Box::into_raw(Box::new(window_buffer_modedata {
+            wp,
+            fs: zeroed(),
+            data: null_mut(),
+            command,
+            format: arg_str('F')
+                .unwrap_or_else(|| cstring_truncating(WINDOW_BUFFER_DEFAULT_FORMAT.to_owned())),
+            key_format: arg_str('K')
+                .unwrap_or_else(|| cstring_truncating(WINDOW_BUFFER_DEFAULT_KEY_FORMAT.to_owned())),
+            item_list: null_mut(),
+            item_size: 0,
+        }));
+        (*wme.as_ptr()).data = data.cast();
+        let data = &mut *data;
+        cmd_find_copy_state(&raw mut data.fs, fs);
 
         data.data = mode_tree_start(
             wp,
@@ -423,11 +446,9 @@ pub unsafe fn window_buffer_free(wme: NonNull<window_mode_entry>) {
         }
         free_((*data).item_list);
 
-        free_((*data).format);
-        free_((*data).key_format);
-        free_((*data).command);
-
-        free_(data);
+        // The item array is a C allocation and is freed above; the owned format strings
+        // go with the Box, which C freed by hand.
+        drop(Box::from_raw(data));
     }
 }
 
@@ -492,7 +513,7 @@ pub unsafe fn window_buffer_do_paste(
             mode_tree_run_command(
                 c,
                 null_mut(),
-                (*data.as_ptr()).command,
+                (*data.as_ptr()).command_ptr(),
                 Some(&(*item.as_ptr()).name),
             );
         }
