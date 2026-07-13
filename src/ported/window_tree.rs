@@ -113,9 +113,11 @@ struct window_tree_modedata {
     references: i32,
 
     data: *mut mode_tree_data,
-    format: *mut u8,
-    key_format: *mut u8,
-    command: *mut u8,
+    /// Owned format strings. Dropped with the struct in `window_tree_destroy`, where C
+    /// freed each by hand. Read via the `*_ptr` accessors.
+    format: CString,
+    key_format: CString,
+    command: CString,
     squash_groups: bool,
 
     item_list: *mut *mut window_tree_itemdata,
@@ -133,6 +135,18 @@ struct window_tree_modedata {
     start: u32,
     end: u32,
     each: u32,
+}
+
+impl window_tree_modedata {
+    fn format_ptr(&self) -> *const u8 {
+        self.format.as_ptr().cast()
+    }
+    fn key_format_ptr(&self) -> *const u8 {
+        self.key_format.as_ptr().cast()
+    }
+    fn command_ptr(&self) -> *const u8 {
+        self.command.as_ptr().cast()
+    }
 }
 
 /// C `vendor/tmux/window-tree.c:220`: `static void window_tree_pull_item(struct window_tree_itemdata *item, struct session **sp, struct winlink **wlp, struct window_pane **wp)`
@@ -231,7 +245,7 @@ unsafe fn window_tree_build_pane(
         (*item).pane = (*wp).id as i32;
 
         let text: *mut u8 =
-            format_single(null_mut(), cstr_to_str((*data.as_ptr()).format), null_mut(), s, wl, wp);
+            format_single(null_mut(), cstr_to_str((*data.as_ptr()).format_ptr()), null_mut(), s, wl, wp);
         let name = format_nul!("{idx}");
 
         mode_tree_add(
@@ -298,7 +312,7 @@ unsafe fn window_tree_build_window(
 
             text = format_single(
                 null_mut(),
-                cstr_to_str((*data.as_ptr()).format),
+                cstr_to_str((*data.as_ptr()).format_ptr()),
                 null_mut(),
                 s,
                 wl,
@@ -403,7 +417,7 @@ unsafe fn window_tree_build_session(
 
         let text = format_single(
             null_mut(),
-            cstr_to_str((*data).format),
+            cstr_to_str((*data).format_ptr()),
             null_mut(),
             s,
             null_mut(),
@@ -1046,7 +1060,7 @@ unsafe fn window_tree_get_key(
         }
         format_add!(ft, "line", "{line}");
 
-        let expanded = format_expand(ft, (*data.as_ptr()).key_format);
+        let expanded = format_expand(ft, (*data.as_ptr()).key_format_ptr());
         let key = key_string_lookup_string(expanded);
         free_(expanded);
         format_free(ft);
@@ -1066,36 +1080,51 @@ unsafe fn window_tree_init(
         // screen *s;
         let mut s = null_mut();
 
-        let data: *mut window_tree_modedata = xcalloc1::<'static, window_tree_modedata>();
+        // Built through Box so the owned CString fields start out as valid Rust values;
+        // xcalloc would zero them, and a NULL CString is not a value CString can hold.
+        let arg_str = |flag: char| -> Option<CString> {
+            if args.is_null() || !args_has(args, flag) {
+                return None;
+            }
+            Some(CStr::from_ptr(args_get_(args, flag).cast()).to_owned())
+        };
+        let command = if args.is_null() || args_count(args) == 0 {
+            cstring_truncating(WINDOW_TREE_DEFAULT_COMMAND.to_owned())
+        } else {
+            CStr::from_ptr(args_string(args, 0).cast()).to_owned()
+        };
+
+        let data = Box::into_raw(Box::new(window_tree_modedata {
+            wp,
+            dead: 0,
+            references: 1,
+            data: null_mut(),
+            format: arg_str('F')
+                .unwrap_or_else(|| cstring_truncating(WINDOW_TREE_DEFAULT_FORMAT.to_owned())),
+            key_format: arg_str('K').unwrap_or_else(|| WINDOW_TREE_DEFAULT_KEY_FORMAT.to_owned()),
+            command,
+            squash_groups: !args_has(args, 'G'),
+            item_list: null_mut(),
+            item_size: 0,
+            entered: null(),
+            fs: zeroed(),
+            type_: if args_has(args, 's') {
+                window_tree_type::WINDOW_TREE_SESSION
+            } else if args_has(args, 'w') {
+                window_tree_type::WINDOW_TREE_WINDOW
+            } else {
+                window_tree_type::WINDOW_TREE_PANE
+            },
+            offset: 0,
+            left: 0,
+            right: 0,
+            start: 0,
+            end: 0,
+            each: 0,
+        }));
         (*wme.as_ptr()).data = data.cast();
-        (*data).wp = wp;
-        (*data).references = 1;
 
-        if args_has(args, 's') {
-            (*data).type_ = window_tree_type::WINDOW_TREE_SESSION;
-        } else if args_has(args, 'w') {
-            (*data).type_ = window_tree_type::WINDOW_TREE_WINDOW;
-        } else {
-            (*data).type_ = window_tree_type::WINDOW_TREE_PANE;
-        }
         memcpy__(&raw mut (*data).fs, fs);
-
-        if args.is_null() || !args_has(args, 'F') {
-            (*data).format = xstrdup__(WINDOW_TREE_DEFAULT_FORMAT);
-        } else {
-            (*data).format = xstrdup(args_get_(args, 'F')).as_ptr();
-        }
-        if args.is_null() || !args_has(args, 'K') {
-            (*data).key_format = xstrdup_(WINDOW_TREE_DEFAULT_KEY_FORMAT).as_ptr();
-        } else {
-            (*data).key_format = xstrdup(args_get_(args, 'K')).as_ptr();
-        }
-        if args.is_null() || args_count(args) == 0 {
-            (*data).command = xstrdup__(WINDOW_TREE_DEFAULT_COMMAND);
-        } else {
-            (*data).command = xstrdup(args_string(args, 0)).as_ptr();
-        }
-        (*data).squash_groups = !args_has(args, 'G');
 
         (*data).data = mode_tree_start(
             wp,
@@ -1136,11 +1165,9 @@ unsafe fn window_tree_destroy(data: NonNull<window_tree_modedata>) {
         }
         free_((*data).item_list);
 
-        free_((*data).format);
-        free_((*data).key_format);
-        free_((*data).command);
-
-        free_(data);
+        // The item array is a C allocation and is freed above; the owned format strings
+        // go with the Box, which C freed by hand.
+        drop(Box::from_raw(data));
     }
 }
 
@@ -1522,7 +1549,12 @@ unsafe fn window_tree_key(
                 continue 'again;
             }
 
-            match key as u8 {
+            // C switches on the full key_code. Truncating to u8 lets a KEYC_* code alias an
+            // ASCII command here: KEYC_MOUSEUP11_STATUS_DEFAULT ends in 0x78 ('x', the Kill
+            // prompt) and KEYC_DOUBLECLICK11_PANE ends in 0x58 ('X', Kill Tagged). Only a key
+            // that really is a bare ASCII byte may match these arms.
+            let key_byte = if key < 0x80 { key as u8 } else { 0 };
+            match key_byte {
                 b'<' => (*data).offset -= 1,
                 b'>' => (*data).offset += 1,
                 b'H' => {
@@ -1627,7 +1659,7 @@ unsafe fn window_tree_key(
                 }
                 b'\r' => {
                     if let Some(name) = window_tree_get_target(item, &raw mut fs) {
-                        mode_tree_run_command(c, null_mut(), (*data).command, Some(&name));
+                        mode_tree_run_command(c, null_mut(), (*data).command_ptr(), Some(&name));
                     }
                     finished = 1;
                 }

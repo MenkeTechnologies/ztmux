@@ -616,7 +616,12 @@ pub unsafe fn window_buffer_key(
             }
 
             finished = mode_tree_key(mtd, c, &raw mut key, m, null_mut(), null_mut()) != 0;
-            match key as u8 {
+            // C switches on the full key_code. Truncating to u8 lets a KEYC_* code alias an
+            // ASCII command here: KEYC_MOUSEUP11_STATUS_DEFAULT ends in 0x78 ('x', the Kill
+            // prompt) and KEYC_DOUBLECLICK11_PANE ends in 0x58 ('X', Kill Tagged). Only a key
+            // that really is a bare ASCII byte may match these arms.
+            let key_byte = if key < 0x80 { key as u8 } else { 0 };
+            match key_byte {
                 b'e' => {
                     let item: NonNull<window_buffer_itemdata> = mode_tree_get_current(mtd).cast();
                     window_buffer_start_edit(data, item.as_ptr(), c);

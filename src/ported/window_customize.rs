@@ -90,7 +90,9 @@ pub struct window_customize_modedata {
     references: i32,
 
     data: *mut mode_tree_data,
-    format: *mut u8,
+    /// Owned format string. Dropped with the struct in `window_customize_destroy`, where
+    /// C freed it by hand. Read via `format_ptr`.
+    format: CString,
     hide_global: bool,
 
     item_list: *mut *mut window_customize_itemdata,
@@ -98,6 +100,12 @@ pub struct window_customize_modedata {
 
     fs: cmd_find_state,
     change: window_customize_change,
+}
+
+impl window_customize_modedata {
+    fn format_ptr(&self) -> *const u8 {
+        self.format.as_ptr().cast()
+    }
 }
 
 /// C `vendor/tmux/window-customize.c:114`: `static uint64_t window_customize_get_tag(struct options_entry *o, int idx, const struct options_table_entry *oe)`
@@ -260,7 +268,7 @@ unsafe fn window_customize_build_array(
             (*item).name = xstrdup__(options_name(o));
             (*item).idx = idx as i32;
 
-            let text: *mut u8 = format_expand(ft, (*data).format);
+            let text: *mut u8 = format_expand(ft, (*data).format_ptr());
             let tag = window_customize_get_tag(o, idx as i32, oe);
             mode_tree_add(
                 (*data).data,
@@ -352,7 +360,7 @@ unsafe fn window_customize_build_option(
         if array != 0 {
             text = null_mut();
         } else {
-            text = format_expand(ft, (*data).format);
+            text = format_expand(ft, (*data).format_ptr());
         }
         let tag = window_customize_get_tag(o, -1, oe);
         let top = mode_tree_add(
@@ -545,7 +553,7 @@ unsafe fn window_customize_build_keys(
             (*item).name = xstrdup(key_string_lookup_key((*item).key, 0)).as_ptr();
             (*item).idx = -1;
 
-            let expanded = format_expand(ft, (*data).format);
+            let expanded = format_expand(ft, (*data).format_ptr());
             let child = mode_tree_add(
                 (*data).data,
                 top,
@@ -1213,18 +1221,29 @@ pub unsafe fn window_customize_init(
         let wp = (*wme.as_ptr()).wp;
         let mut s: *mut screen = null_mut();
 
-        let data: *mut window_customize_modedata = xcalloc1() as *mut window_customize_modedata;
+        // Built through Box so the owned CString starts out as a valid Rust value;
+        // xcalloc would zero it, and a NULL CString is not a value CString can hold.
+        let format = if args.is_null() || !args_has(args, 'F') {
+            cstring_truncating(WINDOW_CUSTOMIZE_DEFAULT_FORMAT.to_owned())
+        } else {
+            CStr::from_ptr(args_get_(args, 'F').cast()).to_owned()
+        };
+
+        let data = Box::into_raw(Box::new(window_customize_modedata {
+            wp,
+            dead: 0,
+            references: 1,
+            data: null_mut(),
+            format,
+            hide_global: false,
+            item_list: null_mut(),
+            item_size: 0,
+            fs: zeroed(),
+            change: window_customize_change::WINDOW_CUSTOMIZE_UNSET,
+        }));
         (*wme.as_ptr()).data = data.cast();
-        (*data).wp = wp;
-        (*data).references = 1;
 
         memcpy__(&raw mut (*data).fs, fs);
-
-        if args.is_null() || !args_has(args, 'F') {
-            (*data).format = xstrdup__(WINDOW_CUSTOMIZE_DEFAULT_FORMAT);
-        } else {
-            (*data).format = xstrdup(args_get_(args, 'F')).as_ptr();
-        }
 
         (*data).data = mode_tree_start(
             wp,
@@ -1262,9 +1281,9 @@ pub unsafe fn window_customize_destroy(data: *mut window_customize_modedata) {
         }
         free_((*data).item_list);
 
-        free_((*data).format);
-
-        free_(data);
+        // The item array is a C allocation and is freed above; the owned format string
+        // goes with the Box, which C freed by hand.
+        drop(Box::from_raw(data));
     }
 }
 
@@ -1896,7 +1915,12 @@ pub unsafe fn window_customize_key(
             item = new_item.as_ptr();
         }
 
-        match key as u8 {
+        // C switches on the full key_code. Truncating to u8 lets a KEYC_* code alias an
+        // ASCII command here: KEYC_MOUSEUP11_STATUS_DEFAULT ends in 0x78 ('x', the Kill
+        // prompt) and KEYC_DOUBLECLICK11_PANE ends in 0x58 ('X', Kill Tagged). Only a key
+        // that really is a bare ASCII byte may match these arms.
+        let key_byte = if key < 0x80 { key as u8 } else { 0 };
+        match key_byte {
             b'\r' | b's' => {
                 if !item.is_null() {
                     if (*item).scope == window_customize_scope::WINDOW_CUSTOMIZE_KEY {
