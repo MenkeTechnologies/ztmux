@@ -333,10 +333,21 @@ pub struct cmd {
     pub entry: &'static cmd_entry,
     pub args: *mut args,
     pub group: u32,
-    pub file: *mut u8,
+    /// Owned source file this command was parsed from; `None` when it did not come
+    /// from a file. Dropped with the struct in `cmd_free`, where C freed it by hand.
+    pub file: Option<CString>,
     pub line: u32,
 
     pub qentry: tailq_entry<cmd>,
+}
+
+impl cmd {
+    pub(crate) fn file_ptr(&self) -> *const u8 {
+        match &self.file {
+            Some(file) => file.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
 }
 pub type cmds = tailq_head<cmd>;
 
@@ -515,7 +526,7 @@ pub unsafe fn cmd_get_group(cmd: *const cmd) -> c_uint {
 pub unsafe fn cmd_get_source(cmd: *mut cmd, file: *mut *const u8, line: &AtomicU32) {
     unsafe {
         if !file.is_null() {
-            *file = (*cmd).file;
+            *file = (*cmd).file_ptr();
         }
         line.store((*cmd).line, std::sync::atomic::Ordering::SeqCst);
     }
@@ -659,24 +670,21 @@ pub unsafe fn cmd_parse(
             return Err(cause);
         }
 
-        let cmd: *mut cmd = Box::leak(Box::new(cmd {
+        // C xstrdup's the file name and frees it in cmd_free. Here it is an owned
+        // CString, so Drop reclaims it: the old code leaked a Rust String's buffer into
+        // the field and freed it with libc free(), which only worked because the global
+        // allocator forwards to malloc.
+        let cmd: *mut cmd = Box::into_raw(Box::new(cmd {
             entry,
             args,
             group: 0,
-            file: null_mut(),
-            line: 0,
+            file: file.map(|file| cstring_truncating(file.to_string())),
+            line,
             qentry: tailq_entry {
                 tqe_next: null_mut(),
                 tqe_prev: null_mut(),
             },
         }));
-
-        if let Some(file) = file {
-            let mut file = file.to_string();
-            file.push('\0');
-            (*cmd).file = file.leak().as_mut_ptr().cast();
-        }
-        (*cmd).line = line;
 
         Ok(cmd)
     }
@@ -685,32 +693,26 @@ pub unsafe fn cmd_parse(
 /// C `vendor/tmux/cmd.c:553`: `void cmd_free(struct cmd *cmd)`
 pub unsafe fn cmd_free(cmd: *mut cmd) {
     unsafe {
-        free((*cmd).file as _);
-
         args_free((*cmd).args);
-        free(cmd as _);
+        // Dropping the Box frees the owned file name, which C did with free(cmd->file).
+        drop(Box::from_raw(cmd));
     }
 }
 
 /// C `vendor/tmux/cmd.c:563`: `struct cmd *cmd_copy(struct cmd *cmd, int argc, char **argv)`
 pub unsafe fn cmd_copy(cmd: *mut cmd, argc: c_int, argv: *mut *mut u8) -> *mut cmd {
     unsafe {
-        let new_cmd: *mut cmd = Box::leak(Box::new(cmd {
+        let new_cmd: *mut cmd = Box::into_raw(Box::new(cmd {
             entry: (*cmd).entry,
             args: args_copy((*cmd).args, argc, argv),
             group: 0,
-            file: null_mut(),
-            line: 0,
+            file: (*cmd).file.clone(),
+            line: (*cmd).line,
             qentry: tailq_entry {
                 tqe_next: null_mut(),
                 tqe_prev: null_mut(),
             },
         }));
-
-        if !(*cmd).file.is_null() {
-            (*new_cmd).file = xstrdup((*cmd).file).as_ptr();
-        }
-        (*new_cmd).line = (*cmd).line;
 
         new_cmd
     }

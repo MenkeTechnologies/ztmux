@@ -629,20 +629,25 @@ pub unsafe fn server_add_message_(args: std::fmt::Arguments) {
 
         let mut msg_time = std::mem::zeroed();
         gettimeofday(&raw mut msg_time, null_mut());
-        MESSAGE_NEXT += 1;
+        // C is `msg->msg_num = message_next++`: the entry takes the current value and
+        // the counter is bumped afterwards. Incrementing first shifted every msg_num up
+        // by one, which skews the eviction test below and `#{message_number}`.
         let msg = Box::into_raw(Box::new(message_entry {
             msg: text,
             msg_num: MESSAGE_NEXT,
             msg_time,
             entry: std::mem::zeroed(),
         }));
+        MESSAGE_NEXT += 1;
 
         tailq_insert_tail(&raw mut MESSAGE_LOG, msg);
 
         let limit = options_get_number_(GLOBAL_OPTIONS, "message-limit") as u32;
         for msg in tailq_foreach(&raw mut MESSAGE_LOG).map(NonNull::as_ptr) {
+            // The log is oldest-first, so the first entry worth keeping ends the sweep.
+            // C breaks here; `continue` kept scanning entries it could never evict.
             if (*msg).msg_num + limit >= MESSAGE_NEXT {
-                continue;
+                break;
             }
             tailq_remove(&raw mut MESSAGE_LOG, msg);
             // Reclaim the boxed entry; its owned `msg` CString drops with it.

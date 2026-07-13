@@ -46,7 +46,9 @@ pub enum cmdq_type {
 impl_tailq_entry!(cmdq_item, entry, tailq_entry<cmdq_item>);
 #[repr(C)]
 pub struct cmdq_item {
-    pub name: *mut u8,
+    /// Owned item name (`[<entry>/<ptr>]`). Dropped with the struct in `cmdq_remove`,
+    /// where C freed it by hand. Read via `name_ptr()`.
+    pub name: CString,
     pub queue: *mut cmdq_list,
     pub next: *mut cmdq_item,
 
@@ -73,6 +75,43 @@ pub struct cmdq_item {
 
     // #[entry]
     pub entry: tailq_entry<cmdq_item>,
+}
+
+impl cmdq_item {
+    pub(crate) fn name_ptr(&self) -> *const u8 {
+        self.name.as_ptr().cast()
+    }
+
+    /// Every field but `name`, which embeds the item's own address and so can only be
+    /// filled in once the allocation exists.
+    ///
+    /// Written out field by field on purpose: `..zeroed()` would build a whole zeroed
+    /// `cmdq_item` — including a null `CString` — and then drop it, which is the very
+    /// bug this conversion exists to remove.
+    fn new_unnamed() -> Box<cmdq_item> {
+        Box::new(cmdq_item {
+            name: CString::default(),
+            queue: null_mut(),
+            next: null_mut(),
+            client: null_mut(),
+            target_client: null_mut(),
+            type_: cmdq_type::CMDQ_COMMAND,
+            group: 0,
+            number: 0,
+            time: 0,
+            flags: 0,
+            state: null_mut(),
+            // SAFETY: cmd_find_state, tailq_entry and the callback pointer are C-style
+            // records with no Rust field, so all-zero is a valid value for each.
+            source: unsafe { zeroed() },
+            target: unsafe { zeroed() },
+            cmdlist: null_mut(),
+            cmd: null_mut(),
+            cb: None,
+            data: null_mut(),
+            entry: unsafe { zeroed() },
+        })
+    }
 }
 
 pub type cmdq_item_list = tailq_head<cmdq_item>;
@@ -154,8 +193,8 @@ pub unsafe fn cmdq_free(queue: *mut cmdq_list) {
 }
 
 /// C `vendor/tmux/cmd-queue.c:145`: `const char *cmdq_get_name(struct cmdq_item *item)`
-pub unsafe fn cmdq_get_name(item: *mut cmdq_item) -> *mut u8 {
-    unsafe { (*item).name }
+pub unsafe fn cmdq_get_name(item: *mut cmdq_item) -> *const u8 {
+    unsafe { (*item).name_ptr() }
 }
 
 /// C `vendor/tmux/cmd-queue.c:152`: `struct client *cmdq_get_client(struct cmdq_item *item)`
@@ -328,7 +367,7 @@ pub unsafe fn cmdq_append(c: *mut client, mut item: *mut cmdq_item) -> *mut cmdq
 
             (*item).queue = queue;
             tailq_insert_tail::<_, ()>(&raw mut (*queue).list, item);
-            log_debug!("{} {}: {}", __func__, _s(cmdq_name(c)), _s((*item).name));
+            log_debug!("{} {}: {}", __func__, _s(cmdq_name(c)), _s((*item).name_ptr()));
 
             item = next;
             if item.is_null() {
@@ -366,8 +405,8 @@ pub unsafe fn cmdq_insert_after(
                 "{} {}: {} after {}",
                 "cmdq_insert_after",
                 _s(cmdq_name(c)),
-                _s((*item).name),
-                _s((*after).name),
+                _s((*item).name_ptr()),
+                _s((*after).name_ptr()),
             );
 
             after = item;
@@ -501,8 +540,8 @@ pub unsafe fn cmdq_remove(item: *mut cmdq_item) {
 
         tailq_remove(&raw mut (*(*item).queue).list, item);
 
-        free_((*item).name);
-        free_(item);
+        // Dropping the Box frees the owned name, which C did with free(item->name).
+        drop(Box::from_raw(item));
     }
 }
 
@@ -551,8 +590,11 @@ pub unsafe fn cmdq_get_command(
         while !cmd.is_null() {
             let entry = cmd_get_entry(cmd);
 
-            let item = xcalloc1::<cmdq_item>() as *mut cmdq_item;
-            (*item).name = format_nul!("[{}/{:p}]", entry.name, item,);
+            // xcalloc would leave `name` an all-zero CString, whose null pointer CString
+            // is not allowed to hold. The name embeds the item's own address, so it is
+            // filled in once the allocation exists.
+            let item = Box::into_raw(cmdq_item::new_unnamed());
+            (*item).name = cstring_truncating(format!("[{}/{item:p}]", entry.name));
             (*item).type_ = cmdq_type::CMDQ_COMMAND;
 
             (*item).group = cmd_get_group(cmd);
@@ -755,10 +797,10 @@ pub unsafe fn cmdq_fire_command(item: *mut cmdq_item) -> cmd_retval {
 
 /// C `vendor/tmux/cmd-queue.c:685`: `struct cmdq_item *cmdq_get_callback1(const char *name, cmdq_cb cb, void *data)`
 pub unsafe fn cmdq_get_callback1(name: &str, cb: cmdq_cb, data: *mut u8) -> NonNull<cmdq_item> {
-    let item = xcalloc_::<cmdq_item>(1).as_ptr();
+    let item = Box::into_raw(cmdq_item::new_unnamed());
 
     unsafe {
-        (*item).name = format_nul!("[{}/{:p}]", name, item);
+        (*item).name = cstring_truncating(format!("[{name}/{item:p}]"));
         (*item).type_ = cmdq_type::CMDQ_CALLBACK;
 
         (*item).group = 0;
@@ -826,7 +868,7 @@ pub unsafe fn cmdq_next(c: *mut client) -> u32 {
                     "{} {}: {} ({}), flags {}",
                     __func__,
                     _s(name),
-                    _s((*item).name),
+                    _s((*item).name_ptr()),
                     (*item).type_ as i32,
                     (*item).flags
                 );
