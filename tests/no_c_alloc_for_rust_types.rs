@@ -52,9 +52,51 @@ fn code(line: &str) -> &str {
     }
 }
 
-/// Names of structs that declare at least one field of an invariant-carrying type.
-fn structs_with_rust_fields(sources: &[(PathBuf, String)]) -> Vec<String> {
-    let mut found = Vec::new();
+/// Does this field type name `ty` mention the type `want`, wherever it sits in the type
+/// and however it is qualified?
+///
+/// The naive check — "starts with it, or is followed by `<`" — misses
+/// `Option<std::ffi::CString>`, which is how `client_file.path` hid from this gate while
+/// four `MaybeUninit::<client_file>` key structs sat in file.rs. Match the bare name with
+/// identifier boundaries instead, so a module path (`std::ffi::CString`) still counts but
+/// `ToString` does not.
+fn mentions_type(ty: &str, want: &str) -> bool {
+    let want = want.trim_end_matches('<');
+    let is_ident = |c: char| c.is_alphanumeric() || c == '_';
+
+    ty.match_indices(want).any(|(i, _)| {
+        let before_ok = ty[..i].chars().next_back().is_none_or(|c| !is_ident(c));
+        let after_ok = ty[i + want.len()..]
+            .chars()
+            .next()
+            .is_none_or(|c| !is_ident(c));
+        before_ok && after_ok
+    })
+}
+
+/// Structs holding an invariant-carrying field, split by what zeroing them would do.
+///
+/// The distinction is the whole point, and it is not a loophole:
+///
+///   * `Option<CString>` zeroed is `None` — the null-pointer niche makes all-zero a
+///     *valid* value. `xcalloc` of such a struct is sound, and several big structs
+///     (`screen`, `window`, `window_pane`, `client`) rely on it.
+///   * A **bare** `CString`/`String`/`Vec`/`Cow`/`Box` zeroed is a null pointer, which
+///     those types are not allowed to hold. Zeroing is invalid.
+///   * `MaybeUninit` hands over **garbage**, not zeros, so it is invalid for *either*
+///     kind — a garbage `Option<CString>` may read as `Some(…)` over a junk pointer.
+///     That is precisely how `session_group_find` came to call `free()` on a pointer Rust
+///     never allocated.
+struct Guarded {
+    /// Any invariant-carrying field at all. Never valid to `MaybeUninit`.
+    any: Vec<String>,
+    /// At least one *bare* (non-`Option`) invariant field. Never valid to zero either.
+    bare: Vec<String>,
+}
+
+fn structs_with_rust_fields(sources: &[(PathBuf, String)]) -> Guarded {
+    let mut any = Vec::new();
+    let mut bare = Vec::new();
 
     for (_, text) in sources {
         let mut current: Option<String> = None;
@@ -85,12 +127,15 @@ fn structs_with_rust_fields(sources: &[(PathBuf, String)]) -> Vec<String> {
 
             // A field line looks like `name: Type,` — the type sits after the colon.
             if let Some((_, ty)) = line.split_once(':')
-                && RUST_INVARIANT_TYPES
-                    .iter()
-                    .any(|t| ty.trim_start().starts_with(t) || ty.contains(&format!("<{t}")))
-                && !found.contains(&name)
+                && RUST_INVARIANT_TYPES.iter().any(|t| mentions_type(ty, t))
             {
-                found.push(name.clone());
+                if !any.contains(&name) {
+                    any.push(name.clone());
+                }
+                // `Option<T>` has the niche; anything else does not.
+                if !ty.trim_start().starts_with("Option<") && !bare.contains(&name) {
+                    bare.push(name.clone());
+                }
             }
 
             if depth <= 0 {
@@ -99,16 +144,15 @@ fn structs_with_rust_fields(sources: &[(PathBuf, String)]) -> Vec<String> {
         }
     }
 
-    found
+    Guarded { any, bare }
 }
 
-/// Every way the codebase allocates or zero-fills a struct C-style.
-fn c_allocation_patterns(struct_name: &str) -> Vec<String> {
+/// Zero-filling allocations. Valid only when every invariant field has the `Option` niche.
+fn zeroing_patterns(struct_name: &str) -> Vec<String> {
     vec![
         format!("xcalloc1::<{struct_name}>"),
         format!("xcalloc_::<{struct_name}>"),
         format!("zeroed::<{struct_name}>"),
-        format!("MaybeUninit::<{struct_name}>"),
         format!(": {struct_name} = zeroed()"),
         format!("*mut {struct_name} = xcalloc"),
     ]
@@ -129,17 +173,22 @@ fn structs_with_rust_fields_are_never_c_allocated() {
 
     let guarded = structs_with_rust_fields(&sources);
     assert!(
-        !guarded.is_empty(),
-        "found no structs with Vec/String/CString/Box fields — the scanner is broken"
+        !guarded.any.is_empty(),
+        "found no structs with Vec/String/CString/Box/Cow fields — the scanner is broken"
     );
 
-    let patterns: Vec<(String, &String)> = guarded
+    // Garbage is never a valid value, for either kind of field.
+    let uninit_patterns: Vec<(String, &String)> = guarded
+        .any
         .iter()
-        .flat_map(|name| {
-            c_allocation_patterns(name)
-                .into_iter()
-                .map(move |p| (p, name))
-        })
+        .map(|name| (format!("MaybeUninit::<{name}>"), name))
+        .collect();
+
+    // Zeros are valid only where every invariant field has the `Option` niche.
+    let zeroing_patterns: Vec<(String, &String)> = guarded
+        .bare
+        .iter()
+        .flat_map(|name| zeroing_patterns(name).into_iter().map(move |p| (p, name)))
         .collect();
 
     let mut violations = Vec::new();
@@ -157,23 +206,36 @@ fn structs_with_rust_fields_are_never_c_allocated() {
                 continue;
             }
 
-            for (pattern, name) in &patterns {
+            for (pattern, name) in &uninit_patterns {
                 if line.contains(pattern.as_str()) {
                     violations.push(format!(
                         "src/{rel}:{}: `{name}` holds a Rust type with a non-null \
-                         invariant but is allocated C-style (`{pattern}`). \
-                         Build it with Box::new(..) and free it with Box::from_raw.",
+                         invariant, and `MaybeUninit` hands over garbage, not zeros — a \
+                         junk `Option<CString>` can read as `Some(..)` over a junk \
+                         pointer. Search with rb_find_by instead of fabricating a key \
+                         struct, or build it with Box::new(..).",
+                        i + 1
+                    ));
+                }
+            }
+
+            for (pattern, name) in &zeroing_patterns {
+                if line.contains(pattern.as_str()) {
+                    violations.push(format!(
+                        "src/{rel}:{}: `{name}` holds a *bare* Rust type with a non-null \
+                         invariant (no `Option` niche), so zeroing it (`{pattern}`) \
+                         builds an invalid value. Build it with Box::new(..) and free it \
+                         with Box::from_raw.",
                         i + 1
                     ));
                 }
             }
 
             // `T { field: x, ..zeroed() }` builds a whole zeroed `T` and then drops the
-            // fields it does not take — including the invariant-carrying ones. The
-            // struct name sits on an earlier line, so look back for it.
+            // fields it does not take. Only the bare ones are invalid when zeroed.
             if line.contains("..zeroed()") || line.contains("..unsafe { zeroed() }") {
                 let start = i.saturating_sub(12);
-                if let Some(name) = guarded.iter().find(|name| {
+                if let Some(name) = guarded.bare.iter().find(|name| {
                     lines[start..=i]
                         .iter()
                         .any(|l| l.contains(&format!("{name} {{")))

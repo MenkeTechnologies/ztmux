@@ -884,7 +884,6 @@ pub unsafe fn file_read_open(
         let flags = O_NONBLOCK | O_RDONLY;
         let error;
 
-        let mut find = MaybeUninit::<client_file>::uninit();
 
         'reply: {
             if msglen < size_of::<msg_read_done>() {
@@ -897,8 +896,10 @@ pub unsafe fn file_read_open(
             }
             log_debug!("open read file {} {}", (*msg).stream, _s(path));
 
-            (*find.as_mut_ptr()).stream = (*msg).stream;
-            if !rb_find(files, find.as_mut_ptr()).is_null() {
+            // client_file owns its path, so a fabricated key struct would hold garbage
+            // where a valid Option<CString> must be. Search by stream instead.
+            let stream = (*msg).stream;
+            if !rb_find_by(files, |cf| stream.cmp(&cf.stream)).is_null() {
                 error = EBADF;
                 break 'reply;
             }
@@ -961,13 +962,14 @@ pub unsafe fn file_read_cancel(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_read_cancel;
         let msglen = (*imsg).hdr.len as usize - IMSG_HEADER_SIZE;
-        let mut find = MaybeUninit::<client_file>::uninit();
 
         if msglen != size_of::<msg_read_cancel>() {
             fatalx("bad MSG_READ_CANCEL size");
         }
-        (*find.as_mut_ptr()).stream = (*msg).stream;
-        let cf = rb_find(files, find.as_mut_ptr());
+        // client_file owns its path, so a fabricated key struct would hold garbage
+        // where a valid Option<CString> must be. Search by stream instead.
+        let stream = (*msg).stream;
+        let cf = rb_find_by(files, |cf| stream.cmp(&cf.stream));
         if cf.is_null() {
             fatalx("unknown stream number");
         }
@@ -982,13 +984,14 @@ pub unsafe fn file_write_ready(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_write_ready;
         let msglen = (*imsg).hdr.len as usize - IMSG_HEADER_SIZE;
-        let mut find = MaybeUninit::<client_file>::uninit();
 
         if msglen != size_of::<msg_write_ready>() {
             fatalx("bad MSG_WRITE_READY size");
         }
-        (*find.as_mut_ptr()).stream = (*msg).stream;
-        let cf = rb_find(files, find.as_mut_ptr());
+        // client_file owns its path, so a fabricated key struct would hold garbage
+        // where a valid Option<CString> must be. Search by stream instead.
+        let stream = (*msg).stream;
+        let cf = rb_find_by(files, |cf| stream.cmp(&cf.stream));
         if cf.is_null() {
             return;
         }
@@ -1008,13 +1011,14 @@ pub unsafe fn file_read_data(files: *mut client_files, imsg: *mut imsg) {
         let msglen = (*imsg).hdr.len as usize - IMSG_HEADER_SIZE;
         let bdata: *mut c_void = msg.add(1).cast();
         let bsize = msglen - size_of::<msg_read_data>();
-        let mut find = MaybeUninit::<client_file>::uninit();
 
         if msglen < size_of::<msg_read_data>() {
             fatalx("bad MSG_READ_DATA size");
         }
-        (*find.as_mut_ptr()).stream = (*msg).stream;
-        let cf = rb_find(files, find.as_mut_ptr());
+        // client_file owns its path, so a fabricated key struct would hold garbage
+        // where a valid Option<CString> must be. Search by stream instead.
+        let stream = (*msg).stream;
+        let cf = rb_find_by(files, |cf| stream.cmp(&cf.stream));
         if cf.is_null() {
             return;
         }
@@ -1036,13 +1040,14 @@ pub unsafe fn file_read_done(files: *mut client_files, imsg: *mut imsg) {
     unsafe {
         let msg = (*imsg).data as *mut msg_read_done;
         let msglen = (*imsg).hdr.len as usize - IMSG_HEADER_SIZE;
-        let mut find = MaybeUninit::<client_file>::uninit();
 
         if msglen != size_of::<msg_read_done>() {
             fatalx("bad MSG_READ_DONE size");
         }
-        (*find.as_mut_ptr()).stream = (*msg).stream;
-        let cf = rb_find(files, find.as_mut_ptr());
+        // client_file owns its path, so a fabricated key struct would hold garbage
+        // where a valid Option<CString> must be. Search by stream instead.
+        let stream = (*msg).stream;
+        let cf = rb_find_by(files, |cf| stream.cmp(&cf.stream));
         if cf.is_null() {
             return;
         }

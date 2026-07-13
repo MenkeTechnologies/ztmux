@@ -200,22 +200,16 @@ pub unsafe fn key_bindings_unref_table(table: *mut key_table) {
 /// C `vendor/tmux/key-bindings.c:160`: `struct key_binding *key_bindings_get(struct key_table *table, key_code key)`
 pub unsafe fn key_bindings_get(table: NonNull<key_table>, key: key_code) -> *mut key_binding {
     unsafe {
-        let mut bd = MaybeUninit::<key_binding>::uninit();
-        let bd = bd.as_mut_ptr();
-
-        (*bd).key = key;
-        rb_find(&raw mut (*table.as_ptr()).key_bindings, bd)
+        // C fabricates a stack key_binding as the RB_FIND key; key_binding owns a note,
+        // so garbage there is not a value it can hold. Search by key instead.
+        rb_find_by(&raw mut (*table.as_ptr()).key_bindings, |bd| key.cmp(&bd.key))
     }
 }
 
 /// C `vendor/tmux/key-bindings.c:169`: `struct key_binding *key_bindings_get_default(struct key_table *table, key_code key)`
 pub unsafe fn key_bindings_get_default(table: *mut key_table, key: key_code) -> *mut key_binding {
     unsafe {
-        let mut bd = MaybeUninit::<key_binding>::uninit();
-        let bd = bd.as_mut_ptr();
-
-        (*bd).key = key;
-        rb_find(&raw mut (*table).default_key_bindings, bd)
+        rb_find_by(&raw mut (*table).default_key_bindings, |bd| key.cmp(&bd.key))
     }
 }
 

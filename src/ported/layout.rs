@@ -1757,8 +1757,9 @@ mod tests {
             // (vendor/tmux/layout.c:214 and :226). We only touch wp.layout_cell,
             // so a placeholder pane whose other fields are uninitialised is safe.
             let lc = layout_create_cell(null_mut());
-            let wp =
-                Box::leak(Box::new(std::mem::MaybeUninit::<window_pane>::uninit())).as_mut_ptr();
+            // Zeroed, not uninit: window_pane owns Option<CString> fields, whose all-zero
+            // form is a valid `None`; garbage is not.
+            let wp: *mut window_pane = Box::into_raw(Box::new(zeroed::<window_pane>()));
 
             layout_make_leaf(lc, wp);
             assert!((*lc).type_ == layout_type::LAYOUT_WINDOWPANE);

@@ -254,15 +254,19 @@ pub unsafe fn popup_draw_cb(c: *mut client, data: *mut c_void, rctx: *mut screen
     unsafe {
         let pd = data.cast::<popup_data>();
         let tty = &mut (*c).tty;
-        let mut s = MaybeUninit::<screen>::uninit();
+        // NOT MaybeUninit: screen_init *assigns* `(*s).title = Some(..)` and
+        // `(*s).path = None`, and an assignment drops whatever was there. Garbage
+        // Option<CString> can read as Some(..) over a junk pointer, so that drop would
+        // free() a pointer Rust never allocated. Zeroed memory is a valid `None`.
+        let mut s: screen = zeroed();
         let mut ctx = MaybeUninit::<screen_write_ctx>::uninit();
         let (px, py) = ((*pd).px, (*pd).py);
         let palette = &raw mut (*pd).palette;
         let mut defaults = MaybeUninit::<grid_cell>::uninit();
         let defaults = defaults.as_mut_ptr();
 
-        screen_init(s.as_mut_ptr(), (*pd).sx, (*pd).sy, 0);
-        screen_write_start(ctx.as_mut_ptr(), s.as_mut_ptr());
+        screen_init(&raw mut s, (*pd).sx, (*pd).sy, 0);
+        screen_write_start(ctx.as_mut_ptr(), &raw mut s);
         screen_write_clearscreen(ctx.as_mut_ptr(), 8);
 
         if (*pd).border_lines == box_lines::BOX_LINES_NONE {
@@ -308,7 +312,7 @@ pub unsafe fn popup_draw_cb(c: *mut client, data: *mut c_void, rctx: *mut screen
         for i in 0..(*pd).sy {
             tty_draw_line(
                 tty,
-                s.as_mut_ptr(),
+                &raw mut s,
                 0,
                 i,
                 (*pd).sx,
@@ -319,7 +323,7 @@ pub unsafe fn popup_draw_cb(c: *mut client, data: *mut c_void, rctx: *mut screen
             );
         }
 
-        screen_free(s.as_mut_ptr());
+        screen_free(&raw mut s);
 
         if !(*pd).md.is_null() {
             (*c).overlay_check = None;
