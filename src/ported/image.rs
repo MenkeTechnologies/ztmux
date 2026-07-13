@@ -183,8 +183,7 @@ pub unsafe fn image_scroll_up(s: *mut screen, lines: u32) -> bool {
                 crate::image_sixel::sixel_size_in_cells(&*(*im.as_ptr()).data);
 
             // Assigning the new placeholder drops the old CString — no free.
-            (*im.as_ptr()).fallback =
-                Some(image_fallback((*im.as_ptr()).sx, (*im.as_ptr()).sy));
+            (*im.as_ptr()).fallback = Some(image_fallback((*im.as_ptr()).sx, (*im.as_ptr()).sy));
             redraw = true;
         }
         redraw

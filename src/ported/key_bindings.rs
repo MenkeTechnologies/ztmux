@@ -344,7 +344,7 @@ pub unsafe fn key_bindings_reset(name: *const u8, key: key_code) {
         (*(*bd).cmdlist).references += 1;
 
         // Clone dd's note (or None); assigning drops bd's old note — no free.
-        (*bd).note = (*dd).note.clone();
+        (*bd).note.clone_from(&(*dd).note);
         (*bd).flags = (*dd).flags;
     }
 }

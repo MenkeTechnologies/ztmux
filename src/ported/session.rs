@@ -623,13 +623,10 @@ pub unsafe fn session_group_contains(target: *mut session) -> *mut session_group
 /// Find session group by name.
 /// C `vendor/tmux/session.c:518`: `struct session_group *session_group_find(const char *name)`
 pub unsafe fn session_group_find(name: &str) -> *mut session_group {
-    unsafe {
-        let mut sg = MaybeUninit::<session_group>::uninit();
-        let sg = sg.as_mut_ptr();
-
-        (*sg).name = Cow::Borrowed(std::mem::transmute::<&str, &'static str>(name));
-        rb_find(&raw mut SESSION_GROUPS, sg)
-    }
+    // C builds a throwaway stack `struct session_group` as the RB_FIND key. That is
+    // unsound in Rust: assigning `.name` into uninitialized memory drops the garbage
+    // that was already there. Search by key instead — same tree descent, no key node.
+    unsafe { rb_find_by(&raw mut SESSION_GROUPS, |sg| name.cmp(&sg.name)) }
 }
 
 /// Create a new session group.
@@ -703,14 +700,14 @@ pub unsafe fn session_group_synchronize_to(s: *mut session) {
             return;
         }
 
-        let mut target = null_mut();
-        for target_ in tailq_foreach(&raw mut (*sg).sessions).map(std::ptr::NonNull::as_ptr) {
-            target = target_;
-            if target != s {
-                break;
-            }
-        }
-        if !target.is_null() {
+        // C's TAILQ_FOREACH leaves the loop variable NULL when it runs to completion,
+        // so a group containing only `s` yields no target and syncs nothing. A Rust
+        // `for` loop instead leaves the last element, which self-synced `s` from `s`
+        // and wiped its window list. Take the first session that is not `s`, or none.
+        let target = tailq_foreach(&raw mut (*sg).sessions)
+            .map(std::ptr::NonNull::as_ptr)
+            .find(|&target| target != s);
+        if let Some(target) = target {
             session_group_synchronize1(target, s);
         }
     }
@@ -888,6 +885,34 @@ mod tests {
             );
             // A single separator alone becomes a single underscore.
             assert_eq!(session_check_name(crate::c!(":")).as_deref(), Some("_"));
+        }
+    }
+
+    // session_group_find used to build an uninitialized stack `session_group` as the
+    // RB_FIND key, mirroring the C. Assigning `.name` into it dropped the uninit
+    // garbage already in that field, so a lookup could free a pointer Rust never
+    // allocated and abort the server (`ztmux new-session -t ggg`). Look each group up
+    // by name to pin both the no-crash property and the tree-descent direction: the
+    // names below straddle the root in sort order, so a reversed comparison would miss.
+    #[test]
+    fn test_session_group_find() {
+        unsafe {
+            for name in ["mid", "alpha", "zulu"] {
+                assert!(!session_group_new(name).is_null());
+            }
+
+            for name in ["alpha", "mid", "zulu"] {
+                let sg = session_group_find(name);
+                assert!(!sg.is_null(), "group {name} should be found");
+                assert_eq!((*sg).name, name);
+            }
+
+            // A name that was never inserted has no group, on either side of the root.
+            assert!(session_group_find("ggg").is_null());
+            assert!(session_group_find("").is_null());
+
+            // Re-finding an existing group returns the same node, never a duplicate.
+            assert_eq!(session_group_find("mid"), session_group_new("mid"));
         }
     }
 }
