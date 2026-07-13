@@ -2518,17 +2518,17 @@ struct client {
     environ: *mut environ,
     jobs: *mut format_job_tree,
 
-    title: *mut u8,
-    path: *mut u8,
-    cwd: *const u8,
+    title: Option<std::ffi::CString>,
+    path: Option<std::ffi::CString>,
+    cwd: Option<std::ffi::CString>,
 
-    term_name: *mut u8,
+    term_name: Option<std::ffi::CString>,
     term_features: c_int,
-    term_type: *mut u8,
+    term_type: Option<std::ffi::CString>,
     term_caps: *mut *mut u8,
     term_ncaps: c_uint,
 
-    ttyname: *mut u8,
+    ttyname: Option<std::ffi::CString>,
     tty: tty,
 
     written: usize,
@@ -2547,8 +2547,8 @@ struct client {
 
     exit_type: exit_type,
     exit_msgtype: msgtype,
-    exit_session: *mut u8,
-    exit_message: *mut u8,
+    exit_session: Option<std::ffi::CString>,
+    exit_message: Option<std::ffi::CString>,
 
     keytable: *mut key_table,
 
@@ -2556,12 +2556,12 @@ struct client {
 
     message_ignore_keys: c_int,
     message_ignore_styles: c_int,
-    message_string: *mut u8,
+    message_string: Option<std::ffi::CString>,
     message_timer: event,
 
-    prompt_string: *mut u8,
+    prompt_string: Option<std::ffi::CString>,
     prompt_buffer: *mut utf8_data,
-    prompt_last: *mut u8,
+    prompt_last: Option<std::ffi::CString>,
     prompt_index: usize,
     prompt_inputcb: prompt_input_cb,
     prompt_freecb: prompt_free_cb,

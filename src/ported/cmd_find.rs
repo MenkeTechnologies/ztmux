@@ -58,7 +58,7 @@ pub unsafe fn cmd_find_inside_pane(c: *mut client) -> *mut window_pane {
         let mut wp: *mut window_pane = null_mut();
         for wp_ in rb_foreach(&raw mut ALL_WINDOW_PANES) {
             wp = wp_.as_ptr();
-            if (*wp).fd != -1 && strcmp((*wp).tty.as_ptr(), (*c).ttyname) == 0 {
+            if (*wp).fd != -1 && strcmp((*wp).tty.as_ptr(), (*c).ttyname_ptr()) == 0 {
                 break;
             }
         }
@@ -1413,16 +1413,16 @@ pub unsafe fn cmd_find_client(
                 break;
             }
 
-            if *(*c).ttyname == b'\0' {
+            if *(*c).ttyname_ptr() == b'\0' {
                 continue;
             }
-            if streq_((*c).ttyname, copy) {
+            if streq_((*c).ttyname_ptr(), copy) {
                 break;
             }
-            if libc::strncmp((*c).ttyname, _PATH_DEV, SIZEOF_PATH_DEV - 1) != 0 {
+            if libc::strncmp((*c).ttyname_ptr(), _PATH_DEV, SIZEOF_PATH_DEV - 1) != 0 {
                 continue;
             }
-            if streq_((*c).ttyname.add(SIZEOF_PATH_DEV - 1), copy) {
+            if streq_((*c).ttyname_ptr().add(SIZEOF_PATH_DEV - 1), copy) {
                 break;
             }
 

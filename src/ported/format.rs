@@ -1763,7 +1763,7 @@ pub unsafe fn format_cb_client_termfeatures(ft: *mut format_tree) -> format_tabl
 pub unsafe fn format_cb_client_termname(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
-            return format!("{}", _s((*(*ft).c).term_name)).into();
+            return format!("{}", _s((*(*ft).c).term_name_ptr())).into();
         }
         format_table_type::None
     }
@@ -1773,10 +1773,10 @@ pub unsafe fn format_cb_client_termname(ft: *mut format_tree) -> format_table_ty
 pub unsafe fn format_cb_client_termtype(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
-            if (*(*ft).c).term_type.is_null() {
+            if (*(*ft).c).term_type.is_none() {
                 return "".into();
             }
-            return format!("{}", _s((*(*ft).c).term_type)).into();
+            return format!("{}", _s((*(*ft).c).term_type_ptr())).into();
         }
         format_table_type::None
     }
@@ -1786,7 +1786,7 @@ pub unsafe fn format_cb_client_termtype(ft: *mut format_tree) -> format_table_ty
 pub unsafe fn format_cb_client_tty(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).c.is_null() {
-            return format!("{}", _s((*(*ft).c).ttyname)).into();
+            return format!("{}", _s((*(*ft).c).ttyname_ptr())).into();
         }
         format_table_type::None
     }

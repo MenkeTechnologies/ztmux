@@ -160,7 +160,7 @@ unsafe extern "C-unwind" fn status_timer_callback(_fd: i32, _events: i16, c: Non
             return;
         }
 
-        if (*c).message_string.is_null() && (*c).prompt_string.is_null() {
+        if (*c).message_string.is_none() && (*c).prompt_string.is_none() {
             (*c).flags |= client_flag::REDRAWSTATUS;
         }
 
@@ -519,7 +519,7 @@ pub unsafe fn status_message_set_(
 ) {
     unsafe {
         let mut tv: timeval = zeroed();
-        let mut s = args.to_string();
+        let s = args.to_string();
 
         // log_debug("%s: %s", __func__, s);
 
@@ -534,10 +534,13 @@ pub unsafe fn status_message_set_(
         if !crate::extensions::ratatui_ui::enabled() {
             status_push_screen(c);
         }
-        s.push('\0');
-        let s = s.leak().as_mut_ptr().cast();
-        (*c).message_string = s;
-        server_add_message!("{} message: {}", _s((*c).name), _s(s));
+        let cs = crate::cstring_truncating(s);
+        server_add_message!(
+            "{} message: {}",
+            _s((*c).name),
+            _s(cs.as_ptr().cast::<u8>())
+        );
+        (*c).message_string = Some(cs);
 
         // With delay -1, the display-time option is used; zero means wait for
         // key press; more than zero is the actual delay time in milliseconds.
@@ -589,7 +592,7 @@ pub unsafe fn status_message_set_(
 pub unsafe fn status_message_clear(c: NonNull<client>) {
     unsafe {
         let c = c.as_ptr();
-        if (*c).message_string.is_null() {
+        if (*c).message_string.is_none() {
             return;
         }
 
@@ -598,10 +601,10 @@ pub unsafe fn status_message_clear(c: NonNull<client>) {
             crate::extensions::ratatui_ui::clear_message_overlay(c);
         }
 
-        free_((*c).message_string);
-        (*c).message_string = null_mut();
+        (*c).message_string = None;
+        (*c).message_string = None;
 
-        if (*c).prompt_string.is_null() {
+        if (*c).prompt_string.is_none() {
             (*c).tty.flags &= !(tty_flags::TTY_NOCURSOR | tty_flags::TTY_FREEZE);
         }
         (*c).flags |= CLIENT_ALLREDRAWFLAGS; /* was frozen and may have changed */
@@ -656,7 +659,7 @@ pub unsafe fn status_message_redraw(c: *mut client) -> i32 {
             messageline = lines - 1;
         }
 
-        let mut len = screen_write_strlen!("{}", _s((*c).message_string));
+        let mut len = screen_write_strlen!("{}", _s((*c).message_string_ptr()));
         if len > (*c).tty.sx as usize {
             len = (*c).tty.sx as usize;
         }
@@ -685,14 +688,14 @@ pub unsafe fn status_message_redraw(c: *mut client) -> i32 {
                 len as isize,
                 &raw mut gc,
                 "{}",
-                _s((*c).message_string),
+                _s((*c).message_string_ptr()),
             );
         } else {
             format_draw(
                 &raw mut ctx,
                 &raw const gc,
                 (*c).tty.sx,
-                cstr_to_str((*c).message_string),
+                cstr_to_str((*c).message_string_ptr()),
                 null_mut(),
                 0,
             );
@@ -747,13 +750,13 @@ pub unsafe fn status_prompt_set<T>(
             status_push_screen(c);
         }
 
-        (*c).prompt_string = format_expand_time(ft, msg);
+        (*c).prompt_string = Some(std::ffi::CString::from_raw(format_expand_time(ft, msg).cast()));
 
         if flags.intersects(prompt_flags::PROMPT_INCREMENTAL) {
-            (*c).prompt_last = xstrdup(tmp).as_ptr();
+            (*c).prompt_last = Some(std::ffi::CStr::from_ptr((tmp) as *const std::ffi::c_char).to_owned());
             (*c).prompt_buffer = utf8_fromcstr(c!(""));
         } else {
-            (*c).prompt_last = null_mut();
+            (*c).prompt_last = None;
             (*c).prompt_buffer = utf8_fromcstr(tmp);
         }
         (*c).prompt_index = utf8_strlen((*c).prompt_buffer);
@@ -808,7 +811,7 @@ pub unsafe fn status_prompt_set<T>(
 /// C `vendor/tmux/status.c:616`: `void status_prompt_clear(struct client *c)`
 pub unsafe fn status_prompt_clear(c: *mut client) {
     unsafe {
-        if (*c).prompt_string.is_null() {
+        if (*c).prompt_string.is_none() {
             return;
         }
 
@@ -823,11 +826,9 @@ pub unsafe fn status_prompt_clear(c: *mut client) {
             prompt_freecb(prompt_data);
         }
 
-        free_((*c).prompt_last);
-        (*c).prompt_last = null_mut();
+        (*c).prompt_last = None;
 
-        free_((*c).prompt_string);
-        (*c).prompt_string = null_mut();
+        (*c).prompt_string = None;
 
         free_((*c).prompt_buffer);
         (*c).prompt_buffer = null_mut();
@@ -854,8 +855,8 @@ pub unsafe fn status_prompt_update(c: *mut client, msg: *const u8, input: *const
 
         let tmp = format_expand_time(ft, input);
 
-        free_((*c).prompt_string);
-        (*c).prompt_string = format_expand_time(ft, msg);
+        (*c).prompt_string = None;
+        (*c).prompt_string = Some(std::ffi::CString::from_raw(format_expand_time(ft, msg).cast()));
 
         free_((*c).prompt_buffer);
         (*c).prompt_buffer = utf8_fromcstr(tmp);
@@ -924,7 +925,7 @@ pub unsafe fn status_prompt_redraw(c: *mut client) -> i32 {
             memcpy__(&raw mut cursorgc, &raw const gc);
             cursorgc.attr ^= grid_attr::GRID_ATTR_REVERSE;
 
-            let mut start = format_width(cstr_to_str((*c).prompt_string));
+            let mut start = format_width(cstr_to_str((*c).prompt_string_ptr()));
             if start > (*c).tty.sx {
                 start = (*c).tty.sx;
             }
@@ -947,7 +948,7 @@ pub unsafe fn status_prompt_redraw(c: *mut client) -> i32 {
                 &raw mut ctx,
                 &raw const gc,
                 start,
-                cstr_to_str((*c).prompt_string),
+                cstr_to_str((*c).prompt_string_ptr()),
                 null_mut(),
                 0,
             );
@@ -1783,7 +1784,7 @@ pub unsafe fn status_prompt_key(c: *mut client, mut key: key_code) -> i32 {
                             if (*(*c).prompt_buffer).size == 0 {
                                 prefix = b'=';
                                 free_((*c).prompt_buffer);
-                                (*c).prompt_buffer = utf8_fromcstr((*c).prompt_last);
+                                (*c).prompt_buffer = utf8_fromcstr((*c).prompt_last_ptr());
                                 (*c).prompt_index = utf8_strlen((*c).prompt_buffer);
                             } else {
                                 prefix = b'-';
@@ -1799,7 +1800,7 @@ pub unsafe fn status_prompt_key(c: *mut client, mut key: key_code) -> i32 {
                             if (*(*c).prompt_buffer).size == 0 {
                                 prefix = b'=';
                                 free_((*c).prompt_buffer);
-                                (*c).prompt_buffer = utf8_fromcstr((*c).prompt_last);
+                                (*c).prompt_buffer = utf8_fromcstr((*c).prompt_last_ptr());
                                 (*c).prompt_index = utf8_strlen((*c).prompt_buffer);
                             } else {
                                 prefix = b'+';
@@ -2157,7 +2158,7 @@ pub(crate) unsafe fn status_prompt_complete_list_menu(
         } else {
             (*c).tty.sy - 3 - height
         };
-        offset += utf8_cstrwidth((*c).prompt_string);
+        offset += utf8_cstrwidth((*c).prompt_string_ptr());
         if offset > 2 {
             offset -= 2;
         } else {
@@ -2274,7 +2275,7 @@ unsafe fn status_prompt_complete_window_menu(
         } else {
             (*c).tty.sy - 3 - height
         };
-        offset += utf8_cstrwidth((*c).prompt_string);
+        offset += utf8_cstrwidth((*c).prompt_string_ptr());
         if offset > 2 {
             offset -= 2;
         } else {

@@ -72,7 +72,7 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
         let mut wait = !args_has(args, 'b');
         let mut space = 1;
 
-        if !(*tc).prompt_string.is_null() {
+        if (*tc).prompt_string.is_some() {
             return cmd_retval::CMD_RETURN_NORMAL;
         }
         if args_has(args, 'i') {

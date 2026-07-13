@@ -2114,8 +2114,8 @@ unsafe fn tty_keys_extended_device_attributes(
         }
         // log_debug( c!("%s: received extended DA %.*s\0"), (*c).name, *size as i32, buf);
 
-        free_((*c).term_type);
-        (*c).term_type = xstrdup(tmp.as_ptr()).as_ptr();
+        (*c).term_type = None;
+        (*c).term_type = Some(std::ffi::CStr::from_ptr((tmp.as_ptr()) as *const std::ffi::c_char).to_owned());
 
         tty_update_features(tty);
         (*tty).flags |= tty_flags::TTY_HAVEXDA;

@@ -265,7 +265,7 @@ pub unsafe fn tty_open(tty: *mut tty, cause: *mut *mut u8) -> i32 {
 
         (*tty).term = tty_term_create(
             tty,
-            (*c).term_name,
+            (*c).term_name_ptr().cast_mut(),
             (*c).term_caps,
             (*c).term_ncaps,
             &raw mut (*c).term_features,

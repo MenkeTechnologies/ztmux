@@ -431,7 +431,7 @@ pub unsafe fn window_client_key(
                     c,
                     null_mut(),
                     (*data).command,
-                    cstr_to_str_((*(*item.as_ptr()).c).ttyname),
+                    cstr_to_str_((*(*item.as_ptr()).c).ttyname_ptr()),
                 );
                 finished = true;
             }

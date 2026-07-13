@@ -452,7 +452,7 @@ pub unsafe fn control_check_age(
             if age < CONTROL_MAXIMUM_AGE {
                 return 0;
             }
-            (*c).exit_message = xstrdup_(c"too far behind").as_ptr();
+            (*c).exit_message = Some(c"too far behind".to_owned());
             (*c).flags |= client_flag::EXIT;
             control_discard(c);
         }

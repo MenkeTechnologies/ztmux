@@ -18,6 +18,37 @@ use crate::{
 };
 use crate::options_::*;
 
+/// Generate `*const u8` accessors for the client's owned `Option<CString>`
+/// string fields (NULL when `None`), replacing the raw `char *` reads.
+macro_rules! client_cstr_ptrs {
+    ($($field:ident => $method:ident),* $(,)?) => {
+        impl client {
+            $(
+                #[inline]
+                pub(crate) fn $method(&self) -> *const u8 {
+                    match &self.$field {
+                        Some(c) => c.as_ptr().cast(),
+                        None => std::ptr::null(),
+                    }
+                }
+            )*
+        }
+    };
+}
+client_cstr_ptrs! {
+    title => title_ptr,
+    path => path_ptr,
+    cwd => cwd_ptr,
+    term_name => term_name_ptr,
+    term_type => term_type_ptr,
+    ttyname => ttyname_ptr,
+    exit_session => exit_session_ptr,
+    exit_message => exit_message_ptr,
+    message_string => message_string_ptr,
+    prompt_string => prompt_string_ptr,
+    prompt_last => prompt_last_ptr,
+}
+
 /// Compare client windows.
 /// C `vendor/tmux/server-client.c:57`: `static int server_client_window_cmp(struct client_window *cw1, struct client_window *cw2)`
 pub fn server_client_window_cmp(cw1: &client_window, cw2: &client_window) -> std::cmp::Ordering {
@@ -194,7 +225,7 @@ pub unsafe fn server_client_check_nested(c: *mut client) -> bool {
         }
 
         for wp in rb_foreach(&raw mut ALL_WINDOW_PANES) {
-            if libc::strcmp((&raw const (*wp.as_ptr()).tty) as _, (*c).ttyname) == 0 {
+            if libc::strcmp((&raw const (*wp.as_ptr()).tty) as _, (*c).ttyname_ptr()) == 0 {
                 return true;
             }
         }
@@ -319,27 +350,27 @@ pub unsafe fn server_client_open(c: *mut client, cause: *mut *mut u8) -> i32 {
             return 0;
         }
 
-        if libc::strcmp((*c).ttyname, ttynam) == 0
+        if libc::strcmp((*c).ttyname_ptr(), ttynam) == 0
             || ((libc::isatty(libc::STDIN_FILENO) != 0
                 && ({
                     ttynam = libc::ttyname(libc::STDIN_FILENO);
                     !ttynam.is_null()
                 })
-                && libc::strcmp((*c).ttyname, ttynam) == 0)
+                && libc::strcmp((*c).ttyname_ptr(), ttynam) == 0)
                 || (libc::isatty(libc::STDOUT_FILENO) != 0
                     && ({
                         ttynam = libc::ttyname(libc::STDOUT_FILENO);
                         !ttynam.is_null()
                     })
-                    && libc::strcmp((*c).ttyname, ttynam) == 0)
+                    && libc::strcmp((*c).ttyname_ptr(), ttynam) == 0)
                 || (libc::isatty(libc::STDERR_FILENO) != 0
                     && ({
                         ttynam = libc::ttyname(libc::STDERR_FILENO);
                         !ttynam.is_null()
                     })
-                    && libc::strcmp((*c).ttyname, ttynam) == 0))
+                    && libc::strcmp((*c).ttyname_ptr(), ttynam) == 0))
         {
-            *cause = format_nul!("can't use {}", _s((*c).ttyname));
+            *cause = format_nul!("can't use {}", _s((*c).ttyname_ptr()));
             return -1;
         }
 
@@ -458,30 +489,30 @@ pub unsafe fn server_client_lost(c: *mut client) {
         if (*c).flags.intersects(client_flag::TERMINAL) {
             tty_free(&raw mut (*c).tty);
         }
-        free_((*c).ttyname);
+        (*c).ttyname = None;
         free_((*c).clipboard_panes);
 
-        free_((*c).term_name);
-        free_((*c).term_type);
+        (*c).term_name = None;
+        (*c).term_type = None;
         tty_term_free_list((*c).term_caps, (*c).term_ncaps);
 
         status_free(c);
 
-        free_((*c).title);
-        free_((*c).cwd.cast_mut()); // TODO cast away const
+        (*c).title = None;
+        (*c).cwd = None;
 
         evtimer_del(&raw mut (*c).repeat_timer);
         evtimer_del(&raw mut (*c).click_timer);
 
         key_bindings_unref_table((*c).keytable);
 
-        free_((*c).message_string);
+        (*c).message_string = None;
         if event_initialized(&raw mut (*c).message_timer) != 0 {
             evtimer_del(&raw mut (*c).message_timer);
         }
 
         free_((*c).prompt_saved);
-        free_((*c).prompt_string);
+        (*c).prompt_string = None;
         free_((*c).prompt_buffer);
 
         format_lost_client(c);
@@ -572,7 +603,7 @@ pub unsafe fn server_client_detach(c: *mut client, msgtype: msgtype) {
 
         (*c).exit_type = exit_type::CLIENT_EXIT_DETACH;
         (*c).exit_msgtype = msgtype;
-        (*c).exit_session = xstrdup__(&(*s).name);
+        (*c).exit_session = Some(crate::cstring_truncating((*s).name.to_string()));
     }
 }
 
@@ -2133,7 +2164,7 @@ pub unsafe fn server_client_handle_key(c: *mut client, event: *mut key_event) ->
         // case. The queue might be blocked so they need to be processed
         // immediately rather than queued.
         if !(*c).flags.intersects(client_flag::READONLY) {
-            if !(*c).message_string.is_null() {
+            if (*c).message_string.is_some() {
                 if (*c).message_ignore_keys != 0 {
                     return 0;
                 }
@@ -2150,7 +2181,7 @@ pub unsafe fn server_client_handle_key(c: *mut client, event: *mut key_event) ->
                 }
             }
             server_client_clear_overlay(c);
-            if !(*c).prompt_string.is_null() && status_prompt_key(c, (*event).key) == 0 {
+            if (*c).prompt_string.is_some() && status_prompt_key(c, (*event).key) == 0 {
                 return 0;
             }
         }
@@ -2489,7 +2520,7 @@ pub unsafe fn server_client_reset_state(c: *mut client) {
         tty_margin_off(tty);
 
         // Move cursor to pane cursor and offset.
-        if !(*c).prompt_string.is_null() {
+        if (*c).prompt_string.is_some() {
             n = options_get_number_((*(*c).session).options, "status-position") as i32;
             if n == 0 {
                 cy = 0;
@@ -2549,7 +2580,7 @@ pub unsafe fn server_client_reset_state(c: *mut client) {
         }
 
         // Clear bracketed paste mode if at the prompt.
-        if (*c).overlay_draw.is_none() && !(*c).prompt_string.is_null() {
+        if (*c).overlay_draw.is_none() && (*c).prompt_string.is_some() {
             mode &= !mode_flag::MODE_BRACKETPASTE;
         }
 
@@ -2610,7 +2641,7 @@ pub unsafe extern "C-unwind" fn server_client_click_timer(
 /// C `vendor/tmux/server-client.c:2152`: `static void server_client_check_exit(struct client *c)`
 pub unsafe fn server_client_check_exit(c: *mut client) {
     unsafe {
-        let name = (*c).exit_session;
+        let name = (*c).exit_session_ptr();
 
         if (*c)
             .flags
@@ -2637,18 +2668,18 @@ pub unsafe fn server_client_check_exit(c: *mut client) {
 
         match (*c).exit_type {
             exit_type::CLIENT_EXIT_RETURN => {
-                let msize = if !(*c).exit_message.is_null() {
-                    strlen((*c).exit_message) + 1
+                let msize = if (*c).exit_message.is_some() {
+                    strlen((*c).exit_message_ptr()) + 1
                 } else {
                     0
                 };
                 let size = size_of::<i32>() + msize;
                 let data = xmalloc(size).as_ptr();
                 libc::memcpy(data, (&raw mut (*c).retval).cast(), size_of::<i32>());
-                if !(*c).exit_message.is_null() {
+                if (*c).exit_message.is_some() {
                     libc::memcpy(
                         data.add(size_of::<i32>()).cast(),
-                        (*c).exit_message.cast(),
+                        (*c).exit_message_ptr().cast(),
                         msize,
                     );
                 }
@@ -2668,8 +2699,8 @@ pub unsafe fn server_client_check_exit(c: *mut client) {
                 );
             }
         }
-        free_((*c).exit_session);
-        free_((*c).exit_message);
+        (*c).exit_session = None;
+        (*c).exit_message = None;
     }
 }
 
@@ -2862,10 +2893,10 @@ pub unsafe fn server_client_set_title(c: *mut client) {
         format_defaults(ft, c, None, None, None);
 
         let title = format_expand_time(ft, template);
-        if (*c).title.is_null() || libc::strcmp(title, (*c).title) != 0 {
-            free_((*c).title);
-            (*c).title = xstrdup(title).as_ptr();
-            tty_set_title(&raw mut (*c).tty, (*c).title);
+        if (*c).title.is_none() || libc::strcmp(title, (*c).title_ptr()) != 0 {
+            (*c).title = None;
+            (*c).title = Some(std::ffi::CStr::from_ptr((title) as *const std::ffi::c_char).to_owned());
+            tty_set_title(&raw mut (*c).tty, (*c).title_ptr());
         }
         free_(title);
 
@@ -2887,10 +2918,10 @@ pub unsafe fn server_client_set_path(c: *mut client) {
         } else {
             (*(*(*(*s).curw).window).active).base.path_ptr()
         };
-        if (*c).path.is_null() || libc::strcmp(path, (*c).path) != 0 {
-            free_((*c).path);
-            (*c).path = xstrdup(path).as_ptr();
-            tty_set_path(&raw mut (*c).tty, (*c).path);
+        if (*c).path.is_none() || libc::strcmp(path, (*c).path_ptr()) != 0 {
+            (*c).path = None;
+            (*c).path = Some(std::ffi::CStr::from_ptr((path) as *const std::ffi::c_char).to_owned());
+            tty_set_path(&raw mut (*c).tty, (*c).path_ptr());
         }
     }
 }
@@ -3158,9 +3189,9 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
                     fatalx("bad MSG_IDENTIFY_TERM string");
                 }
                 if *data.cast::<u8>() == b'\0' {
-                    (*c).term_name = xstrdup(c!("unknown")).as_ptr();
+                    (*c).term_name = Some(std::ffi::CStr::from_ptr((c!("unknown")) as *const std::ffi::c_char).to_owned());
                 } else {
-                    (*c).term_name = xstrdup(data.cast()).as_ptr();
+                    (*c).term_name = Some(std::ffi::CStr::from_ptr((data.cast()) as *const std::ffi::c_char).to_owned());
                 }
                 // log_debug("client %p IDENTIFY_TERM %s", c, data);
             }
@@ -3178,7 +3209,7 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
                 if datalen == 0 || *data.cast::<u8>().add((datalen - 1) as usize) != b'\0' {
                     fatalx("bad MSG_IDENTIFY_TTYNAME string");
                 }
-                (*c).ttyname = xstrdup(data.cast()).as_ptr();
+                (*c).ttyname = Some(std::ffi::CStr::from_ptr((data.cast()) as *const std::ffi::c_char).to_owned());
                 // log_debug("client %p IDENTIFY_TTYNAME %s", c, data);
             }
             msgtype::MSG_IDENTIFY_CWD => {
@@ -3186,11 +3217,11 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
                     // fatalx("bad MSG_IDENTIFY_CWD string");
                 }
                 if libc::access(data.cast(), libc::X_OK) == 0 {
-                    (*c).cwd = xstrdup(data.cast()).as_ptr();
+                    (*c).cwd = Some(std::ffi::CStr::from_ptr((data.cast()) as *const std::ffi::c_char).to_owned());
                 } else if let Some(home) = find_home() {
-                    (*c).cwd = xstrdup_(home).as_ptr();
+                    (*c).cwd = Some(home.to_owned());
                 } else {
-                    (*c).cwd = xstrdup(c!("/")).as_ptr();
+                    (*c).cwd = Some(std::ffi::CStr::from_ptr((c!("/")) as *const std::ffi::c_char).to_owned());
                 }
                 // log_debug("client %p IDENTIFY_CWD %s", c, data);
             }
@@ -3232,8 +3263,8 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
         }
         (*c).flags |= client_flag::IDENTIFIED;
 
-        let name = if *(*c).ttyname != b'\0' {
-            xstrdup((*c).ttyname).as_ptr()
+        let name = if *(*c).ttyname_ptr() != b'\0' {
+            xstrdup((*c).ttyname_ptr()).as_ptr()
         } else {
             format_nul!("client-{}", (*c).pid)
         };
@@ -3242,7 +3273,7 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
 
         // #[cfg(feature = "cygwin")] // I don't think rust even works on cygwin
         // {
-        //     (*c).fd = open((*c).ttyname, O_RDWR | O_NOCTTY);
+        //     (*c).fd = open((*c).ttyname_ptr(), O_RDWR | O_NOCTTY);
         // }
 
         if (*c).flags.intersects(client_flag::CONTROL) {
@@ -3296,9 +3327,9 @@ pub unsafe fn server_client_dispatch_shell(c: *mut client) {
 pub unsafe fn server_client_get_cwd(c: *const client, s: *const session) -> *const u8 {
     unsafe {
         if !CFG_FINISHED.load(atomic::Ordering::Acquire) && !CFG_CLIENT.is_null() {
-            (*CFG_CLIENT).cwd
-        } else if !c.is_null() && (*c).session.is_null() && !(*c).cwd.is_null() {
-            (*c).cwd
+            (*CFG_CLIENT).cwd_ptr()
+        } else if !c.is_null() && (*c).session.is_null() && (*c).cwd.is_some() {
+            (*c).cwd_ptr()
         } else if !s.is_null() && (*s).cwd.is_some() {
             (*s).cwd_ptr()
         } else if !c.is_null()

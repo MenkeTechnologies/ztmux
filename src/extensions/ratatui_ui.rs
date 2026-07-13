@@ -590,7 +590,7 @@ struct MessageLayout {
 
 unsafe fn message_layout(c: *mut client) -> Option<MessageLayout> {
     unsafe {
-        if (*c).message_string.is_null() {
+        if (*c).message_string.is_none() {
             return None;
         }
         let sx = (*c).tty.sx as u16;
@@ -601,7 +601,7 @@ unsafe fn message_layout(c: *mut client) -> Option<MessageLayout> {
 
         // Strip status markup (`#[...]`) - the overlay renders plain text - and
         // fold any embedded newlines / tabs into spaces so wrapping is clean.
-        let text = strip_markup(crate::cstr_to_str((*c).message_string));
+        let text = strip_markup(crate::cstr_to_str((*c).message_string_ptr()));
         let text = text.replace(['\n', '\r', '\t'], " ");
         let text = text.trim();
         if text.is_empty() {
@@ -771,7 +771,7 @@ struct PromptLayout {
 
 unsafe fn prompt_layout(c: *mut client) -> Option<PromptLayout> {
     unsafe {
-        if (*c).prompt_string.is_null() {
+        if (*c).prompt_string.is_none() {
             return None;
         }
         let sx = (*c).tty.sx as u16;
@@ -780,7 +780,7 @@ unsafe fn prompt_layout(c: *mut client) -> Option<PromptLayout> {
             return None;
         }
 
-        let prompt = strip_markup(crate::cstr_to_str((*c).prompt_string));
+        let prompt = strip_markup(crate::cstr_to_str((*c).prompt_string_ptr()));
         let input = prompt_graphemes((*c).prompt_buffer);
         let cursor_i = (*c).prompt_index;
         let input_w: u16 = input.iter().map(|(_, w)| *w).sum();
