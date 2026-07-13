@@ -1181,8 +1181,10 @@ enum screen_cursor_style {
 #[repr(C)]
 #[derive(Clone)]
 struct screen {
-    title: *mut u8,
-    path: *mut u8,
+    /// Owned screen title (`""` after init) / OSC 7 path (`None` until set);
+    /// dropped in `screen_free`. Read via `title_ptr()`/`path_ptr()`.
+    title: Option<std::ffi::CString>,
+    path: Option<std::ffi::CString>,
     titles: *mut screen_titles,
 
     /// grid data

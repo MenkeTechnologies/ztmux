@@ -2882,10 +2882,10 @@ pub unsafe fn server_client_set_path(c: *mut client) {
         if (*s).curw.is_null() {
             return;
         }
-        let path = if (*(*(*(*s).curw).window).active).base.path.is_null() {
+        let path = if (*(*(*(*s).curw).window).active).base.path.is_none() {
             c!("")
         } else {
-            (*(*(*(*s).curw).window).active).base.path
+            (*(*(*(*s).curw).window).active).base.path_ptr()
         };
         if (*c).path.is_null() || libc::strcmp(path, (*c).path) != 0 {
             free_((*c).path);

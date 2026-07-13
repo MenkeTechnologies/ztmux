@@ -156,7 +156,7 @@ unsafe fn sort_session_cmp(a: *mut session, b: *mut session, sc: sort_criteria) 
 /// C `vendor/tmux/sort.c:195`: `static int sort_pane_cmp(const void *a0, const void *b0)`
 unsafe fn sort_pane_cmp(a: *mut window_pane, b: *mut window_pane, sc: sort_criteria) -> i32 {
     unsafe {
-        let title_cmp = || strcmp((*(*a).screen).title, (*(*b).screen).title);
+        let title_cmp = || strcmp((*(*a).screen).title_ptr(), (*(*b).screen).title_ptr());
         let mut result = match sc.order {
             sort_order::SORT_ACTIVITY => (*a).active_point.wrapping_sub((*b).active_point) as i32,
             sort_order::SORT_CREATION => (*a).id.wrapping_sub((*b).id) as i32,

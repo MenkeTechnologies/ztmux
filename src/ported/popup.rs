@@ -436,7 +436,7 @@ pub fn popup_make_pane(pd: *mut popup_data, type_: layout_type) {
         );
         (*pd).job = null_mut();
 
-        screen_set_title(&raw mut (*pd).s, (*new_wp).base.title);
+        screen_set_title(&raw mut (*pd).s, (*new_wp).base.title_ptr());
         screen_free(&raw mut (*new_wp).base);
         memcpy__(&raw mut (*new_wp).base, &raw const (*pd).s);
         screen_resize(&raw mut (*new_wp).base, (*new_wp).sx, (*new_wp).sy, 1);

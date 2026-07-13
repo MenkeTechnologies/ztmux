@@ -2508,10 +2508,10 @@ pub unsafe fn format_cb_pane_mode(ft: *mut format_tree) -> format_table_type {
 pub unsafe fn format_cb_pane_path(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
-            if (*(*ft).wp).base.path.is_null() {
+            if (*(*ft).wp).base.path.is_none() {
                 return "".into();
             }
-            return format!("{}", _s((*(*ft).wp).base.path)).into();
+            return format!("{}", _s((*(*ft).wp).base.path_ptr())).into();
         }
         format_table_type::None
     }
@@ -2586,7 +2586,7 @@ pub unsafe fn format_cb_pane_synchronized(ft: *mut format_tree) -> format_table_
 pub unsafe fn format_cb_pane_title(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
-            return format!("{}", _s((*(*ft).wp).base.title)).into();
+            return format!("{}", _s((*(*ft).wp).base.title_ptr())).into();
         }
         format_table_type::None
     }

@@ -60,6 +60,25 @@ pub unsafe fn screen_free_titles(s: *mut screen) {
     }
 }
 
+impl screen {
+    /// Borrowed `char *` to the title (always set after init), else NULL.
+    #[inline]
+    pub(crate) fn title_ptr(&self) -> *const u8 {
+        match &self.title {
+            Some(c) => c.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+    /// Borrowed `char *` to the OSC 7 path, or NULL when unset.
+    #[inline]
+    pub(crate) fn path_ptr(&self) -> *const u8 {
+        match &self.path {
+            Some(c) => c.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+}
+
 /// Create a new screen.
 /// C `vendor/tmux/screen.c:76`: `void screen_init(struct screen *s, u_int sx, u_int sy, u_int hlimit)`
 pub unsafe fn screen_init(s: *mut screen, sx: u32, sy: u32, hlimit: u32) {
@@ -67,9 +86,9 @@ pub unsafe fn screen_init(s: *mut screen, sx: u32, sy: u32, hlimit: u32) {
         (*s).grid = grid_create(sx, sy, hlimit);
         (*s).saved_grid = null_mut();
 
-        (*s).title = xstrdup_(c"").as_ptr();
+        (*s).title = Some(c"".to_owned());
         (*s).titles = null_mut();
-        (*s).path = null_mut();
+        (*s).path = None;
 
         (*s).cstyle = screen_cursor_style::SCREEN_CURSOR_DEFAULT;
         (*s).default_cstyle = screen_cursor_style::SCREEN_CURSOR_DEFAULT;
@@ -145,8 +164,8 @@ pub unsafe fn screen_free(s: *mut screen) {
     unsafe {
         free_((*s).sel);
         (*s).tabs = None;
-        free_((*s).path);
-        free_((*s).title);
+        (*s).path = None;
+        (*s).title = None;
 
         if !(*s).write_list.is_null() {
             screen_write_free_list(s);
@@ -235,8 +254,8 @@ pub unsafe fn screen_set_title(s: *mut screen, title: *const u8) -> c_int {
         if !utf8_isvalid(title) {
             return 0;
         }
-        free_((*s).title);
-        (*s).title = xstrdup(title).as_ptr();
+        // Assigning drops the old title CString — no manual free.
+        (*s).title = Some(std::ffi::CStr::from_ptr(title.cast()).to_owned());
         1
     }
 }
@@ -245,12 +264,15 @@ pub unsafe fn screen_set_title(s: *mut screen, title: *const u8) -> c_int {
 /// C `vendor/tmux/screen.c:263`: `int screen_set_path(struct screen *s, const char *path, int untrusted)`
 pub unsafe fn screen_set_path(s: *mut screen, path: *const u8) {
     unsafe {
-        free_((*s).path);
+        // utf8_stravis writes a freshly-allocated char* to the out-param;
+        // capture it and adopt into the owned field (dropping the old path).
+        let mut pathbuf: *mut u8 = null_mut();
         utf8_stravis(
-            &mut (*s).path,
+            &raw mut pathbuf,
             path,
             vis_flags::VIS_OCTAL | vis_flags::VIS_CSTYLE | vis_flags::VIS_TAB | vis_flags::VIS_NL,
         );
+        (*s).path = Some(std::ffi::CString::from_raw(pathbuf.cast()));
     }
 }
 
@@ -267,7 +289,7 @@ pub unsafe fn screen_push_title(s: *mut screen) {
         }
 
         let title_entry = Box::leak(Box::new(screen_title_entry {
-            text: xstrdup((*s).title).as_ptr(),
+            text: xstrdup((*s).title_ptr()).as_ptr(),
             entry: tailq_entry::default(),
         }));
         tailq_insert_head((*s).titles, title_entry);
@@ -943,9 +965,9 @@ mod tests {
             assert_eq!(screen_size_y(s), 24);
             assert_eq!(screen_hsize(s), 0);
 
-            assert!(!(*s).title.is_null());
-            assert_eq!(cstr_to_str((*s).title), "");
-            assert!((*s).path.is_null());
+            assert!((*s).title.is_some());
+            assert_eq!(cstr_to_str((*s).title_ptr()), "");
+            assert!((*s).path.is_none());
             assert!((*s).titles.is_null());
             assert!((*s).sel.is_null());
             assert!((*s).saved_grid.is_null());
@@ -987,15 +1009,15 @@ mod tests {
 
             // Plain ASCII accepted, stored verbatim.
             assert_eq!(screen_set_title(s, b"hello\0".as_ptr()), 1);
-            assert_eq!(cstr_to_str((*s).title), "hello");
+            assert_eq!(cstr_to_str((*s).title_ptr()), "hello");
 
             // Valid multibyte UTF-8 ("A" + euro sign) accepted, stored verbatim.
             assert_eq!(screen_set_title(s, b"A\xe2\x82\xac\0".as_ptr()), 1);
-            assert_eq!(cstr_bytes((*s).title), b"A\xe2\x82\xac");
+            assert_eq!(cstr_bytes((*s).title_ptr()), b"A\xe2\x82\xac");
 
             // Invalid UTF-8 (lone continuation byte) rejected; title unchanged.
             assert_eq!(screen_set_title(s, b"\x82\0".as_ptr()), 0);
-            assert_eq!(cstr_bytes((*s).title), b"A\xe2\x82\xac");
+            assert_eq!(cstr_bytes((*s).title_ptr()), b"A\xe2\x82\xac");
 
             free_screen(s);
         }
@@ -1016,12 +1038,12 @@ mod tests {
             let s = new_screen(80, 24, 0);
 
             screen_set_path(s, b"/home/user/dir\0".as_ptr());
-            assert!(!(*s).path.is_null());
-            assert_eq!(cstr_to_str((*s).path), "/home/user/dir");
+            assert!((*s).path.is_some());
+            assert_eq!(cstr_to_str((*s).path_ptr()), "/home/user/dir");
 
             // Replacing frees the previous allocation and stores the new value.
             screen_set_path(s, b"/tmp\0".as_ptr());
-            assert_eq!(cstr_to_str((*s).path), "/tmp");
+            assert_eq!(cstr_to_str((*s).path_ptr()), "/tmp");
 
             free_screen(s);
         }
@@ -1295,13 +1317,13 @@ mod tests {
             // Change the live title, then pop twice to walk back down the stack.
             assert_eq!(screen_set_title(s, c!("third")), 1);
             screen_pop_title(s);
-            assert_eq!(cstr_to_str((*s).title), "second");
+            assert_eq!(cstr_to_str((*s).title_ptr()), "second");
             screen_pop_title(s);
-            assert_eq!(cstr_to_str((*s).title), "first");
+            assert_eq!(cstr_to_str((*s).title_ptr()), "first");
 
             // Extra pop on the now-empty stack is a no-op (title unchanged).
             screen_pop_title(s);
-            assert_eq!(cstr_to_str((*s).title), "first");
+            assert_eq!(cstr_to_str((*s).title_ptr()), "first");
 
             free_screen(s);
         }
@@ -1320,7 +1342,7 @@ mod tests {
             assert!((*s).titles.is_null());
 
             screen_pop_title(s);
-            assert_eq!(cstr_to_str((*s).title), "keep");
+            assert_eq!(cstr_to_str((*s).title_ptr()), "keep");
 
             free_screen(s);
         }
