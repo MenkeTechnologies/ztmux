@@ -55,8 +55,8 @@ unsafe fn cmd_list_keys_get_width(tablename: *const u8, only: key_code) -> u32 {
         while !bd.is_null() {
             if (only != KEYC_UNKNOWN && (*bd).key != only)
                 || KEYC_IS_MOUSE((*bd).key)
-                || (*bd).note.is_null()
-                || *(*bd).note == b'\0'
+                || (*bd).note.is_none()
+                || *(*bd).note_ptr() == b'\0'
             {
                 bd = key_bindings_next(table, bd);
                 continue;
@@ -92,7 +92,7 @@ unsafe fn cmd_list_keys_print_notes(
         while !bd.is_null() {
             if (only != KEYC_UNKNOWN && (*bd).key != only)
                 || KEYC_IS_MOUSE((*bd).key)
-                || (((*bd).note.is_null() || *(*bd).note == b'\0') && !args_has(args, 'a'))
+                || (((*bd).note.is_none() || *(*bd).note_ptr() == b'\0') && !args_has(args, 'a'))
             {
                 bd = key_bindings_next(table, bd);
                 continue;
@@ -100,10 +100,10 @@ unsafe fn cmd_list_keys_print_notes(
             found = 1;
             let key = key_string_lookup_key((*bd).key, 0);
 
-            let note = if (*bd).note.is_null() || *(*bd).note == b'\0' {
+            let note = if (*bd).note.is_none() || *(*bd).note_ptr() == b'\0' {
                 cmd_list_print(&*(*bd).cmdlist, 1)
             } else {
-                xstrdup((*bd).note).as_ptr()
+                xstrdup((*bd).note_ptr()).as_ptr()
             };
 
             let tmp = utf8_padcstr(key, keywidth + 1);

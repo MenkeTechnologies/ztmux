@@ -2880,7 +2880,7 @@ pub unsafe fn tty_cmd_sixelimage(tty: *mut tty, ctx: *const tty_ctx) {
         log_debug!("tty_cmd_sixelimage: clamping to {i},{j}-{rx},{ry} fallback={fallback}");
 
         if fallback == 1 {
-            data = xstrdup((*im).fallback).as_ptr();
+            data = xstrdup((*im).fallback.as_ref().unwrap().as_ptr().cast()).as_ptr();
             size = strlen(data);
         } else {
             new = sixel_scale(si, (*tty).xpixel, (*tty).ypixel, i, j, rx, ry, 0);

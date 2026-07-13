@@ -1106,12 +1106,14 @@ unsafe fn hint_bindings(c: *mut client) -> Vec<(String, String)> {
         let mut bd = key_bindings_first(table);
         while !bd.is_null() {
             let key = (*bd).key;
-            let note = (*bd).note;
+            // Borrowed pointer into the binding's owned note CString (NULL when
+            // unset); not freed here (owned = false).
+            let note = (*bd).note_ptr();
             // Label: the binding's `-N` note if it has one, else the bound
             // command itself (like `list-keys`), so a key the user rebound
             // WITHOUT a note still shows up instead of vanishing.
             let (label, owned) = if !note.is_null() && *note != 0 {
-                (note, false)
+                (note.cast_mut(), false)
             } else if !(*bd).cmdlist.is_null() {
                 (cmd_list_print(&*(*bd).cmdlist, 1), true)
             } else {

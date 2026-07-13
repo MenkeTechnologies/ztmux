@@ -380,7 +380,7 @@ pub unsafe fn spawn_pane(sc: *mut spawn_context, cause: *mut *mut u8) -> *mut wi
                         c!("PATH"),
                         environ_flags::empty(),
                         "{}",
-                        _s(transmute_ptr((*ee).value))
+                        _s((*ee).value_ptr())
                     );
                 }
             }

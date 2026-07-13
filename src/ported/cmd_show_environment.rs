@@ -35,7 +35,7 @@ pub static CMD_SHOW_ENVIRONMENT_ENTRY: cmd_entry = cmd_entry {
 /// C `vendor/tmux/cmd-show-environment.c:51`: `static char *cmd_show_environment_escape(struct environ_entry *envent)`
 unsafe fn cmd_show_environment_escape(envent: *const environ_entry) -> *mut u8 {
     unsafe {
-        let mut value = transmute_ptr((*envent).value);
+        let mut value = (*envent).value_ptr();
         let ret: *mut u8 = xmalloc(strlen(value) * 2 + 1).as_ptr().cast(); /* at most twice the size */
         let mut out = ret;
 
@@ -76,15 +76,15 @@ unsafe fn cmd_show_environment_print(
         }
 
         if !args_has(args, 's') {
-            if let Some(value) = (*envent).value {
+            if let Some(value) = (*envent).value.as_deref() {
                 cmdq_print!(
                     item,
                     "{}={}",
-                    _s(transmute_ptr((*envent).name)),
-                    _s(value.as_ptr())
+                    _s((*envent).name_ptr()),
+                    _s(value.as_ptr().cast::<u8>())
                 );
             } else {
-                cmdq_print!(item, "-{}", _s(transmute_ptr((*envent).name)));
+                cmdq_print!(item, "-{}", _s((*envent).name_ptr()));
             }
             return;
         }
@@ -94,13 +94,13 @@ unsafe fn cmd_show_environment_print(
             cmdq_print!(
                 item,
                 "{}=\"{}\"; export {};",
-                _s(transmute_ptr((*envent).name)),
+                _s((*envent).name_ptr()),
                 _s(escaped),
-                _s(transmute_ptr((*envent).name)),
+                _s((*envent).name_ptr()),
             );
             free_(escaped);
         } else {
-            cmdq_print!(item, "unset {};", _s(transmute_ptr((*envent).name)));
+            cmdq_print!(item, "unset {};", _s((*envent).name_ptr()));
         }
     }
 }

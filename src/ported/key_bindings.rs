@@ -109,12 +109,23 @@ pub fn key_bindings_cmp(bd1: &key_binding, bd2: &key_binding) -> cmp::Ordering {
     bd1.key.cmp(&bd2.key)
 }
 
+impl key_binding {
+    /// Borrowed `char *` to the note, or NULL when unset (C `bd->note == NULL`).
+    #[inline]
+    pub(crate) fn note_ptr(&self) -> *const u8 {
+        match &self.note {
+            Some(n) => n.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+}
+
 /// C `vendor/tmux/key-bindings.c:97`: `static void key_bindings_free(struct key_binding *bd)`
 pub unsafe fn key_bindings_free(bd: *mut key_binding) {
     unsafe {
         cmd_list_free((*bd).cmdlist);
-        free_((*bd).note);
-        free_(bd);
+        // Reclaim the boxed binding; its owned `note` CString drops with it.
+        drop(Box::from_raw(bd));
     }
 }
 
@@ -228,8 +239,8 @@ pub unsafe fn key_bindings_add(
                 // C key-bindings.c:200-208: only replace the note when a new one
                 // is given (leave the existing note otherwise), and honour repeat.
                 if !note.is_null() {
-                    free_((*bd).note);
-                    (*bd).note = xstrdup(note).as_ptr();
+                    // Assigning drops the old note CString — no manual free.
+                    (*bd).note = Some(std::ffi::CStr::from_ptr(note.cast()).to_owned());
                 }
                 if repeat {
                     (*bd).flags |= KEY_BINDING_REPEAT;
@@ -242,11 +253,17 @@ pub unsafe fn key_bindings_add(
             key_bindings_free(bd);
         }
 
-        bd = xcalloc1::<key_binding>();
-        (*bd).key = key & !KEYC_MASK_FLAGS;
-        if !note.is_null() {
-            (*bd).note = xstrdup(note).as_ptr();
-        }
+        bd = Box::into_raw(Box::new(key_binding {
+            key: key & !KEYC_MASK_FLAGS,
+            cmdlist: null_mut(),
+            note: if note.is_null() {
+                None
+            } else {
+                Some(std::ffi::CStr::from_ptr(note.cast()).to_owned())
+            },
+            flags: 0,
+            entry: zeroed(),
+        }));
         rb_insert(&raw mut (*table).key_bindings, bd);
 
         if repeat {
@@ -319,12 +336,8 @@ pub unsafe fn key_bindings_reset(name: *const u8, key: key_code) {
         (*bd).cmdlist = (*dd).cmdlist;
         (*(*bd).cmdlist).references += 1;
 
-        free_((*bd).note);
-        if !(*dd).note.is_null() {
-            (*bd).note = xstrdup((*dd).note).as_ptr();
-        } else {
-            (*bd).note = null_mut();
-        }
+        // Clone dd's note (or None); assigning drops bd's old note — no free.
+        (*bd).note = (*dd).note.clone();
         (*bd).flags = (*dd).flags;
     }
 }
@@ -368,14 +381,14 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
     unsafe {
         for table in rb_foreach(&raw mut KEY_TABLES).map(NonNull::as_ptr) {
             for bd in rb_foreach(&raw mut (*table).key_bindings).map(NonNull::as_ptr) {
-                let new_bd = xcalloc1::<key_binding>();
-                new_bd.key = (*bd).key;
-                if !(*bd).note.is_null() {
-                    new_bd.note = xstrdup((*bd).note).as_ptr();
-                }
-                new_bd.flags = (*bd).flags;
-                new_bd.cmdlist = (*bd).cmdlist;
-                (*new_bd.cmdlist).references += 1;
+                let new_bd = Box::into_raw(Box::new(key_binding {
+                    key: (*bd).key,
+                    cmdlist: (*bd).cmdlist,
+                    note: (*bd).note.clone(),
+                    flags: (*bd).flags,
+                    entry: zeroed(),
+                }));
+                (*(*new_bd).cmdlist).references += 1;
                 rb_insert(&raw mut (*table).default_key_bindings, new_bd);
             }
         }
@@ -925,7 +938,7 @@ mod tests {
             assert_eq!((*bd).key, key);
             assert_eq!((*bd).cmdlist, cmdlist as *mut _);
             assert_eq!((*bd).flags & KEY_BINDING_REPEAT, 0);
-            assert_eq!(strcmp((*bd).note, c!("my note")), 0);
+            assert_eq!(strcmp((*bd).note_ptr(), c!("my note")), 0);
 
             // Remove: binding gone, and since the table is now empty it is
             // removed from KEY_TABLES too (key-bindings.c:253).
@@ -947,7 +960,7 @@ mod tests {
             assert!(!bd.is_null());
             assert_ne!((*bd).flags & KEY_BINDING_REPEAT, 0);
             // note was NULL, so it stays NULL (key-bindings.c:219).
-            assert!((*bd).note.is_null());
+            assert!((*bd).note.is_none());
             drop_table(name);
         }
     }
@@ -1104,7 +1117,7 @@ mod tests {
             let table = NonNull::new(key_bindings_get_table(name, false)).unwrap();
             let bd = key_bindings_get(table, key);
             assert!(!bd.is_null());
-            assert_eq!(strcmp((*bd).note, c!("updated")), 0);
+            assert_eq!(strcmp((*bd).note_ptr(), c!("updated")), 0);
             // C sets the repeat flag here; the port does not.
             assert_ne!((*bd).flags & KEY_BINDING_REPEAT, 0);
 
@@ -1191,7 +1204,7 @@ mod tests {
             let table = NonNull::new(key_bindings_get_table(name, false)).unwrap();
             let bd = key_bindings_get(table, key);
             assert!(!bd.is_null());
-            assert!((*bd).note.is_null(), "replacement with NULL note must clear it");
+            assert!((*bd).note.is_none(), "replacement with NULL note must clear it");
 
             drop_table(name);
         }

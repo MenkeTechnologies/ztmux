@@ -189,7 +189,7 @@ pub unsafe fn server_client_overlay_range(
 pub unsafe fn server_client_check_nested(c: *mut client) -> bool {
     unsafe {
         let envent = environ_find((*c).environ, c!("TMUX"));
-        if envent.is_null() || *transmute_ptr((*envent).value) == b'\0' {
+        if envent.is_null() || (*envent).value.is_none() || *(*envent).value_ptr() == b'\0' {
             return false;
         }
 

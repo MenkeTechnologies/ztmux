@@ -622,17 +622,19 @@ macro_rules! server_add_message {
 pub(crate) use server_add_message;
 pub unsafe fn server_add_message_(args: std::fmt::Arguments) {
     unsafe {
-        let mut s = args.to_string();
-        s.push('\0');
-        let s = s.leak().as_mut_ptr().cast();
+        let text = crate::cstring_truncating(args.to_string());
 
-        log_debug!("message: {}", _s(s));
+        log_debug!("message: {}", _s(text.as_ptr().cast::<u8>()));
 
-        let msg: *mut message_entry = xcalloc1::<message_entry>() as *mut message_entry;
-        gettimeofday(&raw mut (*msg).msg_time, null_mut());
-        (*msg).msg_num = MESSAGE_NEXT + 1;
+        let mut msg_time = std::mem::zeroed();
+        gettimeofday(&raw mut msg_time, null_mut());
         MESSAGE_NEXT += 1;
-        (*msg).msg = s;
+        let msg = Box::into_raw(Box::new(message_entry {
+            msg: text,
+            msg_num: MESSAGE_NEXT,
+            msg_time,
+            entry: std::mem::zeroed(),
+        }));
 
         tailq_insert_tail(&raw mut MESSAGE_LOG, msg);
 
@@ -641,9 +643,9 @@ pub unsafe fn server_add_message_(args: std::fmt::Arguments) {
             if (*msg).msg_num + limit >= MESSAGE_NEXT {
                 continue;
             }
-            free_((*msg).msg);
             tailq_remove(&raw mut MESSAGE_LOG, msg);
-            free_(msg);
+            // Reclaim the boxed entry; its owned `msg` CString drops with it.
+            drop(Box::from_raw(msg));
         }
     }
 }

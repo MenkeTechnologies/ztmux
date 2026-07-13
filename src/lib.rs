@@ -366,6 +366,22 @@ const fn transmute_ptr<T>(value: Option<NonNull<T>>) -> *mut T {
     }
 }
 
+/// Convert an owned `String` into a `CString`, truncating at the first interior
+/// NUL so it mirrors C storing a `char *` that ends at the first NUL byte.
+/// Shared by the owned-`CString` struct fields that replaced raw `char *`.
+pub(crate) fn cstring_truncating(s: String) -> std::ffi::CString {
+    match std::ffi::CString::new(s) {
+        Ok(c) => c,
+        Err(e) => {
+            let n = e.nul_position();
+            let mut v = e.into_vec();
+            v.truncate(n);
+            // `v` now has no interior NUL, so this cannot fail.
+            std::ffi::CString::new(v).unwrap()
+        }
+    }
+}
+
 #[inline]
 const unsafe fn ptr_to_ref<'a, T>(value: *const T) -> Option<&'a T> {
     unsafe { if value.is_null() { None } else { Some(&*value) } }
@@ -1132,11 +1148,13 @@ impl crate::compat::queue::Entry<image, discr_entry> for image {
 }
 #[cfg(feature = "sixel")]
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 struct image {
     s: *mut screen,
     data: *mut sixel_image,
-    fallback: *mut u8,
+    /// Owned text placeholder (`image_fallback`); `None` until `image_store`
+    /// sets it. Drops with the boxed `image` — no manual `free()`.
+    fallback: Option<std::ffi::CString>,
     px: u32,
     py: u32,
     sx: u32,
@@ -1711,10 +1729,17 @@ bitflags::bitflags! {
 const ENVIRON_HIDDEN: environ_flags = environ_flags::ENVIRON_HIDDEN;
 
 /// Environment variable.
+///
+/// `name`/`value` are Rust-owned (`CString`) rather than raw `char *`: the
+/// entry owns its strings and frees them via `Drop` when the boxed node is
+/// dropped, so there is no manual `free()` to double-free — including in the
+/// fork child of `spawn`/`job`, which previously aborted libmalloc with
+/// `POINTER_BEING_FREED_WAS_NOT_ALLOCATED`. `value` is `None` for a cleared
+/// entry (C `NULL`). Read raw pointers via `name_ptr()`/`value_ptr()`.
 #[repr(C)]
 struct environ_entry {
-    name: Option<NonNull<u8>>,
-    value: Option<NonNull<u8>>,
+    name: std::ffi::CString,
+    value: Option<std::ffi::CString>,
 
     flags: environ_flags,
     entry: rb_entry<environ_entry>,
@@ -2029,7 +2054,8 @@ struct tty_ctx {
 impl_tailq_entry!(message_entry, entry, tailq_entry<message_entry>);
 #[repr(C)]
 struct message_entry {
-    msg: *mut u8,
+    /// Owned message text; drops with the boxed entry — no manual `free()`.
+    msg: std::ffi::CString,
     msg_num: u32,
     msg_time: timeval,
 
@@ -2578,7 +2604,8 @@ const KEY_BINDING_REPEAT: i32 = 0x1;
 struct key_binding {
     key: key_code,
     cmdlist: *mut cmd_list,
-    note: *mut u8,
+    /// Owned note text, `None` when unset; drops with the boxed binding.
+    note: Option<std::ffi::CString>,
 
     flags: i32,
 

@@ -525,8 +525,8 @@ unsafe fn window_customize_build_keys(
         let mut bd = key_bindings_first(kt);
         while !bd.is_null() {
             format_add!(ft, "key", "{}", _s(key_string_lookup_key((*bd).key, 0)),);
-            if !(*bd).note.is_null() {
-                format_add!(ft, "key_note", "{}", _s((*bd).note));
+            if (*bd).note.is_some() {
+                format_add!(ft, "key_note", "{}", _s((*bd).note_ptr()));
             }
             if !filter.is_null() {
                 let expanded = format_expand(ft, filter);
@@ -573,8 +573,8 @@ unsafe fn window_customize_build_keys(
             mode_tree_no_tag(mti);
             free_(text);
 
-            if !(*bd).note.is_null() {
-                text = format_nul!("#[ignore]{}", _s((*bd).note));
+            if (*bd).note.is_some() {
+                text = format_nul!("#[ignore]{}", _s((*bd).note_ptr()));
             } else {
                 text = xstrdup(c!("")).as_ptr();
             }
@@ -728,7 +728,7 @@ unsafe fn window_customize_draw_key(
             return;
         }
 
-        let mut note: *const u8 = (*bd).note;
+        let mut note: *const u8 = (*bd).note_ptr();
         if note.is_null() {
             note = c!("There is no note for this key.");
         }
@@ -1621,8 +1621,8 @@ pub unsafe fn window_customize_set_note_callback(
             return 0;
         }
 
-        free_((*bd).note);
-        (*bd).note = xstrdup(s).as_ptr();
+        // Assigning drops the old note CString — no manual free.
+        (*bd).note = Some(std::ffi::CStr::from_ptr(s.cast()).to_owned());
 
         mode_tree_build((*data).data);
         mode_tree_draw(&mut *(*data).data);
@@ -1697,10 +1697,10 @@ pub unsafe fn window_customize_set_key(
                 c,
                 null_mut(),
                 prompt,
-                if (*bd).note.is_null() {
+                if (*bd).note.is_none() {
                     c!("")
                 } else {
-                    (*bd).note
+                    (*bd).note_ptr()
                 },
                 window_customize_set_note_callback,
                 window_customize_free_item_callback,

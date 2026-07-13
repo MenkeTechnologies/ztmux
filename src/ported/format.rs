@@ -3974,7 +3974,7 @@ fn format_find(
                     envent = environ_find(GLOBAL_ENVIRON, key);
                 }
                 if !envent.is_null() && (*envent).value.is_some() {
-                    found = xstrdup((*envent).value.unwrap().as_ptr()).as_ptr();
+                    found = xstrdup((*envent).value_ptr()).as_ptr();
                     break 'found;
                 }
             }

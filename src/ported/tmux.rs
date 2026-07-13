@@ -152,7 +152,7 @@ unsafe fn expand_path(path: *const u8, home: Option<&CStr>) -> Option<CString> {
                 end = c!("");
             }
             return Some(
-                CString::new(format!("{}{}", _s(transmute_ptr((*value).value)), _s(end))).unwrap(),
+                CString::new(format!("{}{}", _s((*value).value_ptr()), _s(end))).unwrap(),
             );
         }
 

@@ -14,17 +14,32 @@
 use crate::*;
 use crate::options_::*;
 
+use std::ffi::{CStr, CString};
+
 pub type environ = rb_head<environ_entry>;
 RB_GENERATE!(environ, environ_entry, entry, discr_entry, environ_cmp);
 
+impl environ_entry {
+    /// Borrowed `char *` to the (always present) name.
+    #[inline]
+    pub(crate) fn name_ptr(&self) -> *const u8 {
+        self.name.as_ptr().cast()
+    }
+
+    /// Borrowed `char *` to the value, or NULL for a cleared entry — matches
+    /// C, where `envent->value` is `NULL` after `environ_clear`.
+    #[inline]
+    pub(crate) fn value_ptr(&self) -> *const u8 {
+        match &self.value {
+            Some(v) => v.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+}
+
 /// C `vendor/tmux/environ.c:37`: `static int environ_cmp(struct environ_entry *envent1, struct environ_entry *envent2)`
 pub fn environ_cmp(envent1: &environ_entry, envent2: &environ_entry) -> std::cmp::Ordering {
-    unsafe {
-        i32_to_ordering(libc::strcmp(
-            transmute_ptr(envent1.name),
-            transmute_ptr(envent2.name),
-        ))
-    }
+    unsafe { i32_to_ordering(libc::strcmp(envent1.name_ptr(), envent2.name_ptr())) }
 }
 
 /// C `vendor/tmux/environ.c:44`: `struct environ *environ_create(void)`
@@ -41,9 +56,8 @@ pub unsafe fn environ_free(env: *mut environ) {
     unsafe {
         for envent in rb_foreach(env).map(NonNull::as_ptr) {
             rb_remove(env, envent);
-            free_(transmute_ptr((*envent).name));
-            free_(transmute_ptr((*envent).value));
-            free_(envent);
+            // Reclaim the boxed node; its `CString` fields drop with it.
+            drop(Box::from_raw(envent));
         }
         free_(env);
     }
@@ -63,16 +77,16 @@ pub unsafe fn environ_next(envent: *mut environ_entry) -> *mut environ_entry {
 pub unsafe fn environ_copy(srcenv: *mut environ, dstenv: *mut environ) {
     unsafe {
         for envent in rb_foreach(srcenv).map(NonNull::as_ptr) {
-            if let Some(value) = (*envent).value {
+            if let Some(value) = (*envent).value.as_deref() {
                 environ_set!(
                     dstenv,
-                    (*envent).name.unwrap().as_ptr(),
+                    (*envent).name_ptr(),
                     (*envent).flags,
                     "{}",
-                    _s(value.as_ptr()),
+                    _s(value.as_ptr().cast::<u8>()),
                 );
             } else {
-                environ_clear(dstenv, transmute_ptr((*envent).name));
+                environ_clear(dstenv, (*envent).name_ptr());
             }
         }
     }
@@ -80,15 +94,9 @@ pub unsafe fn environ_copy(srcenv: *mut environ, dstenv: *mut environ) {
 
 /// C `vendor/tmux/environ.c:102`: `struct environ_entry *environ_find(struct environ *env, const char *name)`
 pub unsafe fn environ_find(env: *mut environ, name: *const u8) -> *mut environ_entry {
-    let mut envent: MaybeUninit<environ_entry> = MaybeUninit::uninit();
-    let envent = envent.as_mut_ptr();
-
-    unsafe {
-        (*envent).name = NonNull::new(name.cast_mut());
-        // std::ptr::write(&raw mut (*envent).name, name);
-    }
-
-    unsafe { rb_find(env, envent) }
+    // Search by a borrowed key (no throwaway node): `strcmp(name, node.name)`
+    // gives the key-vs-node ordering `rb_find_by` walks the tree with.
+    unsafe { rb_find_by(env, |n: &environ_entry| i32_to_ordering(libc::strcmp(name, n.name_ptr()))) }
 }
 
 macro_rules! environ_set {
@@ -104,19 +112,17 @@ pub unsafe fn environ_set_(
     args: std::fmt::Arguments,
 ) {
     unsafe {
-        let mut envent = environ_find(env, name);
-        let mut s = args.to_string();
-        s.push('\0');
-        let s = NonNull::new(s.leak().as_mut_ptr().cast());
+        let envent = environ_find(env, name);
+        let value = crate::cstring_truncating(args.to_string());
 
         if !envent.is_null() {
             (*envent).flags = flags;
-            free_(transmute_ptr((*envent).value));
-            (*envent).value = s;
+            // Assigning the new value drops the old `CString` — no manual free.
+            (*envent).value = Some(value);
         } else {
-            envent = Box::leak(Box::new(environ_entry {
-                name : Some(xstrdup(name).cast()),
-                value: s,
+            let envent = Box::into_raw(Box::new(environ_entry {
+                name: CStr::from_ptr(name.cast()).to_owned(),
+                value: Some(value),
                 flags,
                 entry: rb_entry::default(),
             }));
@@ -128,13 +134,13 @@ pub unsafe fn environ_set_(
 /// C `vendor/tmux/environ.c:135`: `void environ_clear(struct environ *env, const char *name)`
 pub unsafe fn environ_clear(env: *mut environ, name: *const u8) {
     unsafe {
-        let mut envent = environ_find(env, name);
+        let envent = environ_find(env, name);
         if !envent.is_null() {
-            free_(transmute_ptr((*envent).value));
+            // Dropping the old value (setting None) frees it — no manual free.
             (*envent).value = None;
         } else {
-            envent = Box::leak(Box::new(environ_entry {
-                name : Some(xstrdup(name).cast()),
+            let envent = Box::into_raw(Box::new(environ_entry {
+                name: CStr::from_ptr(name.cast()).to_owned(),
                 value: None,
                 flags: environ_flags::empty(),
                 entry: rb_entry::default(),
@@ -147,17 +153,17 @@ pub unsafe fn environ_clear(env: *mut environ, name: *const u8) {
 /// C `vendor/tmux/environ.c:153`: `void environ_put(struct environ *env, const char *var, int flags)`
 pub unsafe fn environ_put(env: *mut environ, var: *const u8, flags: environ_flags) {
     unsafe {
-        let mut value = libc::strchr(var, b'=' as c_int);
+        let value = libc::strchr(var, b'=' as c_int);
         if value.is_null() {
             return;
         }
-        value = value.add(1);
 
-        let name: *mut u8 = xstrdup(var).cast().as_ptr();
-        *name.add(libc::strcspn(name, c!("="))) = b'\0';
+        // Name is the prefix before the first '=' (strcspn stops at '=' or
+        // NUL, so the slice never contains NUL — CString::new cannot fail).
+        let n = libc::strcspn(var, c!("="));
+        let name = CString::new(std::slice::from_raw_parts(var, n)).unwrap();
 
-        environ_set!(env, name, flags, "{}", _s(value));
-        free_(name);
+        environ_set!(env, name.as_ptr().cast::<u8>(), flags, "{}", _s(value.add(1)));
     }
 }
 
@@ -169,9 +175,8 @@ pub unsafe fn environ_unset(env: *mut environ, name: *const u8) {
             return;
         }
         rb_remove(env, envent);
-        free_(transmute_ptr((*envent).name));
-        free_(transmute_ptr((*envent).value));
-        free_(envent);
+        // Reclaim the boxed node; its `CString` fields drop with it.
+        drop(Box::from_raw(envent));
     }
 }
 
@@ -189,13 +194,13 @@ pub unsafe fn environ_update(oo: *mut options, src: *mut environ, dst: *mut envi
             let ov = options_array_item_value(a);
             found = false;
             for envent in rb_foreach(src).map(NonNull::as_ptr) {
-                if libc::fnmatch((*ov).string, transmute_ptr((*envent).name), 0) == 0 {
+                if libc::fnmatch((*ov).string, (*envent).name_ptr(), 0) == 0 {
                     environ_set!(
                         dst,
-                        transmute_ptr((*envent).name),
+                        (*envent).name_ptr(),
                         environ_flags::empty(),
                         "{}",
-                        _s(transmute_ptr((*envent).value)),
+                        _s((*envent).value_ptr()),
                     );
                     found = true;
                 }
@@ -214,7 +219,7 @@ pub unsafe fn environ_push(env: *mut environ) {
         environ = xcalloc_::<*mut u8>(1).as_ptr();
         for envent in rb_foreach(env).map(NonNull::as_ptr) {
             if (*envent).value.is_some()
-                && *(*envent).name.unwrap().as_ptr() != b'\0'
+                && *(*envent).name_ptr() != b'\0'
                 && !(*envent).flags.intersects(ENVIRON_HIDDEN)
             {
                 // Called only in the forked child before exec (job.rs, spawn.rs).
@@ -222,8 +227,8 @@ pub unsafe fn environ_push(env: *mut environ) {
                 // std::env::set_var, which takes std's ENV_LOCK - a lock that is
                 // not reset across fork() and would deadlock/abort the child.
                 ::libc::setenv(
-                    (*envent).name.unwrap().as_ptr().cast(),
-                    (*envent).value.unwrap().as_ptr().cast(),
+                    (*envent).name_ptr().cast(),
+                    (*envent).value_ptr().cast(),
                     1,
                 );
             }
@@ -243,12 +248,12 @@ pub unsafe fn environ_log_(env: *mut environ, args: std::fmt::Arguments) {
         let prefix = args.to_string();
 
         for envent in rb_foreach(env).map(NonNull::as_ptr) {
-            if (*envent).value.is_some() && *(*envent).name.unwrap().as_ptr() != b'\0' {
+            if (*envent).value.is_some() && *(*envent).name_ptr() != b'\0' {
                 log_debug!(
                     "{}{}={}",
                     prefix,
-                    _s(transmute_ptr((*envent).name)),
-                    _s(transmute_ptr((*envent).value))
+                    _s((*envent).name_ptr()),
+                    _s((*envent).value_ptr())
                 );
             }
         }
@@ -318,20 +323,13 @@ mod tests {
     use super::*;
 
     // Build a throwaway entry keyed by `name` (value unset) so environ_cmp can be
-    // exercised directly. Free with `free_entry`.
+    // exercised directly. The owned `CString` name drops with the entry.
     unsafe fn make_entry(name: *const u8) -> environ_entry {
         environ_entry {
-            name: Some(unsafe { xstrdup(name) }),
+            name: unsafe { CStr::from_ptr(name.cast()).to_owned() },
             value: None,
             flags: environ_flags::empty(),
             entry: rb_entry::default(),
-        }
-    }
-
-    unsafe fn free_entry(e: &environ_entry) {
-        unsafe {
-            free_(transmute_ptr(e.name));
-            free_(transmute_ptr(e.value));
         }
     }
 
@@ -343,7 +341,7 @@ mod tests {
             if e.is_null() || (*e).value.is_none() {
                 None
             } else {
-                Some(cstr_to_str(transmute_ptr((*e).value)).to_string())
+                Some(cstr_to_str((*e).value_ptr()).to_string())
             }
         }
     }
@@ -354,7 +352,7 @@ mod tests {
             let mut out = Vec::new();
             let mut e = environ_first(env);
             while !e.is_null() {
-                out.push(cstr_to_str(transmute_ptr((*e).name)).to_string());
+                out.push(cstr_to_str((*e).name_ptr()).to_string());
                 e = environ_next(e);
             }
             out
@@ -492,10 +490,7 @@ mod tests {
             assert_eq!(environ_cmp(&a, &b), std::cmp::Ordering::Less);
             assert_eq!(environ_cmp(&b, &a), std::cmp::Ordering::Greater);
             assert_eq!(environ_cmp(&a, &a2), std::cmp::Ordering::Equal);
-
-            free_entry(&a);
-            free_entry(&b);
-            free_entry(&a2);
+            // a/b/a2 drop here, freeing their owned names.
         }
     }
 

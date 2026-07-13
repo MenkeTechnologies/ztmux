@@ -66,7 +66,7 @@ pub unsafe fn cmd_find_inside_pane(c: *mut client) -> *mut window_pane {
         if wp.is_null() {
             let envent = environ_find((*c).environ, c!("TMUX_PANE"));
             if !envent.is_null() {
-                wp = window_pane_find_by_id_str(cstr_to_str(transmute_ptr((*envent).value)));
+                wp = window_pane_find_by_id_str(cstr_to_str((*envent).value_ptr()));
             }
         }
         if !wp.is_null() {

@@ -1094,10 +1094,9 @@ unsafe fn yylex_token_variable(ps: &mut cmd_parse_state, buf: &mut Vec<u8>) -> b
 
         let envent = environ_find(GLOBAL_ENVIRON, (&raw const name).cast());
         if !envent.is_null() && (*envent).value.is_some() {
-            let value = (*envent).value;
             // log_debug("%s: %s -> %s", __func__, name, value);
-            let value_ptr: *const u8 = transmute_ptr(value);
-            let value_len = libc::strlen(transmute_ptr(value));
+            let value_ptr: *const u8 = (*envent).value_ptr();
+            let value_len = libc::strlen(value_ptr);
             yylex_append(buf, core::slice::from_raw_parts(value_ptr, value_len));
         }
         true
@@ -1129,8 +1128,8 @@ unsafe fn yylex_token_tilde(ps: &mut cmd_parse_state, buf: &mut Vec<u8>) -> bool
 
         if name[0] == b'\0' {
             let envent = environ_find(GLOBAL_ENVIRON, c!("HOME"));
-            if !envent.is_null() && (*(*envent).value.unwrap().as_ptr()) != b'\0' {
-                home = transmute_ptr((*envent).value);
+            if !envent.is_null() && (*envent).value.is_some() && *(*envent).value_ptr() != b'\0' {
+                home = (*envent).value_ptr();
             } else if let Some(pw) = NonNull::new(libc::getpwuid(libc::getuid())) {
                 home = (*pw.as_ptr()).pw_dir.cast();
             }

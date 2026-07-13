@@ -31,8 +31,8 @@ unsafe fn image_free(im: NonNull<image>) {
 
         tailq_remove::<_, discr_entry>(&raw mut (*s).images, im);
         crate::image_sixel::sixel_free((*im).data);
-        free_((*im).fallback);
-        free_(im);
+        // Reclaim the boxed image; its owned `fallback` CString drops with it.
+        drop(Box::from_raw(im));
     }
 }
 
@@ -92,14 +92,14 @@ pub unsafe fn image_store(s: *mut screen, si: *mut sixel_image) -> *mut image {
             py: (*s).cy,
             sx: 0,
             sy: 0,
-            fallback: null_mut(),
+            fallback: None,
             all_entry: zeroed(),
             entry: zeroed(),
         });
 
         (im.sx, im.sy) = crate::image_sixel::sixel_size_in_cells(&*si);
 
-        im.fallback = image_fallback(im.sx, im.sy).into_raw().cast();
+        im.fallback = Some(image_fallback(im.sx, im.sy));
 
         tailq_insert_tail::<image, discr_entry>(&raw mut (*s).images, &mut *im);
         tailq_insert_tail::<image, discr_all_entry>(&raw mut ALL_IMAGES, &mut *im);
@@ -182,10 +182,9 @@ pub unsafe fn image_scroll_up(s: *mut screen, lines: u32) -> bool {
             ((*im.as_ptr()).sx, (*im.as_ptr()).sy) =
                 crate::image_sixel::sixel_size_in_cells(&*(*im.as_ptr()).data);
 
-            free_((*im.as_ptr()).fallback);
-            (*im.as_ptr()).fallback = image_fallback((*im.as_ptr()).sx, (*im.as_ptr()).sy)
-                .into_raw()
-                .cast();
+            // Assigning the new placeholder drops the old CString — no free.
+            (*im.as_ptr()).fallback =
+                Some(image_fallback((*im.as_ptr()).sx, (*im.as_ptr()).sy));
             redraw = true;
         }
         redraw
@@ -359,7 +358,7 @@ mod tests {
             assert_eq!((*im).sy, esy);
             assert_eq!(((*im).sx, (*im).sy), (2, 2));
             assert_eq!((*im).s, s);
-            assert!(!(*im).fallback.is_null());
+            assert!((*im).fallback.is_some());
             assert_eq!(image_count(s), 1);
 
             // Now that an image is attached, image_free_all reports a redraw
@@ -469,7 +468,7 @@ mod tests {
             assert!(image_scroll_up(s, 1));
             assert_eq!(image_count(s), 1);
             assert_eq!((*im).py, 0);
-            assert!(!(*im).fallback.is_null());
+            assert!((*im).fallback.is_some());
 
             teardown(s);
         }
