@@ -2100,7 +2100,10 @@ impl_tailq_entry!(args_value, entry, tailq_entry<args_value>);
 struct args_value {
     type_: args_type,
     union_: args_value_union,
-    cached: *mut u8,
+    /// Lazily-computed cache of the printed command list; `None` until first
+    /// `args_value_as_string`. Dropped in `args_free_value`. `args_copy_value`
+    /// leaves it `None` on the (zeroed) target. Read via `cached_ptr()`.
+    cached: Option<std::ffi::CString>,
     // #[entry]
     entry: tailq_entry<args_value>,
 }

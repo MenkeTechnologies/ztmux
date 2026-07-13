@@ -84,16 +84,28 @@ pub fn args_type_to_string(type_: args_type) -> &'static str {
 }
 
 /// C `vendor/tmux/arguments.c:119`: `static const char *args_value_as_string(struct args_value *value)`
+impl args_value {
+    #[inline]
+    pub(crate) fn cached_ptr(&self) -> *const u8 {
+        match &self.cached {
+            Some(c) => c.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+}
+
 pub unsafe fn args_value_as_string(value: *mut args_value) -> *const u8 {
     unsafe {
         match (*value).type_ {
             args_type::ARGS_NONE => c!(""),
             args_type::ARGS_STRING => (*value).union_.string,
             args_type::ARGS_COMMANDS => {
-                if (*value).cached.is_null() {
-                    (*value).cached = cmd_list_print(&*(*value).union_.cmdlist, 0);
+                if (*value).cached.is_none() {
+                    (*value).cached = Some(std::ffi::CString::from_raw(
+                        cmd_list_print(&*(*value).union_.cmdlist, 0).cast(),
+                    ));
                 }
-                (*value).cached
+                (*value).cached_ptr()
             }
         }
     }
@@ -436,7 +448,7 @@ pub unsafe fn args_free_value(value: *mut args_value) {
             args_type::ARGS_STRING => free_((*value).union_.string),
             args_type::ARGS_COMMANDS => cmd_list_free((*value).union_.cmdlist),
         }
-        free_((*value).cached);
+        (*value).cached = None;
     }
 }
 
