@@ -255,19 +255,16 @@ pub unsafe fn options_get_only(oo: *mut options, name: &str) -> *mut options_ent
         if oo.is_null() {
             return null_mut();
         }
-        let name = std::mem::transmute::<&str, &'static str>(name);
-        let mut o = options_entry {
-            name: Cow::Borrowed(name),
-            ..zeroed() // TODO use uninit
-        };
-
-        let found = rb_find(&raw mut (*oo).tree, &raw const o);
-        if found.is_null() {
-            o.name = Cow::Borrowed(options_map_name(name).unwrap_or(name));
-            rb_find(&raw mut (*oo).tree, &o)
-        } else {
-            found
+        // C builds a throwaway stack `struct options_entry` as the RB_FIND key. Here
+        // `name` is an owned Cow, so `options_entry { name, ..zeroed() }` constructs a
+        // whole zeroed entry and drops its (invalid) Cow — the same trap as the other
+        // key structs. Search by key instead: same descent, no key node.
+        let found = rb_find_by(&raw mut (*oo).tree, |o| name.cmp(&o.name));
+        if !found.is_null() {
+            return found;
         }
+        let mapped = options_map_name(name).unwrap_or(name);
+        rb_find_by(&raw mut (*oo).tree, |o| mapped.cmp(&o.name))
     }
 }
 // consider to remove this one or the other
@@ -471,8 +468,10 @@ unsafe fn options_remove(o: *mut options_entry) {
             options_value_free(o, &mut (*o).value);
         }
         rb_remove(&mut (*oo).tree, o);
-        (*o).name = Cow::Borrowed("");
-        free_(o);
+        // Dropping the Box frees the owned name, which C did with free(o->name).
+        // free_(o) skipped Drop entirely, which is why the name had to be cleared by
+        // assignment first.
+        drop(Box::from_raw(o));
     }
 }
 
@@ -494,11 +493,7 @@ pub unsafe fn options_table_entry(o: *mut options_entry) -> *const options_table
 /// C `vendor/tmux/options.c:381`: `static struct options_array_item *options_array_item(struct options_entry *o, u_int idx)`
 unsafe fn options_array_item(o: *mut options_entry, idx: c_uint) -> *mut options_array_item {
     unsafe {
-        let mut a = options_array_item {
-            index: idx,
-            ..zeroed() // TODO use uninit
-        };
-        rb_find(&raw mut (*o).value.array, &raw mut a)
+        rb_find_by(&raw mut (*o).value.array, |a| idx.cmp(&a.index))
     }
 }
 

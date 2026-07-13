@@ -139,8 +139,6 @@ pub unsafe fn paste_get_top(name: *mut Option<&str>) -> *mut paste_buffer {
 /// C `vendor/tmux/paste.c:125`: `struct paste_buffer *paste_get_name(const char *name)`
 pub unsafe fn paste_get_name(name: Option<&str>) -> *mut paste_buffer {
     unsafe {
-        let mut pbfind = MaybeUninit::<paste_buffer>::uninit();
-
         let Some(name) = name else {
             return null_mut();
         };
@@ -148,17 +146,9 @@ pub unsafe fn paste_get_name(name: Option<&str>) -> *mut paste_buffer {
             return null_mut();
         }
 
-        // `pbfind` is uninitialized, so a normal `= ` assignment would drop the
-        // garbage `Cow` currently in the `name` field (freeing a random pointer
-        // when the uninit discriminant reads as `Owned`). Write it in place with
-        // ptr::write, which does not drop the previous (uninit) value. rb_find
-        // only reads this field via the name comparator, so leaving the rest of
-        // the struct uninitialized is fine.
-        std::ptr::write(
-            &raw mut (*pbfind.as_mut_ptr()).name,
-            Cow::Borrowed(std::mem::transmute::<&str, &'static str>(name)),
-        );
-        rb_find::<_, discr_name_entry>(&raw mut PASTE_BY_NAME, pbfind.as_ptr())
+        // C uses a throwaway stack `struct paste_buffer` as the RB_FIND key. `name` is
+        // an owned Cow here, so search by key instead of fabricating one.
+        rb_find_by::<_, discr_name_entry, _>(&raw mut PASTE_BY_NAME, |pb| name.cmp(&pb.name))
     }
 }
 

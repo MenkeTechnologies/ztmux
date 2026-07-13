@@ -47,13 +47,10 @@ pub unsafe fn session_alive(s: *mut session) -> bool {
 /// Find session by name.
 /// C `vendor/tmux/session.c:72`: `struct session *session_find(const char *name)`
 pub unsafe fn session_find(name: &str) -> *mut session {
-    let mut s = MaybeUninit::<session>::uninit();
-    let s = s.as_mut_ptr();
-
-    unsafe {
-        std::ptr::write(&raw mut (*s).name, Cow::Borrowed(std::mem::transmute::<&str, &'static str>(name)));
-        rb_find(&raw mut SESSIONS, s)
-    }
+    // C uses a throwaway stack `struct session` as the RB_FIND key. `name` is an owned
+    // Cow here, so no valid key struct can be fabricated without writing every field.
+    // Search by key instead: same descent, no key node.
+    unsafe { rb_find_by(&raw mut SESSIONS, |s| name.cmp(&s.name)) }
 }
 
 /// Find session by id parsed from a string.
@@ -638,8 +635,14 @@ pub unsafe fn session_group_new(name: &str) -> *mut session_group {
             return sg;
         }
 
-        sg = xcalloc1::<session_group>();
-        (*sg).name = name.to_string().into();
+        // xcalloc leaves `name` an all-zero Cow, and the assignment that follows would
+        // drop that invalid value. Build the group through Box so every field starts out
+        // valid, and let Drop free the name.
+        sg = Box::into_raw(Box::new(session_group {
+            name: Cow::Owned(name.to_string()),
+            sessions: zeroed(),
+            entry: zeroed(),
+        }));
         tailq_init(&raw mut (*sg).sessions);
 
         rb_insert(&raw mut SESSION_GROUPS, sg);

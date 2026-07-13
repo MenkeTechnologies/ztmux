@@ -23,7 +23,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Field types that carry a non-null (or otherwise non-zero) validity invariant.
-const RUST_INVARIANT_TYPES: &[&str] = &["Vec<", "String", "CString", "Box<"];
+///
+/// `Cow` is here because its `Borrowed` arm holds a reference, which may not be null:
+/// zeroing one produces a value the type cannot hold, and the struct-update form
+/// `T { field: x, ..zeroed() }` then *drops* it, since the un-named fields of the
+/// zeroed temporary are discarded.
+const RUST_INVARIANT_TYPES: &[&str] = &["Vec<", "String", "CString", "Box<", "Cow<"];
 
 fn rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
@@ -139,8 +144,11 @@ fn structs_with_rust_fields_are_never_c_allocated() {
 
     let mut violations = Vec::new();
     for (path, text) in &sources {
-        for (i, raw) in text.lines().enumerate() {
-            let line = code(raw);
+        let lines: Vec<&str> = text.lines().map(code).collect();
+
+        for (i, line) in lines.iter().enumerate() {
+            let rel = path.strip_prefix(&root).unwrap_or(path).display();
+
             // Only lines that allocate or zero-fill can violate; skip the rest cheaply.
             if !(line.contains("xcalloc")
                 || line.contains("zeroed")
@@ -148,13 +156,33 @@ fn structs_with_rust_fields_are_never_c_allocated() {
             {
                 continue;
             }
+
             for (pattern, name) in &patterns {
                 if line.contains(pattern.as_str()) {
-                    let rel = path.strip_prefix(&root).unwrap_or(path).display();
                     violations.push(format!(
                         "src/{rel}:{}: `{name}` holds a Rust type with a non-null \
                          invariant but is allocated C-style (`{pattern}`). \
                          Build it with Box::new(..) and free it with Box::from_raw.",
+                        i + 1
+                    ));
+                }
+            }
+
+            // `T { field: x, ..zeroed() }` builds a whole zeroed `T` and then drops the
+            // fields it does not take — including the invariant-carrying ones. The
+            // struct name sits on an earlier line, so look back for it.
+            if line.contains("..zeroed()") || line.contains("..unsafe { zeroed() }") {
+                let start = i.saturating_sub(12);
+                if let Some(name) = guarded.iter().find(|name| {
+                    lines[start..=i]
+                        .iter()
+                        .any(|l| l.contains(&format!("{name} {{")))
+                }) {
+                    violations.push(format!(
+                        "src/{rel}:{}: `{name}` holds a Rust type with a non-null \
+                         invariant, so `..zeroed()` builds and then drops an invalid \
+                         value. Write every field out, or search with rb_find_by instead \
+                         of fabricating a key struct.",
                         i + 1
                     ));
                 }
