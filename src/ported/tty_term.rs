@@ -395,7 +395,7 @@ pub unsafe fn tty_term_apply(term: *mut tty_term, capabilities: &str, quiet: i32
         let mut value;
         let mut s;
 
-        let name = (*term).name;
+        let name = (*term).name_ptr();
 
         while {
             s = tty_term_override_next(capabilities, &raw mut offset);
@@ -489,7 +489,7 @@ pub unsafe fn tty_term_apply_overrides(term: *mut tty_term) {
 
             offset = 0;
             first = tty_term_override_next(cstr_to_str(s), &raw mut offset);
-            if !first.is_null() && fnmatch(first, (*term).name, 0) == 0 {
+            if !first.is_null() && fnmatch(first, (*term).name_ptr(), 0) == 0 {
                 tty_term_apply(term, cstr_to_str(s.add(offset)), 0);
             }
             a = options_array_next(a);
@@ -582,6 +582,16 @@ pub unsafe fn tty_term_apply_overrides(term: *mut tty_term) {
 }
 
 /// C `vendor/tmux/tty-term.c:525`: `struct tty_term *tty_term_create(struct tty *tty, char *name, char **caps, u_int ncaps, int *feat, char **cause)`
+impl tty_term {
+    #[inline]
+    pub(crate) fn name_ptr(&self) -> *const u8 {
+        match &self.name {
+            Some(c) => c.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
+}
+
 pub unsafe fn tty_term_create(
     tty: *mut tty,
     name: *mut u8,
@@ -594,7 +604,7 @@ pub unsafe fn tty_term_create(
         log_debug!("adding term {}", _s(name));
         let term = xcalloc1::<tty_term>() as *mut tty_term;
         (*term).tty = tty;
-        (*term).name = xstrdup(name).as_ptr();
+        (*term).name = Some(std::ffi::CStr::from_ptr(name.cast()).to_owned());
         (*term).codes = xcalloc_(tty_term_ncodes() as usize).as_ptr();
         (*term).expand_context = ExpandContext::new();
         list_insert_head(&raw mut TTY_TERMS, term);
@@ -653,7 +663,7 @@ pub unsafe fn tty_term_create(
 
                 let mut offset = 0;
                 let first = tty_term_override_next(cstr_to_str(s), &raw mut offset);
-                if !first.is_null() && fnmatch(first, (*term).name, 0) == 0 {
+                if !first.is_null() && fnmatch(first, (*term).name_ptr(), 0) == 0 {
                     tty_add_features(feat, cstr_to_str(s.add(offset)), c!(":"));
                 }
                 a = options_array_next(a);
@@ -723,7 +733,7 @@ pub unsafe fn tty_term_create(
 /// C `vendor/tmux/tty-term.c:672`: `void tty_term_free(struct tty_term *term)`
 pub unsafe fn tty_term_free(term: *mut tty_term) {
     unsafe {
-        log_debug!("removing term {}", _s((*term).name));
+        log_debug!("removing term {}", _s((*term).name_ptr()));
 
         for i in 0..tty_term_ncodes() as usize {
             if (*(*term).codes.add(i)).type_ == tty_code_type::String {
@@ -733,7 +743,7 @@ pub unsafe fn tty_term_free(term: *mut tty_term) {
         free_((*term).codes);
 
         list_remove(term);
-        free_((*term).name);
+        (*term).name = None;
         free_(term);
     }
 }

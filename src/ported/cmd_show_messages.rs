@@ -52,7 +52,7 @@ unsafe fn cmd_show_messages_terminals(
                 item,
                 "Terminal {}: {} for {}, flags=0x{:x}:",
                 n,
-                _s((*term).name),
+                _s((*term).name_ptr()),
                 _s((*(*(*term).tty).client).name),
                 (*term).flags,
             );

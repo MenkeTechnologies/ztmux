@@ -1910,7 +1910,8 @@ bitflags::bitflags! {
 /// Terminal definition.
 #[repr(C)]
 struct tty_term {
-    name: *mut u8,
+    /// Owned terminal name; dropped in `tty_term_free`. Read via `name_ptr()`.
+    name: Option<std::ffi::CString>,
     tty: *mut tty,
     features: i32,
 
