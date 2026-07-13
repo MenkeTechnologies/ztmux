@@ -4974,13 +4974,11 @@ pub unsafe fn format_replace(
         let ft = (*es).ft;
         let wp = (*ft).wp;
         let mut copy: *const u8;
-        let cp: *const u8;
         let mut marker: *const u8 = null();
 
         let mut time_format: *const u8 = null();
 
         let copy0: *mut u8;
-        let condition: *mut u8;
         let mut found: *mut u8;
         let mut new: *mut u8;
         let mut value: *mut u8 = null_mut();
@@ -5442,65 +5440,89 @@ pub unsafe fn format_replace(
                     free_(right);
                     free_(left);
                 } else if *copy == b'?' {
-                    // Conditional: check first and choose second or third.
-                    cp = format_skip1(es, copy.add(1), c!(","));
-                    if cp.is_null() {
-                        format_log1!(es, __func__, "condition syntax error: {}", _s(copy.add(1)),);
-                        break 'fail;
-                    }
-                    condition =
-                        xstrndup(copy.add(1), cp.offset_from(copy.add(1)) as usize).as_ptr();
-                    format_log1!(es, __func__, "condition is: {}", _s(condition));
-
-                    found = format_find(ft, condition, modifiers, time_format);
-                    if found.is_null() {
-                        // If the condition not found, try to expand it. If
-                        // the expansion doesn't have any effect, then assume
-                        // false.
-                        found = format_expand1(es, condition);
-                        if strcmp(found, condition) == 0 {
-                            free_(found);
-                            found = xstrdup(c!("")).as_ptr();
+                    // Conditional: for each pair of (condition, value), check the
+                    // condition and return the value if true. If no condition matches,
+                    // return the last unpaired arg if there is one, or the empty string
+                    // if not. The port previously handled only a single
+                    // (condition, true, false) triple, so `#{?a}` gave "" instead of "a"
+                    // and `#{?0,a,1,b,c}` gave "1,b,c" instead of "c".
+                    // `cp`/`condition` are declared immutable at the top of
+                    // format_replace for the other branches; shadow them here.
+                    let mut cp = copy.add(1);
+                    loop {
+                        let mut cp2 = format_skip1(es, cp, c!(","));
+                        if cp2.is_null() {
                             format_log1!(
                                 es,
                                 __func__,
-                                "condition '{}' not found; assuming false",
+                                "no condition matched in '{}'; using last arg",
+                                _s(copy.add(1)),
+                            );
+                            value = format_expand1(es, cp);
+                            break;
+                        }
+
+                        let condition = xstrndup(cp, cp2.offset_from(cp) as usize).as_ptr();
+                        format_log1!(es, __func__, "condition is: {}", _s(condition));
+
+                        found = format_find(ft, condition, modifiers, time_format);
+                        if found.is_null() {
+                            // If the condition is not found, try to expand it. If the
+                            // expansion doesn't have any effect, then assume false.
+                            found = format_expand1(es, condition);
+                            if strcmp(found, condition) == 0 {
+                                free_(found);
+                                found = xstrdup(c!("")).as_ptr();
+                                format_log1!(
+                                    es,
+                                    __func__,
+                                    "condition '{}' not found; assuming false",
+                                    _s(condition),
+                                );
+                            }
+                        } else {
+                            format_log1!(
+                                es,
+                                __func__,
+                                "condition '{}' found: {}",
                                 _s(condition),
+                                _s(found),
                             );
                         }
-                    } else {
-                        format_log1!(
-                            es,
-                            __func__,
-                            "condition '{}' found: {}",
-                            _s(condition),
-                            _s(found),
-                        );
-                    }
 
-                    if format_choose(es, cp.add(1), &raw mut left, &raw mut right, 0) != 0 {
-                        format_log1!(
-                            es,
-                            __func__,
-                            "condition '{}' syntax error: {}",
-                            _s(condition),
-                            _s(cp.add(1)),
-                        );
-                        free_(found);
-                        break 'fail;
-                    }
-                    if format_true(found) {
-                        format_log1!(es, __func__, "condition '{}' is true", _s(condition));
-                        value = format_expand1(es, left);
-                    } else {
+                        cp = cp2.add(1);
+                        cp2 = format_skip1(es, cp, c!(","));
+                        if format_true(found) {
+                            format_log1!(es, __func__, "condition '{}' is true", _s(condition));
+                            if cp2.is_null() {
+                                value = format_expand1(es, cp);
+                            } else {
+                                right = xstrndup(cp, cp2.offset_from(cp) as usize).as_ptr();
+                                value = format_expand1(es, right);
+                                free_(right);
+                            }
+                            free_(condition);
+                            free_(found);
+                            break;
+                        }
                         format_log1!(es, __func__, "condition '{}' is false", _s(condition));
-                        value = format_expand1(es, right);
-                    }
-                    free_(right);
-                    free_(left);
 
-                    free_(condition);
-                    free_(found);
+                        free_(condition);
+                        free_(found);
+
+                        if cp2.is_null() {
+                            format_log1!(
+                                es,
+                                __func__,
+                                "no condition matched in '{}'; using empty string",
+                                _s(copy.add(1)),
+                            );
+                            value = xstrdup(c!("")).as_ptr();
+                            break;
+                        }
+
+                        cp = cp2.add(1);
+                    }
                 } else if !mexp.is_null() {
                     value = format_replace_expression(mexp, es, copy);
                     if value.is_null() {
