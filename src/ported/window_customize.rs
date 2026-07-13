@@ -505,7 +505,7 @@ unsafe fn window_customize_build_keys(
     unsafe {
         let tag: u64 = (1u64 << 62) | ((number as u64) << 54) | 1;
 
-        let title: *mut u8 = format_nul!("Key Table - {}", _s((*kt).name));
+        let title: *mut u8 = format_nul!("Key Table - {}", _s((*kt).name_ptr()));
         let top = mode_tree_add(
             (*data).data,
             null_mut(),
@@ -540,7 +540,7 @@ unsafe fn window_customize_build_keys(
 
             let item = window_customize_add_item(data);
             (*item).scope = window_customize_scope::WINDOW_CUSTOMIZE_KEY;
-            (*item).table = xstrdup((*kt).name).as_ptr();
+            (*item).table = xstrdup((*kt).name_ptr()).as_ptr();
             (*item).key = (*bd).key;
             (*item).name = xstrdup(key_string_lookup_key((*item).key, 0)).as_ptr();
             (*item).idx = -1;
@@ -761,7 +761,7 @@ unsafe fn window_customize_draw_key(
             0,
             &raw const GRID_DEFAULT_CELL,
             "This key is in the {} table.",
-            _s((*kt).name),
+            _s((*kt).name_ptr()),
         ) {
             return;
         }
@@ -1730,7 +1730,7 @@ pub unsafe fn window_customize_unset_key(
             mode_tree_collapse_current((*data).data);
             mode_tree_up((*data).data, 0);
         }
-        key_bindings_remove((*kt).name, (*bd).key);
+        key_bindings_remove((*kt).name_ptr(), (*bd).key);
     }
 }
 
@@ -1755,7 +1755,7 @@ pub unsafe fn window_customize_reset_key(
             mode_tree_collapse_current((*data).data);
             mode_tree_up((*data).data, 0);
         }
-        key_bindings_reset((*kt).name, (*bd).key);
+        key_bindings_reset((*kt).name_ptr(), (*bd).key);
     }
 }
 

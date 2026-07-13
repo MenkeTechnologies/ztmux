@@ -1168,7 +1168,7 @@ unsafe fn hint_layout(c: *mut client) -> Option<HintLayout> {
         if chips.is_empty() {
             return None;
         }
-        let table = strip_markup(crate::cstr_to_str((*(*c).keytable).name));
+        let table = strip_markup(crate::cstr_to_str((*(*c).keytable).name_ptr()));
 
         // Greedy-pack chips ("key note") into rows no wider than the inner box.
         let gap = 2usize;

@@ -235,7 +235,7 @@ unsafe fn cmd_list_keys_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
             keywidth = 0;
             table = key_bindings_first_table();
             while !table.is_null() {
-                if !tablename.is_null() && strcmp((*table).name, tablename) != 0 {
+                if !tablename.is_null() && strcmp((*table).name_ptr(), tablename) != 0 {
                     table = key_bindings_next_table(table);
                     continue;
                 }
@@ -251,7 +251,7 @@ unsafe fn cmd_list_keys_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
                         repeat = 1;
                     }
 
-                    width = utf8_cstrwidth((*table).name) as _;
+                    width = utf8_cstrwidth((*table).name_ptr()) as _;
                     if width > tablewidth {
                         tablewidth = width;
                     }
@@ -271,7 +271,7 @@ unsafe fn cmd_list_keys_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
 
             table = key_bindings_first_table();
             while !table.is_null() {
-                if !tablename.is_null() && strcmp((*table).name, tablename) != 0 {
+                if !tablename.is_null() && strcmp((*table).name_ptr(), tablename) != 0 {
                     table = key_bindings_next_table(table);
                     continue;
                 }
@@ -294,7 +294,7 @@ unsafe fn cmd_list_keys_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
                     let mut tmpused: usize =
                         xsnprintf_!(tmp.as_ptr(), tmpsize, "{}-T ", r).unwrap() as _;
 
-                    let mut cp = utf8_padcstr((*table).name, tablewidth as _);
+                    let mut cp = utf8_padcstr((*table).name_ptr(), tablewidth as _);
                     let mut cplen = strlen(cp) + 1;
                     while tmpused + cplen + 1 >= tmpsize {
                         tmpsize *= 2;

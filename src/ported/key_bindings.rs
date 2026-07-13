@@ -101,7 +101,15 @@ static mut KEY_TABLES: key_tables = rb_initializer();
 
 /// C `vendor/tmux/key-bindings.c:81`: `static int key_table_cmp(struct key_table *table1, struct key_table *table2)`
 pub fn key_table_cmp(table1: &key_table, table2: &key_table) -> cmp::Ordering {
-    unsafe { i32_to_ordering(strcmp(table1.name, table2.name)) }
+    unsafe { i32_to_ordering(strcmp(table1.name_ptr(), table2.name_ptr())) }
+}
+
+impl key_table {
+    /// Borrowed `char *` to the (always present) table name.
+    #[inline]
+    pub(crate) fn name_ptr(&self) -> *const u8 {
+        self.name.as_ptr().cast()
+    }
 }
 
 /// C `vendor/tmux/key-bindings.c:87`: `static int key_bindings_cmp(struct key_binding *bd1, struct key_binding *bd2)`
@@ -132,17 +140,16 @@ pub unsafe fn key_bindings_free(bd: *mut key_binding) {
 /// C `vendor/tmux/key-bindings.c:105`: `struct key_table *key_bindings_get_table(const char *name, int create)`
 pub unsafe fn key_bindings_get_table(name: *const u8, create: bool) -> *mut key_table {
     unsafe {
-        let mut table_find = MaybeUninit::<key_table>::uninit();
-        let table_find = table_find.as_mut_ptr();
-
-        (*table_find).name = name.cast_mut();
-        let table = rb_find(&raw mut KEY_TABLES, table_find);
+        // Look up by a borrowed key (no throwaway node): strcmp(name, node.name).
+        let table = rb_find_by(&raw mut KEY_TABLES, |t: &key_table| {
+            i32_to_ordering(strcmp(name, t.name_ptr()))
+        });
         if !table.is_null() || !create {
             return table;
         }
 
-        let table = Box::leak(Box::new(key_table {
-            name: xstrdup(name).as_ptr(),
+        let table = Box::into_raw(Box::new(key_table {
+            name: std::ffi::CStr::from_ptr(name.cast()).to_owned(),
             activity_time: timeval {
                 tv_sec: 0,
                 tv_usec: 0,
@@ -185,8 +192,8 @@ pub unsafe fn key_bindings_unref_table(table: *mut key_table) {
             key_bindings_free(bd);
         }
 
-        free_((*table).name);
-        free_(table);
+        // Reclaim the boxed table; its owned `name` CString drops with it.
+        drop(Box::from_raw(table));
     }
 }
 
@@ -851,11 +858,18 @@ mod tests {
         bd
     }
 
-    // Zeroed key_table with only `.name` set; key_table_cmp only reads `.name`.
+    // key_table with only `.name` meaningful; key_table_cmp only reads `.name`.
     fn kt_with_name(name: *const u8) -> key_table {
-        let mut t: key_table = unsafe { std::mem::zeroed() };
-        t.name = name.cast_mut();
-        t
+        unsafe {
+            key_table {
+                name: std::ffi::CStr::from_ptr(name.cast()).to_owned(),
+                activity_time: std::mem::zeroed(),
+                key_bindings: rb_initializer(),
+                default_key_bindings: rb_initializer(),
+                references: 0,
+                entry: rb_entry::default(),
+            }
+        }
     }
 
     // vendor/tmux/key-bindings.c:87 key_bindings_cmp: -1 if key1<key2, 1 if >, 0 if ==.
@@ -908,7 +922,7 @@ mod tests {
             let t = key_bindings_get_table(name, true);
             assert!(!t.is_null());
             // Name is a heap dup that compares equal.
-            assert_eq!(strcmp((*t).name, name), 0);
+            assert_eq!(strcmp((*t).name_ptr(), name), 0);
             assert_eq!((*t).references, 1);
 
             // Re-lookup (no create) returns the identical pointer.
@@ -1141,7 +1155,7 @@ mod tests {
             let mut got: Vec<String> = Vec::new();
             let mut t = key_bindings_first_table();
             while !t.is_null() {
-                got.push(CStr::from_ptr((*t).name.cast()).to_str().unwrap().to_string());
+                got.push((*t).name.to_str().unwrap().to_string());
                 t = key_bindings_next_table(t);
             }
             assert_eq!(got, vec!["kbt-aaa", "kbt-mmm", "kbt-zzz"]);

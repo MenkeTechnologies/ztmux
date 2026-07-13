@@ -2615,7 +2615,8 @@ type key_bindings = rb_head<key_binding>;
 
 #[repr(C)]
 struct key_table {
-    name: *mut u8,
+    /// Owned table name; drops with the boxed table — no manual `free()`.
+    name: std::ffi::CString,
     activity_time: timeval,
     key_bindings: key_bindings,
     default_key_bindings: key_bindings,
