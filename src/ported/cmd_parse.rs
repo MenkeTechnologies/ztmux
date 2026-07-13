@@ -32,13 +32,19 @@ use lalrpop::cmd_parse;
 fn yyparse(ps: &mut cmd_parse_state) -> Result<Option<&'static mut cmd_parse_commands>, ()> {
     let parser = cmd_parse::LinesParser::new();
 
-    let ps = NonNull::new(ps).unwrap();
+    let mut ps = NonNull::new(ps).unwrap();
     let lexer = lexer::Lexer::new(ps);
 
     match parser.parse(ps, lexer) {
         Ok(cmds) => Ok(cmds),
         Err(parse_err) => {
             log_debug!("parsing error {parse_err:?}");
+            // bison calls yyerror("syntax error") itself when the grammar fails. The
+            // LALRPOP parser has no such hook, so `ps.error` stayed NULL and callers
+            // printed "parse error: (null)" instead of the message. yyerror_ keeps any
+            // more specific error already recorded (e.g. "invalid octal escape"), which
+            // is what C's early return does.
+            unsafe { yyerror_(ps.as_mut(), format_args!("syntax error")) };
             Err(())
         }
     }

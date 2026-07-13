@@ -54,6 +54,60 @@ fn kill(sock: &str) {
     let _ = ztmux(sock, &["kill-server"]);
 }
 
+/// Control mode (`-C`) is the machine-readable client protocol; every reply the server
+/// sends a control client goes through `control_write`.
+///
+/// `control_vwrite` built the line as an owned Rust `String`, took a raw pointer into it
+/// and called `free()` on that pointer — then the `String` dropped at end of scope and
+/// freed the same buffer again. The double free aborted the server on the *first* line it
+/// wrote, so control mode was unusable end to end: a client got `%exit` and nothing else.
+/// Reaching the protocol at all is the assertion.
+#[test]
+fn control_mode_survives_a_command_and_speaks_the_protocol() {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let sock = socket("control");
+    boot(&sock);
+
+    let mut child = Command::new(BIN)
+        .args(["-L", &sock, "-C", "attach-session", "-t", "base"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn control-mode client");
+
+    child
+        .stdin
+        .as_mut()
+        .expect("no stdin")
+        .write_all(b"list-sessions\n")
+        .expect("failed to write to control client");
+
+    let out = child
+        .wait_with_output()
+        .expect("control client did not exit");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    // %begin/%end wrap every command's reply; the double free killed the server before
+    // the first one was ever written.
+    assert!(
+        stdout.contains("%begin") && stdout.contains("%end"),
+        "control mode never spoke the protocol, got stdout {stdout:?}"
+    );
+    assert!(
+        stdout.contains("base:"),
+        "control mode did not return the list-sessions reply, got stdout {stdout:?}"
+    );
+    assert!(
+        server_alive(&sock),
+        "server died serving a control-mode client"
+    );
+
+    kill(&sock);
+}
+
 /// `lock-client -t <unknown>` must report an error, not take down the server.
 ///
 /// `cmd_find_client` returned the last client in the list rather than NULL, so the

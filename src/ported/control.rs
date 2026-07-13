@@ -17,11 +17,22 @@ use crate::*;
 #[repr(C)]
 pub struct control_block {
     pub size: usize,
-    pub line: *mut u8,
+    /// Owned output line. `None` for a data block, where C left `line` NULL and leaned
+    /// on `free(NULL)` being a no-op. Dropped with the struct in `control_free_block`.
+    pub line: Option<CString>,
     pub t: u64,
 
     pub entry: tailq_entry<control_block>,
     pub all_entry: tailq_entry<control_block>,
+}
+
+impl control_block {
+    pub(crate) fn line_ptr(&self) -> *const u8 {
+        match &self.line {
+            Some(line) => line.as_ptr().cast(),
+            None => std::ptr::null(),
+        }
+    }
 }
 
 impl crate::compat::queue::Entry<control_block, discr_entry> for control_block {
@@ -67,7 +78,8 @@ impl Entry<control_pane, discr_pending_entry> for control_pane {
 pub struct control_sub_pane {
     pane: u32,
     idx: u32,
-    last: *mut u8,
+    /// Last value reported for this pane; `None` until the first report.
+    last: Option<CString>,
 
     entry: rb_entry<control_sub_pane>,
 }
@@ -77,7 +89,8 @@ pub type control_sub_panes = rb_head<control_sub_pane>;
 pub struct control_sub_window {
     window: u32,
     idx: u32,
-    last: *mut u8,
+    /// Last value reported for this window; `None` until the first report.
+    last: Option<CString>,
 
     entry: rb_entry<control_sub_window>,
 }
@@ -85,12 +98,15 @@ pub type control_sub_windows = rb_head<control_sub_window>;
 
 #[repr(C)]
 pub struct control_sub {
-    pub name: *mut u8,
-    pub format: *mut u8,
+    /// Owned subscription name and format, and the last value reported for the session
+    /// (`None` until the first report). All dropped with the struct in
+    /// `control_free_sub`, where C freed each by hand.
+    pub name: CString,
+    pub format: CString,
     pub type_: control_sub_type,
     pub id: u32,
 
-    pub last: *mut u8,
+    pub last: Option<CString>,
 
     pub panes: control_sub_panes,
     pub windows: control_sub_windows,
@@ -98,6 +114,15 @@ pub struct control_sub {
     pub entry: rb_entry<control_sub>,
 }
 pub type control_subs = rb_head<control_sub>;
+
+impl control_sub {
+    pub(crate) fn name_ptr(&self) -> *const u8 {
+        self.name.as_ptr().cast()
+    }
+    pub(crate) fn format_ptr(&self) -> *const u8 {
+        self.format.as_ptr().cast()
+    }
+}
 
 #[repr(C)]
 pub struct control_state {
@@ -143,7 +168,9 @@ RB_GENERATE!(
 
 /// C `vendor/tmux/control.c:159`: `static int control_sub_cmp(struct control_sub *csub1, struct control_sub *csub2)`
 pub fn control_sub_cmp(csub1: &control_sub, csub2: &control_sub) -> cmp::Ordering {
-    unsafe { i32_to_ordering(libc::strcmp(csub1.name, csub2.name)) }
+    // strcmp orders by unsigned byte and treats a prefix as less than the longer string;
+    // comparing the byte slices reproduces both.
+    csub1.name.as_bytes().cmp(csub2.name.as_bytes())
 }
 RB_GENERATE!(
     control_subs,
@@ -189,27 +216,26 @@ pub unsafe fn control_free_sub(cs: *mut control_state, csub: *mut control_sub) {
     unsafe {
         for csp in rb_foreach(&raw mut (*csub).panes).map(NonNull::as_ptr) {
             rb_remove(&raw mut (*csub).panes, csp);
-            free_(csp);
+            drop(Box::from_raw(csp));
         }
         for csw in rb_foreach(&raw mut (*csub).windows).map(NonNull::as_ptr) {
             rb_remove(&raw mut (*csub).windows, csw);
-            free_(csw);
+            drop(Box::from_raw(csw));
         }
-        free_((*csub).last);
 
         rb_remove(&raw mut (*cs).subs, csub);
-        free_((*csub).name);
-        free_((*csub).format);
-        free_(csub);
+        // Dropping the Box frees the owned name, format and last value, which C freed
+        // one by one.
+        drop(Box::from_raw(csub));
     }
 }
 
 /// C `vendor/tmux/control.c:228`: `static void control_free_block(struct control_state *cs, struct control_block *cb)`
 pub unsafe fn control_free_block(cs: *mut control_state, cb: *mut control_block) {
     unsafe {
-        free_((*cb).line);
         tailq_remove::<_, discr_all_entry>(&raw mut (*cs).all_blocks, cb);
-        free_(cb);
+        // Dropping the Box frees the owned line, which C did with `free(cb->line)`.
+        drop(Box::from_raw(cb));
     }
 }
 
@@ -363,22 +389,23 @@ pub unsafe fn control_vwrite(c: *mut client, args: std::fmt::Arguments) {
     unsafe {
         let cs = (*c).control_state;
 
-        let mut s = args.to_string();
-        s.push('\0');
-        let s: *mut u8 = s.as_mut_ptr().cast();
+        // C xvasprintf's the line and frees it. Here the line is already an owned Rust
+        // value: taking a pointer into it and then calling free() on that pointer freed
+        // the buffer once, and the String freed it again when it dropped at end of scope.
+        // Write it out and let Drop do the freeing.
+        let s = cstring_truncating(args.to_string());
 
         log_debug!(
             "{}: {}: writing line: {}",
             "control_vwrite",
             _s((*c).name),
-            _s(s)
+            _s(s.as_ptr().cast::<u8>())
         );
 
-        bufferevent_write((*cs).write_event, s.cast(), strlen(s));
+        bufferevent_write((*cs).write_event, s.as_ptr().cast(), s.as_bytes().len());
         bufferevent_write((*cs).write_event, c!("\n").cast(), 1);
 
         bufferevent_enable((*cs).write_event, EV_WRITE);
-        free_(s);
     }
 }
 
@@ -398,10 +425,13 @@ pub unsafe fn control_write_(c: *mut client, args: std::fmt::Arguments) {
             return;
         }
 
-        let cb = xcalloc_::<control_block>(1).as_ptr();
-        let mut value = args.to_string();
-        value.push('\0');
-        (*cb).line = value.leak().as_mut_ptr().cast();
+        let cb = Box::into_raw(Box::new(control_block {
+            size: 0,
+            line: Some(cstring_truncating(args.to_string())),
+            t: 0,
+            entry: zeroed(),
+            all_entry: zeroed(),
+        }));
         tailq_insert_tail::<_, discr_all_entry>(&raw mut (*cs).all_blocks, cb);
         (*cb).t = get_timer();
 
@@ -409,7 +439,7 @@ pub unsafe fn control_write_(c: *mut client, args: std::fmt::Arguments) {
             "{}: {}: storing line: {}",
             "control_write",
             _s((*c).name),
-            _s((*cb).line)
+            _s((*cb).line_ptr())
         );
         bufferevent_enable((*cs).write_event, EV_WRITE);
     }
@@ -495,8 +525,14 @@ pub unsafe fn control_write_output(c: *mut client, wp: *mut window_pane) {
             }
             window_pane_update_used_data(wp, &raw mut (*cp).queued, new_size);
 
-            let cb = xcalloc_::<control_block>(1).as_ptr();
-            (*cb).size = new_size;
+            // A data block carries no line; C left `line` NULL here.
+            let cb = Box::into_raw(Box::new(control_block {
+                size: new_size,
+                line: None,
+                t: 0,
+                entry: zeroed(),
+                all_entry: zeroed(),
+            }));
             tailq_insert_tail::<_, discr_all_entry>(&raw mut (*cs).all_blocks, cb);
             (*cb).t = get_timer();
 
@@ -626,10 +662,10 @@ pub unsafe fn control_flush_all_blocks(c: *mut client) {
                 "{}: {}: flushing line: {}",
                 __func__,
                 _s((*c).name),
-                _s((*cb).line)
+                _s((*cb).line_ptr())
             );
 
-            bufferevent_write((*cs).write_event, (*cb).line.cast(), strlen((*cb).line));
+            bufferevent_write((*cs).write_event, (*cb).line_ptr().cast(), strlen((*cb).line_ptr()));
             bufferevent_write((*cs).write_event, c!("\n").cast(), 1);
             control_free_block(cs, cb);
         }
@@ -920,22 +956,25 @@ pub unsafe fn control_check_subs_session(c: *mut client, csub: *mut control_sub)
         let s = (*c).session;
 
         let ft = format_create_defaults(null_mut(), c, s, null_mut(), null_mut());
-        let value = format_expand(ft, (*csub).format);
+        let value = format_expand(ft, (*csub).format_ptr());
         format_free(ft);
 
-        if !(*csub).last.is_null() && libc::strcmp(value, (*csub).last) == 0 {
+        let value_c = CStr::from_ptr(value.cast());
+        if (*csub).last.as_deref() == Some(value_c) {
             free_(value);
             return;
         }
         control_write!(
             c,
             "%subscription-changed {} ${} - - - : {}",
-            _s((*csub).name),
+            _s((*csub).name_ptr()),
             (*s).id,
             _s(value),
         );
-        free_((*csub).last);
-        (*csub).last = value;
+        // C stored the expanded string and freed the previous one; take an owned
+        // copy so the struct's Drop reclaims it.
+        (*csub).last = Some(value_c.to_owned());
+        free_(value);
     }
 }
 
@@ -943,7 +982,6 @@ pub unsafe fn control_check_subs_session(c: *mut client, csub: *mut control_sub)
 pub unsafe fn control_check_subs_pane(c: *mut client, csub: *mut control_sub) {
     unsafe {
         let s = (*c).session;
-        let mut find: control_sub_pane = zeroed(); //TODO uninit
 
         let wp = window_pane_find_by_id((*csub).id);
         if wp.is_null() || (*wp).fd == -1 {
@@ -957,36 +995,42 @@ pub unsafe fn control_check_subs_pane(c: *mut client, csub: *mut control_sub) {
             }
 
             let ft = format_create_defaults(null_mut(), c, s, wl, wp);
-            let value = format_expand(ft, (*csub).format);
+            let value = format_expand(ft, (*csub).format_ptr());
             format_free(ft);
 
-            find.pane = (*wp).id;
-            find.idx = (*wl).idx as u32;
-
-            let mut csp = rb_find(&raw mut (*csub).panes, &raw mut find);
+            let (pane, idx) = ((*wp).id, (*wl).idx as u32);
+            let mut csp = rb_find_by(&raw mut (*csub).panes, |csp| {
+                pane.cmp(&csp.pane).then_with(|| idx.cmp(&csp.idx))
+            });
             if csp.is_null() {
-                csp = xcalloc_::<control_sub_pane>(1).as_ptr();
-                (*csp).pane = (*wp).id;
-                (*csp).idx = (*wl).idx as u32;
+                csp = Box::into_raw(Box::new(control_sub_pane {
+                    pane,
+                    idx,
+                    last: None,
+                    entry: zeroed(),
+                }));
                 rb_insert(&raw mut (*csub).panes, csp);
             }
 
-            if !(*csp).last.is_null() && libc::strcmp(value, (*csp).last) == 0 {
+            let value_c = CStr::from_ptr(value.cast());
+            if (*csp).last.as_deref() == Some(value_c) {
                 free_(value);
                 continue;
             }
             control_write!(
                 c,
                 "%subscription-changed {} ${} @{} {} %{} : {}",
-                _s((*csub).name),
+                _s((*csub).name_ptr()),
                 (*s).id,
                 (*w).id,
                 (*wl).idx,
                 (*wp).id,
                 _s(value),
             );
-            free_((*csp).last);
-            (*csp).last = value;
+            // C stored the expanded string and freed the previous one; take an owned
+            // copy so the struct's Drop reclaims it.
+            (*csp).last = Some(value_c.to_owned());
+            free_(value);
         }
     }
 }
@@ -994,42 +1038,47 @@ pub unsafe fn control_check_subs_pane(c: *mut client, csub: *mut control_sub) {
 pub unsafe fn control_check_subs_all_panes(c: *mut client, csub: *mut control_sub) {
     unsafe {
         let s = (*c).session;
-        let mut find: control_sub_pane = zeroed();
 
         for wl in rb_foreach(&raw mut (*s).windows).map(NonNull::as_ptr) {
             let w = (*wl).window;
             for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
                 let ft = format_create_defaults(null_mut(), c, s, wl, wp);
-                let value = format_expand(ft, (*csub).format);
+                let value = format_expand(ft, (*csub).format_ptr());
                 format_free(ft);
 
-                find.pane = (*wp).id;
-                find.idx = (*wl).idx as u32;
-
-                let mut csp = rb_find(&raw mut (*csub).panes, &raw mut find);
+                let (pane, idx) = ((*wp).id, (*wl).idx as u32);
+                let mut csp = rb_find_by(&raw mut (*csub).panes, |csp| {
+                    pane.cmp(&csp.pane).then_with(|| idx.cmp(&csp.idx))
+                });
                 if csp.is_null() {
-                    csp = xcalloc_::<control_sub_pane>(1).as_ptr();
-                    (*csp).pane = (*wp).id;
-                    (*csp).idx = (*wl).idx as u32;
+                    csp = Box::into_raw(Box::new(control_sub_pane {
+                        pane,
+                        idx,
+                        last: None,
+                        entry: zeroed(),
+                    }));
                     rb_insert(&raw mut (*csub).panes, csp);
                 }
 
-                if !(*csp).last.is_null() && libc::strcmp(value, (*csp).last) == 0 {
+                let value_c = CStr::from_ptr(value.cast());
+                if (*csp).last.as_deref() == Some(value_c) {
                     free_(value);
                     continue;
                 }
                 control_write!(
                     c,
                     "%subscription-changed {} ${} @{} {} %{} : {}",
-                    _s((*csub).name),
+                    _s((*csub).name_ptr()),
                     (*s).id,
                     (*w).id,
                     (*wl).idx,
                     (*wp).id,
                     _s(value),
                 );
-                free_((*csp).last);
-                (*csp).last = value;
+                // C stored the expanded string and freed the previous one; take an owned
+                // copy so the struct's Drop reclaims it.
+                (*csp).last = Some(value_c.to_owned());
+                free_(value);
             }
         }
     }
@@ -1039,7 +1088,6 @@ pub unsafe fn control_check_subs_all_panes(c: *mut client, csub: *mut control_su
 pub unsafe fn control_check_subs_window(c: *mut client, csub: *mut control_sub) {
     unsafe {
         let s = (*c).session;
-        let mut find: control_sub_window = zeroed(); // TODO uninit
 
         let w = window_find_by_id((*csub).id);
         if w.is_null() {
@@ -1054,35 +1102,41 @@ pub unsafe fn control_check_subs_window(c: *mut client, csub: *mut control_sub) 
             }
 
             let ft = format_create_defaults(null_mut(), c, s, wl, null_mut());
-            let value = format_expand(ft, (*csub).format);
+            let value = format_expand(ft, (*csub).format_ptr());
             format_free(ft);
 
-            find.window = (*w).id;
-            find.idx = (*wl).idx as u32;
-
-            let mut csw = rb_find(&raw mut (*csub).windows, &raw mut find);
+            let (window, idx) = ((*w).id, (*wl).idx as u32);
+            let mut csw = rb_find_by(&raw mut (*csub).windows, |csw| {
+                window.cmp(&csw.window).then_with(|| idx.cmp(&csw.idx))
+            });
             if csw.is_null() {
-                csw = xcalloc_::<control_sub_window>(1).as_ptr();
-                (*csw).window = (*w).id;
-                (*csw).idx = (*wl).idx as u32;
+                csw = Box::into_raw(Box::new(control_sub_window {
+                    window,
+                    idx,
+                    last: None,
+                    entry: zeroed(),
+                }));
                 rb_insert(&raw mut (*csub).windows, csw);
             }
 
-            if !(*csw).last.is_null() && libc::strcmp(value, (*csw).last) == 0 {
+            let value_c = CStr::from_ptr(value.cast());
+            if (*csw).last.as_deref() == Some(value_c) {
                 free_(value);
                 continue;
             }
             control_write!(
                 c,
                 "%subscription-changed {} ${} @{} {} - : {}",
-                _s((*csub).name),
+                _s((*csub).name_ptr()),
                 (*s).id,
                 (*w).id,
                 (*wl).idx,
                 _s(value),
             );
-            free_((*csw).last);
-            (*csw).last = value;
+            // C stored the expanded string and freed the previous one; take an owned
+            // copy so the struct's Drop reclaims it.
+            (*csw).last = Some(value_c.to_owned());
+            free_(value);
         }
     }
 }
@@ -1090,41 +1144,46 @@ pub unsafe fn control_check_subs_window(c: *mut client, csub: *mut control_sub) 
 pub unsafe fn control_check_subs_all_windows(c: *mut client, csub: *mut control_sub) {
     unsafe {
         let s = (*c).session;
-        let mut find: control_sub_window = zeroed();
 
         for wl in rb_foreach(&raw mut (*s).windows).map(NonNull::as_ptr) {
             let w = (*wl).window;
 
             let ft = format_create_defaults(null_mut(), c, s, wl, null_mut());
-            let value = format_expand(ft, (*csub).format);
+            let value = format_expand(ft, (*csub).format_ptr());
             format_free(ft);
 
-            find.window = (*w).id;
-            find.idx = (*wl).idx as u32;
-
-            let mut csw = rb_find(&raw mut (*csub).windows, &raw mut find);
+            let (window, idx) = ((*w).id, (*wl).idx as u32);
+            let mut csw = rb_find_by(&raw mut (*csub).windows, |csw| {
+                window.cmp(&csw.window).then_with(|| idx.cmp(&csw.idx))
+            });
             if csw.is_null() {
-                csw = xcalloc_::<control_sub_window>(1).as_ptr();
-                (*csw).window = (*w).id;
-                (*csw).idx = (*wl).idx as u32;
+                csw = Box::into_raw(Box::new(control_sub_window {
+                    window,
+                    idx,
+                    last: None,
+                    entry: zeroed(),
+                }));
                 rb_insert(&raw mut (*csub).windows, csw);
             }
 
-            if !(*csw).last.is_null() && libc::strcmp(value, (*csw).last) == 0 {
+            let value_c = CStr::from_ptr(value.cast());
+            if (*csw).last.as_deref() == Some(value_c) {
                 free_(value);
                 continue;
             }
             control_write!(
                 c,
                 "%subscription-changed {} ${} @{} {} - : {}",
-                _s((*csub).name),
+                _s((*csub).name_ptr()),
                 (*s).id,
                 (*w).id,
                 (*wl).idx,
                 _s(value),
             );
-            free_((*csw).last);
-            (*csw).last = value;
+            // C stored the expanded string and freed the previous one; take an owned
+            // copy so the struct's Drop reclaims it.
+            (*csw).last = Some(value_c.to_owned());
+            free_(value);
         }
     }
 }
@@ -1175,19 +1234,26 @@ pub unsafe fn control_add_sub(
             tv_usec: 0,
         };
 
-        let mut find: control_sub = zeroed();
-
-        find.name = name.cast();
-        let mut csub = rb_find(&raw mut (*cs).subs, &raw mut find);
+        // C builds a throwaway stack `struct control_sub` as the RB_FIND key. With an
+        // owned name that is unsound in Rust, so search by key instead.
+        let key = CStr::from_ptr(name.cast());
+        let csub = rb_find_by(&raw mut (*cs).subs, |csub| {
+            key.to_bytes().cmp(csub.name.as_bytes())
+        });
         if !csub.is_null() {
             control_free_sub(cs, csub);
         }
 
-        csub = xcalloc_::<control_sub>(1).as_ptr();
-        (*csub).name = xstrdup(name).as_ptr();
-        (*csub).type_ = type_;
-        (*csub).id = id as u32;
-        (*csub).format = xstrdup(format).as_ptr();
+        let csub = Box::into_raw(Box::new(control_sub {
+            name: key.to_owned(),
+            format: CStr::from_ptr(format.cast()).to_owned(),
+            type_,
+            id: id as u32,
+            last: None,
+            panes: zeroed(),
+            windows: zeroed(),
+            entry: zeroed(),
+        }));
         rb_insert(&raw mut (*cs).subs, csub);
 
         rb_init(&raw mut (*csub).panes);
@@ -1211,9 +1277,10 @@ pub unsafe fn control_remove_sub(c: *mut client, name: *mut u8) {
     unsafe {
         let cs = (*c).control_state;
 
-        let mut find: control_sub = zeroed();
-        find.name = name.cast();
-        let csub = rb_find(&raw mut (*cs).subs, &raw mut find);
+        let key = CStr::from_ptr(name.cast());
+        let csub = rb_find_by(&raw mut (*cs).subs, |csub| {
+            key.to_bytes().cmp(csub.name.as_bytes())
+        });
         if !csub.is_null() {
             control_free_sub(cs, csub);
         }
@@ -1227,9 +1294,40 @@ pub unsafe fn control_remove_sub(c: *mut client, name: *mut u8) {
 mod tests {
     use super::*;
 
-    // These RB-tree comparators order the control-mode trees. The structs are
-    // plain C-style records with no Drop impl, so a zeroed instance with the
-    // relevant fields set is a safe way to exercise the ordering.
+    // These RB-tree comparators order the control-mode trees. The subscription structs
+    // own their strings now, so they cannot be built by zeroing (a zeroed CString has a
+    // null pointer, which CString is not allowed to hold). Build them properly.
+
+    fn sub_pane(pane: u32, idx: u32) -> control_sub_pane {
+        control_sub_pane {
+            pane,
+            idx,
+            last: None,
+            entry: unsafe { zeroed() },
+        }
+    }
+
+    fn sub_window(window: u32, idx: u32) -> control_sub_window {
+        control_sub_window {
+            window,
+            idx,
+            last: None,
+            entry: unsafe { zeroed() },
+        }
+    }
+
+    fn sub(name: &str) -> control_sub {
+        control_sub {
+            name: CString::new(name).unwrap(),
+            format: CString::new("").unwrap(),
+            type_: control_sub_type::CONTROL_SUB_SESSION,
+            id: 0,
+            last: None,
+            panes: unsafe { zeroed() },
+            windows: unsafe { zeroed() },
+            entry: unsafe { zeroed() },
+        }
+    }
 
     // control_pane_cmp orders by pane id alone.
     #[test]
@@ -1249,85 +1347,52 @@ mod tests {
     // control_sub_pane_cmp orders by pane first, then breaks ties on idx.
     #[test]
     fn test_control_sub_pane_cmp_tie_breaks_on_idx() {
-        unsafe {
-            let mut a: control_sub_pane = zeroed();
-            let mut b: control_sub_pane = zeroed();
-            // Different pane dominates regardless of idx.
-            a.pane = 1;
-            a.idx = 99;
-            b.pane = 2;
-            b.idx = 0;
-            assert_eq!(control_sub_pane_cmp(&a, &b), cmp::Ordering::Less);
-            // Same pane -> idx decides.
-            b.pane = 1;
-            b.idx = 100;
-            assert_eq!(control_sub_pane_cmp(&a, &b), cmp::Ordering::Less);
-            b.idx = 99;
-            assert_eq!(control_sub_pane_cmp(&a, &b), cmp::Ordering::Equal);
-        }
+        // Different pane dominates regardless of idx.
+        let a = sub_pane(1, 99);
+        assert_eq!(control_sub_pane_cmp(&a, &sub_pane(2, 0)), cmp::Ordering::Less);
+        // Same pane -> idx decides.
+        assert_eq!(control_sub_pane_cmp(&a, &sub_pane(1, 100)), cmp::Ordering::Less);
+        assert_eq!(control_sub_pane_cmp(&a, &sub_pane(1, 99)), cmp::Ordering::Equal);
     }
 
     // control_sub_window_cmp orders by window first, then breaks ties on idx.
     #[test]
     fn test_control_sub_window_cmp_tie_breaks_on_idx() {
-        unsafe {
-            let mut a: control_sub_window = zeroed();
-            let mut b: control_sub_window = zeroed();
-            a.window = 5;
-            a.idx = 1;
-            b.window = 5;
-            b.idx = 2;
-            assert_eq!(control_sub_window_cmp(&a, &b), cmp::Ordering::Less);
-            b.window = 4;
-            b.idx = 100;
-            // Lower window wins even though its idx is far higher.
-            assert_eq!(control_sub_window_cmp(&a, &b), cmp::Ordering::Greater);
-        }
+        let a = sub_window(5, 1);
+        assert_eq!(control_sub_window_cmp(&a, &sub_window(5, 2)), cmp::Ordering::Less);
+        // Lower window wins even though its idx is far higher.
+        assert_eq!(
+            control_sub_window_cmp(&a, &sub_window(4, 100)),
+            cmp::Ordering::Greater
+        );
     }
 
     // control_sub_cmp orders by the subscription name (C strcmp semantics).
     #[test]
     fn test_control_sub_cmp_by_name() {
-        unsafe {
-            let mut a: control_sub = zeroed();
-            let mut b: control_sub = zeroed();
-            a.name = crate::c!("alpha") as *mut u8;
-            b.name = crate::c!("beta") as *mut u8;
-            assert_eq!(control_sub_cmp(&a, &b), cmp::Ordering::Less);
-            assert_eq!(control_sub_cmp(&b, &a), cmp::Ordering::Greater);
-            b.name = crate::c!("alpha") as *mut u8;
-            assert_eq!(control_sub_cmp(&a, &b), cmp::Ordering::Equal);
-        }
+        let a = sub("alpha");
+        let b = sub("beta");
+        assert_eq!(control_sub_cmp(&a, &b), cmp::Ordering::Less);
+        assert_eq!(control_sub_cmp(&b, &a), cmp::Ordering::Greater);
+        assert_eq!(control_sub_cmp(&a, &sub("alpha")), cmp::Ordering::Equal);
     }
 
     // control_sub_window_cmp is Equal only when both window and idx match
     // (control.c:185-193), otherwise idx breaks the tie within a window.
     #[test]
     fn test_control_sub_window_cmp_equal_and_idx_tiebreak() {
-        unsafe {
-            let mut a: control_sub_window = zeroed();
-            let mut b: control_sub_window = zeroed();
-            a.window = 7;
-            a.idx = 3;
-            b.window = 7;
-            b.idx = 3;
-            assert_eq!(control_sub_window_cmp(&a, &b), cmp::Ordering::Equal);
-            b.idx = 4;
-            assert_eq!(control_sub_window_cmp(&a, &b), cmp::Ordering::Less);
-        }
+        let a = sub_window(7, 3);
+        assert_eq!(control_sub_window_cmp(&a, &sub_window(7, 3)), cmp::Ordering::Equal);
+        assert_eq!(control_sub_window_cmp(&a, &sub_window(7, 4)), cmp::Ordering::Less);
     }
 
     // control_sub_cmp uses C strcmp (control.c:159-164): a prefix sorts before
     // the longer string that starts with it.
     #[test]
     fn test_control_sub_cmp_prefix_ordering() {
-        unsafe {
-            let mut a: control_sub = zeroed();
-            let mut b: control_sub = zeroed();
-            a.name = crate::c!("a") as *mut u8;
-            b.name = crate::c!("ab") as *mut u8;
-            assert_eq!(control_sub_cmp(&a, &b), cmp::Ordering::Less);
-            assert_eq!(control_sub_cmp(&b, &a), cmp::Ordering::Greater);
-        }
+        let a = sub("a");
+        let b = sub("ab");
+        assert_eq!(control_sub_cmp(&a, &b), cmp::Ordering::Less);
+        assert_eq!(control_sub_cmp(&b, &a), cmp::Ordering::Greater);
     }
 }
