@@ -93,13 +93,19 @@ cargo build --release
 cargo run --release -- new-session       # start a server + session, like `tmux`
 
 # Debian / Ubuntu
-sudo apt-get install libncurses-dev libevent-dev
+sudo apt-get install libncurses-dev libevent-dev pkg-config
 cargo build --release
 ```
 
+The `-dev` / `-devel` package is required, not just the runtime one: linking needs the
+unversioned `libevent_core.so` symlink that `libevent-core-2.1-7` (and friends) do not
+ship. Without it the build fails with `libevent development files not found` and the
+install command for your distro.
+
 The binary is `ztmux`. On macOS the build links Homebrew's `libevent` automatically; set
-`TMUX_RS_DISABLE_HOMEBREW_LIBS=1` to skip the Homebrew search path. Linking can be forced
-with the `static` / `dynamic` features.
+`TMUX_RS_DISABLE_HOMEBREW_LIBS=1` to skip the Homebrew search path. Everywhere else the
+build asks `pkg-config` for `libevent_core` and falls back to a plain `-levent_core` when
+pkg-config is unavailable. Linking can be forced with the `static` / `dynamic` features.
 
 ---
 

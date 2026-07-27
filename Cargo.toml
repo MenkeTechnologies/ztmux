@@ -63,6 +63,7 @@ serde_json   = { version = "1" }
 
 [build-dependencies]
 lalrpop      = { version = "0.22.2", default-features = false }
+pkg-config   = { version = "0.3.32" }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
