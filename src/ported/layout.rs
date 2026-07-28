@@ -748,9 +748,20 @@ pub unsafe fn layout_resize_adjust(
 
         // Child cell runs in a different direction
         if (*lc).type_ != type_ {
-            for lcchild in tailq_foreach(&raw mut (*lc).cells) {
-                layout_resize_adjust(w, lcchild.as_ptr(), type_, change);
+            for lcchild in tailq_foreach(&raw mut (*lc).cells).map(NonNull::as_ptr) {
+                // Floating cells are outside the tiled flow and keep their size.
+                if layout_cell_is_tiled(lcchild) == 0
+                    && layout_cell_has_tiled_child(lcchild) == 0
+                {
+                    continue;
+                }
+                layout_resize_adjust(w, lcchild, type_, change);
             }
+            return;
+        }
+
+        // A node with no tiled cells has nothing to adjust.
+        if layout_cell_has_tiled_child(lc) == 0 {
             return;
         }
 
@@ -760,6 +771,11 @@ pub unsafe fn layout_resize_adjust(
             for lcchild in tailq_foreach(&raw mut (*lc).cells) {
                 if change == 0 {
                     break;
+                }
+                if layout_cell_is_tiled(lcchild.as_ptr()) == 0
+                    && layout_cell_has_tiled_child(lcchild.as_ptr()) == 0
+                {
+                    continue;
                 }
                 if change > 0 {
                     layout_resize_adjust(w, lcchild.as_ptr(), type_, 1);
@@ -1352,6 +1368,11 @@ pub unsafe fn layout_resize_child_cells(w: *mut window, lc: *mut layout_cell) {
         let mut count: u32 = 0;
         let mut previous: u32 = 0;
         for lcchild in tailq_foreach(&raw mut (*lc).cells).map(NonNull::as_ptr) {
+            // A floating cell is not part of the tiled flow: it neither
+            // contributes to the used size nor gets resized below.
+            if layout_cell_is_tiled(lcchild) == 0 && layout_cell_has_tiled_child(lcchild) == 0 {
+                continue;
+            }
             count += 1;
             if (*lc).type_ == layout_type::LAYOUT_LEFTRIGHT {
                 previous += (*lcchild).sx;
@@ -1370,10 +1391,11 @@ pub unsafe fn layout_resize_child_cells(w: *mut window, lc: *mut layout_cell) {
         }
 
         // Resize children into the new size.
-        for (idx, lcchild) in tailq_foreach(&raw mut (*lc).cells)
-            .map(NonNull::as_ptr)
-            .enumerate()
-        {
+        let mut idx: u32 = 0;
+        for lcchild in tailq_foreach(&raw mut (*lc).cells).map(NonNull::as_ptr) {
+            if layout_cell_is_tiled(lcchild) == 0 && layout_cell_has_tiled_child(lcchild) == 0 {
+                continue;
+            }
             if (*lc).type_ == layout_type::LAYOUT_TOPBOTTOM {
                 (*lcchild).sx = (*lc).sx;
                 (*lcchild).xoff = (*lc).xoff;
@@ -1384,7 +1406,7 @@ pub unsafe fn layout_resize_child_cells(w: *mut window, lc: *mut layout_cell) {
                     lcchild,
                     (*lc).type_,
                     (*lc).sx,
-                    count - idx as u32,
+                    count - idx,
                     available,
                 );
                 // C layout.c `available -= (lcchild->sx + 1)` on u_int: underflow
@@ -1395,6 +1417,7 @@ pub unsafe fn layout_resize_child_cells(w: *mut window, lc: *mut layout_cell) {
             }
             if (*lc).type_ == layout_type::LAYOUT_LEFTRIGHT {
                 (*lcchild).sy = (*lc).sy;
+                (*lcchild).yoff = (*lc).yoff;
             } else {
                 (*lcchild).sy = layout_new_pane_size(
                     w,
@@ -1402,7 +1425,7 @@ pub unsafe fn layout_resize_child_cells(w: *mut window, lc: *mut layout_cell) {
                     lcchild,
                     (*lc).type_,
                     (*lc).sy,
-                    count - idx as u32,
+                    count - idx,
                     available,
                 );
                 // C layout.c `available -= (lcchild->sy + 1)` on u_int: wraps on
@@ -1410,6 +1433,7 @@ pub unsafe fn layout_resize_child_cells(w: *mut window, lc: *mut layout_cell) {
                 available = available.wrapping_sub((*lcchild).sy + 1);
             }
             layout_resize_child_cells(w, lcchild);
+            idx += 1;
         }
     }
 }

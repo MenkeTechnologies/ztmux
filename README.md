@@ -10,7 +10,7 @@
 [![CI](https://github.com/MenkeTechnologies/ztmux/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/ztmux/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://menketechnologies.github.io/ztmux/)
 [![Port Report](https://img.shields.io/badge/port-report-8a2be2.svg)](https://menketechnologies.github.io/ztmux/port_report.html)
-[![Parity vs tmux](https://img.shields.io/badge/parity%20vs%20tmux-1127%2F1127%20(100%25)-brightgreen.svg)](parity/PARITY_ROADMAP.md)
+[![Parity vs tmux](https://img.shields.io/badge/parity%20vs%20tmux-1128%2F1128%20(100%25)-brightgreen.svg)](parity/PARITY_ROADMAP.md)
 [![Status](https://img.shields.io/badge/status-100%25%20functional-brightgreen.svg)](docs/BUGS.md)
 [![Reference](https://img.shields.io/badge/reference-tmux%203.x-00ffcc.svg)](https://github.com/tmux/tmux)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -22,7 +22,7 @@
 >
 > *"Not a wrapper. Not control mode. The multiplexer itself."*
 >
-> *"Ported against the C, verified against the C — byte for byte, 1127/1127 parity cases passing."*
+> *"Ported against the C, verified against the C — byte for byte, 1128/1128 parity cases passing."*
 
 ## `[FROM SOURCE, NOT FROM SCRATCH]`
 
@@ -65,7 +65,7 @@ opens its own socket namespace (`ztmux-<uid>`) so it never collides with a runni
 
 **Status: 100% functional.** The port builds, runs, and self-hosts — `ztmux new-session`,
 splits, detach/reattach, the command language, formats, and layouts all work — and the
-parity suite is green at **1127/1127 (100%)** against the vendored tmux. Every bug the harness
+parity suite is green at **1128/1128 (100%)** against the vendored tmux. Every bug the harness
 found has been root-caused and fixed (see [`docs/BUGS.md`](docs/BUGS.md)).
 
 On top of the port, ztmux ships original subcommands with no tmux counterpart — live
@@ -159,7 +159,7 @@ It earns its keep: it root-caused a `#{l:…}` server crash to a dropped pointer
 `format_unescape`, fixed even-horizontal layout rounding and `#{pane_current_command}` on
 macOS, regex backreferences, `#{!:}`, named buffers, loop variables, and the last layout
 divergences — each pinned to a single case and then ported correctly. It now stands at
-**1127/1127 cases passing (100%), byte-for-byte vs the vendored tmux, with zero known
+**1128/1128 cases passing (100%), byte-for-byte vs the vendored tmux, with zero known
 divergences.** See [`parity/PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md) and the bug log
 [`docs/BUGS.md`](docs/BUGS.md).
 
@@ -255,9 +255,9 @@ They fall into a few families:
   directly, and `prefix {` / `}` / `M-{` / `M-}` snap it to a corner at half size. With `mouse on`
   it is fully draggable: drag its **top border** to move it, any **other border or corner** to
   resize, and `Alt`-drag anywhere on it to move it. Panes underneath are clipped around it, so
-  output from a tiled pane does not draw over the float. Pane *borders* are not clipped yet —
-  a tiled border crossing the float still paints over it — because that needs next-3.7's
-  redraw-scene builder (`redraw_build_ctx` / `redraw_mark_border_cell`), which is unported.
+  output from a tiled pane does not draw over the float, and a tiled border crossing it is
+  drawn under it. Rendered screens are compared against the vendored tmux through a real VT
+  emulator, not just the model state.
   Setting `@ztmux-float-autohide` (`set -wg @ztmux-float-autohide 1`, or the pane menu's
   `Auto-Hide Floating Panes`) switches to the zellij model instead: floating panes disappear
   while a tiled pane has focus and come back on `prefix C-f`. Off by default, so the upstream
