@@ -996,6 +996,22 @@ pub unsafe fn cmd_mouse_pane(
     }
 }
 
+/// Convert a mouse coordinate pair to window coordinates: add the pane offset,
+/// then subtract the status lines drawn above the window (or clamp to the row
+/// just above a status line drawn below it).
+/// C `vendor/tmux/cmd-resize-pane.c:260`, repeated at `cmd-join-pane.c:310`.
+pub unsafe fn cmd_mouse_position(x: c_int, y: c_int, m: *mut mouse_event) -> (c_int, c_int) {
+    unsafe {
+        let mut y = y + (*m).oy as c_int;
+        if (*m).statusat == 0 && y >= (*m).statuslines as c_int {
+            y -= (*m).statuslines as c_int;
+        } else if (*m).statusat > 0 && y >= (*m).statusat {
+            y = (*m).statusat - 1;
+        }
+        (x + (*m).ox as c_int, y)
+    }
+}
+
 /// Replace the first %% or %idx in template by s.
 /// C `vendor/tmux/cmd.c:843`: `char *cmd_template_replace(const char *template, const char *s, int idx)`
 pub unsafe fn cmd_template_replace(template: *const u8, s: Option<&str>, idx: c_int) -> *mut u8 {

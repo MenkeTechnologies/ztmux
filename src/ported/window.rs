@@ -971,6 +971,23 @@ pub unsafe fn window_get_pane_lines(w: *mut window) -> pane_lines {
     }
 }
 
+/// C `vendor/tmux/window.c:2498`: `enum pane_lines window_pane_get_pane_lines(struct window_pane *wp)`
+///
+/// Border style for one pane: a floating pane reads its own options (so it can
+/// be borderless independently of the window), a tiled pane reads the window's.
+pub unsafe fn window_pane_get_pane_lines(wp: *mut window_pane) -> pane_lines {
+    unsafe {
+        let oo = if window_pane_is_floating(wp) == 0 {
+            (*(*wp).window).options
+        } else {
+            (*wp).options
+        };
+        options_get_number___::<i32>(&*oo, "pane-border-lines")
+            .try_into()
+            .unwrap_or(pane_lines::PANE_LINES_SINGLE)
+    }
+}
+
 /// C `vendor/tmux/window.c`: `int window_pane_zindex(struct window_pane *wp, u_int *i)`
 ///
 /// Index of a pane counting only non-floating panes ahead of it in the z-index

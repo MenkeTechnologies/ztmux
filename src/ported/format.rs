@@ -797,6 +797,58 @@ pub unsafe fn format_cb_pane_zoomed_flag(ft: *mut format_tree) -> format_table_t
     }
 }
 
+/// Callback for `pane_floating_flag`.
+/// C `vendor/tmux/format.c:1043`: `static void *format_cb_pane_floating_flag(struct format_tree *ft)`
+pub unsafe fn format_cb_pane_floating_flag(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        let wp = (*ft).wp;
+        if !wp.is_null() {
+            if window_pane_is_floating(wp) != 0 {
+                return "1".into();
+            }
+            return "0".into();
+        }
+        format_table_type::None
+    }
+}
+
+/// Callback for `pane_x`.
+/// C `vendor/tmux/format.c:2442`: `static void *format_cb_pane_x(struct format_tree *ft)`
+pub unsafe fn format_cb_pane_x(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        let wp = (*ft).wp;
+        if !wp.is_null() {
+            return format!("{}", (*wp).xoff).into();
+        }
+        format_table_type::None
+    }
+}
+
+/// Callback for `pane_y`.
+/// C `vendor/tmux/format.c:2451`: `static void *format_cb_pane_y(struct format_tree *ft)`
+pub unsafe fn format_cb_pane_y(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        let wp = (*ft).wp;
+        if !wp.is_null() {
+            return format!("{}", (*wp).yoff).into();
+        }
+        format_table_type::None
+    }
+}
+
+/// Callback for `pane_z`.
+/// C `vendor/tmux/format.c:2460`: `static void *format_cb_pane_z(struct format_tree *ft)`
+pub unsafe fn format_cb_pane_z(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        let wp = (*ft).wp;
+        let mut idx: u32 = 0;
+        if !wp.is_null() && window_pane_zindex(wp, &raw mut idx) == 0 {
+            return format!("{idx}").into();
+        }
+        format_table_type::None
+    }
+}
+
 /// Callback for `session_stack`.
 /// C `vendor/tmux/format.c:650`: `static void *format_cb_session_stack(struct format_tree *ft)`
 pub unsafe fn format_cb_session_stack(ft: *mut format_tree) -> format_table_type {
@@ -3468,6 +3520,7 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("pane_dead_time", format_cb_pane_dead_time),
     format_table_entry::new("pane_fg", format_cb_pane_fg),
     format_table_entry::new("pane_flags", format_cb_pane_flags),
+    format_table_entry::new("pane_floating_flag", format_cb_pane_floating_flag),
     format_table_entry::new("pane_format", format_cb_pane_format),
     format_table_entry::new("pane_height", format_cb_pane_height),
     format_table_entry::new("pane_id", format_cb_pane_id),
@@ -3494,6 +3547,9 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("pane_tty", format_cb_pane_tty),
     format_table_entry::new("pane_unseen_changes", format_cb_pane_unseen_changes),
     format_table_entry::new("pane_width", format_cb_pane_width),
+    format_table_entry::new("pane_x", format_cb_pane_x),
+    format_table_entry::new("pane_y", format_cb_pane_y),
+    format_table_entry::new("pane_z", format_cb_pane_z),
     format_table_entry::new("pane_zoomed_flag", format_cb_pane_zoomed_flag),
     format_table_entry::new("pid", format_cb_pid),
     format_table_entry::new("scroll_region_lower", format_cb_scroll_region_lower),

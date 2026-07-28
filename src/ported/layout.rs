@@ -85,6 +85,24 @@ pub unsafe fn layout_cell_is_tiled(lc: *mut layout_cell) -> c_int {
     }
 }
 
+/// C `vendor/tmux/layout.c:272`: `static int layout_cell_has_tiled_child(struct layout_cell *lc)`
+///
+/// Whether any descendant of `lc` is a tiled cell, i.e. whether `lc` takes part
+/// in the tiled flow at all.
+unsafe fn layout_cell_has_tiled_child(lc: *mut layout_cell) -> c_int {
+    unsafe {
+        if (*lc).type_ == layout_type::LAYOUT_WINDOWPANE {
+            return 0;
+        }
+        for lcchild in tailq_foreach(&raw mut (*lc).cells).map(NonNull::as_ptr) {
+            if layout_cell_is_tiled(lcchild) != 0 || layout_cell_has_tiled_child(lcchild) != 0 {
+                return 1;
+            }
+        }
+        0
+    }
+}
+
 /// C `vendor/tmux/layout.c:124`: `void layout_print_cell(struct layout_cell *lc, const char *hdr, u_int n)`
 pub unsafe fn layout_print_cell(lc: *mut layout_cell, hdr: *const u8, n: u32) {
     unsafe {
@@ -206,6 +224,13 @@ unsafe fn layout_fix_offsets1(lc: *mut layout_cell) {
             let mut xoff = (*lc).xoff;
             for lcchild in tailq_foreach(&raw mut (*lc).cells) {
                 let lcchild = lcchild.as_ptr();
+                // Floating cells carry their own offsets and take no space in
+                // the tiled flow, so skip them and anything holding only them.
+                if layout_cell_is_tiled(lcchild) == 0
+                    && layout_cell_has_tiled_child(lcchild) == 0
+                {
+                    continue;
+                }
                 (*lcchild).xoff = xoff;
                 (*lcchild).yoff = (*lc).yoff;
                 if (*lcchild).type_ != layout_type::LAYOUT_WINDOWPANE {
@@ -217,6 +242,11 @@ unsafe fn layout_fix_offsets1(lc: *mut layout_cell) {
             let mut yoff = (*lc).yoff;
             for lcchild in tailq_foreach(&raw mut (*lc).cells) {
                 let lcchild = lcchild.as_ptr();
+                if layout_cell_is_tiled(lcchild) == 0
+                    && layout_cell_has_tiled_child(lcchild) == 0
+                {
+                    continue;
+                }
                 (*lcchild).xoff = (*lc).xoff;
                 (*lcchild).yoff = yoff;
                 if (*lcchild).type_ != layout_type::LAYOUT_WINDOWPANE {
@@ -610,6 +640,97 @@ pub unsafe fn layout_resize_pane_to(wp: *mut window_pane, type_: layout_type, ne
 
         // Resize the pane
         layout_resize_pane(wp, type_, change, 1);
+    }
+}
+
+/// Resize a floating pane to an absolute size.
+/// C `vendor/tmux/layout.c:861`: `int layout_resize_floating_pane_to(struct window_pane *wp, enum layout_type type, u_int size, char **cause)`
+pub unsafe fn layout_resize_floating_pane_to(
+    wp: *mut window_pane,
+    type_: layout_type,
+    mut size: u32,
+    cause: *mut *mut u8,
+) -> c_int {
+    unsafe {
+        let lc = (*wp).layout_cell;
+
+        if (*lc).flags & LAYOUT_CELL_FLOATING == 0 {
+            *cause = xstrdup_(c"pane is not floating").as_ptr();
+            return -1;
+        }
+
+        // The requested size is the outer size; drop the two border rows or
+        // columns when the pane is drawn with a border.
+        if window_pane_get_pane_lines(wp) != pane_lines::PANE_LINES_NONE && size >= PANE_MINIMUM + 2
+        {
+            size -= 2;
+        }
+        if !(PANE_MINIMUM..=PANE_MAXIMUM).contains(&size) {
+            *cause = xstrdup_(c"size is too big or too small").as_ptr();
+            return -1;
+        }
+
+        if type_ == layout_type::LAYOUT_TOPBOTTOM {
+            if (*lc).sy == size {
+                return 0;
+            }
+            (*lc).sy = size;
+        } else {
+            if (*lc).sx == size {
+                return 0;
+            }
+            (*lc).sx = size;
+        }
+        redraw_invalidate_scene((*wp).window);
+        0
+    }
+}
+
+/// Resize a floating pane relative to its current size.
+/// C `vendor/tmux/layout.c:894`: `int layout_resize_floating_pane(struct window_pane *wp, enum layout_type type, int change, int opposite, char **cause)`
+pub unsafe fn layout_resize_floating_pane(
+    wp: *mut window_pane,
+    type_: layout_type,
+    change: c_int,
+    opposite: c_int,
+    cause: *mut *mut u8,
+) -> c_int {
+    unsafe {
+        let lc = (*wp).layout_cell;
+
+        if (*lc).flags & LAYOUT_CELL_FLOATING == 0 {
+            *cause = xstrdup_(c"pane is not floating").as_ptr();
+            return -1;
+        }
+        if change == 0 {
+            return 0;
+        }
+
+        // `opposite` grows the pane away from the anchored edge, so the offset
+        // moves back by the same amount the size grew.
+        if type_ == layout_type::LAYOUT_TOPBOTTOM {
+            let size = (*lc).sy as c_int + change;
+            if size < PANE_MINIMUM as c_int || size > PANE_MAXIMUM as c_int {
+                *cause = xstrdup_(c"change is too big or too small").as_ptr();
+                return -1;
+            }
+            (*lc).sy = size as u32;
+            if opposite != 0 {
+                (*lc).yoff = ((*lc).yoff as c_int - change) as u32;
+            }
+        } else {
+            let size = (*lc).sx as c_int + change;
+            if size < PANE_MINIMUM as c_int || size > PANE_MAXIMUM as c_int {
+                *cause = xstrdup_(c"change is too big or too small").as_ptr();
+                return -1;
+            }
+            (*lc).sx = size as u32;
+            if opposite != 0 {
+                (*lc).xoff = ((*lc).xoff as c_int - change) as u32;
+            }
+        }
+        redraw_invalidate_scene((*wp).window);
+        0
     }
 }
 

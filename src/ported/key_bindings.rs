@@ -60,12 +60,12 @@ macro_rules! DEFAULT_PANE_MENU {
             " '#{?mouse_hyperlink,Type #[underscore]#{=/9/...:mouse_hyperlink},}' 'C-h' {copy-mode -q; send-keys -l -- \"#{q:mouse_hyperlink}\"}",
             " '#{?mouse_hyperlink,Copy #[underscore]#{=/9/...:mouse_hyperlink},}' 'h' {copy-mode -q; set-buffer -- \"#{q:mouse_hyperlink}\"}",
             " ''",
-            " 'Horizontal Split' 'h' {split-window -h}",
-            " 'Vertical Split' 'v' {split-window -v}",
+            " '#{?#{!:#{pane_floating_flag}},Horizontal Split,}' 'h' {split-window -h}",
+            " '#{?#{!:#{pane_floating_flag}},Vertical Split,}' 'v' {split-window -v}",
             " ''",
-            " '#{?#{>:#{window_panes},1},,-}Swap Up' 'u' {swap-pane -U}",
-            " '#{?#{>:#{window_panes},1},,-}Swap Down' 'd' {swap-pane -D}",
-            " '#{?pane_marked_set,,-}Swap Marked' 's' {swap-pane}",
+            " '#{?#{&&:#{!:#{pane_floating_flag}},#{>:#{window_panes},1}},Swap Up,}' 'u' {swap-pane -U}",
+            " '#{?#{&&:#{!:#{pane_floating_flag}},#{>:#{window_panes},1}},Swap Down,}' 'd' {swap-pane -D}",
+            " '#{?#{!:#{pane_floating_flag}},#{?pane_marked_set,,-}Swap Marked,}' 's' {swap-pane}",
             " ''",
             " 'Kill' 'X' {kill-pane}",
             " 'Respawn' 'R' {respawn-pane -k}",
@@ -83,7 +83,9 @@ macro_rules! DEFAULT_PANE_MENU {
             " ''",
             " '#{?@ztmux-stacked,Unstack Panes,Stack Panes (zellij)}' 'k' {if -F '#{@ztmux-stacked}' {set -uw @ztmux-stacked ; select-layout even-vertical} {set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 999}}",
             " '#{?@ztmux-tab-bar,Hide Tab Bar,Tab Bar (zellij)}' 'T' {run-shell \"ztmux -S #{socket_path} tabs toggle\"}",
-            " 'Floating Pane (zellij)' 'f' {if -F '#{==:#{session_name},_ztmux_float}' {detach-client} {display-popup -E -w 80% -h 70% -T ' floating pane (prefix C-f to close) ' 'ztmux -S \"${TMUX%%,*}\" new-session -A -s _ztmux_float'}}",
+            " '#{?pane_floating_flag,Close Floating Pane,New Floating Pane}' 'f' {if -F '#{pane_floating_flag}' {kill-pane} {new-pane -x70% -y60%}}",
+            " '#{?pane_floating_flag,Centre Floating Pane,}' 'C' {move-pane -P centre}",
+            " '#{?pane_floating_flag,Raise Floating Pane,}' 'F' {move-pane -P front}",
             " 'Open URL / Path from Pane' 'o' {display-popup -E -w 80% -h 60% 'ztmux -S \"${TMUX%%,*}\" open'}",
         )
     };
@@ -401,7 +403,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
 /// C `vendor/tmux/key-bindings.c:349`: `void key_bindings_init(void)`
 pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
-    static DEFAULTS: [&str; 263] = [
+    static DEFAULTS: [&str; 268] = [
         // Prefix keys.
         "bind -N 'Send the prefix key' C-b { send-prefix }",
         "bind -N 'Rotate through the panes' C-o { rotate-window }",
@@ -420,6 +422,7 @@ pub unsafe fn key_bindings_init() {
         "bind -N 'Delete the most recent paste buffer' - { delete-buffer }",
         "bind -N 'Move the current window' . { command-prompt -T target { move-window -t '%%' } }",
         "bind -N 'Describe key binding' '/' { command-prompt -kpkey  { list-keys -1N '%%' } }",
+        "bind -N 'New floating pane' * { new-pane }",
         "bind -N 'Select window 0' 0 { select-window -t:=0 }",
         "bind -N 'Select window 1' 1 { select-window -t:=1 }",
         "bind -N 'Select window 2' 2 { select-window -t:=2 }",
@@ -457,8 +460,10 @@ pub unsafe fn key_bindings_init() {
         "bind -N 'Choose a window from a list' w { choose-tree -Zw }",
         "bind -N 'Kill the active pane' x { confirm-before -p\"kill-pane #P? (y/n)\" kill-pane }",
         "bind -N 'Zoom the active pane' z { resize-pane -Z }",
-        "bind -N 'Swap the active pane with the pane above' '{' { swap-pane -U }",
-        "bind -N 'Swap the active pane with the pane below' '}' { swap-pane -D }",
+        "bind -N 'Move pane to top-left corner' '{' { resize-pane -x50% -y50%; move-pane -P top-left }",
+        "bind -N 'Move pane to top-right corner' '}' { resize-pane -x50% -y50%; move-pane -P top-right }",
+        "bind -N 'Move pane to bottom-left corner' 'M-{' { resize-pane -x50% -y50%; move-pane -P bottom-left }",
+        "bind -N 'Move pane to bottom-right corner' 'M-}' { resize-pane -x50% -y50%; move-pane -P bottom-right }",
         "bind -N 'Show messages' '~' { show-messages }",
         "bind -N 'Enter copy mode and scroll up' PPage { copy-mode -u }",
         "bind -N 'Select the pane above the active pane' -r Up { select-pane -U }",
@@ -495,6 +500,7 @@ pub unsafe fn key_bindings_init() {
         "bind -n MouseDown1Pane { select-pane -t=; send -M }",
         /* Mouse button 1 drag on pane. */
         "bind -n MouseDrag1Pane { if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -M } }",
+        "bind -n M-MouseDrag1Pane { move-pane -M }",
         /* Mouse wheel up on pane. */
         "bind -n WheelUpPane { if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -e } }",
         /* Mouse button 2 down on pane. */
@@ -505,6 +511,7 @@ pub unsafe fn key_bindings_init() {
         "bind -n TripleClick1Pane { select-pane -t=; if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -H; send -X select-line; run -d0.3; send -X copy-pipe-and-cancel } }",
         /* Mouse button 1 drag on border. */
         "bind -n MouseDrag1Border { resize-pane -M }",
+        "bind -n M-MouseDrag1Border { move-pane -M }",
         /* ztmux: right-click a pane BORDER for the pane context menu. Bound to
          * the border (not the pane body) so a TUI running inside the pane keeps
          * all its own right-click/mouse events - the menu never shadows it. `-O`
@@ -709,13 +716,14 @@ pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
     static ZTMUX_EXTENSION_BINDINGS: [&str; 15] = [
         "bind -N 'ztmux: live server dashboard' C-d { display-popup -E -w 90% -h 90% 'ztmux -S \"${TMUX%%,*}\" dashboard' }",
-        // Zellij-style floating pane: a persistent pane that floats above the
-        // tiled layout in a popup. It lives in a hidden `_ztmux_float` holding
-        // session (state kept between toggles); `new-session -A` attaches it or
-        // creates it on first use. Pressing the key again *inside* the float
-        // (its session name matches) detaches, closing the popup. So `prefix C-f`
-        // both opens and closes it.
-        "bind -N 'ztmux: toggle floating pane' C-f { if -F '#{==:#{session_name},_ztmux_float}' { detach-client } { display-popup -E -w 80% -h 70% -T ' floating pane (prefix C-f to close) ' 'ztmux -S \"${TMUX%%,*}\" new-session -A -s _ztmux_float' } }",
+        // Toggle a real floating pane: a genuine window pane with a floating
+        // layout cell, so it can be moved (`move-pane`, M-drag) and resized
+        // (`resize-pane`, border drag) like any other pane. Pressing the key
+        // while the floating pane is active kills it, so `prefix C-f` both
+        // opens and closes it. The earlier `display-popup` version of this
+        // binding could not move or resize — popup geometry is fixed at
+        // creation — and is gone.
+        "bind -N 'ztmux: toggle floating pane' C-f { if -F '#{pane_floating_flag}' { kill-pane } { new-pane -x70% -y60% } }",
         "bind -N 'ztmux: session/window/pane picker' S { display-popup -E -w 80% -h 70% 'ztmux -S \"${TMUX%%,*}\" switcher' }",
         "bind -N 'ztmux: server tree' T { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" tree | less -R' }",
         "bind -N 'ztmux: environment/server health check' H { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" doctor | less -R' }",

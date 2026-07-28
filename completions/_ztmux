@@ -88,6 +88,7 @@ _ztmux_aliasmap=(
     lsw         list-windows
     movep       move-pane
     movew       move-window
+    newp        new-pane
     neww        new-window
     nextl       next-layout
     next        next-window
@@ -587,7 +588,34 @@ _ztmux-lock-session() {
 }
 
 _ztmux-move-pane() {
- _ztmux-join-pane "$@"
+  [[ -n ${tmux_describe} ]] && print "move a pane, or reposition a floating one" && return
+  # Beyond join-pane's flags, move-pane repositions/restacks a FLOATING pane:
+  # -P places it, -X/-Y/-U/-L/-R offset it, -z sets its z-index, -M drags it.
+  # NB: upstream's args template has no -D, so it is not offered here.
+  _arguments -s -A "-*" -S \
+    '(-b)-a[move pane to next index after destination pane]' \
+    '(-a)-b[move pane to next index before destination pane]' \
+    "-d[don't make the moved pane become the active one]" \
+    '-f[move pane to span the full window width or height]' \
+    '-h[split the destination pane horizontally]' \
+    '-v[split the destination pane vertically]' \
+    '-l+[specify size]:size' \
+    '-M[begin mouse dragging of a floating pane]' \
+    '-P+[place a floating pane at a position]:position:(
+      top-left top-centre top-center top-right
+      centre-left center-left centre center centre-right center-right
+      bottom-left bottom-centre bottom-center bottom-right
+      top-left-centre top-left-center top-right-centre top-right-center
+      bottom-left-centre bottom-left-center bottom-right-centre bottom-right-center
+      front back forward backward forward-loop backward-loop)' \
+    '-X+[set the x position of a floating pane]:x position' \
+    '-Y+[set the y position of a floating pane]:y position' \
+    '-U[move a floating pane up]' \
+    '-L[move a floating pane left]' \
+    '-R[move a floating pane right]' \
+    '-z+[set the z-index of a floating pane]:z-index' \
+    '-s+[specify source pane]:pane:__ztmux-panes' \
+    '-t+[specify destination pane]:pane:__ztmux-panes'
 }
 
 _ztmux-move-window() {
@@ -600,6 +628,41 @@ _ztmux-move-window() {
     '-s+[specify source window]:window:__ztmux-windows' \
     '-r[renumber windows in session in sequential order]' \
     '-t+[specify destination window]:window:__ztmux-windows'
+}
+
+_ztmux-new-pane() {
+  [[ -n ${tmux_describe} ]] && print "create a new floating pane" && return
+  # Same exec as split-window, but the pane floats above the layout unless -L is
+  # given; -x/-y size it and -X/-Y place it (all accept a % suffix).
+  _arguments -s \
+    '-b[create new pane left of or above target pane]' \
+    '-B+[set the border lines for the pane]:lines:(single double heavy simple number none)' \
+    '-c+[specify working directory for the pane]:directory:_directories' \
+    "-d[don't make the new pane become the active one]" \
+    '*-e[specify environment variable]:environment variable:_parameters -g "*export*" -qS=' \
+    '-E[close the pane when the command exits]' \
+    '-F+[specify output format]:format:__ztmux-formats' \
+    '(-l)-f[create new pane spanning full window width or height]' \
+    '-h[split horizontally]' \
+    '-v[split vertically]' \
+    '-I[create empty pane and forward stdin to it]' \
+    '-k[kill an existing pane at the target]' \
+    "(-p)-l[define new pane's size]:size" \
+    '-L[create a tiled pane instead of a floating one]' \
+    '-m+[specify a message to show in the pane]:message' \
+    '-P[print information about the new pane]' \
+    '-s+[specify style for the pane]:style' \
+    '-S+[specify active border style]:style' \
+    '-R+[specify inactive border style]:style' \
+    '-T+[specify title for the pane]:title' \
+    '-t+[specify target pane]:pane:__ztmux-panes' \
+    '-W[wait for a key before closing the pane]' \
+    '-x+[specify width]:width' \
+    '-y+[specify height]:height' \
+    '-X+[specify x position]:x position' \
+    '-Y+[specify y position]:y position' \
+    '-Z[zoom the pane]' \
+    ':command:_cmdambivalent'
 }
 
 _ztmux-new-session() {
