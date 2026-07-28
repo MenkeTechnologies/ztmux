@@ -134,10 +134,21 @@ unsafe fn cmd_join_pane_place(
             }
             "back" => {
                 tailq_remove::<_, discr_zentry>(zi, wp);
-                match first_tiled_pane(w) {
-                    Some(owp) => tailq_insert_before::<_, discr_zentry>(owp, wp),
-                    None => tailq_insert_tail::<_, discr_zentry>(zi, wp),
-                }
+{{
+                    // First non-floating pane: floats stack in front of it.
+                    let mut before = null_mut();
+                    for owp in tailq_foreach::<_, discr_zentry>(zi).map(NonNull::as_ptr) {{
+                        if window_pane_is_floating(owp) == 0 {{
+                            before = owp;
+                            break;
+                        }}
+                    }}
+                    if !before.is_null() {{
+                        tailq_insert_before::<_, discr_zentry>(before, wp);
+                    }} else {{
+                        tailq_insert_tail::<_, discr_zentry>(zi, wp);
+                    }}
+                }}
             }
             "forward" => {
                 let owp = tailq_prev::<_, window_pane, discr_zentry>(wp);
@@ -159,10 +170,21 @@ unsafe fn cmd_join_pane_place(
                 if !owp.is_null() {
                     tailq_insert_before::<_, discr_zentry>(owp, wp);
                 } else {
-                    match first_tiled_pane(w) {
-                        Some(owp) => tailq_insert_before::<_, discr_zentry>(owp, wp),
-                        None => tailq_insert_tail::<_, discr_zentry>(zi, wp),
-                    }
+{{
+                    // First non-floating pane: floats stack in front of it.
+                    let mut before = null_mut();
+                    for owp in tailq_foreach::<_, discr_zentry>(zi).map(NonNull::as_ptr) {{
+                        if window_pane_is_floating(owp) == 0 {{
+                            before = owp;
+                            break;
+                        }}
+                    }}
+                    if !before.is_null() {{
+                        tailq_insert_before::<_, discr_zentry>(before, wp);
+                    }} else {{
+                        tailq_insert_tail::<_, discr_zentry>(zi, wp);
+                    }}
+                }}
                 }
             }
             "backward-loop" => {
@@ -189,16 +211,6 @@ unsafe fn cmd_join_pane_place(
         server_redraw_window(w);
 
         cmd_retval::CMD_RETURN_NORMAL
-    }
-}
-
-/// First non-floating pane in the z-index list, i.e. the point floating panes
-/// are stacked in front of.
-unsafe fn first_tiled_pane(w: *mut window) -> Option<*mut window_pane> {
-    unsafe {
-        tailq_foreach::<_, discr_zentry>(&raw mut (*w).z_index)
-            .map(NonNull::as_ptr)
-            .find(|&owp| window_pane_is_floating(owp) == 0)
     }
 }
 
@@ -344,8 +356,22 @@ unsafe fn cmd_join_pane_mouse_move(c: *mut client, m: *mut mouse_event) {
         let w = (*wl).window;
         let lc = (*wp).layout_cell;
 
-        let (x, y) = cmd_mouse_position((*m).x as c_int, (*m).y as c_int, m);
-        let (lx, ly) = cmd_mouse_position((*m).lx as c_int, (*m).ly as c_int, m);
+        // Mouse position in window coordinates; the C repeats this inline at
+        // both sites (cmd-resize-pane.c:260, cmd-join-pane.c:310).
+let mut y = (*m).y as c_int + (*m).oy as c_int;
+        if (*m).statusat == 0 && y >= (*m).statuslines as c_int {
+            y -= (*m).statuslines as c_int;
+        } else if (*m).statusat > 0 && y >= (*m).statusat {
+            y = (*m).statusat - 1;
+        }
+        let x = (*m).x as c_int + (*m).ox as c_int;
+        let mut ly = (*m).ly as c_int + (*m).oy as c_int;
+        if (*m).statusat == 0 && ly >= (*m).statuslines as c_int {
+            ly -= (*m).statuslines as c_int;
+        } else if (*m).statusat > 0 && ly >= (*m).statusat {
+            ly = (*m).statusat - 1;
+        }
+        let lx = (*m).lx as c_int + (*m).ox as c_int;
 
         if x != lx || y != ly {
             (*lc).xoff = ((*lc).xoff as c_int + (x - lx)) as u32;

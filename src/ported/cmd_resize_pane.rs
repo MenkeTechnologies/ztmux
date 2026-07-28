@@ -274,8 +274,22 @@ unsafe fn cmd_resize_pane_mouse_resize_move_floating(c: *mut client, m: *mut mou
         let top = (*wp).yoff as c_int - 1;
         let bottom = (*wp).yoff as c_int + sy;
 
-        let (x, y) = cmd_mouse_position((*m).x as c_int, (*m).y as c_int, m);
-        let (lx, ly) = cmd_mouse_position((*m).lx as c_int, (*m).ly as c_int, m);
+        // Mouse position in window coordinates; the C repeats this inline at
+        // both sites (cmd-resize-pane.c:260, cmd-join-pane.c:310).
+let mut y = (*m).y as c_int + (*m).oy as c_int;
+        if (*m).statusat == 0 && y >= (*m).statuslines as c_int {
+            y -= (*m).statuslines as c_int;
+        } else if (*m).statusat > 0 && y >= (*m).statusat {
+            y = (*m).statusat - 1;
+        }
+        let x = (*m).x as c_int + (*m).ox as c_int;
+        let mut ly = (*m).ly as c_int + (*m).oy as c_int;
+        if (*m).statusat == 0 && ly >= (*m).statuslines as c_int {
+            ly -= (*m).statuslines as c_int;
+        } else if (*m).statusat > 0 && ly >= (*m).statusat {
+            ly = (*m).statusat - 1;
+        }
+        let lx = (*m).lx as c_int + (*m).ox as c_int;
 
         let clamp = |v: c_int| v.max(PANE_MINIMUM as c_int);
 

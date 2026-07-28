@@ -59,16 +59,18 @@ pub unsafe fn window_visible_ranges(
     mut r: *mut visible_ranges,
 ) -> *mut visible_ranges {
     unsafe {
-        if py < 0 || width == 0 {
-            return window_visible_ranges_empty(r);
-        }
-        if px < 0 {
-            if (-px) as u32 >= width {
-                return window_visible_ranges_empty(r);
+        // `'empty` stands in for the C's `goto empty`.
+        'empty: {
+            if py < 0 || width == 0 {
+                break 'empty;
             }
-            width -= (-px) as u32;
-            px = 0;
-        }
+            if px < 0 {
+                if (-px) as u32 >= width {
+                    break 'empty;
+                }
+                width -= (-px) as u32;
+                px = 0;
+            }
 
         if base_wp.is_null() {
             if !r.is_null() {
@@ -84,10 +86,12 @@ pub unsafe fn window_visible_ranges(
 
         let w = (*base_wp).window;
         if py as u32 >= (*w).sy {
-            return window_visible_ranges_empty(r);
+            break 'empty;
         }
         if px as u32 + width > (*w).sx {
-            width = (*w).sx - px as u32;
+            // `window-visible.c:87` in u_int: px past the window wraps here,
+            // and the huge width is clamped by the callers' own bounds checks.
+            width = (*w).sx.wrapping_sub(px as u32);
         }
 
         if r.is_null() {
@@ -196,13 +200,10 @@ pub unsafe fn window_visible_ranges(
                 i += 1;
             }
         }
-        r
-    }
-}
+        return r;
+        } // 'empty
 
-/// C `vendor/tmux/window-visible.c:218`: the `empty:` label.
-unsafe fn window_visible_ranges_empty(r: *mut visible_ranges) -> *mut visible_ranges {
-    unsafe {
+        // C `window-visible.c:218`: the `empty:` label.
         if r.is_null() {
             let sr = &raw mut STATIC_RANGES;
             server_client_ensure_ranges(sr, 1);
@@ -213,3 +214,4 @@ unsafe fn window_visible_ranges_empty(r: *mut visible_ranges) -> *mut visible_ra
         r
     }
 }
+

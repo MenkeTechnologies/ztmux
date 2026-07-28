@@ -258,10 +258,23 @@ pub unsafe fn screen_write_pane_is_obscured(ctx: *mut screen_write_ctx) -> bool 
         (*ctx).flags |= SCREEN_WRITE_CHECKED_IF_OBSCURED;
 
         let w = (*base).window;
-        if (*base).xoff + (*base).sx > (*w).sx || (*base).yoff + (*base).sy > (*w).sy {
+        // `screen-write.c` also tests `xoff < 0 || yoff < 0` first, which only
+        // makes sense on the C's signed offsets — see the note below.
+        if ((*base).xoff as i32) < 0
+            || ((*base).yoff as i32) < 0
+            || (*base).xoff as i32 + (*base).sx as i32 > (*w).sx as i32
+            || (*base).yoff as i32 + (*base).sy as i32 > (*w).sy as i32
+        {
             (*ctx).flags |= SCREEN_WRITE_OBSCURED;
             return true;
         }
+
+        // `tmux.h:1518` types window_pane.xoff/yoff as int, so a floating pane
+        // pushed past an edge carries a negative offset. ztmux still stores them
+        // as u32, where that reads as ~4.29e9 and every comparison below would
+        // overflow; reinterpreting as i32 recovers the C's value and semantics.
+        let (bx, by) = ((*base).xoff as i32, (*base).yoff as i32);
+        let (bsx, bsy) = ((*base).sx as i32, (*base).sy as i32);
 
         // Walk toward the head of the z-index: those panes are drawn above.
         let mut wp = base;
@@ -270,12 +283,12 @@ pub unsafe fn screen_write_pane_is_obscured(ctx: *mut screen_write_ctx) -> bool 
             if wp.is_null() {
                 return false;
             }
-            let overlaps_y = ((*wp).yoff >= (*base).yoff && (*wp).yoff <= (*base).yoff + (*base).sy)
-                || ((*wp).yoff + (*wp).sy >= (*base).yoff
-                    && (*wp).yoff + (*wp).sy <= (*base).yoff + (*base).sy);
-            let overlaps_x = ((*wp).xoff >= (*base).xoff && (*wp).xoff <= (*base).xoff + (*base).sx)
-                || ((*wp).xoff + (*wp).sx >= (*base).xoff
-                    && (*wp).xoff + (*wp).sx <= (*base).xoff + (*base).sx);
+            let (px, py) = ((*wp).xoff as i32, (*wp).yoff as i32);
+            let (psx, psy) = ((*wp).sx as i32, (*wp).sy as i32);
+            let overlaps_y =
+                (py >= by && py <= by + bsy) || (py + psy >= by && py + psy <= by + bsy);
+            let overlaps_x =
+                (px >= bx && px <= bx + bsx) || (px + psx >= bx && px + psx <= bx + bsx);
             if window_pane_is_floating(wp) != 0 && overlaps_y && overlaps_x {
                 (*ctx).flags |= SCREEN_WRITE_OBSCURED;
                 return true;
@@ -326,7 +339,13 @@ unsafe fn screen_write_redraw_line(
             if cx >= sx {
                 continue;
             }
-            (*ttyctx).num = if cx + ri.nx > sx { sx - cx } else { ri.nx };
+            // `screen-write.c:1221` computes this in u_int; a range wider than
+            // the pane wraps there rather than aborting.
+            (*ttyctx).num = if cx.wrapping_add(ri.nx) > sx {
+                sx.wrapping_sub(cx)
+            } else {
+                ri.nx
+            };
             if (*ttyctx).num == 0 {
                 continue;
             }
@@ -2061,7 +2080,13 @@ pub unsafe fn screen_write_clearendofscreen(ctx: *mut screen_write_ctx, bg: u32)
                 sx - (*s).cx,
                 null_mut(),
             );
-            screen_write_insert_clear_ranges(ctx, r, xoff, bg);
+            for i in 0..(*r).used as usize {
+                let ri = *(*r).ranges.add(i);
+                if ri.nx == 0 {
+                    continue;
+                }
+                screen_write_collect_insert_clear(ctx, (ri.px as c_int - xoff) as u32, ri.nx, bg);
+            }
         }
 
         // Below cursor to bottom.
@@ -2069,28 +2094,15 @@ pub unsafe fn screen_write_clearendofscreen(ctx: *mut screen_write_ctx, bg: u32)
             screen_write_set_cursor(ctx, 0, y as i32);
             let r =
                 window_visible_ranges((*ctx).wp, xoff, yoff + y as c_int, sx, null_mut());
-            screen_write_insert_clear_ranges(ctx, r, xoff, bg);
+            for i in 0..(*r).used as usize {
+                let ri = *(*r).ranges.add(i);
+                if ri.nx == 0 {
+                    continue;
+                }
+                screen_write_collect_insert_clear(ctx, (ri.px as c_int - xoff) as u32, ri.nx, bg);
+            }
         }
         screen_write_set_cursor(ctx, ocx as i32, ocy as i32);
-    }
-}
-
-/// Queue a clear for each non-empty span in `r`, converting window coordinates
-/// back to pane coordinates.
-unsafe fn screen_write_insert_clear_ranges(
-    ctx: *mut screen_write_ctx,
-    r: *mut visible_ranges,
-    xoff: c_int,
-    bg: u32,
-) {
-    unsafe {
-        for i in 0..(*r).used as usize {
-            let ri = *(*r).ranges.add(i);
-            if ri.nx == 0 {
-                continue;
-            }
-            screen_write_collect_insert_clear(ctx, (ri.px as c_int - xoff) as u32, ri.nx, bg);
-        }
     }
 }
 
@@ -2140,7 +2152,13 @@ pub unsafe fn screen_write_clearstartofscreen(ctx: *mut screen_write_ctx, bg: u3
         for y in 0..(*s).cy {
             screen_write_set_cursor(ctx, 0, y as i32);
             let r = window_visible_ranges((*ctx).wp, xoff, yoff + y as c_int, sx, null_mut());
-            screen_write_insert_clear_ranges(ctx, r, xoff, bg);
+            for i in 0..(*r).used as usize {
+                let ri = *(*r).ranges.add(i);
+                if ri.nx == 0 {
+                    continue;
+                }
+                screen_write_collect_insert_clear(ctx, (ri.px as c_int - xoff) as u32, ri.nx, bg);
+            }
         }
 
         // Last line (containing the cursor).
@@ -2152,7 +2170,13 @@ pub unsafe fn screen_write_clearstartofscreen(ctx: *mut screen_write_ctx, bg: u3
             (*s).cx + 1,
             null_mut(),
         );
-        screen_write_insert_clear_ranges(ctx, r, xoff, bg);
+        for i in 0..(*r).used as usize {
+                let ri = *(*r).ranges.add(i);
+                if ri.nx == 0 {
+                    continue;
+                }
+                screen_write_collect_insert_clear(ctx, (ri.px as c_int - xoff) as u32, ri.nx, bg);
+            }
         screen_write_set_cursor(ctx, ocx as i32, ocy as i32);
     }
 }
@@ -2204,7 +2228,13 @@ pub unsafe fn screen_write_clearscreen(ctx: *mut screen_write_ctx, bg: u32) {
         for y in 0..sy {
             screen_write_set_cursor(ctx, 0, y as i32);
             let r = window_visible_ranges((*ctx).wp, xoff, yoff + y as c_int, sx, null_mut());
-            screen_write_insert_clear_ranges(ctx, r, xoff, bg);
+            for i in 0..(*r).used as usize {
+                let ri = *(*r).ranges.add(i);
+                if ri.nx == 0 {
+                    continue;
+                }
+                screen_write_collect_insert_clear(ctx, (ri.px as c_int - xoff) as u32, ri.nx, bg);
+            }
         }
         screen_write_set_cursor(ctx, ocx as i32, ocy as i32);
     }
