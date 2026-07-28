@@ -284,6 +284,86 @@ pub unsafe fn screen_write_pane_is_obscured(ctx: *mut screen_write_ctx) -> bool 
     }
 }
 
+/// Whether `gc` is a plain single-width printable cell, so a one-column redraw
+/// can be sent as a single cell rather than a whole line.
+/// C `vendor/tmux/screen-write.c`: `static int screen_write_cell_is_single(const struct grid_cell *gc)`
+unsafe fn screen_write_cell_is_single(gc: *const grid_cell) -> bool {
+    unsafe {
+        (*gc).data.width == 1
+            && (*gc).data.size == 1
+            && (*gc).data.data[0] >= 0x20
+            && (*gc).data.data[0] != 0x7f
+            && !(*gc).flags.intersects(
+                grid_flag::CLEARED | grid_flag::PADDING | grid_flag::TAB,
+            )
+    }
+}
+
+/// Redraw all visible cells on one line of the pane, skipping the spans a
+/// floating pane covers.
+/// C `vendor/tmux/screen-write.c:1201`: `static void screen_write_redraw_line(struct screen_write_ctx *ctx, struct tty_ctx *ttyctx, u_int yy)`
+unsafe fn screen_write_redraw_line(
+    ctx: *mut screen_write_ctx,
+    ttyctx: *mut tty_ctx,
+    yy: u32,
+) {
+    unsafe {
+        let wp = (*ctx).wp;
+        let s = (*ctx).s;
+        let sx = screen_size_x(s);
+        let mut gc: grid_cell = zeroed();
+        let mut ngc: grid_cell = zeroed();
+        let (xoff, yoff) = ((*wp).xoff as c_int, (*wp).yoff as c_int);
+
+        let r = window_visible_ranges(wp, xoff, yoff + yy as c_int, sx, null_mut());
+        for i in 0..(*r).used as usize {
+            let ri = *(*r).ranges.add(i);
+            if ri.nx == 0 {
+                continue;
+            }
+
+            let cx = (ri.px as c_int - xoff) as u32;
+            if cx >= sx {
+                continue;
+            }
+            (*ttyctx).num = if cx + ri.nx > sx { sx - cx } else { ri.nx };
+            if (*ttyctx).num == 0 {
+                continue;
+            }
+            (*ttyctx).ocx = cx;
+            (*ttyctx).ocy = yy;
+
+            if (*ttyctx).num != 1 {
+                tty_write(tty_cmd_redrawline, ttyctx);
+                continue;
+            }
+
+            grid_view_get_cell((*s).grid, cx, yy, &raw mut gc);
+            if !screen_write_cell_is_single(&raw const gc) {
+                tty_write(tty_cmd_redrawline, ttyctx);
+                continue;
+            }
+            if !gc.flags.intersects(grid_flag::SELECTED) {
+                (*ttyctx).cell = &raw const gc;
+            } else {
+                screen_select_cell(s, &raw mut ngc, &raw const gc);
+                (*ttyctx).cell = &raw const ngc;
+            }
+            tty_write(tty_cmd_cell, ttyctx);
+        }
+    }
+}
+
+/// Redraw all visible cells in a pane.
+/// C `vendor/tmux/screen-write.c:1290`: `static void screen_write_redraw_pane(struct screen_write_ctx *ctx, struct tty_ctx *ttyctx)`
+unsafe fn screen_write_redraw_pane(ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx) {
+    unsafe {
+        for yy in 0..screen_size_y((*ctx).s) {
+            screen_write_redraw_line(ctx, ttyctx, yy);
+        }
+    }
+}
+
 /// Queue a clear of `nx` cells at `px` on the current line.
 /// C `vendor/tmux/screen-write.c`: `static void screen_write_collect_insert_clear(struct screen_write_ctx *ctx, u_int px, u_int nx, u_int bg)`
 unsafe fn screen_write_collect_insert_clear(
@@ -1298,7 +1378,11 @@ pub unsafe fn screen_write_alignmenttest(ctx: *mut screen_write_ctx) {
         screen_write_initctx(ctx, &raw mut ttyctx, 1);
 
         screen_write_collect_clear(ctx, 0, screen_size_y(s) - 1);
-        tty_write(tty_cmd_alignmenttest, &raw mut ttyctx);
+        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
+        } else {
+            tty_write(tty_cmd_alignmenttest, &raw mut ttyctx);
+        }
     }
 }
 
@@ -1338,7 +1422,11 @@ pub unsafe fn screen_write_insertcharacter(ctx: *mut screen_write_ctx, mut nx: u
 
         screen_write_collect_flush(ctx, 0, "screen_write_insertcharacter");
         ttyctx.num = nx;
-        tty_write(tty_cmd_insertcharacter, &raw mut ttyctx);
+        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
+        } else {
+            tty_write(tty_cmd_insertcharacter, &raw mut ttyctx);
+        }
     }
 }
 
@@ -1378,7 +1466,11 @@ pub unsafe fn screen_write_deletecharacter(ctx: *mut screen_write_ctx, mut nx: u
 
         screen_write_collect_flush(ctx, 0, "screen_write_deletecharacter");
         ttyctx.num = nx;
-        tty_write(tty_cmd_deletecharacter, &raw mut ttyctx);
+        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
+        } else {
+            tty_write(tty_cmd_deletecharacter, &raw mut ttyctx);
+        }
     }
 }
 
@@ -1418,7 +1510,11 @@ pub unsafe fn screen_write_clearcharacter(ctx: *mut screen_write_ctx, mut nx: u3
 
         screen_write_collect_flush(ctx, 0, "screen_write_clearcharacter");
         ttyctx.num = nx;
-        tty_write(tty_cmd_clearcharacter, &raw mut ttyctx);
+        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
+        } else {
+            tty_write(tty_cmd_clearcharacter, &raw mut ttyctx);
+        }
     }
 }
 
@@ -1457,7 +1553,11 @@ pub unsafe fn screen_write_insertline(ctx: *mut screen_write_ctx, mut ny: u32, b
 
             screen_write_collect_flush(ctx, 0, "screen_write_insertline");
             ttyctx.num = ny;
-            tty_write(tty_cmd_insertline, &raw mut ttyctx);
+            if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+                screen_write_redraw_pane(ctx, &raw mut ttyctx);
+            } else {
+                tty_write(tty_cmd_insertline, &raw mut ttyctx);
+            }
             return;
         }
 
@@ -1480,7 +1580,11 @@ pub unsafe fn screen_write_insertline(ctx: *mut screen_write_ctx, mut ny: u32, b
         screen_write_collect_flush(ctx, 0, "screen_write_insertline");
 
         ttyctx.num = ny;
-        tty_write(tty_cmd_insertline, &raw mut ttyctx);
+        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
+        } else {
+            tty_write(tty_cmd_insertline, &raw mut ttyctx);
+        }
     }
 }
 
@@ -1519,7 +1623,11 @@ pub unsafe fn screen_write_deleteline(ctx: *mut screen_write_ctx, mut ny: u32, b
 
             screen_write_collect_flush(ctx, 0, "screen_write_deleteline");
             ttyctx.num = ny;
-            tty_write(tty_cmd_deleteline, &raw mut ttyctx);
+            if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+                screen_write_redraw_pane(ctx, &raw mut ttyctx);
+            } else {
+                tty_write(tty_cmd_deleteline, &raw mut ttyctx);
+            }
             return;
         }
 
@@ -1541,7 +1649,11 @@ pub unsafe fn screen_write_deleteline(ctx: *mut screen_write_ctx, mut ny: u32, b
 
         screen_write_collect_flush(ctx, 0, "screen_write_deleteline");
         ttyctx.num = ny;
-        tty_write(tty_cmd_deleteline, &raw mut ttyctx);
+        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
+        } else {
+            tty_write(tty_cmd_deleteline, &raw mut ttyctx);
+        }
     }
 }
 
@@ -1719,7 +1831,11 @@ pub unsafe fn screen_write_reverseindex(ctx: *mut screen_write_ctx, bg: u32) {
             screen_write_initctx(ctx, &raw mut ttyctx, 1);
             ttyctx.bg = bg;
 
-            tty_write(tty_cmd_reverseindex, &raw mut ttyctx);
+            if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+                screen_write_redraw_pane(ctx, &raw mut ttyctx);
+            } else {
+                tty_write(tty_cmd_reverseindex, &raw mut ttyctx);
+            }
         } else if (*s).cy > 0 {
             screen_write_set_cursor(ctx, -1, (*s).cy as i32 - 1);
         }
@@ -1868,7 +1984,11 @@ pub unsafe fn screen_write_scrolldown(ctx: *mut screen_write_ctx, mut lines: u32
 
         screen_write_collect_flush(ctx, 0, "screen_write_scrolldown");
         ttyctx.num = lines;
-        tty_write(tty_cmd_scrolldown, &raw mut ttyctx);
+        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
+        } else {
+            tty_write(tty_cmd_scrolldown, &raw mut ttyctx);
+        }
     }
 }
 
@@ -2343,7 +2463,11 @@ unsafe fn screen_write_collect_flush_line(ctx: *mut screen_write_ctx, y: u32) ->
                     screen_write_initctx(ctx, &raw mut ttyctx, 1);
                     ttyctx.bg = (*ci).bg;
                     ttyctx.num = w_length;
-                    tty_write(tty_cmd_clearcharacter, &raw mut ttyctx);
+                    if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+                        screen_write_redraw_pane(ctx, &raw mut ttyctx);
+                    } else {
+                        tty_write(tty_cmd_clearcharacter, &raw mut ttyctx);
+                    }
                 } else {
                     screen_write_initctx(ctx, &raw mut ttyctx, 0);
                     ttyctx.cell = &(*ci).gc;
@@ -2633,7 +2757,11 @@ pub unsafe fn screen_write_cell(ctx: *mut screen_write_ctx, gc: *const grid_cell
         if (*s).mode.intersects(mode_flag::MODE_INSERT) {
             screen_write_collect_flush(ctx, 0, "screen_write_cell");
             ttyctx.num = width;
-            tty_write(tty_cmd_insertcharacter, &raw mut ttyctx);
+            if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+                screen_write_redraw_pane(ctx, &raw mut ttyctx);
+            } else {
+                tty_write(tty_cmd_insertcharacter, &raw mut ttyctx);
+            }
         }
 
         // Write to the screen.
