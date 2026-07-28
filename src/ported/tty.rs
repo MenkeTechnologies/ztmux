@@ -732,7 +732,7 @@ pub unsafe fn tty_putc(tty: *mut tty, ch: u8) {
             && ch >= 0x20
             && ch != 0x7f
             && (*tty).cy == (*tty).sy - 1
-            && (*tty).cx + 1 >= (*tty).sx
+            && (*tty).cx.wrapping_add(1) >= (*tty).sx
         {
             return;
         }
@@ -776,16 +776,20 @@ pub unsafe fn tty_putc(tty: *mut tty, ch: u8) {
 /// C `vendor/tmux/tty.c:693`: `void tty_putn(struct tty *tty, const void *buf, size_t len, u_int width)`
 pub unsafe fn tty_putn(tty: *mut tty, buf: *const c_void, mut len: usize, width: u32) {
     unsafe {
+        // tty->cx is u_int and carries UINT_MAX as the "cursor position
+        // unknown" sentinel (set below, and cleared by the next tty_cursor).
+        // The C does all of this in unsigned and lets it wrap; wrapping_* keeps
+        // that instead of panicking once the sentinel is in play.
         if (*(*tty).term).flags.intersects(term_flags::TERM_NOAM)
             && (*tty).cy == (*tty).sy - 1
             && (*tty).cx as usize + len >= (*tty).sx as usize
         {
-            len = ((*tty).sx - (*tty).cx - 1) as usize;
+            len = (*tty).sx.wrapping_sub((*tty).cx).wrapping_sub(1) as usize;
         }
 
         tty_add(tty, buf.cast(), len);
-        if (*tty).cx + width > (*tty).sx {
-            (*tty).cx = ((*tty).cx + width) - (*tty).sx;
+        if (*tty).cx.wrapping_add(width) > (*tty).sx {
+            (*tty).cx = (*tty).cx.wrapping_add(width).wrapping_sub((*tty).sx);
             if (*tty).cx <= (*tty).sx {
                 (*tty).cy += 1;
             } else {
@@ -793,7 +797,7 @@ pub unsafe fn tty_putn(tty: *mut tty, buf: *const c_void, mut len: usize, width:
                 (*tty).cy = u32::MAX;
             }
         } else {
-            (*tty).cx += width;
+            (*tty).cx = (*tty).cx.wrapping_add(width);
         }
     }
 }
