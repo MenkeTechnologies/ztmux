@@ -999,7 +999,6 @@ pub unsafe fn window_pane_is_floating(wp: *mut window_pane) -> c_int {
     }
 }
 
-#[expect(dead_code)] // floating-pane API, consumed from the next phase (F1+)
 /// C `vendor/tmux/window.c`: `int window_has_floating_panes(struct window *w)`
 pub unsafe fn window_has_floating_panes(w: *mut window) -> c_int {
     unsafe {

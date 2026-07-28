@@ -829,6 +829,31 @@ pub unsafe fn screen_redraw_draw_borders_cell(ctx: *mut screen_redraw_ctx, i: u3
             }
         }
 
+        // A visible floating pane is drawn above the tiled layout, so a tiled
+        // border must never be painted into the area one covers — including the
+        // float's own border ring, which the pane pass draws. Without this a
+        // border-only redraw (changing the active pane, say) runs with no pane
+        // pass after it and leaves the divider sitting on top of the float.
+        if window_has_floating_panes(w) != 0 {
+            for fwp in tailq_foreach::<_, discr_zentry>(&raw mut (*w).z_index).map(NonNull::as_ptr) {
+                if window_pane_is_floating(fwp) == 0 || !window_pane_visible(fwp) {
+                    continue;
+                }
+                let (fx, fy) = ((*fwp).xoff as c_int, (*fwp).yoff as c_int);
+                let (fsx, fsy) = ((*fwp).sx as c_int, (*fwp).sy as c_int);
+                let border = c_int::from(
+                    window_pane_get_pane_lines(fwp) != pane_lines::PANE_LINES_NONE,
+                );
+                if (x as c_int) >= fx - border
+                    && (x as c_int) < fx + fsx + border
+                    && (y as c_int) >= fy - border
+                    && (y as c_int) < fy + fsy + border
+                {
+                    return;
+                }
+            }
+        }
+
         let mut wp = null_mut();
         let cell_type = screen_redraw_check_cell(ctx, x, y, &raw mut wp);
         if cell_type == cell_type::CELL_INSIDE {
