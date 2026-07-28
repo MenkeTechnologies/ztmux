@@ -2781,7 +2781,7 @@ pub unsafe fn tty_cmd_cells(tty: *mut tty, ctx: *const tty_ctx) {
                 || !tty_full_width(tty, ctx)
                 || ((*(*tty).term).flags.intersects(term_flags::TERM_NOAM))
                 || (*ctx).xoff + (*ctx).ocx != 0
-                || (*ctx).yoff + (*ctx).ocy != (*tty).cy + 1
+                || (*ctx).yoff + (*ctx).ocy != (*tty).cy.wrapping_add(1)
                 || (*tty).cx < (*tty).sx
                 || (*tty).cy == (*tty).rlower
             {
@@ -3182,7 +3182,7 @@ pub unsafe fn tty_cursor_pane_unless_wrap(tty: *mut tty, ctx: *const tty_ctx, cx
             || !tty_full_width(tty, ctx)
             || (*(*tty).term).flags.intersects(term_flags::TERM_NOAM)
             || (*ctx).xoff + cx != 0
-            || (*ctx).yoff + cy != (*tty).cy + 1
+            || (*ctx).yoff + cy != (*tty).cy.wrapping_add(1)
             || (*tty).cx < (*tty).sx
             || (*tty).cy == (*tty).rlower
         {
@@ -3249,7 +3249,7 @@ pub unsafe fn tty_cursor(tty: *mut tty, mut cx: u32, cy: u32) {
 
                 // Zero on the next line.
                 if cx == 0
-                    && cy == thisy + 1
+                    && cy == thisy.wrapping_add(1)
                     && thisy != (*tty).rlower
                     && (!tty_use_margin(tty) || (*tty).rleft == 0)
                 {
@@ -3276,7 +3276,7 @@ pub unsafe fn tty_cursor(tty: *mut tty, mut cx: u32, cy: u32) {
                     }
 
                     // One to the right.
-                    if cx == thisx + 1 && tty_term_has(term, tty_code_code::TTYC_CUF1) {
+                    if cx == thisx.wrapping_add(1) && tty_term_has(term, tty_code_code::TTYC_CUF1) {
                         tty_putcode(tty, tty_code_code::TTYC_CUF1);
                         break 'out;
                     }
@@ -3312,7 +3312,7 @@ pub unsafe fn tty_cursor(tty: *mut tty, mut cx: u32, cy: u32) {
 
                     // One above.
                     if thisy != (*tty).rupper
-                        && cy + 1 == thisy // note avoids underflow in dev
+                        && cy.wrapping_add(1) == thisy // note avoids underflow in dev
                         && tty_term_has(term, tty_code_code::TTYC_CUU1)
                     {
                         tty_putcode(tty, tty_code_code::TTYC_CUU1);
@@ -3321,7 +3321,7 @@ pub unsafe fn tty_cursor(tty: *mut tty, mut cx: u32, cy: u32) {
 
                     // One below.
                     if thisy != (*tty).rlower
-                        && cy == thisy + 1
+                        && cy == thisy.wrapping_add(1)
                         && tty_term_has(term, tty_code_code::TTYC_CUD1)
                     {
                         tty_putcode(tty, tty_code_code::TTYC_CUD1);
