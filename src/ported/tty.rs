@@ -752,7 +752,7 @@ pub unsafe fn tty_putc(tty: *mut tty, ch: u8) {
             if (*tty).cx >= (*tty).sx {
                 (*tty).cx = 1;
                 if (*tty).cy != (*tty).rlower {
-                    (*tty).cy += 1;
+                    (*tty).cy = (*tty).cy.wrapping_add(1);
                 }
 
                 // On !am terminals, force the cursor position to where
@@ -767,7 +767,7 @@ pub unsafe fn tty_putc(tty: *mut tty, ch: u8) {
                     );
                 }
             } else {
-                (*tty).cx += 1;
+                (*tty).cx = (*tty).cx.wrapping_add(1);
             }
         }
     }
@@ -791,7 +791,7 @@ pub unsafe fn tty_putn(tty: *mut tty, buf: *const c_void, mut len: usize, width:
         if (*tty).cx.wrapping_add(width) > (*tty).sx {
             (*tty).cx = (*tty).cx.wrapping_add(width).wrapping_sub((*tty).sx);
             if (*tty).cx <= (*tty).sx {
-                (*tty).cy += 1;
+                (*tty).cy = (*tty).cy.wrapping_add(1);
             } else {
                 (*tty).cx = u32::MAX;
                 (*tty).cy = u32::MAX;
