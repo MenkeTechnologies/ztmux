@@ -133,6 +133,7 @@ unsafe fn cmd_rotate_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
         window_set_active_pane(w, wp, 1);
         cmd_find_from_winlink_pane(current, wl, wp, cmd_find_flags::empty());
         window_pop_zoom(w);
+        redraw_invalidate_scene(w);
         server_redraw_window(w);
 
         cmd_retval::CMD_RETURN_NORMAL

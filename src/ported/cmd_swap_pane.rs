@@ -137,7 +137,9 @@ unsafe fn cmd_swap_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
                 colour_palette_from_option(Some(&mut (*src_wp).palette), (*src_wp).options);
                 colour_palette_from_option(Some(&mut (*dst_wp).palette), (*dst_wp).options);
             }
+            redraw_invalidate_scene(src_w);
             server_redraw_window(src_w);
+            redraw_invalidate_scene(dst_w);
             server_redraw_window(dst_w);
             notify_window(c"window-layout-changed", src_w);
             if src_w != dst_w {

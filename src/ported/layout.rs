@@ -625,12 +625,15 @@ pub unsafe fn layout_fix_panes(w: *mut window, skip: *mut window_pane) {
             pane_status::try_from(options_get_number_((*w).options, "pane-border-status") as i32)
                 .unwrap();
 
+        let mut changed = false;
         for wp in tailq_foreach::<window_pane, discr_entry>(&raw mut (*w).panes) {
             let wp = wp.as_ptr();
             let lc = (*wp).layout_cell;
             if lc.is_null() || wp == skip {
                 continue;
             }
+            let (old_xoff, old_yoff) = ((*wp).xoff, (*wp).yoff);
+            let (old_sx, old_sy) = ((*wp).sx, (*wp).sy);
 
             (*wp).xoff = (*lc).xoff;
             (*wp).yoff = (*lc).yoff;
@@ -652,6 +655,17 @@ pub unsafe fn layout_fix_panes(w: *mut window, skip: *mut window_pane) {
             } else {
                 window_pane_resize(wp, (*lc).sx, (*lc).sy);
             }
+
+            if (*wp).xoff != old_xoff
+                || (*wp).yoff != old_yoff
+                || (*wp).sx != old_sx
+                || (*wp).sy != old_sy
+            {
+                changed = true;
+            }
+        }
+        if changed {
+            redraw_invalidate_scene(w);
         }
     }
 }

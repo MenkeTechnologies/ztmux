@@ -667,10 +667,14 @@ pub unsafe fn screen_check_selection(s: *mut screen, px: u32, py: u32) -> c_int 
 
 /// Get selected grid cell.
 /// C `vendor/tmux/screen.c:627`: `int screen_select_cell(struct screen *s, struct grid_cell *dst, const struct grid_cell *src)`
-pub unsafe fn screen_select_cell(s: *mut screen, dst: *mut grid_cell, src: *const grid_cell) {
+pub unsafe fn screen_select_cell(
+    s: *mut screen,
+    dst: *mut grid_cell,
+    src: *const grid_cell,
+) -> bool {
     unsafe {
         if (*s).sel.is_null() || (*(*s).sel).hidden != 0 {
-            return;
+            return false;
         }
 
         memcpy__(dst, &raw const (*(*s).sel).cell);
@@ -679,6 +683,7 @@ pub unsafe fn screen_select_cell(s: *mut screen, dst: *mut grid_cell, src: *cons
         (*dst).attr &= !grid_attr::GRID_ATTR_CHARSET;
         (*dst).attr |= (*src).attr & grid_attr::GRID_ATTR_CHARSET;
         (*dst).flags = (*src).flags;
+        true
     }
 }
 

@@ -1508,6 +1508,15 @@ pub unsafe fn options_push_changes(name: &str) {
             status_timer_start_all();
         }
 
+        if name == "status"
+            || name == "status-position"
+            || name == "pane-border-indicators"
+            || name == "pane-border-lines"
+            || name == "pane-border-status"
+        {
+            redraw_invalidate_all_scenes();
+        }
+
         if name == "monitor-silence" {
             alerts_reset_all();
         }

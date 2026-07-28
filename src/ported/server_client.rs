@@ -520,6 +520,9 @@ pub unsafe fn server_client_lost(c: *mut client) {
 
         status_free(c);
 
+        redraw_free_scene((*c).redraw_scene);
+        (*c).redraw_scene = null_mut();
+
         (*c).title = None;
         (*c).cwd = None;
 
@@ -2952,7 +2955,7 @@ pub unsafe fn server_client_check_redraw(c: *mut client) {
                     continue;
                 }
                 // log_debug("%s: redrawing pane %%%u", __func__, (*wp).id);
-                screen_redraw_pane(c, wp);
+                redraw_pane(c, wp);
             }
             (*c).redraw_panes = 0;
             (*c).flags &= !client_flag::REDRAWPANES;
@@ -2963,7 +2966,7 @@ pub unsafe fn server_client_check_redraw(c: *mut client) {
                 server_client_set_title(c);
                 server_client_set_path(c);
             }
-            screen_redraw_screen(c);
+            redraw_screen(c);
         }
 
         (*tty).flags =

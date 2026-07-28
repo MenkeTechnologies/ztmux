@@ -256,8 +256,10 @@ They fall into a few families:
   it is fully draggable: drag its **top border** to move it, any **other border or corner** to
   resize, and `Alt`-drag anywhere on it to move it. Panes underneath are clipped around it, so
   output from a tiled pane does not draw over the float, and a tiled border crossing it is
-  drawn under it. Rendered screens are compared against the vendored tmux through a real VT
-  emulator, not just the model state.
+  drawn under it. A client redraw composites every visible cell — pane content, borders, pane
+  status lines, floats — into a cached scene of spans first, then writes the spans out, so a
+  float never costs a second pass over the terminal. Rendered screens are compared against the
+  vendored tmux through a real VT emulator, not just the model state.
   Setting `@ztmux-float-autohide` (`set -wg @ztmux-float-autohide 1`, or the pane menu's
   `Auto-Hide Floating Panes`) switches to the zellij model instead: floating panes disappear
   while a tiled pane has focus and come back on `prefix C-f`. Off by default, so the upstream

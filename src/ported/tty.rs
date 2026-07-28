@@ -1673,17 +1673,24 @@ pub unsafe fn tty_draw_pane(tty: *mut tty, ctx: *const tty_ctx, py: u32) {
         // log_debug("%s: %s %u %d", __func__, (*(*tty).client).name, py, (*ctx).bigger);
 
         if (*ctx).bigger == 0 {
-            tty_draw_line(
-                tty,
-                s,
-                0,
-                py,
-                nx,
-                (*ctx).xoff,
-                (*ctx).yoff + py,
-                &raw const (*ctx).defaults,
-                (*ctx).palette,
-            );
+            let r = tty_check_overlay_range(tty, (*ctx).xoff, (*ctx).yoff + py, nx);
+            for j in 0..(*r).used as usize {
+                let rr = *(*r).ranges.add(j);
+                if rr.nx == 0 {
+                    continue;
+                }
+                tty_draw_line(
+                    tty,
+                    s,
+                    rr.px - (*ctx).xoff,
+                    py,
+                    rr.nx,
+                    rr.px,
+                    (*ctx).yoff + py,
+                    &raw const (*ctx).defaults,
+                    (*ctx).palette,
+                );
+            }
             return;
         }
         if tty_clamp_line(
@@ -1697,17 +1704,24 @@ pub unsafe fn tty_draw_pane(tty: *mut tty, ctx: *const tty_ctx, py: u32) {
             &raw mut rx,
             &raw mut ry,
         ) {
-            tty_draw_line(
-                tty,
-                s,
-                i,
-                py,
-                rx,
-                x,
-                ry,
-                &raw const (*ctx).defaults,
-                (*ctx).palette,
-            );
+            let r = tty_check_overlay_range(tty, x, ry, rx);
+            for j in 0..(*r).used as usize {
+                let rr = *(*r).ranges.add(j);
+                if rr.nx == 0 {
+                    continue;
+                }
+                tty_draw_line(
+                    tty,
+                    s,
+                    i + rr.px - x,
+                    py,
+                    rr.nx,
+                    rr.px,
+                    ry,
+                    &raw const (*ctx).defaults,
+                    (*ctx).palette,
+                );
+            }
         }
     }
 }
@@ -1784,205 +1798,6 @@ pub unsafe fn tty_check_overlay_range(
         (*(*r).ranges).nx = nx;
         (*r).used = 1;
         r
-    }
-}
-
-/// C `vendor/tmux/tty-draw.c:118`: `void tty_draw_line(struct tty *tty, struct screen *s, u_int px, u_int py, u_int nx, u_int atx, u_int aty, const struct tty_style_ctx *style_ctx)`
-pub unsafe fn tty_draw_line(
-    tty: *mut tty,
-    s: *mut screen,
-    px: u32,
-    py: u32,
-    mut nx: u32,
-    atx: u32,
-    aty: u32,
-    defaults: *const grid_cell,
-    palette: *const colour_palette,
-) {
-    unsafe {
-        let gd = (*s).grid;
-        let mut gc: grid_cell = zeroed();
-        let mut last: grid_cell = zeroed();
-        let c = (*tty).client;
-
-        let mut cleared = 0;
-        let mut wrapped = false;
-        const SIZEOF_BUF: usize = 512;
-        let mut buf: [u8; SIZEOF_BUF] = [0; SIZEOF_BUF];
-
-        // log_debug("%s: px=%u py=%u nx=%u atx=%u aty=%u", __func__, px, py, nx, atx, aty);
-        // log_debug("%s: defaults: fg=%d, bg=%d", __func__, (*defaults).fg, (*defaults).bg);
-
-        // py is the line in the screen to draw.
-        // px is the start x and nx is the width to draw.
-        // atx,aty is the line on the terminal to draw it.
-
-        let flags = (*tty).flags & tty_flags::TTY_NOCURSOR;
-        (*tty).flags |= tty_flags::TTY_NOCURSOR;
-        tty_update_mode(tty, (*tty).mode, s);
-
-        tty_region_off(tty);
-        tty_margin_off(tty);
-
-        // Clamp the width to cellsize - note this is not cellused, because
-        // there may be empty background cells after it (from BCE).
-        let mut sx = screen_size_x(s);
-        if nx > sx {
-            nx = sx;
-        }
-
-        let cellsize = (*grid_get_line(gd, (*gd).hsize + py)).cellsize;
-        if sx > cellsize {
-            sx = cellsize;
-        }
-        if sx > (*tty).sx {
-            sx = (*tty).sx;
-        }
-        if sx > nx {
-            sx = nx;
-        }
-        let mut ux = 0;
-
-        let gl = if py == 0 {
-            null_mut()
-        } else {
-            grid_get_line(gd, (*gd).hsize + py - 1)
-        };
-        if gl.is_null()
-            || !(*gl).flags.intersects(grid_line_flag::WRAPPED)
-            || atx != 0
-            || (*tty).cx < (*tty).sx
-            || nx < (*tty).sx
-        {
-            if nx < (*tty).sx
-                && atx == 0
-                && px + sx != nx
-                && tty_term_has((*tty).term, tty_code_code::TTYC_EL1)
-                && !tty_fake_bce(tty, defaults, 8)
-                && (*c).overlay_check.is_none()
-            {
-                tty_default_attributes(tty, defaults, palette, 8, (*s).hyperlinks);
-                tty_cursor(tty, nx - 1, aty);
-                tty_putcode(tty, tty_code_code::TTYC_EL1);
-                cleared = 1;
-            }
-        } else {
-            // log_debug("%s: wrapped line %u", __func__, aty);
-            wrapped = true;
-        }
-
-        memcpy__(&raw mut last, &raw const GRID_DEFAULT_CELL);
-        let mut len = 0;
-        let mut width = 0;
-
-        for i in 0..sx {
-            grid_view_get_cell(gd, px + i, py, &raw mut gc);
-            let gcp = tty_check_codeset(tty, &gc);
-            if len != 0
-                && (!tty_check_overlay(tty, atx + ux + width, aty)
-                    || (*gcp).attr.intersects(grid_attr::GRID_ATTR_CHARSET)
-                    || (*gcp).flags != last.flags
-                    || (*gcp).attr != last.attr
-                    || (*gcp).fg != last.fg
-                    || (*gcp).bg != last.bg
-                    || (*gcp).us != last.us
-                    || (*gcp).link != last.link
-                    || ux + width + (*gcp).data.width as u32 > nx
-                    || (SIZEOF_BUF) - len < (*gcp).data.size as usize)
-            {
-                tty_attributes(tty, &last, defaults, palette, (*s).hyperlinks);
-                if last.flags.intersects(grid_flag::CLEARED) {
-                    // log_debug("%s: %zu cleared", __func__, len);
-                    tty_clear_line(tty, defaults, aty, atx + ux, width, last.bg as u32);
-                } else {
-                    if !wrapped || atx != 0 || ux != 0 {
-                        tty_cursor(tty, atx + ux, aty);
-                    }
-                    tty_putn(tty, (&raw const buf).cast(), len, width);
-                }
-                ux += width;
-
-                len = 0;
-                width = 0;
-                wrapped = false;
-            }
-
-            if (*gcp).flags.intersects(grid_flag::SELECTED) {
-                screen_select_cell(s, &raw mut last, gcp);
-            } else {
-                memcpy__(&raw mut last, gcp);
-            }
-
-            let r = tty_check_overlay_range(tty, atx + ux, aty, (*gcp).data.width as u32);
-            let mut hidden = 0;
-            for j in 0..(*r).used as usize {
-                hidden += (*(*r).ranges.add(j)).nx;
-            }
-            hidden = (*gcp).data.width as u32 - hidden;
-            if hidden != 0 && hidden == (*gcp).data.width as u32 {
-                if !(*gcp).flags.intersects(grid_flag::PADDING) {
-                    ux += (*gcp).data.width as u32;
-                }
-            } else if hidden != 0 || ux + (*gcp).data.width as u32 > nx {
-                if !(*gcp).flags.intersects(grid_flag::PADDING) {
-                    tty_attributes(tty, &raw mut last, defaults, palette, (*s).hyperlinks);
-                    for j in 0..(*r).used as usize {
-                        let rj = (*r).ranges.add(j);
-                        if (*rj).nx == 0 {
-                            continue;
-                        }
-                        // Effective width drawn so far.
-                        let eux = (*rj).px - atx;
-                        if eux < nx {
-                            tty_cursor(tty, (*rj).px, aty);
-                            let nxx = nx - eux;
-                            if (*rj).nx > nxx {
-                                (*rj).nx = nxx;
-                            }
-                            tty_repeat_space(tty, (*rj).nx);
-                            ux = eux + (*rj).nx;
-                        }
-                    }
-                }
-            } else if (*gcp).attr.intersects(grid_attr::GRID_ATTR_CHARSET) {
-                tty_attributes(tty, &raw mut last, defaults, palette, (*s).hyperlinks);
-                tty_cursor(tty, atx + ux, aty);
-                for j in 0..(*gcp).data.size {
-                    tty_putc(tty, (*gcp).data.data[j as usize]);
-                }
-                ux += (*gcp).data.width as u32;
-            } else if !(*gcp).flags.intersects(grid_flag::PADDING) {
-                libc::memcpy(
-                    (&raw mut buf as *mut i8).add(len).cast(),
-                    (&raw const (*gcp).data.data).cast(),
-                    (*gcp).data.size as usize,
-                );
-                len += (*gcp).data.size as usize;
-                width += (*gcp).data.width as u32;
-            }
-        }
-        if len != 0 && ((!last.flags.intersects(grid_flag::CLEARED)) || last.bg != 8) {
-            tty_attributes(tty, &raw mut last, defaults, palette, (*s).hyperlinks);
-            if last.flags.intersects(grid_flag::CLEARED) {
-                // log_debug("%s: %zu cleared (end)", __func__, len);
-                tty_clear_line(tty, defaults, aty, atx + ux, width, last.bg as u32);
-            } else {
-                if !wrapped || atx != 0 || ux != 0 {
-                    tty_cursor(tty, atx + ux, aty);
-                }
-                tty_putn(tty, (&raw const buf).cast(), len, width);
-            }
-            ux += width;
-        }
-
-        if cleared == 0 && ux < nx {
-            // log_debug( "%s: %u to end of line (%zu cleared)", __func__, nx - ux, len,);
-            tty_default_attributes(tty, defaults, palette, 8, (*s).hyperlinks);
-            tty_clear_line(tty, defaults, aty, atx + ux, nx - ux, 8);
-        }
-
-        (*tty).flags = ((*tty).flags & !tty_flags::TTY_NOCURSOR) | flags;
-        tty_update_mode(tty, (*tty).mode, s);
     }
 }
 

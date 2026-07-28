@@ -178,6 +178,8 @@ cfg_pub_mods! {
     mod tty_;
     #[path = "ported/tty_acs.rs"]
     mod tty_acs;
+    #[path = "ported/tty_draw.rs"]
+    mod tty_draw;
     #[path = "ported/tty_features.rs"]
     mod tty_features;
     #[path = "ported/tty_keys.rs"]
@@ -190,6 +192,8 @@ cfg_pub_mods! {
     mod utf8_combined;
     #[path = "ported/window.rs"]
     mod window_;
+    #[path = "ported/window_border.rs"]
+    mod window_border;
     #[path = "ported/window_buffer.rs"]
     mod window_buffer;
     #[path = "ported/window_client.rs"]
@@ -301,12 +305,14 @@ use crate::{
     tmux_protocol::*,
     tty_::*,
     tty_acs::*,
+    tty_draw::*,
     tty_features::*,
     tty_keys::*,
     tty_term_::*,
     utf8::*,
     utf8_combined::*,
     window_::*,
+    window_border::*,
     window_buffer::WINDOW_BUFFER_MODE,
     window_client::WINDOW_CLIENT_MODE,
     window_clock::{WINDOW_CLOCK_MODE, WINDOW_CLOCK_TABLE},
@@ -926,8 +932,9 @@ bitflags::bitflags! {
 
 /// Cell positions.
 #[repr(i32)]
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Default)]
 enum cell_type {
+    #[default]
     CELL_INSIDE = 0,
     CELL_TOPBOTTOM = 1,
     CELL_LEFTRIGHT = 2,
@@ -1318,6 +1325,187 @@ struct screen_redraw_ctx {
     oy: u32,
 }
 
+/// Type of span in the scene.
+/// C `vendor/tmux/screen-redraw.c:64`: `enum redraw_span_type`
+#[repr(i32)]
+#[derive(Copy, Clone, Eq, PartialEq, Default)]
+enum redraw_span_type {
+    /// inside a pane
+    #[default]
+    REDRAW_SPAN_PANE,
+    /// outside the window
+    REDRAW_SPAN_OUTSIDE,
+    /// inside the window but nothing visible
+    REDRAW_SPAN_EMPTY,
+    /// pane status line
+    REDRAW_SPAN_STATUS,
+    /// pane border
+    REDRAW_SPAN_BORDER,
+    /// pane scrollbar. ztmux has no pane scrollbars, so this variant is never
+    /// built — it exists so the per-line span arrays keep the C's indexing.
+    #[expect(dead_code)]
+    REDRAW_SPAN_SCROLLBAR,
+}
+/// C `vendor/tmux/screen-redraw.c:72`: `#define REDRAW_SPAN_TYPES 6`
+const REDRAW_SPAN_TYPES: usize = 6;
+
+// Border connections to adjacent cells.
+/// C `vendor/tmux/screen-redraw.c:75`: `#define REDRAW_BORDER_L 0x1`
+const REDRAW_BORDER_L: i32 = 0x1;
+/// C `vendor/tmux/screen-redraw.c:76`: `#define REDRAW_BORDER_R 0x2`
+const REDRAW_BORDER_R: i32 = 0x2;
+/// C `vendor/tmux/screen-redraw.c:77`: `#define REDRAW_BORDER_U 0x4`
+const REDRAW_BORDER_U: i32 = 0x4;
+/// C `vendor/tmux/screen-redraw.c:78`: `#define REDRAW_BORDER_D 0x8`
+const REDRAW_BORDER_D: i32 = 0x8;
+
+// Span flags.
+/// C `vendor/tmux/screen-redraw.c:81`: `#define REDRAW_BORDER_IS_ARROW 0x1`
+const REDRAW_BORDER_IS_ARROW: i32 = 0x1;
+
+// Draw operations.
+/// C `vendor/tmux/screen-redraw.c:88`: `#define REDRAW_PANE 0x1`
+const REDRAW_PANE: i32 = 0x1;
+/// C `vendor/tmux/screen-redraw.c:89`: `#define REDRAW_OUTSIDE 0x2`
+const REDRAW_OUTSIDE: i32 = 0x2;
+/// C `vendor/tmux/screen-redraw.c:90`: `#define REDRAW_EMPTY 0x4`
+const REDRAW_EMPTY: i32 = 0x4;
+/// C `vendor/tmux/screen-redraw.c:91`: `#define REDRAW_PANE_BORDER 0x8`
+const REDRAW_PANE_BORDER: i32 = 0x8;
+/// C `vendor/tmux/screen-redraw.c:92`: `#define REDRAW_PANE_STATUS 0x10`
+const REDRAW_PANE_STATUS: i32 = 0x10;
+/// C `vendor/tmux/screen-redraw.c:94`: `#define REDRAW_STATUS 0x40`
+const REDRAW_STATUS: i32 = 0x40;
+/// C `vendor/tmux/screen-redraw.c:95`: `#define REDRAW_OVERLAY 0x80`
+const REDRAW_OVERLAY: i32 = 0x80;
+/// C `vendor/tmux/screen-redraw.c:98`: `#define REDRAW_ALL 0x7fffffff`
+const REDRAW_ALL: i32 = 0x7fff_ffff;
+// C `vendor/tmux/screen-redraw.c:99`'s `REDRAW_IS_ALL(flags)` macro is written
+// out as `flags == REDRAW_ALL` at its call sites.
+
+/// Data for a span.
+/// C `vendor/tmux/screen-redraw.c:106`: `struct redraw_span_data`
+///
+/// The C original is a tagged union; the arms are flattened here so a build
+/// cell can be compared and copied without reading an inactive union member.
+/// Only the fields belonging to `type` are ever meaningful.
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+struct redraw_span_data {
+    type_: redraw_span_type,
+
+    /// `p.wp`: pane this span belongs to.
+    p_wp: *mut window_pane,
+    /// `p.px`, `p.py`: position of the span inside the pane.
+    p_px: u32,
+    p_py: u32,
+
+    /// `b.top_wp` .. `b.right_wp`: adjacent panes on each side.
+    b_top_wp: *mut window_pane,
+    b_bottom_wp: *mut window_pane,
+    b_left_wp: *mut window_pane,
+    b_right_wp: *mut window_pane,
+    /// `b.style_wp`: pane owning the style, when known at build time. Used for
+    /// the half-coloured active pane indicator.
+    b_style_wp: *mut window_pane,
+    /// `b.cell_type`, `b.cell_mask`: border shape and its connection mask.
+    b_cell_type: cell_type,
+    b_cell_mask: i32,
+    /// `b.top_lines` .. `b.right_lines`: line style contributed by each side.
+    b_top_lines: pane_lines,
+    b_bottom_lines: pane_lines,
+    b_left_lines: pane_lines,
+    b_right_lines: pane_lines,
+    /// `b.flags`: `REDRAW_BORDER_IS_ARROW`.
+    b_flags: i32,
+
+    /// `st.wp`, `st.offset`, `st.cell_type`: pane status line and the offset
+    /// into it, plus the border shape underneath.
+    st_wp: *mut window_pane,
+    st_offset: u32,
+    st_cell_type: cell_type,
+}
+
+/// A span of cells of the same type inside a line.
+/// C `vendor/tmux/screen-redraw.c:167`: `struct redraw_span`
+#[derive(Copy, Clone, Default)]
+struct redraw_span {
+    x: u32,
+    width: u32,
+    data: redraw_span_data,
+}
+
+/// A visible line on the client.
+/// C `vendor/tmux/screen-redraw.c:177`: `struct redraw_line`
+///
+/// The C original keeps one TAILQ per span type; a `Vec` per type preserves
+/// insertion order with the same effect and no per-span allocation.
+#[derive(Default)]
+struct redraw_line {
+    spans: [Vec<redraw_span>; REDRAW_SPAN_TYPES],
+}
+
+/// A scene representing all the spans on the client.
+/// C `vendor/tmux/screen-redraw.c:182`: `struct redraw_scene`
+struct redraw_scene {
+    c: *mut client,
+    w: *mut window,
+    lines: Vec<redraw_line>,
+
+    generation: u64,
+    sx: u32,
+    sy: u32,
+    ox: u32,
+    oy: u32,
+}
+
+/// Cell for building the scene.
+/// C `vendor/tmux/screen-redraw.c:194`: `struct redraw_build_cell`
+#[derive(Copy, Clone, Default)]
+struct redraw_build_cell {
+    data: redraw_span_data,
+}
+
+/// Context for building the scene.
+/// C `vendor/tmux/screen-redraw.c:201`: `struct redraw_build_ctx`
+struct redraw_build_ctx {
+    #[expect(dead_code)]
+    c: *mut client,
+    w: *mut window,
+
+    ox: u32,
+    oy: u32,
+    sx: u32,
+    sy: u32,
+
+    ind: i32,
+
+    cells: Vec<redraw_build_cell>,
+}
+
+// Draw context flags.
+/// C `vendor/tmux/screen-redraw.c:230`: `#define REDRAW_ISOLATES 0x1`
+const REDRAW_ISOLATES: i32 = 0x1;
+/// C `vendor/tmux/screen-redraw.c:231`: `#define REDRAW_DEFAULT_SET 0x2`
+const REDRAW_DEFAULT_SET: i32 = 0x2;
+/// C `vendor/tmux/screen-redraw.c:232`: `#define REDRAW_STATUS_TOP 0x4`
+const REDRAW_STATUS_TOP: i32 = 0x4;
+
+/// Context for redrawing.
+/// C `vendor/tmux/screen-redraw.c:216`: `struct redraw_draw_ctx`
+struct redraw_draw_ctx {
+    scene: *mut redraw_scene,
+
+    active: *mut window_pane,
+    marked: *mut window_pane,
+
+    status_lines: u32,
+    pane_lines: pane_lines,
+    default_gc: grid_cell,
+
+    flags: i32,
+}
+
 unsafe fn screen_size_x(s: *const screen) -> u32 {
     unsafe { (*(*s).grid).sx }
 }
@@ -1441,7 +1629,9 @@ bitflags::bitflags! {
         const PANE_FOCUSED = 0x4;
         const PANE_VISITED = 0x8;
         const PANE_ZOOMED = 0x10;
-        /* 0x20 unused */
+        /// C `vendor/tmux/tmux.h:1285`: `#define PANE_NEWSTATUS 0x20`. Set when
+        /// the pane's status line changed and its spans need redrawing.
+        const PANE_NEWSTATUS = 0x20;
         const PANE_INPUTOFF = 0x40;
         const PANE_CHANGED = 0x80;
         const PANE_EXITED = 0x100;
@@ -1535,6 +1725,14 @@ struct window_pane {
 
     border_gc_set: i32,
     border_gc: grid_cell,
+
+    /// C `vendor/tmux/tmux.h:1362`: `int active_border_gc_set`
+    active_border_gc_set: i32,
+    /// C `vendor/tmux/tmux.h:1363`: `struct grid_cell active_border_gc`
+    ///
+    /// Cached separately from `border_gc` because a scene redraw resolves both
+    /// the active and inactive border style for the same pane in one pass.
+    active_border_gc: grid_cell,
 
     control_bg: i32,
     control_fg: i32,
@@ -2623,6 +2821,13 @@ struct client {
     click_event: mouse_event,
 
     status: status_line,
+
+    /// C `vendor/tmux/tmux.h:1855`: `struct redraw_scene *redraw_scene`
+    ///
+    /// Cached composite of the window's visible cells. Rebuilt when the
+    /// window, its generation, or the visible offset/size changes; freed with
+    /// `redraw_free_scene`.
+    redraw_scene: *mut redraw_scene,
 
     flags: client_flag,
 

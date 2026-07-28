@@ -667,7 +667,25 @@ pub unsafe fn window_redraw_active_switch(w: *mut window, mut wp: *mut window_pa
             if wp == (*w).active {
                 break;
             }
+
+            // If the pane is floating, move to the front.
+            if window_pane_is_floating(wp) != 0 {
+                tailq_remove::<_, discr_zentry>(&raw mut (*w).z_index, wp);
+                tailq_insert_head::<_, discr_zentry>(&raw mut (*w).z_index, wp);
+                (*wp).flags |= window_pane_flags::PANE_REDRAW;
+                redraw_invalidate_scene(w);
+            }
+
             wp = (*w).active;
+            if wp.is_null() {
+                break;
+            }
+        }
+
+        // ztmux: with @ztmux-float-autohide, a float's visibility depends on
+        // which pane is active, so any switch changes what the scene contains.
+        if window_has_floating_panes(w) != 0 {
+            redraw_invalidate_scene(w);
         }
     }
 }
@@ -814,6 +832,7 @@ pub unsafe fn window_zoom(wp: *mut window_pane) -> i32 {
         (*w).flags |= window_flag::ZOOMED;
         notify_window(c"window-layout-changed", w);
 
+        redraw_invalidate_scene(w);
         0
     }
 }
@@ -841,6 +860,7 @@ pub unsafe fn window_unzoom(w: *mut window, notify: i32) -> i32 {
             notify_window(c"window-layout-changed", w);
         }
 
+        redraw_invalidate_scene(w);
         0
     }
 }
@@ -972,6 +992,7 @@ pub unsafe fn window_lost_pane(w: *mut window, wp: *mut window_pane) {
                 window_update_focus(w);
             }
         }
+        redraw_invalidate_scene(w);
     }
 }
 

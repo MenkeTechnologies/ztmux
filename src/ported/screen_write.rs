@@ -2511,27 +2511,64 @@ pub unsafe fn screen_write_collect_scroll(ctx: *mut screen_write_ctx, bg: u32) {
 pub unsafe fn screen_write_collect_flush(ctx: *mut screen_write_ctx, scroll_only: u32, from: &str) {
     unsafe {
         let s = (*ctx).s;
+        let wp = (*ctx).wp;
         let mut items = 0;
 
-        if (*ctx).scrolled != 0 {
-            screen_write_collect_flush_scrolled(ctx);
-        }
-        (*ctx).scrolled = 0;
-        (*ctx).bg = 8;
+        'discard: {
+            if !wp.is_null()
+                && (*wp)
+                    .flags
+                    .intersects(window_pane_flags::PANE_REDRAW | window_pane_flags::PANE_DROP)
+            {
+                break 'discard;
+            }
+            if (*s).mode.intersects(mode_flag::MODE_SYNC) {
+                for y in 0..screen_size_y(s) {
+                    let cl = (*s).write_list.add(y as usize);
+                    if tailq_first(&raw mut (*cl).items).is_null() {
+                        continue;
+                    }
+                    screen_write_should_draw_line(ctx, y);
+                }
+                break 'discard;
+            }
 
-        if scroll_only != 0 {
+            if (*ctx).scrolled != 0 {
+                // A zero return means the scroll was serviced by redrawing the
+                // whole pane, so the per-line items are already on screen and
+                // flushing them would paint the same frame twice.
+                if screen_write_collect_flush_scrolled(ctx) == 0 {
+                    break 'discard;
+                }
+                (*ctx).scrolled = 0;
+            }
+            (*ctx).bg = 8;
+
+            if scroll_only != 0 {
+                return;
+            }
+
+            let cx = (*s).cx;
+            let cy = (*s).cy;
+            for y in 0..screen_size_y(s) {
+                items += screen_write_collect_flush_line(ctx, y);
+            }
+            (*s).cx = cx;
+            (*s).cy = cy;
+
+            log_debug!("screen_write_collect_flush: flushed {items} items ({from})",);
             return;
         }
 
-        let cx = (*s).cx;
-        let cy = (*s).cy;
         for y in 0..screen_size_y(s) {
-            items += screen_write_collect_flush_line(ctx, y);
+            let cl = (*s).write_list.add(y as usize);
+            for ci in tailq_foreach(&raw mut (*cl).items).map(NonNull::as_ptr) {
+                tailq_remove(&raw mut (*cl).items, ci);
+                screen_write_free_citem(ci);
+            }
         }
-        (*s).cx = cx;
-        (*s).cy = cy;
-
-        log_debug!("screen_write_collect_flush: flushed {items} items ({from})",);
+        (*ctx).scrolled = 0;
+        (*ctx).bg = 8;
     }
 }
 
