@@ -30,6 +30,18 @@ impl BitStr {
         }
     }
 
+    /// C `vendor/tmux/compat/bitstring.h`: `bit_nset(name, start, stop)`.
+    pub fn bit_nset(&mut self, start: u32, stop: u32) {
+        for i in start..=stop {
+            self.bit_set(i);
+        }
+    }
+
+    /// Number of bits this string was allocated for.
+    pub fn len(&self) -> u32 {
+        (self.bits.len() * 8) as u32
+    }
+
     pub fn bit_test(&self, i: u32) -> bool {
         let byte_index = i / 8;
         let bit_index = i % 8;

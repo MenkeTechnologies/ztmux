@@ -1503,6 +1503,12 @@ struct window_pane {
     resize_queue: window_pane_resizes,
     resize_timer: event,
     sync_timer: event,
+    /// C `vendor/tmux/tmux.h`: `bitstr_t *sync_dirty` / `u_int sync_dirty_size`.
+    ///
+    /// Lines touched while synchronized-output mode is on. Drawing is deferred
+    /// until the mode ends, so an app that repaints inside a sync block costs
+    /// one flush rather than one draw per operation.
+    sync_dirty: Option<Box<BitStr>>,
 
     ictx: *mut input_ctx,
 

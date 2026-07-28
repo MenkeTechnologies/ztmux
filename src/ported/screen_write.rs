@@ -167,6 +167,9 @@ pub unsafe fn screen_write_stop_sync(wp: *mut window_pane) {
             evtimer_del(&raw mut (*wp).sync_timer);
         }
         (*wp).base.mode &= !mode_flag::MODE_SYNC;
+
+        screen_write_flush_dirty(wp);
+
         log_debug!("screen_write_stop_sync: %{} stopped sync mode", (*wp).id);
     }
 }
@@ -241,6 +244,108 @@ unsafe fn screen_write_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i3
 
 /// Set up context for TTY command.
 /// C `vendor/tmux/screen-write.c:262`: `static void screen_write_initctx(struct screen_write_ctx *ctx, struct tty_ctx *ttyctx, int is_sync, int check_obscured)`
+/// Should these lines be drawn to the tty now?
+/// C `vendor/tmux/screen-write.c:220`: `static int screen_write_should_draw_lines(struct screen_write_ctx *ctx, u_int y, u_int ny)`
+///
+/// No while the pane already has a full redraw pending, and no during
+/// synchronized-output mode — there the lines are recorded and drawn once when
+/// the mode ends. An app that repaints inside a sync block (htop and friends)
+/// otherwise costs a draw per operation, which shows up as flicker.
+unsafe fn screen_write_should_draw_lines(
+    ctx: *mut screen_write_ctx,
+    mut y: u32,
+    mut ny: u32,
+) -> bool {
+    unsafe {
+        let wp = (*ctx).wp;
+        let s = (*ctx).s;
+        let sy = screen_size_y(s);
+
+        if !wp.is_null()
+            && (*wp)
+                .flags
+                .intersects(window_pane_flags::PANE_REDRAW | window_pane_flags::PANE_DROP)
+        {
+            return false;
+        }
+        if (*s).mode.intersects(mode_flag::MODE_SYNC) {
+            if !wp.is_null() && y < sy && ny != 0 {
+                if ny > sy - y {
+                    ny = sy - y;
+                }
+                // A resize invalidates the map, so redo the whole pane.
+                let stale = match &(*wp).sync_dirty {
+                    Some(bs) => bs.len() < sy,
+                    None => false,
+                };
+                if (*wp).sync_dirty.is_none() || stale {
+                    if stale {
+                        y = 0;
+                        ny = sy;
+                    }
+                    (*wp).sync_dirty = Some(Box::new(BitStr::new(sy)));
+                }
+                if let Some(bs) = &mut (*wp).sync_dirty {
+                    bs.bit_nset(y, y + ny - 1);
+                }
+            }
+            return false;
+        }
+        true
+    }
+}
+
+/// C `vendor/tmux/screen-write.c:255`: `static int screen_write_should_draw_line(struct screen_write_ctx *ctx, u_int y)`
+unsafe fn screen_write_should_draw_line(ctx: *mut screen_write_ctx, y: u32) -> bool {
+    unsafe { screen_write_should_draw_lines(ctx, y, 1) }
+}
+
+/// Draw the lines touched during synchronized-output mode.
+/// C `vendor/tmux/screen-write.c:1252`: `static void screen_write_flush_dirty(struct window_pane *wp)`
+pub unsafe fn screen_write_flush_dirty(wp: *mut window_pane) {
+    unsafe {
+        if wp.is_null() || (*wp).sync_dirty.is_none() {
+            return;
+        }
+        let s = &raw mut (*wp).base;
+        let sy = screen_size_y(s);
+
+        let mut ctx: screen_write_ctx = zeroed();
+        let mut ttyctx: tty_ctx = zeroed();
+        screen_write_start_pane(&raw mut ctx, wp, s);
+        screen_write_initctx(&raw mut ctx, &raw mut ttyctx, 1);
+
+        let mut lines = 0;
+        for y in 0..sy {
+            let dirty = match &(*wp).sync_dirty {
+                Some(bs) => y < bs.len() && bs.bit_test(y),
+                None => false,
+            };
+            if dirty {
+                screen_write_redraw_line(&raw mut ctx, &raw mut ttyctx, y);
+                lines += 1;
+            }
+        }
+        log_debug!(
+            "screen_write_flush_dirty: %{} had {} dirty lines",
+            (*wp).id,
+            lines,
+        );
+
+        screen_write_stop(&raw mut ctx);
+        screen_write_clear_dirty(wp);
+    }
+}
+
+/// C `vendor/tmux/screen-write.c`: `void screen_write_clear_dirty(struct window_pane *wp)`
+pub unsafe fn screen_write_clear_dirty(wp: *mut window_pane) {
+    unsafe {
+        if !wp.is_null() {
+            (*wp).sync_dirty = None;
+        }
+    }
+}
+
 /// Whether a floating pane overlaps this write context's pane, so the cheap
 /// whole-screen escape sequences must not be used.
 /// C `vendor/tmux/screen-write.c`: `static int screen_write_pane_is_obscured(struct screen_write_ctx *ctx)`
@@ -1391,7 +1496,8 @@ pub unsafe fn screen_write_alignmenttest(ctx: *mut screen_write_ctx) {
         screen_write_initctx(ctx, &raw mut ttyctx, 1);
 
         screen_write_collect_clear(ctx, 0, screen_size_y(s) - 1);
-        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_alignmenttest, &raw mut ttyctx);
@@ -1435,7 +1541,8 @@ pub unsafe fn screen_write_insertcharacter(ctx: *mut screen_write_ctx, mut nx: u
 
         screen_write_collect_flush(ctx, 0, "screen_write_insertcharacter");
         ttyctx.num = nx;
-        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_insertcharacter, &raw mut ttyctx);
@@ -1479,7 +1586,8 @@ pub unsafe fn screen_write_deletecharacter(ctx: *mut screen_write_ctx, mut nx: u
 
         screen_write_collect_flush(ctx, 0, "screen_write_deletecharacter");
         ttyctx.num = nx;
-        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_deletecharacter, &raw mut ttyctx);
@@ -1523,7 +1631,8 @@ pub unsafe fn screen_write_clearcharacter(ctx: *mut screen_write_ctx, mut nx: u3
 
         screen_write_collect_flush(ctx, 0, "screen_write_clearcharacter");
         ttyctx.num = nx;
-        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_clearcharacter, &raw mut ttyctx);
@@ -1566,7 +1675,8 @@ pub unsafe fn screen_write_insertline(ctx: *mut screen_write_ctx, mut ny: u32, b
 
             screen_write_collect_flush(ctx, 0, "screen_write_insertline");
             ttyctx.num = ny;
-            if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            if !screen_write_should_draw_line(ctx, (*s).cy) {
+            } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
                 screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
                 tty_write(tty_cmd_insertline, &raw mut ttyctx);
@@ -1593,7 +1703,8 @@ pub unsafe fn screen_write_insertline(ctx: *mut screen_write_ctx, mut ny: u32, b
         screen_write_collect_flush(ctx, 0, "screen_write_insertline");
 
         ttyctx.num = ny;
-        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_insertline, &raw mut ttyctx);
@@ -1636,7 +1747,8 @@ pub unsafe fn screen_write_deleteline(ctx: *mut screen_write_ctx, mut ny: u32, b
 
             screen_write_collect_flush(ctx, 0, "screen_write_deleteline");
             ttyctx.num = ny;
-            if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            if !screen_write_should_draw_line(ctx, (*s).cy) {
+            } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
                 screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
                 tty_write(tty_cmd_deleteline, &raw mut ttyctx);
@@ -1662,7 +1774,8 @@ pub unsafe fn screen_write_deleteline(ctx: *mut screen_write_ctx, mut ny: u32, b
 
         screen_write_collect_flush(ctx, 0, "screen_write_deleteline");
         ttyctx.num = ny;
-        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_deleteline, &raw mut ttyctx);
@@ -1844,7 +1957,8 @@ pub unsafe fn screen_write_reverseindex(ctx: *mut screen_write_ctx, bg: u32) {
             screen_write_initctx(ctx, &raw mut ttyctx, 1);
             ttyctx.bg = bg;
 
-            if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            if !screen_write_should_draw_line(ctx, (*s).cy) {
+            } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
                 screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
                 tty_write(tty_cmd_reverseindex, &raw mut ttyctx);
@@ -1997,7 +2111,8 @@ pub unsafe fn screen_write_scrolldown(ctx: *mut screen_write_ctx, mut lines: u32
 
         screen_write_collect_flush(ctx, 0, "screen_write_scrolldown");
         ttyctx.num = lines;
-        if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_scrolldown, &raw mut ttyctx);
@@ -2814,7 +2929,8 @@ pub unsafe fn screen_write_cell(ctx: *mut screen_write_ctx, gc: *const grid_cell
         if (*s).mode.intersects(mode_flag::MODE_INSERT) {
             screen_write_collect_flush(ctx, 0, "screen_write_cell");
             ttyctx.num = width;
-            if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            if !screen_write_should_draw_line(ctx, (*s).cy) {
+            } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
                 screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
                 tty_write(tty_cmd_insertcharacter, &raw mut ttyctx);
@@ -2833,6 +2949,10 @@ pub unsafe fn screen_write_cell(ctx: *mut screen_write_ctx, gc: *const grid_cell
             memcpy__(&raw mut tmp_gc, gc);
         }
         ttyctx.cell = &raw const tmp_gc;
+
+        if !screen_write_should_draw_line(ctx, (*s).cy) {
+            return;
+        }
 
         // If the cell is fully visible, it can be written entirely.
         let mut vis = 0;
