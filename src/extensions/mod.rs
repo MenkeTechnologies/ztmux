@@ -153,6 +153,7 @@ pub(crate) mod equalize;
 pub(crate) mod events;
 pub(crate) mod fanout;
 pub(crate) mod find;
+pub(crate) mod float;
 pub(crate) mod focus;
 pub(crate) mod git;
 pub(crate) mod gitcmd;

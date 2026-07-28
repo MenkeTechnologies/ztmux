@@ -84,6 +84,7 @@ macro_rules! DEFAULT_PANE_MENU {
             " '#{?@ztmux-stacked,Unstack Panes,Stack Panes (zellij)}' 'k' {if -F '#{@ztmux-stacked}' {set -uw @ztmux-stacked ; select-layout even-vertical} {set -w @ztmux-stacked 1 ; select-layout even-vertical ; resize-pane -y 999}}",
             " '#{?@ztmux-tab-bar,Hide Tab Bar,Tab Bar (zellij)}' 'T' {run-shell \"ztmux -S #{socket_path} tabs toggle\"}",
             " '#{?pane_floating_flag,Close Floating Pane,New Floating Pane}' 'f' {if -F '#{pane_floating_flag}' {kill-pane} {new-pane -x70% -y60%}}",
+            " '#{?@ztmux-float-autohide,Keep Floating Panes Visible,Auto-Hide Floating Panes (zellij)}' 'A' {if -F '#{@ztmux-float-autohide}' {set -uw @ztmux-float-autohide} {set -w @ztmux-float-autohide 1}}",
             " '#{?pane_floating_flag,Centre Floating Pane,}' 'C' {move-pane -P centre}",
             " '#{?pane_floating_flag,Raise Floating Pane,}' 'F' {move-pane -P front}",
             " 'Open URL / Path from Pane' 'o' {display-popup -E -w 80% -h 60% 'ztmux -S \"${TMUX%%,*}\" open'}",
@@ -725,7 +726,13 @@ pub unsafe fn key_bindings_init() {
         // opens and closes it. The earlier `display-popup` version of this
         // binding could not move or resize — popup geometry is fixed at
         // creation — and is gone.
-        "bind -N 'ztmux: toggle floating pane' C-f { if -F '#{pane_floating_flag}' { kill-pane } { new-pane -x70% -y60% } }",
+        // Focus toggle rather than create/destroy, so it also works as the
+        // show/hide key when @ztmux-float-autohide is set: on the float, go
+        // back to the previous pane (which hides it under autohide); off it,
+        // focus the existing float, creating one only if there is none. The
+        // `#{P:...}` loop yields the floating pane's id, empty when there is
+        // no float.
+        "bind -N 'ztmux: toggle floating pane' C-f { if -F '#{pane_floating_flag}' { select-pane -t '{last}' } { if -F '#{P:#{?pane_floating_flag,1,}}' { select-pane -t '#{P:#{?pane_floating_flag,#{pane_id},}}' } { new-pane -x70% -y60% } } }",
         "bind -N 'ztmux: session/window/pane picker' S { display-popup -E -w 80% -h 70% 'ztmux -S \"${TMUX%%,*}\" switcher' }",
         "bind -N 'ztmux: server tree' T { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" tree | less -R' }",
         "bind -N 'ztmux: environment/server health check' H { display-popup -E -w 80% -h 80% 'ztmux -S \"${TMUX%%,*}\" doctor | less -R' }",
