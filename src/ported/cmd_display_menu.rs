@@ -13,7 +13,10 @@
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 use crate::compat::queue::tailq_foreach;
 use crate::libc::strtol;
-use crate::options_::{options_find_choice, options_get, options_get_number___, options_get_string_, options_table_entry};
+use crate::options_::{
+    options_find_choice, options_get, options_get_number___, options_get_string_,
+    options_table_entry,
+};
 use crate::*;
 
 pub static CMD_DISPLAY_MENU_ENTRY: cmd_entry = cmd_entry {
@@ -38,8 +41,8 @@ pub static CMD_DISPLAY_POPUP_ENTRY: cmd_entry = cmd_entry {
     name: "display-popup",
     alias: Some("popup"),
 
-    args: args_parse::new("Bb:Cc:d:e:Eh:s:S:t:T:w:x:y:", 0, -1, None),
-    usage: "[-BCE] [-b border-lines] [-c target-client] [-d start-directory] [-e environment] [-h height] [-s style] [-S border-style] [-t target-pane][-T title] [-w width] [-x position] [-y position] [shell-command]",
+    args: args_parse::new("Bb:Cc:d:e:Eh:kNs:S:t:T:w:x:y:", 0, -1, None),
+    usage: "[-BCEkN] [-b border-lines] [-c target-client] [-d start-directory] [-e environment] [-h height] [-s style] [-S border-style] [-t target-pane][-T title] [-w width] [-x position] [-y position] [shell-command [argument ...]]",
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
 
     flags: cmd_flag::CMD_AFTERHOOK.union(cmd_flag::CMD_CLIENT_CFLAG),
@@ -473,66 +476,126 @@ unsafe fn cmd_display_popup_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
         let border_style = args_get(args, b'S');
         let mut cause: *mut u8 = null_mut();
         let mut argc = 0;
+        let mut argv: *mut *mut u8 = null_mut();
         let mut lines = box_lines::BOX_LINES_DEFAULT as i32;
         let mut px = 0;
         let mut py = 0;
+        let mut w = 0;
+        let mut h = 0;
+        let mut cwd: *mut u8 = null_mut();
         let count = args_count(args);
         let mut env = null_mut();
+        let mut shellcmd = null();
         let o = (*(*(*s).curw).window).options;
+        // Run inside an existing popup, this modifies that popup instead of
+        // opening another one.
+        let modify = popup_present(tc) != 0;
+
+        /// C's `out:` and `fail:` cleanup.
+        unsafe fn cleanup(
+            argc: c_int,
+            argv: *mut *mut u8,
+            env: *mut environ,
+            cwd: *mut u8,
+            title: *mut u8,
+        ) {
+            unsafe {
+                cmd_free_argv(argc, argv);
+                if !env.is_null() {
+                    environ_free(env);
+                }
+                free_(cwd);
+                free_(title);
+            }
+        }
 
         if args_has(args, 'C') {
             server_client_clear_overlay(tc);
             return cmd_retval::CMD_RETURN_NORMAL;
         }
-        if (*tc).overlay_draw.is_some() {
+        if !modify && (*tc).overlay_draw.is_some() {
             return cmd_retval::CMD_RETURN_NORMAL;
         }
 
-        let mut h: u32 = (*tty).sy / 2;
-        if args_has(args, 'h') {
-            h = args_percentage(
-                args,
-                b'h',
-                1,
-                (*tty).sy as i64,
-                (*tty).sy as i64,
-                &raw mut cause,
-            ) as u32;
-            if !cause.is_null() {
-                cmdq_error!(item, "height {}", _s(cause));
-                free_(cause);
-                return cmd_retval::CMD_RETURN_ERROR;
+        if !modify {
+            h = (*tty).sy / 2;
+            if args_has(args, 'h') {
+                h = args_percentage(
+                    args,
+                    b'h',
+                    1,
+                    (*tty).sy as i64,
+                    (*tty).sy as i64,
+                    &raw mut cause,
+                ) as u32;
+                if !cause.is_null() {
+                    cmdq_error!(item, "height {}", _s(cause));
+                    free_(cause);
+                    return cmd_retval::CMD_RETURN_ERROR;
+                }
+            }
+
+            w = (*tty).sx / 2;
+            if args_has(args, 'w') {
+                w = args_percentage(
+                    args,
+                    b'w',
+                    1,
+                    (*tty).sx as i64,
+                    (*tty).sx as i64,
+                    &raw mut cause,
+                ) as u32;
+                if !cause.is_null() {
+                    cmdq_error!(item, "width {}", _s(cause));
+                    free_(cause);
+                    return cmd_retval::CMD_RETURN_ERROR;
+                }
+            }
+
+            if w > (*tty).sx {
+                w = (*tty).sx;
+            }
+            if h > (*tty).sy {
+                h = (*tty).sy;
+            }
+            if cmd_display_menu_get_position(tc, item, args, &raw mut px, &raw mut py, w, h) == 0 {
+                return cmd_retval::CMD_RETURN_NORMAL;
+            }
+
+            let value = args_get(args, b'd');
+            cwd = if !value.is_null() {
+                format_single_from_target(item, value)
+            } else {
+                xstrdup(server_client_get_cwd(tc, s)).as_ptr()
+            };
+            if count == 0 {
+                shellcmd = options_get_string_((*s).options, "default-command");
+            } else if count == 1 {
+                shellcmd = args_string(args, 0);
+            }
+
+            if count <= 1 && (shellcmd.is_null() || *shellcmd == b'\0') {
+                shellcmd = null_mut();
+                let mut shell = options_get_string_((*s).options, "default-shell");
+                if !checkshell_(shell) {
+                    shell = _PATH_BSHELL;
+                }
+                cmd_append_argv(&raw mut argc, &raw mut argv, shell);
+            } else {
+                args_to_vector(args, &raw mut argc, &raw mut argv);
+            }
+
+            if args_has(args, 'e') {
+                env = environ_create().as_ptr();
+                let mut av = args_first_value(args, b'e');
+                while !av.is_null() {
+                    environ_put(env, (*av).union_.string, environ_flags::empty());
+                    av = args_next_value(av);
+                }
             }
         }
 
-        let mut w = (*tty).sx / 2;
-        if args_has(args, 'w') {
-            w = args_percentage(
-                args,
-                b'w',
-                1,
-                (*tty).sx as i64,
-                (*tty).sx as i64,
-                &raw mut cause,
-            ) as u32;
-            if !cause.is_null() {
-                cmdq_error!(item, "width {}", _s(cause));
-                free_(cause);
-                return cmd_retval::CMD_RETURN_ERROR;
-            }
-        }
-
-        if w > (*tty).sx {
-            w = (*tty).sx;
-        }
-        if h > (*tty).sy {
-            h = (*tty).sy;
-        }
-        if cmd_display_menu_get_position(tc, item, args, &raw mut px, &raw mut py, w, h) == 0 {
-            return cmd_retval::CMD_RETURN_NORMAL;
-        }
-
-        let mut value = args_get(args, b'b');
+        let value = args_get(args, b'b');
         if args_has(args, 'B') {
             lines = box_lines::BOX_LINES_NONE as i32;
         } else if !value.is_null() {
@@ -541,44 +604,10 @@ unsafe fn cmd_display_popup_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
                 Ok(ok) => ok,
                 Err(cause) => {
                     cmdq_error!(item, "popup-border-lines {}", cause.to_str().unwrap());
+                    cleanup(argc, argv, env, cwd, null_mut());
                     return cmd_retval::CMD_RETURN_ERROR;
                 }
             };
-        }
-
-        value = args_get(args, b'd');
-        let cwd = if !value.is_null() {
-            format_single_from_target(item, value)
-        } else {
-            xstrdup(server_client_get_cwd(tc, s)).as_ptr()
-        };
-        let mut shellcmd = null();
-        if count == 0 {
-            shellcmd = options_get_string_((*s).options, "default-command");
-        } else if count == 1 {
-            shellcmd = args_string(args, 0);
-        }
-
-        let mut argv = null_mut();
-
-        if count <= 1 && (shellcmd.is_null() || *shellcmd == b'\0') {
-            shellcmd = null_mut();
-            let mut shell = options_get_string_((*s).options, "default-shell");
-            if !checkshell_(shell) {
-                shell = _PATH_BSHELL;
-            }
-            cmd_append_argv(&raw mut argc, &raw mut argv, shell);
-        } else {
-            args_to_vector(args, &raw mut argc, &raw mut argv);
-        }
-
-        if args_has(args, 'e') {
-            env = environ_create().as_ptr();
-            let mut av = args_first_value(args, b'e');
-            while !av.is_null() {
-                environ_put(env, (*av).union_.string, environ_flags::empty());
-                av = args_next_value(av);
-            }
         }
 
         let title = if args_has(args, 'T') {
@@ -586,14 +615,36 @@ unsafe fn cmd_display_popup_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
         } else {
             xstrdup_(c"").as_ptr()
         };
-        let mut flags = popup_flag::empty();
+        // `None` is C's `flags = -1`: when modifying, leave the flags of the
+        // open popup alone unless one of -N, -E, -EE or -k is given.
+        let mut flags = if args_has(args, 'N') || !modify {
+            Some(popup_flag::empty())
+        } else {
+            None
+        };
         if args_has_count(args, b'E') > 1 {
-            flags |= popup_flag::POPUP_CLOSEEXITZERO;
+            flags = Some(flags.unwrap_or(popup_flag::empty()) | popup_flag::POPUP_CLOSEEXITZERO);
         } else if args_has(args, 'E') {
-            flags |= popup_flag::POPUP_CLOSEEXIT;
+            flags = Some(flags.unwrap_or(popup_flag::empty()) | popup_flag::POPUP_CLOSEEXIT);
+        }
+        if args_has(args, 'k') {
+            flags = Some(flags.unwrap_or(popup_flag::empty()) | popup_flag::POPUP_CLOSEANYKEY);
+        }
+
+        if modify {
+            popup_modify(
+                tc,
+                title,
+                style,
+                border_style,
+                box_lines::try_from(lines).unwrap(),
+                flags,
+            );
+            cleanup(argc, argv, env, cwd, title);
+            return cmd_retval::CMD_RETURN_NORMAL;
         }
         if popup_display(
-            flags,
+            flags.unwrap_or(popup_flag::empty()),
             box_lines::try_from(lines).unwrap(),
             item,
             px,
@@ -614,20 +665,10 @@ unsafe fn cmd_display_popup_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
             null_mut(),
         ) != 0
         {
-            cmd_free_argv(argc, argv);
-            if !env.is_null() {
-                environ_free(env);
-            }
-            free_(cwd);
-            free_(title);
+            cleanup(argc, argv, env, cwd, title);
             return cmd_retval::CMD_RETURN_NORMAL;
         }
-        if !env.is_null() {
-            environ_free(env);
-        }
-        free_(cwd);
-        free_(title);
-        cmd_free_argv(argc, argv);
+        cleanup(argc, argv, env, cwd, title);
 
         cmd_retval::CMD_RETURN_WAIT
     }

@@ -390,16 +390,25 @@ _ztmux-display-panes() {
 _ztmux-display-popup() {
   [[ -n ${tmux_describe} ]] && print "display a popup box over a pane" && return
   _arguments -s \
+    '-B[draw the popup without a border]' \
+    '-b+[specify border line type]:border lines:(single rounded double heavy simple padded none)' \
     '-C[close any popup on the client]' \
     '-c+[specify target client]:client:__ztmux-clients' \
     '-d+[specify working directory for the command]:directory:_directories' \
-    '-E[close the popup when the command exits]' \
+    '*-e+[set an environment variable for the popup, as VARIABLE=value]:variable' \
+    '*-E[close the popup when the command exits; twice for only on success]' \
+    '-k[dismiss the popup on any key, not only Escape or C-c]' \
+    '-N[reset the popup flags when modifying an open popup]' \
+    '-s+[specify popup style]:style' \
+    '-S+[specify popup border style]:style' \
+    '-T+[specify popup title format]:title' \
     '-w+[specify width]:width' \
     '-h+[specify height]:height' \
     '-t+[specify target pane]:pane:__ztmux-panes' \
     '-x+[specify horizontal position]:position' \
     '-y+[specify vertical position]:position' \
-    ':shell command:_cmdstring'
+    ':shell command:_cmdstring' \
+    '*::argument:_normal'
 }
 
 _ztmux-find-window() {

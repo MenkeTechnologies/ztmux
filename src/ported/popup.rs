@@ -11,8 +11,8 @@
 // WHATSOEVER RESULTING FROM LOSS OF MIND, USE, DATA OR PROFITS, WHETHER
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-use crate::*;
 use crate::options_::*;
+use crate::*;
 
 bitflags::bitflags! {
     #[repr(transparent)]
@@ -20,7 +20,11 @@ bitflags::bitflags! {
     pub struct popup_flag : i32 {
         const POPUP_CLOSEEXIT = 0x1;
         const POPUP_CLOSEEXITZERO = 0x2;
-        const POPUP_INTERNAL = 0x4;
+        const POPUP_CLOSEANYKEY = 0x4;
+        /// ztmux-only, so it takes the first bit above upstream's flags: the
+        /// popup is one ztmux opened itself (the `-e` editor popup) and gets
+        /// the reduced menu without the pane-conversion entries.
+        const POPUP_INTERNAL = 0x8;
     }
 }
 
@@ -42,6 +46,11 @@ pub struct popup_data {
     pub flags: popup_flag,
     pub title: *mut u8,
 
+    /// The `-s` style string, kept so `popup_reapply_styles` can layer it over
+    /// `popup-style` again on every draw.
+    pub style: *mut u8,
+    /// The `-S` border style string, kept for the same reason.
+    pub border_style: *mut u8,
     pub border_cell: grid_cell,
     pub border_lines: box_lines,
 
@@ -115,6 +124,79 @@ static POPUP_INTERNAL_MENU_ITEMS: [menu_item; 4] = [
     menu_item::new("Fill Space", 'F' as u64, null_mut()),
     menu_item::new("Centre", 'C' as u64, null_mut()),
 ];
+
+/// C `vendor/tmux/popup.c:92`: `static void popup_free(struct popup_data *pd)`
+unsafe fn popup_free(pd: *mut popup_data) {
+    unsafe {
+        server_client_unref((*pd).c);
+
+        if !(*pd).job.is_null() {
+            job_free((*pd).job);
+        }
+        input_free((*pd).ictx);
+
+        free_((*pd).or[0].ranges);
+        free_((*pd).or[1].ranges);
+        free_((*pd).r.ranges);
+        screen_free(&raw mut (*pd).s);
+        colour_palette_free(Some(&mut (*pd).palette));
+
+        free_((*pd).title);
+        free_((*pd).style);
+        free_((*pd).border_style);
+        free_(pd);
+    }
+}
+
+/// Re-evaluate `popup-style` and `popup-border-style` (plus any `-s`/`-S`
+/// overrides) so a style that changes while the popup is open takes effect.
+/// C `vendor/tmux/popup.c:113`: `static void popup_reapply_styles(struct popup_data *pd)`
+unsafe fn popup_reapply_styles(pd: *mut popup_data) {
+    unsafe {
+        let c = (*pd).c;
+        let s = (*c).session;
+
+        if s.is_null() {
+            return;
+        }
+        let o = (*(*(*s).curw).window).options;
+
+        let ft = format_create_defaults(null_mut(), c, s, (*s).curw, null_mut());
+
+        // Reapply popup style from options.
+        memcpy__(&raw mut (*pd).defaults, &raw const GRID_DEFAULT_CELL);
+        style_apply(&raw mut (*pd).defaults, o, c!("popup-style"), ft);
+        if !(*pd).style.is_null() {
+            let mut sytmp = MaybeUninit::<style>::uninit();
+            style_set(sytmp.as_mut_ptr(), &raw const GRID_DEFAULT_CELL);
+            if style_parse(sytmp.as_mut_ptr(), &raw mut (*pd).defaults, (*pd).style) == 0 {
+                (*pd).defaults.fg = (*sytmp.as_ptr()).gc.fg;
+                (*pd).defaults.bg = (*sytmp.as_ptr()).gc.bg;
+            }
+        }
+        (*pd).defaults.attr = grid_attr::empty();
+
+        // Reapply border style from options.
+        memcpy__(&raw mut (*pd).border_cell, &raw const GRID_DEFAULT_CELL);
+        style_apply(&raw mut (*pd).border_cell, o, c!("popup-border-style"), ft);
+        if !(*pd).border_style.is_null() {
+            let mut sytmp = MaybeUninit::<style>::uninit();
+            style_set(sytmp.as_mut_ptr(), &raw const GRID_DEFAULT_CELL);
+            if style_parse(
+                sytmp.as_mut_ptr(),
+                &raw mut (*pd).border_cell,
+                (*pd).border_style,
+            ) == 0
+            {
+                (*pd).border_cell.fg = (*sytmp.as_ptr()).gc.fg;
+                (*pd).border_cell.bg = (*sytmp.as_ptr()).gc.bg;
+            }
+        }
+        (*pd).border_cell.attr = grid_attr::empty();
+
+        format_free(ft);
+    }
+}
 
 /// C `vendor/tmux/popup.c:156`: `static void popup_redraw_cb(const struct tty_ctx *ttyctx)`
 pub unsafe fn popup_redraw_cb(ttyctx: *const tty_ctx) {
@@ -283,6 +365,8 @@ pub unsafe fn popup_draw_cb(c: *mut client, data: *mut c_void, rctx: *mut screen
         let mut defaults = MaybeUninit::<grid_cell>::uninit();
         let defaults = defaults.as_mut_ptr();
 
+        popup_reapply_styles(pd);
+
         screen_init(&raw mut s, (*pd).sx, (*pd).sy, 0);
         screen_write_start(ctx.as_mut_ptr(), &raw mut s);
         screen_write_clearscreen(ctx.as_mut_ptr(), 8);
@@ -375,18 +459,8 @@ pub fn popup_free_cb(c: *mut client, data: *mut c_void) {
             }
             cmdq_continue(item);
         }
-        server_client_unref((*pd).c);
 
-        if !(*pd).job.is_null() {
-            job_free((*pd).job);
-        }
-        input_free((*pd).ictx);
-
-        screen_free(&mut (*pd).s);
-        colour_palette_free(Some(&mut (*pd).palette));
-
-        free_((*pd).title);
-        free_(pd);
+        popup_free(pd);
     }
 }
 
@@ -655,7 +729,7 @@ pub unsafe fn popup_key_cb(c: *mut client, data: *mut c_void, event: *mut key_ev
                         break 'menu;
                     }
                     if (((*m).b & MOUSE_MASK_MODIFIERS) == MOUSE_MASK_META)
-                        || border != Border::None
+                        || (border != Border::None && !MOUSE_DRAG((*m).lb))
                     {
                         if !MOUSE_DRAG((*m).b) {
                             break 'out;
@@ -675,6 +749,16 @@ pub unsafe fn popup_key_cb(c: *mut client, data: *mut c_void, event: *mut key_ev
                     .intersects(popup_flag::POPUP_CLOSEEXIT | popup_flag::POPUP_CLOSEEXITZERO))
                     || (*pd).job.is_null())
                     && ((*event).key == b'\x1b' as u64 || (*event).key == (b'c' as u64 | KEYC_CTRL))
+                {
+                    return 1;
+                }
+                // C also excludes `KEYC_IS_PASTE(event->key)` here. ztmux's key
+                // codes have no KEYC_PASTE_START/KEYC_PASTE_END (bracketed paste
+                // is handled through MODE_BRACKETPASTE, not as a key), so there
+                // is no paste key that could reach this point.
+                if (*pd).job.is_null()
+                    && (*pd).flags.intersects(popup_flag::POPUP_CLOSEANYKEY)
+                    && !KEYC_IS_MOUSE((*event).key)
                 {
                     return 1;
                 }
@@ -717,7 +801,10 @@ pub unsafe fn popup_key_cb(c: *mut client, data: *mut c_void, event: *mut key_ev
             } else {
                 menu_add_items((*pd).menu, &POPUP_MENU_ITEMS, null_mut(), c, null_mut());
             }
-            #[expect(clippy::manual_midpoint, reason = "not really being used as midpoint calculation")]
+            #[expect(
+                clippy::manual_midpoint,
+                reason = "not really being used as midpoint calculation"
+            )]
             let x = (*m).x.saturating_sub(((*(*pd).menu).width + 4) / 2);
             (*pd).md = menu_prepare(
                 (*pd).menu,
@@ -804,6 +891,94 @@ pub unsafe fn popup_job_complete_cb(job: *mut job) {
     }
 }
 
+/// Bare form of [`overlay_draw_cb`], for identifying the popup overlay by the
+/// address of its draw callback.
+type overlay_draw_fn = unsafe fn(*mut client, *mut c_void, *mut screen_redraw_ctx);
+
+/// Whether a popup is already open on this client.
+/// C `vendor/tmux/popup.c:702`: `int popup_present(struct client *c)`
+pub unsafe fn popup_present(c: *mut client) -> c_int {
+    unsafe {
+        (*c).overlay_draw
+            .is_some_and(|f| std::ptr::fn_addr_eq(f, popup_draw_cb as overlay_draw_fn))
+            as c_int
+    }
+}
+
+/// Change the title, styles, border and flags of the popup already open on
+/// `c`; this is what `display-popup` run inside a popup does. `flags` of
+/// `None` is C's `-1`: leave the flags as they are.
+/// C `vendor/tmux/popup.c:708`: `int popup_modify(struct client *c, const char *title, const char *style, const char *border_style, enum box_lines lines, int flags)`
+pub unsafe fn popup_modify(
+    c: *mut client,
+    title: *const u8,
+    style: *const u8,
+    border_style: *const u8,
+    lines: box_lines,
+    flags: Option<popup_flag>,
+) -> c_int {
+    unsafe {
+        let pd = (*c).overlay_data.cast::<popup_data>();
+
+        if !title.is_null() {
+            free_((*pd).title);
+            (*pd).title = xstrdup(title).as_ptr();
+        }
+        if !border_style.is_null() {
+            free_((*pd).border_style);
+            (*pd).border_style = xstrdup(border_style).as_ptr();
+
+            let mut sytmp = MaybeUninit::<style>::uninit();
+            style_set(sytmp.as_mut_ptr(), &raw const (*pd).border_cell);
+            if style_parse(sytmp.as_mut_ptr(), &raw mut (*pd).border_cell, border_style) == 0 {
+                (*pd).border_cell.fg = (*sytmp.as_ptr()).gc.fg;
+                (*pd).border_cell.bg = (*sytmp.as_ptr()).gc.bg;
+            }
+        }
+        if !style.is_null() {
+            free_((*pd).style);
+            (*pd).style = xstrdup(style).as_ptr();
+
+            let mut sytmp = MaybeUninit::<style>::uninit();
+            style_set(sytmp.as_mut_ptr(), &raw const (*pd).defaults);
+            if style_parse(sytmp.as_mut_ptr(), &raw mut (*pd).defaults, style) == 0 {
+                (*pd).defaults.fg = (*sytmp.as_ptr()).gc.fg;
+                (*pd).defaults.bg = (*sytmp.as_ptr()).gc.bg;
+            }
+        }
+        if lines != box_lines::BOX_LINES_DEFAULT {
+            // Gaining or losing the border changes the size available to the
+            // command, so the screen and the job follow it. Two guards C does
+            // not have: the popup outlives its job when `-E` is not given, so
+            // the job is NULL-checked, and `sx`/`sy` are checked before the -2
+            // so a one-column `-B` popup gaining a border cannot underflow.
+            if lines == box_lines::BOX_LINES_NONE && (*pd).border_lines != lines {
+                screen_resize(&raw mut (*pd).s, (*pd).sx, (*pd).sy, 1);
+                if !(*pd).job.is_null() {
+                    job_resize((*pd).job, (*pd).sx, (*pd).sy);
+                }
+            } else if (*pd).border_lines == box_lines::BOX_LINES_NONE
+                && (*pd).border_lines != lines
+                && (*pd).sx > 2
+                && (*pd).sy > 2
+            {
+                screen_resize(&raw mut (*pd).s, (*pd).sx - 2, (*pd).sy - 2, 1);
+                if !(*pd).job.is_null() {
+                    job_resize((*pd).job, (*pd).sx - 2, (*pd).sy - 2);
+                }
+            }
+            (*pd).border_lines = lines;
+            tty_resize(&raw mut (*c).tty);
+        }
+        if let Some(flags) = flags {
+            (*pd).flags = flags;
+        }
+
+        server_redraw_client(c);
+        0
+    }
+}
+
 /// C `vendor/tmux/popup.c:757`: `int popup_display(int flags, enum box_lines lines, struct cmdq_item *item, u_int px, u_int py, u_int sx, u_int sy, struct environ *env, const char *shellcmd, int argc, char **argv, const char *cwd, const char *title, struct client *c, struct session *s, const char *style, const char *border_style, popup_close_cb cb, void *arg)`
 pub unsafe fn popup_display(
     flags: popup_flag,
@@ -862,6 +1037,12 @@ pub unsafe fn popup_display(
         (*pd).flags = flags;
         if !title.is_null() {
             (*pd).title = xstrdup(title).as_ptr();
+        }
+        if !style.is_null() {
+            (*pd).style = xstrdup(style).as_ptr();
+        }
+        if !border_style.is_null() {
+            (*pd).border_style = xstrdup(border_style).as_ptr();
         }
 
         (*pd).c = c;
@@ -939,6 +1120,10 @@ pub unsafe fn popup_display(
             jx as i32,
             jy as i32,
         );
+        if (*pd).job.is_null() {
+            popup_free(pd);
+            return -1;
+        }
         (*pd).ictx = input_init(null_mut(), job_get_event((*pd).job), &raw mut (*pd).palette);
 
         server_client_set_overlay(
