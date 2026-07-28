@@ -241,6 +241,80 @@ unsafe fn screen_write_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i3
 
 /// Set up context for TTY command.
 /// C `vendor/tmux/screen-write.c:262`: `static void screen_write_initctx(struct screen_write_ctx *ctx, struct tty_ctx *ttyctx, int is_sync, int check_obscured)`
+/// Whether a floating pane overlaps this write context's pane, so the cheap
+/// whole-screen escape sequences must not be used.
+/// C `vendor/tmux/screen-write.c`: `static int screen_write_pane_is_obscured(struct screen_write_ctx *ctx)`
+///
+/// The answer is cached on the context: it is asked once per clear operation.
+pub unsafe fn screen_write_pane_is_obscured(ctx: *mut screen_write_ctx) -> bool {
+    unsafe {
+        let base = (*ctx).wp;
+        if base.is_null() {
+            return false;
+        }
+        if (*ctx).flags & SCREEN_WRITE_CHECKED_IF_OBSCURED != 0 {
+            return (*ctx).flags & SCREEN_WRITE_OBSCURED != 0;
+        }
+        (*ctx).flags |= SCREEN_WRITE_CHECKED_IF_OBSCURED;
+
+        let w = (*base).window;
+        if (*base).xoff + (*base).sx > (*w).sx || (*base).yoff + (*base).sy > (*w).sy {
+            (*ctx).flags |= SCREEN_WRITE_OBSCURED;
+            return true;
+        }
+
+        // Walk toward the head of the z-index: those panes are drawn above.
+        let mut wp = base;
+        loop {
+            wp = tailq_prev::<_, window_pane, discr_zentry>(wp);
+            if wp.is_null() {
+                return false;
+            }
+            let overlaps_y = ((*wp).yoff >= (*base).yoff && (*wp).yoff <= (*base).yoff + (*base).sy)
+                || ((*wp).yoff + (*wp).sy >= (*base).yoff
+                    && (*wp).yoff + (*wp).sy <= (*base).yoff + (*base).sy);
+            let overlaps_x = ((*wp).xoff >= (*base).xoff && (*wp).xoff <= (*base).xoff + (*base).sx)
+                || ((*wp).xoff + (*wp).sx >= (*base).xoff
+                    && (*wp).xoff + (*wp).sx <= (*base).xoff + (*base).sx);
+            if window_pane_is_floating(wp) != 0 && overlaps_y && overlaps_x {
+                (*ctx).flags |= SCREEN_WRITE_OBSCURED;
+                return true;
+            }
+        }
+    }
+}
+
+/// Queue a clear of `nx` cells at `px` on the current line.
+/// C `vendor/tmux/screen-write.c`: `static void screen_write_collect_insert_clear(struct screen_write_ctx *ctx, u_int px, u_int nx, u_int bg)`
+unsafe fn screen_write_collect_insert_clear(
+    ctx: *mut screen_write_ctx,
+    px: u32,
+    nx: u32,
+    bg: u32,
+) {
+    unsafe {
+        if nx == 0 {
+            return;
+        }
+        let s = (*ctx).s;
+        let cl = (*s).write_list.add((*s).cy as usize);
+        let ci = (*ctx).item;
+        (*ci).x = px;
+        (*ci).used = nx;
+        (*ci).type_ = screen_write_citem_type::Clear;
+        (*ci).bg = bg;
+
+        let before =
+            screen_write_collect_trim(ctx, (*s).cy, (*ci).x, (*ci).used, &raw mut (*ci).wrapped);
+        if before.is_null() {
+            tailq_insert_tail(&raw mut (*cl).items, ci);
+        } else {
+            tailq_insert_before(before, ci);
+        }
+        (*ctx).item = screen_write_get_citem().as_ptr();
+    }
+}
+
 unsafe fn screen_write_initctx(ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx, sync: i32) {
     unsafe {
         let s = (*ctx).s;
@@ -1843,7 +1917,60 @@ pub unsafe fn screen_write_clearendofscreen(ctx: *mut screen_write_ctx, bg: u32)
 
         screen_write_collect_clear(ctx, (*s).cy + 1, sy - ((*s).cy + 1));
         screen_write_collect_flush(ctx, 0, "screen_write_clearendofscreen");
-        tty_write(tty_cmd_clearendofscreen, &raw mut ttyctx);
+
+        if !screen_write_pane_is_obscured(ctx) {
+            tty_write(tty_cmd_clearendofscreen, &raw mut ttyctx);
+            return;
+        }
+
+        // Can't clear the whole screen in one escape: a floating pane sits over
+        // part of it, so queue a clear per visible span instead.
+        let (ocx, ocy) = ((*s).cx, (*s).cy);
+        let (xoff, yoff) = if (*ctx).wp.is_null() {
+            (0, 0)
+        } else {
+            ((*(*ctx).wp).xoff as c_int, (*(*ctx).wp).yoff as c_int)
+        };
+
+        // First line (containing the cursor).
+        if (*s).cx < sx {
+            let r = window_visible_ranges(
+                (*ctx).wp,
+                xoff + (*s).cx as c_int,
+                yoff + (*s).cy as c_int,
+                sx - (*s).cx,
+                null_mut(),
+            );
+            screen_write_insert_clear_ranges(ctx, r, xoff, bg);
+        }
+
+        // Below cursor to bottom.
+        for y in (*s).cy + 1..sy {
+            screen_write_set_cursor(ctx, 0, y as i32);
+            let r =
+                window_visible_ranges((*ctx).wp, xoff, yoff + y as c_int, sx, null_mut());
+            screen_write_insert_clear_ranges(ctx, r, xoff, bg);
+        }
+        screen_write_set_cursor(ctx, ocx as i32, ocy as i32);
+    }
+}
+
+/// Queue a clear for each non-empty span in `r`, converting window coordinates
+/// back to pane coordinates.
+unsafe fn screen_write_insert_clear_ranges(
+    ctx: *mut screen_write_ctx,
+    r: *mut visible_ranges,
+    xoff: c_int,
+    bg: u32,
+) {
+    unsafe {
+        for i in 0..(*r).used as usize {
+            let ri = *(*r).ranges.add(i);
+            if ri.nx == 0 {
+                continue;
+            }
+            screen_write_collect_insert_clear(ctx, (ri.px as c_int - xoff) as u32, ri.nx, bg);
+        }
     }
 }
 
@@ -1876,7 +2003,37 @@ pub unsafe fn screen_write_clearstartofscreen(ctx: *mut screen_write_ctx, bg: u3
 
         screen_write_collect_clear(ctx, 0, (*s).cy);
         screen_write_collect_flush(ctx, 0, "screen_write_clearstartofscreen");
-        tty_write(tty_cmd_clearstartofscreen, &raw mut ttyctx);
+
+        if !screen_write_pane_is_obscured(ctx) {
+            tty_write(tty_cmd_clearstartofscreen, &raw mut ttyctx);
+            return;
+        }
+
+        let (ocx, ocy) = ((*s).cx, (*s).cy);
+        let (xoff, yoff) = if (*ctx).wp.is_null() {
+            (0, 0)
+        } else {
+            ((*(*ctx).wp).xoff as c_int, (*(*ctx).wp).yoff as c_int)
+        };
+
+        // Top to above the cursor.
+        for y in 0..(*s).cy {
+            screen_write_set_cursor(ctx, 0, y as i32);
+            let r = window_visible_ranges((*ctx).wp, xoff, yoff + y as c_int, sx, null_mut());
+            screen_write_insert_clear_ranges(ctx, r, xoff, bg);
+        }
+
+        // Last line (containing the cursor).
+        screen_write_set_cursor(ctx, 0, (*s).cy as i32);
+        let r = window_visible_ranges(
+            (*ctx).wp,
+            xoff,
+            yoff + ocy as c_int,
+            (*s).cx + 1,
+            null_mut(),
+        );
+        screen_write_insert_clear_ranges(ctx, r, xoff, bg);
+        screen_write_set_cursor(ctx, ocx as i32, ocy as i32);
     }
 }
 
@@ -1910,7 +2067,26 @@ pub unsafe fn screen_write_clearscreen(ctx: *mut screen_write_ctx, bg: u32) {
         }
 
         screen_write_collect_clear(ctx, 0, sy);
-        tty_write(tty_cmd_clearscreen, &raw mut ttyctx);
+
+        if !screen_write_pane_is_obscured(ctx) {
+            tty_write(tty_cmd_clearscreen, &raw mut ttyctx);
+            return;
+        }
+
+        let (ocx, ocy) = ((*s).cx, (*s).cy);
+        let (xoff, yoff) = if (*ctx).wp.is_null() {
+            (0, 0)
+        } else {
+            ((*(*ctx).wp).xoff as c_int, (*(*ctx).wp).yoff as c_int)
+        };
+
+        // Clear every line, skipping what a floating pane covers.
+        for y in 0..sy {
+            screen_write_set_cursor(ctx, 0, y as i32);
+            let r = window_visible_ranges((*ctx).wp, xoff, yoff + y as c_int, sx, null_mut());
+            screen_write_insert_clear_ranges(ctx, r, xoff, bg);
+        }
+        screen_write_set_cursor(ctx, ocx as i32, ocy as i32);
     }
 }
 
@@ -2091,37 +2267,101 @@ pub unsafe fn screen_write_collect_flush(ctx: *mut screen_write_ctx, scroll_only
         let cx = (*s).cx;
         let cy = (*s).cy;
         for y in 0..screen_size_y(s) {
-            let cl = (*(*ctx).s).write_list.add(y as usize);
-            let mut last = u32::MAX;
-            for ci in tailq_foreach(&raw mut (*cl).items).map(NonNull::as_ptr) {
-                if last != u32::MAX && (*ci).x <= last {
-                    panic!("collect list not in order: {} <= {}", (*ci).x, last);
-                } // fatalx("collect list not in order: %u <= %u", (*ci).x, last);
-                screen_write_set_cursor(ctx, (*ci).x as i32, y as i32);
-                if (*ci).type_ == screen_write_citem_type::Clear {
-                    screen_write_initctx(ctx, &raw mut ttyctx, 1);
-                    ttyctx.bg = (*ci).bg;
-                    ttyctx.num = (*ci).used;
-                    tty_write(tty_cmd_clearcharacter, &raw mut ttyctx);
-                } else {
-                    screen_write_initctx(ctx, &raw mut ttyctx, 0);
-                    ttyctx.cell = &(*ci).gc;
-                    ttyctx.wrapped = (*ci).wrapped;
-                    ttyctx.ptr = (*cl).data.add((*ci).x as usize).cast();
-                    ttyctx.num = (*ci).used;
-                    tty_write(tty_cmd_cells, &raw mut ttyctx);
-                }
-                items += 1;
-
-                tailq_remove(&raw mut (*cl).items, ci);
-                screen_write_free_citem(ci);
-                last = (*ci).x;
-            }
+            items += screen_write_collect_flush_line(ctx, y);
         }
         (*s).cx = cx;
         (*s).cy = cy;
 
         log_debug!("screen_write_collect_flush: flushed {items} items ({from})",);
+    }
+}
+
+/// Flush one collected line, writing only the spans of it that are not covered
+/// by a floating pane above this one. Returns the number of items written.
+/// C `vendor/tmux/screen-write.c:2300`: `static u_int screen_write_collect_flush_line(struct screen_write_ctx *ctx, u_int y)`
+unsafe fn screen_write_collect_flush_line(ctx: *mut screen_write_ctx, y: u32) -> u32 {
+    unsafe {
+        let wp = (*ctx).wp;
+        let s = (*ctx).s;
+        let cl = (*s).write_list.add(y as usize);
+        let mut last = u32::MAX;
+        let mut items = 0;
+        let mut ttyctx: tty_ctx = zeroed();
+
+        let (wsx, wsy, xoff, yoff) = if wp.is_null() {
+            (screen_size_x(s), screen_size_y(s), 0, 0)
+        } else {
+            (
+                (*(*wp).window).sx,
+                (*(*wp).window).sy,
+                (*wp).xoff as c_int,
+                (*wp).yoff as c_int,
+            )
+        };
+        if y as c_int + yoff >= wsy as c_int {
+            return 0;
+        }
+
+        let r = window_visible_ranges(wp, 0, y as c_int + yoff, wsx, null_mut());
+        for ci in tailq_foreach(&raw mut (*cl).items).map(NonNull::as_ptr) {
+            if last != u32::MAX && (*ci).x <= last {
+                fatalx_!("collect list bad order: {} <= {}", (*ci).x, last);
+            }
+
+            let mut written = false;
+            for i in 0..(*r).used as usize {
+                let ri = *(*r).ranges.add(i);
+                if ri.nx == 0 {
+                    continue;
+                }
+
+                let r_start = ri.px as c_int;
+                let r_end = (ri.px + ri.nx) as c_int;
+                let c_start = (*ci).x as c_int;
+                let c_end = ((*ci).x + (*ci).used) as c_int;
+
+                if c_start + xoff >= r_end || c_end + xoff <= r_start {
+                    continue;
+                }
+                let w_start = if r_start > c_start + xoff {
+                    r_start - xoff
+                } else {
+                    c_start
+                };
+                let w_end = if c_end + xoff > r_end {
+                    r_end - xoff
+                } else {
+                    c_end
+                };
+                if w_end <= w_start {
+                    continue;
+                }
+                let w_length = (w_end - w_start) as u32;
+
+                screen_write_set_cursor(ctx, w_start, y as i32);
+                if (*ci).type_ == screen_write_citem_type::Clear {
+                    screen_write_initctx(ctx, &raw mut ttyctx, 1);
+                    ttyctx.bg = (*ci).bg;
+                    ttyctx.num = w_length;
+                    tty_write(tty_cmd_clearcharacter, &raw mut ttyctx);
+                } else {
+                    screen_write_initctx(ctx, &raw mut ttyctx, 0);
+                    ttyctx.cell = &(*ci).gc;
+                    ttyctx.wrapped = (*ci).wrapped;
+                    ttyctx.ptr = (*cl).data.add(w_start as usize).cast();
+                    ttyctx.num = w_length;
+                    tty_write(tty_cmd_cells, &raw mut ttyctx);
+                }
+                items += 1;
+                written = true;
+            }
+            if written {
+                last = (*ci).x;
+                tailq_remove(&raw mut (*cl).items, ci);
+                screen_write_free_citem(ci);
+            }
+        }
+        items
     }
 }
 
@@ -2364,6 +2604,22 @@ pub unsafe fn screen_write_cell(ctx: *mut screen_write_ctx, gc: *const grid_cell
             skip = false;
         }
 
+        // Get visible ranges for the character before moving the cursor, so a
+        // floating pane above this one is not drawn over.
+        let wp = (*ctx).wp;
+        let (xoff, yoff) = if wp.is_null() {
+            (0, 0)
+        } else {
+            ((*wp).xoff as c_int, (*wp).yoff as c_int)
+        };
+        let r = window_visible_ranges(
+            wp,
+            xoff + (*s).cx as c_int,
+            (*s).cy as c_int + yoff,
+            width,
+            null_mut(),
+        );
+
         // Move the cursor. If not wrapping, stick at the last character and
         // replace it.
         let not_wrap = !((*s).mode.intersects(mode_flag::MODE_WRAP)) as i32;
@@ -2381,14 +2637,40 @@ pub unsafe fn screen_write_cell(ctx: *mut screen_write_ctx, gc: *const grid_cell
         }
 
         // Write to the screen.
-        if !skip {
-            if selected {
-                screen_select_cell(s, &raw mut tmp_gc, gc);
-                ttyctx.cell = &tmp_gc;
-            } else {
-                ttyctx.cell = gc;
-            }
+        if skip {
+            return;
+        }
+
+        // Work out the cell attributes.
+        if selected {
+            screen_select_cell(s, &raw mut tmp_gc, gc);
+        } else {
+            memcpy__(&raw mut tmp_gc, gc);
+        }
+        ttyctx.cell = &raw const tmp_gc;
+
+        // If the cell is fully visible, it can be written entirely.
+        let mut vis = 0;
+        for i in 0..(*r).used as usize {
+            vis += (*(*r).ranges.add(i)).nx;
+        }
+        if vis >= width {
             tty_write(tty_cmd_cell, &raw mut ttyctx);
+            return;
+        }
+
+        // Otherwise this is a wide character or tab partly obscured by a
+        // floating pane. Write spaces in the visible regions only.
+        utf8_set(&raw mut tmp_gc.data, b' ');
+        for i in 0..(*r).used as usize {
+            let ri = *(*r).ranges.add(i);
+            if ri.nx == 0 {
+                continue;
+            }
+            for n in 0..ri.nx {
+                ttyctx.ocx = (ri.px as c_int - xoff + n as c_int) as u32;
+                tty_write(tty_cmd_cell, &raw mut ttyctx);
+            }
         }
     }
 }
@@ -2483,6 +2765,32 @@ pub unsafe fn screen_write_combine(ctx: *mut screen_write_ctx, gc: *const grid_c
         grid_view_set_cell(gd, cx - n, cy, &last);
         if force_wide != 0 {
             grid_view_set_padding(gd, cx - 1, cy);
+        }
+
+        // Check if all of this character is visible. No character is obscured
+        // in the middle, only on the left or right, but there can be an empty
+        // range in between so add them all up.
+        let wp = (*ctx).wp;
+        let yoff = if wp.is_null() {
+            0
+        } else {
+            (*wp).yoff as c_int
+        };
+        let r = window_visible_ranges(
+            wp,
+            (cx - n) as c_int,
+            cy as c_int + yoff,
+            n,
+            null_mut(),
+        );
+        let mut vis = 0;
+        for i in 0..(*r).used as usize {
+            vis += (*(*r).ranges.add(i)).nx;
+        }
+        if vis < n {
+            // Part of this character is obscured by a floating pane. Return 1
+            // and let screen_write_cell write a space.
+            return 1;
         }
 
         // Redraw the combined cell. If forcing the cell to width 2, reset the

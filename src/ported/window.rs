@@ -1657,6 +1657,12 @@ pub unsafe fn window_pane_key(
 
 pub unsafe fn window_pane_visible(wp: *const window_pane) -> bool {
     unsafe {
+        // ztmux extension: with @ztmux-float-autohide set, a floating pane is
+        // hidden while a tiled pane has focus (zellij behaviour). Off by
+        // default, in which case this never fires and upstream behaviour holds.
+        if crate::extensions::float::is_hidden(wp.cast_mut()) {
+            return false;
+        }
         if !(*(*wp).window).flags.intersects(window_flag::ZOOMED) {
             return true;
         }
