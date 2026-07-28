@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1115/1115 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 cases.
+**1121/1121 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 cases.
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
 (full-size split with a pre-existing split) crashed the server on a u32 underflow
@@ -263,7 +263,7 @@ so a regression in ported behavior cannot land.
 
 `parity/known_gaps/` is the inverse of `parity/cases/`: next-3.7 features ztmux
 does **not** implement yet, each pinned by a case that is expected to *diverge*
-from the reference. The 13 cases cover ~50 individual options/format-vars/commands
+from the reference. The 6 cases cover ~45 individual options/format-vars/commands
 (pane scrollbars, the theme system, copy-mode line numbers, floating-pane format
 vars, `switch-mode`, …), each tied to an unported C area. Run them with the
 inverted runner:
@@ -276,7 +276,7 @@ The runner is an advisory tripwire — it exits non-zero only when a gap closes
 (the feature got ported and its case should move to `parity/cases/`), so it never
 reddens CI merely because the gaps still exist. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1115/1115 ported surface; they measure
+proof. These gaps do not count against the 1121/1121 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite
