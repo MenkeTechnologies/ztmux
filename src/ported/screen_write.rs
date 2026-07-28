@@ -555,7 +555,16 @@ unsafe fn screen_write_initctx(ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx,
             // move the cursor); for other panes, always use it, since the
             // cursor will have to move.
             if !(*ctx).wp.is_null() {
-                if (*ctx).wp != (*(*(*ctx).wp).window).active {
+                // ztmux: a window with a floating pane always syncs. Drawing
+                // either the float or a pane clipped around it moves the cursor
+                // for every span, so an unsynchronised frame is visibly torn —
+                // the float flickered whenever dynamic content sat behind it.
+                // Upstream forces sync on non-active panes for the same stated
+                // reason ("the cursor will have to move"); this extends it to
+                // the case its scene cache makes unnecessary.
+                if (*ctx).wp != (*(*(*ctx).wp).window).active
+                    || window_has_floating_panes((*(*ctx).wp).window) != 0
+                {
                     (*ttyctx).num = 1;
                 } else {
                     (*ttyctx).num = sync as u32;

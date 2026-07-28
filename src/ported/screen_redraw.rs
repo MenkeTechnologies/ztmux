@@ -751,6 +751,7 @@ pub unsafe fn screen_redraw_screen(c: *mut client) {
         }
 
         tty_reset(&raw mut (*c).tty);
+        tty_sync_end(&raw mut (*c).tty);
     }
 }
 
@@ -770,6 +771,7 @@ pub unsafe fn screen_redraw_pane(c: *mut client, wp: *mut window_pane) {
         screen_redraw_draw_pane(ctx.as_mut_ptr(), wp);
 
         tty_reset(&raw mut (*c).tty);
+        tty_sync_end(&raw mut (*c).tty);
     }
 }
 
