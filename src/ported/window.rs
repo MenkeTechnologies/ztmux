@@ -1781,7 +1781,7 @@ pub unsafe fn window_pane_find_up(wp: *mut window_pane) -> *mut window_pane {
         let mut list: *mut *mut window_pane = null_mut();
         let mut size = 0;
 
-        let mut edge = (*wp).yoff;
+        let mut edge = (*wp).yoff as u32;
         match status {
             pane_status::PANE_STATUS_TOP => {
                 if edge == 1 {
@@ -1800,23 +1800,23 @@ pub unsafe fn window_pane_find_up(wp: *mut window_pane) -> *mut window_pane {
             }
         }
 
-        let left = (*wp).xoff;
-        let right = (*wp).xoff + (*wp).sx;
+        let left = (*wp).xoff as u32;
+        let right = (*wp).xoff as u32 + (*wp).sx;
 
         for next in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
             if next == wp {
                 continue;
             }
-            if (*next).yoff + (*next).sy + 1 != edge {
+            if (*next).yoff as u32 + (*next).sy + 1 != edge {
                 continue;
             }
-            let end = (*next).xoff + (*next).sx - 1;
+            let end = (*next).xoff as u32 + (*next).sx - 1;
 
             let mut found = 0;
             #[expect(clippy::if_same_then_else)]
-            if (*next).xoff < left && end > right {
+            if ((*next).xoff as u32) < left && end > right {
                 found = 1;
-            } else if (*next).xoff >= left && (*next).xoff <= right {
+            } else if ((*next).xoff as u32) >= left && ((*next).xoff as u32) <= right {
                 found = 1;
             } else if end >= left && end <= right {
                 found = 1;
@@ -1850,7 +1850,7 @@ pub unsafe fn window_pane_find_down(wp: *mut window_pane) -> *mut window_pane {
         let mut list: *mut *mut window_pane = null_mut();
         let mut size = 0;
 
-        let mut edge = (*wp).yoff + (*wp).sy + 1;
+        let mut edge = (*wp).yoff as u32 + (*wp).sy + 1;
         match status {
             pane_status::PANE_STATUS_TOP => {
                 if edge >= (*w).sy {
@@ -1869,23 +1869,23 @@ pub unsafe fn window_pane_find_down(wp: *mut window_pane) -> *mut window_pane {
             }
         }
 
-        let left = (*wp).xoff;
-        let right = (*wp).xoff + (*wp).sx;
+        let left = (*wp).xoff as u32;
+        let right = (*wp).xoff as u32 + (*wp).sx;
 
         for next in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
             if next == wp {
                 continue;
             }
-            if (*next).yoff != edge {
+            if (*next).yoff as u32 != edge {
                 continue;
             }
-            let end = (*next).xoff + (*next).sx - 1;
+            let end = (*next).xoff as u32 + (*next).sx - 1;
 
             let mut found = 0;
             #[expect(clippy::if_same_then_else)]
-            if (*next).xoff < left && end > right {
+            if ((*next).xoff as u32) < left && end > right {
                 found = 1;
-            } else if (*next).xoff >= left && (*next).xoff <= right {
+            } else if ((*next).xoff as u32) >= left && ((*next).xoff as u32) <= right {
                 found = 1;
             } else if end >= left && end <= right {
                 found = 1;
@@ -1916,28 +1916,28 @@ pub unsafe fn window_pane_find_left(wp: *mut window_pane) -> *mut window_pane {
         let mut list: *mut *mut window_pane = null_mut();
         let mut size = 0;
 
-        let mut edge = (*wp).xoff;
+        let mut edge = (*wp).xoff as u32;
         if edge == 0 {
             edge = (*w).sx + 1;
         }
 
-        let top = (*wp).yoff;
-        let bottom = (*wp).yoff + (*wp).sy;
+        let top = (*wp).yoff as u32;
+        let bottom = (*wp).yoff as u32 + (*wp).sy;
 
         for next in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
             if next == wp {
                 continue;
             }
-            if (*next).xoff + (*next).sx + 1 != edge {
+            if (*next).xoff as u32 + (*next).sx + 1 != edge {
                 continue;
             }
-            let end = (*next).yoff + (*next).sy - 1;
+            let end = (*next).yoff as u32 + (*next).sy - 1;
 
             let mut found = false;
             #[expect(clippy::if_same_then_else)]
-            if (*next).yoff < top && end > bottom {
+            if ((*next).yoff as u32) < top && end > bottom {
                 found = true;
-            } else if (*next).yoff >= top && (*next).yoff <= bottom {
+            } else if ((*next).yoff as u32) >= top && ((*next).yoff as u32) <= bottom {
                 found = true;
             } else if end >= top && end <= bottom {
                 found = true;
@@ -1968,28 +1968,28 @@ pub unsafe fn window_pane_find_right(wp: *mut window_pane) -> *mut window_pane {
         let mut list: *mut *mut window_pane = null_mut();
         let mut size = 0;
 
-        let mut edge = (*wp).xoff + (*wp).sx + 1;
+        let mut edge = (*wp).xoff as u32 + (*wp).sx + 1;
         if edge >= (*w).sx {
             edge = 0;
         }
 
-        let top = (*wp).yoff;
-        let bottom = (*wp).yoff + (*wp).sy;
+        let top = (*wp).yoff as u32;
+        let bottom = (*wp).yoff as u32 + (*wp).sy;
 
         for next in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
             if next == wp {
                 continue;
             }
-            if (*next).xoff != edge {
+            if (*next).xoff as u32 != edge {
                 continue;
             }
-            let end = (*next).yoff + (*next).sy - 1;
+            let end = (*next).yoff as u32 + (*next).sy - 1;
 
             let mut found = false;
             #[expect(clippy::if_same_then_else)]
-            if (*next).yoff < top && end > bottom {
+            if ((*next).yoff as u32) < top && end > bottom {
                 found = true;
-            } else if (*next).yoff >= top && (*next).yoff <= bottom {
+            } else if ((*next).yoff as u32) >= top && ((*next).yoff as u32) <= bottom {
                 found = true;
             } else if end >= top && end <= bottom {
                 found = true;

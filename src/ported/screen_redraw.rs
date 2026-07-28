@@ -107,10 +107,10 @@ pub unsafe fn screen_redraw_two_panes(w: *mut window, direction: i32) -> bool {
         if !tailq_next::<_, _, discr_entry>(wp).is_null() {
             return false; /* more than two panes */
         }
-        if direction == 0 && (*wp).xoff == 0 {
+        if direction == 0 && (*wp).xoff as u32 == 0 {
             return false;
         }
-        if direction == 1 && (*wp).yoff == 0 {
+        if direction == 1 && (*wp).yoff as u32 == 0 {
             return false;
         }
     }
@@ -127,12 +127,17 @@ pub unsafe fn screen_redraw_pane_border(
     unsafe {
         let oo = (*(*wp).window).options;
         let mut split = 0;
-        let ex = (*wp).xoff + (*wp).sx;
-        let ey = (*wp).yoff + (*wp).sy;
+        // Signed throughout: a floating pane may sit past an edge, so xoff/yoff
+        // and everything derived from them can be negative.
+        let (px, py) = (px as i32, py as i32);
+        let (xoff, yoff) = ((*wp).xoff, (*wp).yoff);
+        let (sx, sy) = ((*wp).sx as i32, (*wp).sy as i32);
+        let ex = xoff + sx;
+        let ey = yoff + sy;
         let pane_status = (*ctx).pane_status;
 
         // Inside pane
-        if px >= (*wp).xoff && px < ex && py >= (*wp).yoff && py < ey {
+        if px >= xoff && px < ex && py >= yoff && py < ey {
             return screen_redraw_border_type::SCREEN_REDRAW_INSIDE;
         }
 
@@ -150,22 +155,22 @@ pub unsafe fn screen_redraw_pane_border(
         // Left/right borders
         if pane_status == pane_status::PANE_STATUS_OFF {
             if screen_redraw_two_panes((*wp).window, 0) && split != 0 {
-                if (*wp).xoff == 0 && px == (*wp).sx && py <= (*wp).sy / 2 {
+                if xoff == 0 && px == sx && py <= sy / 2 {
                     return screen_redraw_border_type::SCREEN_REDRAW_BORDER_RIGHT;
                 }
-                if (*wp).xoff != 0 && px == (*wp).xoff - 1 && py > (*wp).sy / 2 {
+                if xoff != 0 && px == xoff - 1 && py > sy / 2 {
                     return screen_redraw_border_type::SCREEN_REDRAW_BORDER_LEFT;
                 }
-            } else if ((*wp).yoff == 0 || py >= (*wp).yoff - 1) && py <= ey {
-                if (*wp).xoff != 0 && px == (*wp).xoff - 1 {
+            } else if (yoff == 0 || py >= yoff - 1) && py <= ey {
+                if xoff != 0 && px == xoff - 1 {
                     return screen_redraw_border_type::SCREEN_REDRAW_BORDER_LEFT;
                 }
                 if px == ex {
                     return screen_redraw_border_type::SCREEN_REDRAW_BORDER_RIGHT;
                 }
             }
-        } else if ((*wp).yoff == 0 || py >= (*wp).yoff - 1) && py <= ey {
-            if (*wp).xoff != 0 && px == (*wp).xoff - 1 {
+        } else if (yoff == 0 || py >= yoff - 1) && py <= ey {
+            if xoff != 0 && px == xoff - 1 {
                 return screen_redraw_border_type::SCREEN_REDRAW_BORDER_LEFT;
             }
             if px == ex {
@@ -176,14 +181,14 @@ pub unsafe fn screen_redraw_pane_border(
         // Top/bottom borders
         if pane_status == pane_status::PANE_STATUS_OFF {
             if screen_redraw_two_panes((*wp).window, 1) && split != 0 {
-                if (*wp).yoff == 0 && py == (*wp).sy && px <= (*wp).sx / 2 {
+                if yoff == 0 && py == sy && px <= sx / 2 {
                     return screen_redraw_border_type::SCREEN_REDRAW_BORDER_BOTTOM;
                 }
-                if (*wp).yoff != 0 && py == (*wp).yoff - 1 && px > (*wp).sx / 2 {
+                if yoff != 0 && py == yoff - 1 && px > sx / 2 {
                     return screen_redraw_border_type::SCREEN_REDRAW_BORDER_TOP;
                 }
-            } else if ((*wp).xoff == 0 || px >= (*wp).xoff - 1) && px <= ex {
-                if (*wp).yoff != 0 && py == (*wp).yoff - 1 {
+            } else if (xoff == 0 || px >= xoff - 1) && px <= ex {
+                if yoff != 0 && py == yoff - 1 {
                     return screen_redraw_border_type::SCREEN_REDRAW_BORDER_TOP;
                 }
                 if py == ey {
@@ -191,14 +196,14 @@ pub unsafe fn screen_redraw_pane_border(
                 }
             }
         } else if pane_status == pane_status::PANE_STATUS_TOP {
-            if ((*wp).xoff == 0 || px >= (*wp).xoff - 1)
+            if (xoff == 0 || px >= xoff - 1)
                 && px <= ex
-                && (*wp).yoff != 0
-                && py == (*wp).yoff - 1
+                && yoff != 0
+                && py == yoff - 1
             {
                 return screen_redraw_border_type::SCREEN_REDRAW_BORDER_TOP;
             }
-        } else if ((*wp).xoff == 0 || px >= (*wp).xoff - 1) && px <= ex && py == ey {
+        } else if (xoff == 0 || px >= xoff - 1) && px <= ex && py == ey {
             return screen_redraw_border_type::SCREEN_REDRAW_BORDER_BOTTOM;
         }
 
@@ -358,13 +363,13 @@ pub unsafe fn screen_redraw_check_cell(
                     }
 
                     if pane_status == pane_status::PANE_STATUS_TOP {
-                        line = (*wp).yoff - 1;
+                        line = (*wp).yoff as u32 - 1;
                     } else {
-                        line = (*wp).yoff + (*wp).sy;
+                        line = (*wp).yoff as u32 + (*wp).sy;
                     }
-                    right = (*wp).xoff + 2 + (*wp).status_size as u32 - 1;
+                    right = (*wp).xoff as u32 + 2 + (*wp).status_size as u32 - 1;
 
-                    if py == line && px >= (*wp).xoff + 2 && px <= right {
+                    if py == line && px >= (*wp).xoff as u32 + 2 && px <= right {
                         return cell_type::CELL_INSIDE;
                     }
                 }
@@ -482,11 +487,11 @@ pub unsafe fn screen_redraw_make_pane_status(
         screen_write_start(ctx.as_mut_ptr(), &raw mut (*wp).status_screen);
 
         for i in 0..width {
-            px = (*wp).xoff + 2 + i;
+            px = (*wp).xoff as u32 + 2 + i;
             if pane_status == pane_status::PANE_STATUS_TOP {
-                py = (*wp).yoff - 1;
+                py = (*wp).yoff as u32 - 1;
             } else {
-                py = (*wp).yoff + (*wp).sy;
+                py = (*wp).yoff as u32 + (*wp).sy;
             }
             let cell_type = screen_redraw_type_of_cell(rctx, px, py);
             screen_redraw_border_set(w, wp, pane_lines, cell_type, &raw mut gc);
@@ -538,11 +543,11 @@ pub unsafe fn screen_redraw_draw_pane_status(ctx: *mut screen_redraw_ctx) {
 
             let size: u32 = (*wp).status_size as u32;
             let mut yoff = if (*ctx).pane_status == pane_status::PANE_STATUS_TOP {
-                (*wp).yoff - 1
+                (*wp).yoff as u32 - 1
             } else {
-                (*wp).yoff + (*wp).sy
+                (*wp).yoff as u32 + (*wp).sy
             };
-            let xoff = (*wp).xoff + 2;
+            let xoff = (*wp).xoff as u32 + 2;
 
             if xoff + size <= (*ctx).ox
                 || xoff >= (*ctx).ox + (*ctx).sx
@@ -914,13 +919,13 @@ pub unsafe fn screen_redraw_draw_borders_cell(ctx: *mut screen_redraw_ctx, i: u3
 
         if !wp.is_null() && arrows != 0 {
             border = screen_redraw_pane_border(ctx, active, x, y);
-            if ((i == (*wp).xoff + 1
+            if ((i == (*wp).xoff as u32 + 1
                 && (cell_type == cell_type::CELL_LEFTRIGHT
                     || (cell_type == cell_type::CELL_TOPJOIN
                         && border == screen_redraw_border_type::SCREEN_REDRAW_BORDER_BOTTOM)
                     || (cell_type == cell_type::CELL_BOTTOMJOIN
                         && border == screen_redraw_border_type::SCREEN_REDRAW_BORDER_TOP)))
-                || (j == (*wp).yoff + 1
+                || (j == (*wp).yoff as u32 + 1
                     && (cell_type == cell_type::CELL_TOPBOTTOM
                         || (cell_type == cell_type::CELL_LEFTJOIN
                             && border == screen_redraw_border_type::SCREEN_REDRAW_BORDER_RIGHT)
@@ -1054,7 +1059,14 @@ pub unsafe fn screen_redraw_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
             (*wp).id,
         );
 
-        if (*wp).xoff + (*wp).sx <= (*ctx).ox || (*wp).xoff >= (*ctx).ox + (*ctx).sx {
+        // Signed: a floating pane may be positioned past an edge, so xoff/yoff
+        // are negative there and the clipping below has to cope.
+        let (xoff, yoff) = ((*wp).xoff, (*wp).yoff);
+        let (psx, psy) = ((*wp).sx as i32, (*wp).sy as i32);
+        let (ox, oy) = ((*ctx).ox as i32, (*ctx).oy as i32);
+        let (csx, csy) = ((*ctx).sx as i32, (*ctx).sy as i32);
+
+        if xoff + psx <= ox || xoff >= ox + csx {
             return;
         }
 
@@ -1064,28 +1076,28 @@ pub unsafe fn screen_redraw_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
             0
         };
 
-        for j in 0..(*wp).sy {
-            if (*wp).yoff + j < (*ctx).oy || (*wp).yoff + j >= (*ctx).oy + (*ctx).sy {
+        for j in 0..psy {
+            if yoff + j < oy || yoff + j >= oy + csy {
                 continue;
             }
-            let y = top + (*wp).yoff + j - (*ctx).oy;
+            let y = (top as i32 + yoff + j - oy) as u32;
 
-            let (i, x, width) =
-                if (*wp).xoff >= (*ctx).ox && (*wp).xoff + (*wp).sx <= (*ctx).ox + (*ctx).sx {
-                    // All visible
-                    (0, (*wp).xoff - (*ctx).ox, (*wp).sx)
-                } else if (*wp).xoff < (*ctx).ox && (*wp).xoff + (*wp).sx > (*ctx).ox + (*ctx).sx {
-                    // Both left and right not visible
-                    ((*ctx).ox, 0, (*ctx).sx)
-                } else if (*wp).xoff < (*ctx).ox {
-                    // Left not visible
-                    let i = (*ctx).ox - (*wp).xoff;
-                    (i, 0, (*wp).sx - i)
-                } else {
-                    // Right not visible
-                    let x = (*wp).xoff - (*ctx).ox;
-                    (0, x, (*ctx).sx - x)
-                };
+            let (i, x, width) = if xoff >= ox && xoff + psx <= ox + csx {
+                // All visible
+                (0, xoff - ox, psx)
+            } else if xoff < ox && xoff + psx > ox + csx {
+                // Both left and right not visible
+                (ox, 0, csx)
+            } else if xoff < ox {
+                // Left not visible
+                let i = ox - xoff;
+                (i, 0, psx - i)
+            } else {
+                // Right not visible
+                let x = xoff - ox;
+                (0, x, csx - x)
+            };
+            let (i, x, width) = (i as u32, x as u32, width as u32);
 
             log_debug!(
                 "{}: {} %%{} line {},{} at {},{}, width {}",
@@ -1100,7 +1112,7 @@ pub unsafe fn screen_redraw_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
             );
 
             tty_default_colours(&raw mut defaults, wp);
-            tty_draw_line(tty, s, i, j, width, x, y, &raw mut defaults, palette);
+            tty_draw_line(tty, s, i, j as u32, width, x, y, &raw mut defaults, palette);
         }
 
         #[cfg(feature = "sixel")]
@@ -1113,10 +1125,10 @@ pub unsafe fn screen_redraw_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
         // (screen-redraw.c redraw_mark_pane_borders).
         if window_pane_is_floating(wp) != 0 && (*ctx).pane_lines != pane_lines::PANE_LINES_NONE {
             let oo = (*w).options;
-            let left = (*wp).xoff as i32 - 1;
-            let right = ((*wp).xoff + (*wp).sx) as i32;
-            let topb = (*wp).yoff as i32 - 1;
-            let botb = ((*wp).yoff + (*wp).sy) as i32;
+            let left = (*wp).xoff - 1;
+            let right = (*wp).xoff + (*wp).sx as i32;
+            let topb = (*wp).yoff - 1;
+            let botb = (*wp).yoff + (*wp).sy as i32;
 
             let ft = format_create_defaults(null_mut(), c, (*c).session, (*(*c).session).curw, wp);
             let mut base: grid_cell = zeroed();

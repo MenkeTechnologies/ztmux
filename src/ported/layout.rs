@@ -24,8 +24,8 @@ pub unsafe fn layout_create_cell(lcparent: *mut layout_cell) -> *mut layout_cell
             parent: lcparent,
             sx: u32::MAX,
             sy: u32::MAX,
-            xoff: u32::MAX,
-            yoff: u32::MAX,
+            xoff: i32::MAX,
+            yoff: i32::MAX,
             wp: null_mut(),
             cells: tailq_head {
                 tqh_first: null_mut(),
@@ -415,8 +415,8 @@ pub unsafe fn layout_print_cell(lc: *mut layout_cell, hdr: *const u8, n: u32) {
             type_str.to_string_lossy(),
             (*lc).parent as *mut c_void,
             (*lc).wp as *mut c_void,
-            (*lc).xoff,
-            (*lc).yoff,
+            (*lc).xoff as u32,
+            (*lc).yoff as u32,
             (*lc).sx,
             (*lc).sy,
         );
@@ -440,10 +440,10 @@ pub unsafe fn layout_search_by_border(lc: *mut layout_cell, x: u32, y: u32) -> *
         for lcchild in tailq_foreach(&raw mut (*lc).cells) {
             let lcchild = lcchild.as_ptr();
 
-            if x >= (*lcchild).xoff
-                && x < (*lcchild).xoff + (*lcchild).sx
-                && y >= (*lcchild).yoff
-                && y < (*lcchild).yoff + (*lcchild).sy
+            if x >= (*lcchild).xoff as u32
+                && x < (*lcchild).xoff as u32 + (*lcchild).sx
+                && y >= (*lcchild).yoff as u32
+                && y < (*lcchild).yoff as u32 + (*lcchild).sy
             {
                 // Inside the cell - recurse
                 return layout_search_by_border(lcchild, x, y);
@@ -456,12 +456,12 @@ pub unsafe fn layout_search_by_border(lc: *mut layout_cell, x: u32, y: u32) -> *
 
             match (*lc).type_ {
                 layout_type::LAYOUT_LEFTRIGHT => {
-                    if x < (*lcchild).xoff && x >= (*last).xoff + (*last).sx {
+                    if x < (*lcchild).xoff as u32 && x >= (*last).xoff as u32 + (*last).sx {
                         return last;
                     }
                 }
                 layout_type::LAYOUT_TOPBOTTOM => {
-                    if y < (*lcchild).yoff && y >= (*last).yoff + (*last).sy {
+                    if y < (*lcchild).yoff as u32 && y >= (*last).yoff as u32 + (*last).sy {
                         return last;
                     }
                 }
@@ -480,8 +480,8 @@ pub unsafe fn layout_set_size(lc: *mut layout_cell, sx: u32, sy: u32, xoff: u32,
     unsafe {
         (*lc).sx = sx;
         (*lc).sy = sy;
-        (*lc).xoff = xoff;
-        (*lc).yoff = yoff;
+        (*lc).xoff = (xoff) as i32;
+        (*lc).yoff = (yoff) as i32;
     }
 }
 
@@ -516,7 +516,7 @@ pub unsafe fn layout_make_node(lc: *mut layout_cell, type_: layout_type) {
 unsafe fn layout_fix_offsets1(lc: *mut layout_cell) {
     unsafe {
         if (*lc).type_ == layout_type::LAYOUT_LEFTRIGHT {
-            let mut xoff = (*lc).xoff;
+            let mut xoff = (*lc).xoff as u32;
             for lcchild in tailq_foreach(&raw mut (*lc).cells) {
                 let lcchild = lcchild.as_ptr();
                 // Floating cells carry their own offsets and take no space in
@@ -526,7 +526,7 @@ unsafe fn layout_fix_offsets1(lc: *mut layout_cell) {
                 {
                     continue;
                 }
-                (*lcchild).xoff = xoff;
+                (*lcchild).xoff = (xoff) as i32;
                 (*lcchild).yoff = (*lc).yoff;
                 if (*lcchild).type_ != layout_type::LAYOUT_WINDOWPANE {
                     layout_fix_offsets1(lcchild);
@@ -534,7 +534,7 @@ unsafe fn layout_fix_offsets1(lc: *mut layout_cell) {
                 xoff += (*lcchild).sx + 1;
             }
         } else {
-            let mut yoff = (*lc).yoff;
+            let mut yoff = (*lc).yoff as u32;
             for lcchild in tailq_foreach(&raw mut (*lc).cells) {
                 let lcchild = lcchild.as_ptr();
                 if layout_cell_is_tiled(lcchild) == 0
@@ -543,7 +543,7 @@ unsafe fn layout_fix_offsets1(lc: *mut layout_cell) {
                     continue;
                 }
                 (*lcchild).xoff = (*lc).xoff;
-                (*lcchild).yoff = yoff;
+                (*lcchild).yoff = (yoff) as i32;
                 if (*lcchild).type_ != layout_type::LAYOUT_WINDOWPANE {
                     layout_fix_offsets1(lcchild);
                 }
@@ -558,8 +558,8 @@ unsafe fn layout_fix_offsets1(lc: *mut layout_cell) {
 pub unsafe fn layout_fix_offsets(w: *mut window) {
     unsafe {
         let lc = (*w).layout_root;
-        (*lc).xoff = 0;
-        (*lc).yoff = 0;
+        (*lc).xoff = 0_i32;
+        (*lc).yoff = 0_i32;
         layout_fix_offsets1(lc);
     }
 }
@@ -646,8 +646,8 @@ pub unsafe fn layout_fix_panes(w: *mut window, skip: *mut window_pane) {
                 }
                 window_pane_resize(wp, (*lc).sx, (*lc).sy - 1);
             } else if inset != 0 && (*lc).sx > 2 * inset && (*lc).sy > 2 * inset {
-                (*wp).xoff += inset;
-                (*wp).yoff += inset;
+                (*wp).xoff += inset as i32;
+                (*wp).yoff += inset as i32;
                 window_pane_resize(wp, (*lc).sx - 2 * inset, (*lc).sy - 2 * inset);
             } else {
                 window_pane_resize(wp, (*lc).sx, (*lc).sy);
@@ -845,8 +845,8 @@ pub unsafe fn layout_destroy_cell(
                 // Only a tiled cell anchors at the window origin; a floating
                 // one keeps its own offsets. `layout.c:741`.
                 if layout_cell_is_tiled(lc) != 0 {
-                    (*lc).xoff = 0;
-                    (*lc).yoff = 0;
+                    (*lc).xoff = 0_i32;
+                    (*lc).yoff = 0_i32;
                 }
                 *lcroot = lc;
             } else {
@@ -1042,7 +1042,7 @@ pub unsafe fn layout_resize_floating_pane(
             }
             (*lc).sy = size as u32;
             if opposite != 0 {
-                (*lc).yoff = ((*lc).yoff as c_int - change) as u32;
+                (*lc).yoff = (((*lc).yoff as c_int - change) as u32) as i32;
             }
         } else {
             let size = (*lc).sx as c_int + change;
@@ -1052,7 +1052,7 @@ pub unsafe fn layout_resize_floating_pane(
             }
             (*lc).sx = size as u32;
             if opposite != 0 {
-                (*lc).xoff = ((*lc).xoff as c_int - change) as u32;
+                (*lc).xoff = (((*lc).xoff as c_int - change) as u32) as i32;
             }
         }
         redraw_invalidate_scene((*wp).window);
@@ -1450,7 +1450,7 @@ pub unsafe fn layout_replace_with_node(
     unsafe {
         let lcparent = layout_create_cell((*lc).parent);
         layout_make_node(lcparent, type_);
-        layout_set_size(lcparent, (*lc).sx, (*lc).sy, (*lc).xoff, (*lc).yoff);
+        layout_set_size(lcparent, (*lc).sx, (*lc).sy, (*lc).xoff as u32, (*lc).yoff as u32);
         if (*lc).parent.is_null() {
             (*w).layout_root = lcparent;
         } else {
@@ -1670,8 +1670,8 @@ pub unsafe fn layout_split_pane(
         // Copy the old cell size
         let sx = (*lc).sx;
         let sy = (*lc).sy;
-        let xoff = (*lc).xoff;
-        let yoff = (*lc).yoff;
+        let xoff = (*lc).xoff as u32;
+        let yoff = (*lc).yoff as u32;
 
         // Check there is enough space for the two new panes
         if layout_split_check_space(wp, lc, type_) == 0 {
@@ -1949,8 +1949,8 @@ mod tests {
             (*lc).type_ = layout_type::LAYOUT_WINDOWPANE;
             (*lc).sx = sx;
             (*lc).sy = sy;
-            (*lc).xoff = 0;
-            (*lc).yoff = 0;
+            (*lc).xoff = 0_i32;
+            (*lc).yoff = 0_i32;
             lc
         }
     }
@@ -1962,8 +1962,8 @@ mod tests {
             (*p).type_ = type_;
             (*p).sx = 0;
             (*p).sy = 0;
-            (*p).xoff = 0;
-            (*p).yoff = 0;
+            (*p).xoff = 0_i32;
+            (*p).yoff = 0_i32;
             for &c in children {
                 (*c).parent = p;
                 tailq_insert_tail(&raw mut (*p).cells, c);
@@ -2038,12 +2038,12 @@ mod tests {
             let a = leaf(40, 24);
             let b = leaf(39, 24);
             let p = node(layout_type::LAYOUT_LEFTRIGHT, &[a, b]);
-            (*p).xoff = 0;
-            (*p).yoff = 0;
+            (*p).xoff = 0_i32;
+            (*p).yoff = 0_i32;
             layout_fix_offsets1(p);
-            assert_eq!(((*a).xoff, (*a).yoff), (0, 0));
+            assert_eq!(((*a).xoff as u32, (*a).yoff as u32), (0, 0));
             // second cell starts after first cell + 1 border column.
-            assert_eq!(((*b).xoff, (*b).yoff), (41, 0));
+            assert_eq!(((*b).xoff as u32, (*b).yoff as u32), (41, 0));
             layout_free_cell(p, 0);
         }
     }
@@ -2055,9 +2055,9 @@ mod tests {
             let b = leaf(80, 11);
             let p = node(layout_type::LAYOUT_TOPBOTTOM, &[a, b]);
             layout_fix_offsets1(p);
-            assert_eq!(((*a).xoff, (*a).yoff), (0, 0));
+            assert_eq!(((*a).xoff as u32, (*a).yoff as u32), (0, 0));
             // second cell starts after first cell + 1 border row.
-            assert_eq!(((*b).xoff, (*b).yoff), (0, 13));
+            assert_eq!(((*b).xoff as u32, (*b).yoff as u32), (0, 13));
             layout_free_cell(p, 0);
         }
     }
@@ -2069,8 +2069,8 @@ mod tests {
             let a = leaf(40, 24);
             let b = leaf(40, 24);
             let p = node(layout_type::LAYOUT_LEFTRIGHT, &[a, b]);
-            (*p).xoff = 0;
-            (*p).yoff = 0;
+            (*p).xoff = 0_i32;
+            (*p).yoff = 0_i32;
             layout_fix_offsets1(p);
             // Inside a cell -> not a border hit.
             assert!(layout_search_by_border(p, 10, 5).is_null());
@@ -2157,8 +2157,8 @@ mod tests {
             layout_set_size(lc, 80, 24, 3, 7);
             assert_eq!((*lc).sx, 80);
             assert_eq!((*lc).sy, 24);
-            assert_eq!((*lc).xoff, 3);
-            assert_eq!((*lc).yoff, 7);
+            assert_eq!((*lc).xoff as u32, 3);
+            assert_eq!((*lc).yoff as u32, 7);
             layout_free_cell(lc, 0);
         }
     }
@@ -2229,8 +2229,8 @@ mod tests {
             let a = leaf(80, 12);
             let b = leaf(80, 11);
             let p = node(layout_type::LAYOUT_TOPBOTTOM, &[a, b]);
-            (*p).xoff = 0;
-            (*p).yoff = 0;
+            (*p).xoff = 0_i32;
+            (*p).yoff = 0_i32;
             (*p).sx = 80;
             (*p).sy = 24;
             layout_fix_offsets1(p);
@@ -2446,8 +2446,8 @@ mod tests {
             let a = leaf(40, 24);
             let b = leaf(40, 24);
             let p = node(layout_type::LAYOUT_LEFTRIGHT, &[a, b]);
-            (*p).xoff = 0;
-            (*p).yoff = 0;
+            (*p).xoff = 0_i32;
+            (*p).yoff = 0_i32;
             layout_fix_offsets1(p);
             // Well past the right edge of both cells.
             assert!(layout_search_by_border(p, 200, 5).is_null());
@@ -2474,12 +2474,12 @@ mod tests {
             let b = leaf(30, 24);
             let c = leaf(28, 24);
             let p = node(layout_type::LAYOUT_LEFTRIGHT, &[a, b, c]);
-            (*p).xoff = 0;
-            (*p).yoff = 0;
+            (*p).xoff = 0_i32;
+            (*p).yoff = 0_i32;
             layout_fix_offsets1(p);
-            assert_eq!(((*a).xoff, (*a).yoff), (0, 0));
-            assert_eq!(((*b).xoff, (*b).yoff), (21, 0)); // 20 + 1 border
-            assert_eq!(((*c).xoff, (*c).yoff), (52, 0)); // 21 + 30 + 1 border
+            assert_eq!(((*a).xoff as u32, (*a).yoff as u32), (0, 0));
+            assert_eq!(((*b).xoff as u32, (*b).yoff as u32), (21, 0)); // 20 + 1 border
+            assert_eq!(((*c).xoff as u32, (*c).yoff as u32), (52, 0)); // 21 + 30 + 1 border
             layout_free_cell(p, 0);
         }
     }

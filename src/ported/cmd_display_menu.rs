@@ -246,9 +246,9 @@ unsafe fn cmd_display_menu_get_position(
             ft,
             "popup_pane_bottom",
             "{}",
-            top + (*wp).yoff as i32 + (*wp).sy as i32 - oy as i32,
+            top + (*wp).yoff + (*wp).sy as i32 - oy as i32,
         );
-        format_add!(ft, "popup_pane_left", "{}", (*wp).xoff - ox,);
+        format_add!(ft, "popup_pane_left", "{}", (*wp).xoff as u32 - ox,);
         n = (*wp).xoff as c_long + (*wp).sx as i64 - ox as i64 - w as i64;
         if n < 0 {
             format_add!(ft, "popup_pane_right", "0");

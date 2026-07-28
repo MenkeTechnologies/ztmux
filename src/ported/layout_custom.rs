@@ -97,8 +97,8 @@ pub unsafe fn layout_append(lc: *mut layout_cell, buf: *mut u8, len: usize) -> i
                 "{}x{},{},{},{}",
                 (*lc).sx,
                 (*lc).sy,
-                (*lc).xoff,
-                (*lc).yoff,
+                (*lc).xoff as u32,
+                (*lc).yoff as u32,
                 (*(*lc).wp).id,
             )
             .unwrap()
@@ -109,8 +109,8 @@ pub unsafe fn layout_append(lc: *mut layout_cell, buf: *mut u8, len: usize) -> i
                 "{}x{},{},{}",
                 (*lc).sx,
                 (*lc).sy,
-                (*lc).xoff,
-                (*lc).yoff,
+                (*lc).xoff as u32,
+                (*lc).yoff as u32,
             )
             .unwrap()
         };
@@ -380,8 +380,8 @@ unsafe fn layout_construct(lcparent: *mut layout_cell, layout: *mut *const u8) -
             lc = layout_create_cell(lcparent);
             (*lc).sx = sx;
             (*lc).sy = sy;
-            (*lc).xoff = xoff;
-            (*lc).yoff = yoff;
+            (*lc).xoff = (xoff) as i32;
+            (*lc).yoff = (yoff) as i32;
 
             match **layout {
                 b',' | b'}' | b']' | b'\0' => return lc,
@@ -709,8 +709,8 @@ mod tests {
             assert!((*lc).type_ == layout_type::LAYOUT_WINDOWPANE);
             assert_eq!((*lc).sx, 80);
             assert_eq!((*lc).sy, 24);
-            assert_eq!((*lc).xoff, 3);
-            assert_eq!((*lc).yoff, 7);
+            assert_eq!((*lc).xoff as u32, 3);
+            assert_eq!((*lc).yoff as u32, 7);
             // Parser advanced to the terminating NUL.
             assert_eq!(*p, b'\0');
             layout_free_cell(lc, 0);
@@ -747,7 +747,7 @@ mod tests {
             let c1 = tailq_next(c0);
             assert_eq!((*c0).sx, 80);
             assert_eq!((*c1).sx, 79);
-            assert_eq!((*c1).xoff, 81);
+            assert_eq!((*c1).xoff as u32, 81);
             assert!(tailq_next(c1).is_null());
             assert_eq!(*p, b'\0');
             layout_free_cell(lc, 0);
@@ -766,7 +766,7 @@ mod tests {
             let c1 = tailq_next(c0);
             assert_eq!((*c0).sy, 24);
             assert_eq!((*c1).sy, 23);
-            assert_eq!((*c1).yoff, 25);
+            assert_eq!((*c1).yoff as u32, 25);
             layout_free_cell(lc, 0);
         }
     }

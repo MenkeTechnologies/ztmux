@@ -119,7 +119,7 @@ pub unsafe fn window_visible_ranges(
                 ((*wp).yoff as c_int, (*wp).yoff as c_int + (*wp).sy as c_int - 1)
             } else {
                 (
-                    if (*wp).yoff > 0 { (*wp).yoff as c_int - 1 } else { 0 },
+                    if ((*wp).yoff as u32) > 0 { (*wp).yoff as c_int - 1 } else { 0 },
                     (*wp).yoff as c_int + (*wp).sy as c_int,
                 )
             };
@@ -145,7 +145,7 @@ pub unsafe fn window_visible_ranges(
                     lb = (*wp).xoff as c_int;
                     rb = (*wp).xoff as c_int + (*wp).sx as c_int - 1;
                 } else {
-                    lb = if (*wp).xoff > 0 { (*wp).xoff as c_int - 1 } else { 0 };
+                    lb = if ((*wp).xoff as u32) > 0 { (*wp).xoff as c_int - 1 } else { 0 };
                     rb = (*wp).xoff as c_int + (*wp).sx as c_int;
                 }
                 if lb < 0 {

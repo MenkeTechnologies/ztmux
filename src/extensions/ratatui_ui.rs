@@ -403,10 +403,10 @@ pub(crate) unsafe fn draw_pane_number(ctx: *mut screen_redraw_ctx, wp: *mut wind
         let tty = &raw mut (*c).tty;
 
         // Prototype: draw for panes fully inside the viewport; skip partials.
-        if (*wp).xoff < (*ctx).ox
-            || (*wp).yoff < (*ctx).oy
-            || (*wp).xoff + (*wp).sx > (*ctx).ox + (*ctx).sx
-            || (*wp).yoff + (*wp).sy > (*ctx).oy + (*ctx).sy
+        if ((*wp).xoff as u32) < (*ctx).ox
+            || ((*wp).yoff as u32) < (*ctx).oy
+            || (*wp).xoff as u32 + (*wp).sx > (*ctx).ox + (*ctx).sx
+            || (*wp).yoff as u32 + (*wp).sy > (*ctx).oy + (*ctx).sy
         {
             return;
         }
@@ -453,13 +453,13 @@ pub(crate) unsafe fn draw_pane_number(ctx: *mut screen_redraw_ctx, wp: *mut wind
             }
         }
 
-        let yoff = (*wp).yoff - (*ctx).oy
+        let yoff = (*wp).yoff as u32 - (*ctx).oy
             + if (*ctx).statustop != 0 {
                 (*ctx).statuslines
             } else {
                 0
             };
-        let xoff = (*wp).xoff - (*ctx).ox;
+        let xoff = (*wp).xoff as u32 - (*ctx).ox;
         let px = xoff + ((*wp).sx.saturating_sub(boxw as u32)) / 2;
         let py = yoff + ((*wp).sy.saturating_sub(boxh as u32)) / 2;
         blit_tty(tty, &buf, px, py);
@@ -1546,10 +1546,10 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
         if (*wp).sy <= 2 {
             let width = (*wp).sx as usize;
             if width < 4
-                || (*wp).yoff < (*ctx).oy
-                || (*wp).yoff >= (*ctx).oy + (*ctx).sy
-                || (*wp).xoff < (*ctx).ox
-                || (*wp).xoff + (*wp).sx > (*ctx).ox + (*ctx).sx
+                || ((*wp).yoff as u32) < (*ctx).oy
+                || ((*wp).yoff as u32) >= (*ctx).oy + (*ctx).sy
+                || ((*wp).xoff as u32) < (*ctx).ox
+                || (*wp).xoff as u32 + (*wp).sx > (*ctx).ox + (*ctx).sx
             {
                 return;
             }
@@ -1587,13 +1587,13 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
             for (x, ch) in row.iter().enumerate() {
                 buf[(x as u16, 0)].set_char(*ch).set_style(st);
             }
-            let yoff = (*wp).yoff - (*ctx).oy
+            let yoff = (*wp).yoff as u32 - (*ctx).oy
                 + if (*ctx).statustop != 0 {
                     (*ctx).statuslines
                 } else {
                     0
                 };
-            let xoff = (*wp).xoff - (*ctx).ox;
+            let xoff = (*wp).xoff as u32 - (*ctx).ox;
             let tty = &raw mut (*(*ctx).c).tty;
             blit_tty(tty, &buf, xoff, yoff);
             return;
@@ -1601,8 +1601,8 @@ pub(crate) unsafe fn draw_pane_frame(ctx: *mut screen_redraw_ctx, wp: *mut windo
 
         // The frame occupies the reserved ring: the full layout cell, one inset
         // cell out from the content on each side.
-        let cell_x = (*wp).xoff.saturating_sub(inset);
-        let cell_y = (*wp).yoff.saturating_sub(inset);
+        let cell_x = ((*wp).xoff as u32).saturating_sub(inset);
+        let cell_y = ((*wp).yoff as u32).saturating_sub(inset);
         let cell_sx = ((*wp).sx + 2 * inset) as u16;
         let cell_sy = ((*wp).sy + 2 * inset) as u16;
         if cell_sx < 4 || cell_sy < 3 {

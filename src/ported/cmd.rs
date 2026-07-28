@@ -917,19 +917,19 @@ pub unsafe fn cmd_mouse_at(
             y -= (*m).statuslines;
         }
 
-        if x < (*wp).xoff || x >= (*wp).xoff + (*wp).sx {
+        if x < (*wp).xoff as u32 || x >= (*wp).xoff as u32 + (*wp).sx {
             return -1;
         }
 
-        if y < (*wp).yoff || y >= (*wp).yoff + (*wp).sy {
+        if y < (*wp).yoff as u32 || y >= (*wp).yoff as u32 + (*wp).sy {
             return -1;
         }
 
         if !xp.is_null() {
-            *xp = x - (*wp).xoff;
+            *xp = x - (*wp).xoff as u32;
         }
         if !yp.is_null() {
-            *yp = y - (*wp).yoff;
+            *yp = y - (*wp).yoff as u32;
         }
         0
     }

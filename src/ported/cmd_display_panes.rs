@@ -48,10 +48,10 @@ unsafe fn cmd_display_panes_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
         let w = (*wp).window;
 
         'out: {
-            if (*wp).xoff + (*wp).sx <= (*ctx).ox
-                || (*wp).xoff >= (*ctx).ox + (*ctx).sx
-                || (*wp).yoff + (*wp).sy <= (*ctx).oy
-                || (*wp).yoff >= (*ctx).oy + (*ctx).sy
+            if (*wp).xoff as u32 + (*wp).sx <= (*ctx).ox
+                || ((*wp).xoff as u32) >= (*ctx).ox + (*ctx).sx
+                || (*wp).yoff as u32 + (*wp).sy <= (*ctx).oy
+                || ((*wp).yoff as u32) >= (*ctx).oy + (*ctx).sy
             {
                 return;
             }
@@ -61,38 +61,38 @@ unsafe fn cmd_display_panes_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
 
             let xoff: u32;
             let sx: u32;
-            if (*wp).xoff >= (*ctx).ox && (*wp).xoff + (*wp).sx <= (*ctx).ox + (*ctx).sx {
+            if ((*wp).xoff as u32) >= (*ctx).ox && (*wp).xoff as u32 + (*wp).sx <= (*ctx).ox + (*ctx).sx {
                 // All visible.
-                xoff = (*wp).xoff - (*ctx).ox;
+                xoff = (*wp).xoff as u32 - (*ctx).ox;
                 sx = (*wp).sx;
-            } else if (*wp).xoff < (*ctx).ox && (*wp).xoff + (*wp).sx > (*ctx).ox + (*ctx).sx {
+            } else if ((*wp).xoff as u32) < (*ctx).ox && (*wp).xoff as u32 + (*wp).sx > (*ctx).ox + (*ctx).sx {
                 // Both left and right not visible.
                 xoff = 0;
                 sx = (*ctx).sx;
-            } else if (*wp).xoff < (*ctx).ox {
+            } else if ((*wp).xoff as u32) < (*ctx).ox {
                 // Left not visible.
                 xoff = 0;
-                sx = (*wp).sx - ((*ctx).ox - (*wp).xoff);
+                sx = (*wp).sx - ((*ctx).ox - (*wp).xoff as u32);
             } else {
                 // Right not visible.
-                xoff = (*wp).xoff - (*ctx).ox;
+                xoff = (*wp).xoff as u32 - (*ctx).ox;
                 sx = (*wp).sx - xoff;
             }
-            if (*wp).yoff >= (*ctx).oy && (*wp).yoff + (*wp).sy <= (*ctx).oy + (*ctx).sy {
+            if ((*wp).yoff as u32) >= (*ctx).oy && (*wp).yoff as u32 + (*wp).sy <= (*ctx).oy + (*ctx).sy {
                 // All visible.
-                yoff = (*wp).yoff - (*ctx).oy;
+                yoff = (*wp).yoff as u32 - (*ctx).oy;
                 sy = (*wp).sy;
-            } else if (*wp).yoff < (*ctx).oy && (*wp).yoff + (*wp).sy > (*ctx).oy + (*ctx).sy {
+            } else if ((*wp).yoff as u32) < (*ctx).oy && (*wp).yoff as u32 + (*wp).sy > (*ctx).oy + (*ctx).sy {
                 // Both top and bottom not visible.
                 yoff = 0;
                 sy = (*ctx).sy;
-            } else if (*wp).yoff < (*ctx).oy {
+            } else if ((*wp).yoff as u32) < (*ctx).oy {
                 // Top not visible.
                 yoff = 0;
-                sy = (*wp).sy - ((*ctx).oy - (*wp).yoff);
+                sy = (*wp).sy - ((*ctx).oy - (*wp).yoff as u32);
             } else {
                 // Bottom not visible.
-                yoff = (*wp).yoff - (*ctx).oy;
+                yoff = (*wp).yoff as u32 - (*ctx).oy;
                 sy = (*wp).sy - yoff;
             }
 

@@ -225,11 +225,11 @@ unsafe fn screen_write_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i3
             &raw mut (*ttyctx).wsy,
         );
 
-        (*ttyctx).rxoff = (*wp).xoff;
-        (*ttyctx).xoff = (*wp).xoff;
+        (*ttyctx).rxoff = (*wp).xoff as u32;
+        (*ttyctx).xoff = (*wp).xoff as u32;
 
-        (*ttyctx).ryoff = (*wp).yoff;
-        (*ttyctx).yoff = (*wp).yoff;
+        (*ttyctx).ryoff = (*wp).yoff as u32;
+        (*ttyctx).yoff = (*wp).yoff as u32;
 
         if status_at_line(c) == 0 {
             (*ttyctx).yoff += status_line_size(c);
@@ -258,22 +258,16 @@ pub unsafe fn screen_write_pane_is_obscured(ctx: *mut screen_write_ctx) -> bool 
         (*ctx).flags |= SCREEN_WRITE_CHECKED_IF_OBSCURED;
 
         let w = (*base).window;
-        // `screen-write.c` also tests `xoff < 0 || yoff < 0` first, which only
-        // makes sense on the C's signed offsets — see the note below.
-        if ((*base).xoff as i32) < 0
-            || ((*base).yoff as i32) < 0
-            || (*base).xoff as i32 + (*base).sx as i32 > (*w).sx as i32
-            || (*base).yoff as i32 + (*base).sy as i32 > (*w).sy as i32
+        if (*base).xoff < 0
+            || (*base).yoff < 0
+            || (*base).xoff + (*base).sx as i32 > (*w).sx as i32
+            || (*base).yoff + (*base).sy as i32 > (*w).sy as i32
         {
             (*ctx).flags |= SCREEN_WRITE_OBSCURED;
             return true;
         }
 
-        // `tmux.h:1518` types window_pane.xoff/yoff as int, so a floating pane
-        // pushed past an edge carries a negative offset. ztmux still stores them
-        // as u32, where that reads as ~4.29e9 and every comparison below would
-        // overflow; reinterpreting as i32 recovers the C's value and semantics.
-        let (bx, by) = ((*base).xoff as i32, (*base).yoff as i32);
+        let (bx, by) = ((*base).xoff, (*base).yoff);
         let (bsx, bsy) = ((*base).sx as i32, (*base).sy as i32);
 
         // Walk toward the head of the z-index: those panes are drawn above.
@@ -283,7 +277,7 @@ pub unsafe fn screen_write_pane_is_obscured(ctx: *mut screen_write_ctx) -> bool 
             if wp.is_null() {
                 return false;
             }
-            let (px, py) = ((*wp).xoff as i32, (*wp).yoff as i32);
+            let (px, py) = ((*wp).xoff, (*wp).yoff);
             let (psx, psy) = ((*wp).sx as i32, (*wp).sy as i32);
             let overlaps_y =
                 (py >= by && py <= by + bsy) || (py + psy >= by && py + psy <= by + bsy);
@@ -525,7 +519,7 @@ pub unsafe fn screen_write_start_pane(
         (*ctx).wp = wp;
 
         if log_get_level() != 0 {
-            // log_debug("%s: size %ux%u, pane %%%u (at %u,%u)", __func__, screen_size_x((*ctx).s), screen_size_y((*ctx).s), (*wp).id, (*wp).xoff, (*wp).yoff);
+            // log_debug("%s: size %ux%u, pane %%%u (at %u,%u)", __func__, screen_size_x((*ctx).s), screen_size_y((*ctx).s), (*wp).id, (*wp).xoff as u32, (*wp).yoff as u32);
         }
     }
 }

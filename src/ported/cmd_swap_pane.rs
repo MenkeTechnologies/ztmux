@@ -106,13 +106,13 @@ unsafe fn cmd_swap_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
 
             let sx = (*src_wp).sx;
             let sy = (*src_wp).sy;
-            let xoff = (*src_wp).xoff;
-            let yoff = (*src_wp).yoff;
+            let xoff = (*src_wp).xoff as u32;
+            let yoff = (*src_wp).yoff as u32;
             (*src_wp).xoff = (*dst_wp).xoff;
             (*src_wp).yoff = (*dst_wp).yoff;
             window_pane_resize(src_wp, (*dst_wp).sx, (*dst_wp).sy);
-            (*dst_wp).xoff = xoff;
-            (*dst_wp).yoff = yoff;
+            (*dst_wp).xoff = (xoff) as i32;
+            (*dst_wp).yoff = (yoff) as i32;
             window_pane_resize(dst_wp, sx, sy);
 
             if !args_has(args, 'd') {

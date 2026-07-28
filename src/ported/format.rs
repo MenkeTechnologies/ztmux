@@ -1408,9 +1408,9 @@ pub unsafe fn format_cb_pane_at_top(ft: *mut format_tree) -> format_table_type {
         let w = (*wp).window;
         let status: i64 = options_get_number___(&*(*w).options, "pane-border-status");
         let flag = if status == pane_status::PANE_STATUS_TOP as i64 {
-            (*wp).yoff == 1
+            (*wp).yoff as u32 == 1
         } else {
-            (*wp).yoff == 0
+            (*wp).yoff as u32 == 0
         };
 
         // C: xasprintf(&value, "%d", flag) — 1/0, not Rust's true/false.
@@ -1430,9 +1430,9 @@ pub unsafe fn format_cb_pane_at_bottom(ft: *mut format_tree) -> format_table_typ
         let w = (*wp).window;
         let status: i64 = options_get_number___(&*(*w).options, "pane-border-status");
         let flag = if status == pane_status::PANE_STATUS_BOTTOM as i64 {
-            (*wp).yoff + (*wp).sy == (*w).sy - 1
+            (*wp).yoff as u32 + (*wp).sy == (*w).sy - 1
         } else {
-            (*wp).yoff + (*wp).sy == (*w).sy
+            (*wp).yoff as u32 + (*wp).sy == (*w).sy
         };
 
         // C: xasprintf(&value, "%d", flag) — 1/0, not Rust's true/false.
@@ -2326,7 +2326,7 @@ pub unsafe fn format_cb_pane_at_left(ft: *mut format_tree) -> format_table_type 
 pub unsafe fn format_cb_pane_at_right(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
-            if (*(*ft).wp).xoff + (*(*ft).wp).sx == (*(*(*ft).wp).window).sx {
+            if (*(*ft).wp).xoff as u32 + (*(*ft).wp).sx == (*(*(*ft).wp).window).sx {
                 return "1".into();
             }
             return "0".into();
@@ -2340,7 +2340,7 @@ pub unsafe fn format_cb_pane_at_right(ft: *mut format_tree) -> format_table_type
 pub unsafe fn format_cb_pane_bottom(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
-            return format!("{}", (*(*ft).wp).yoff + (*(*ft).wp).sy - 1).into();
+            return format!("{}", (*(*ft).wp).yoff + (*(*ft).wp).sy as i32 - 1).into();
         }
         format_table_type::None
     }
@@ -2614,7 +2614,7 @@ pub unsafe fn format_cb_pane_pipe(ft: *mut format_tree) -> format_table_type {
 pub unsafe fn format_cb_pane_right(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).wp.is_null() {
-            return format!("{}", (*(*ft).wp).xoff + (*(*ft).wp).sx - 1).into();
+            return format!("{}", (*(*ft).wp).xoff + (*(*ft).wp).sx as i32 - 1).into();
         }
         format_table_type::None
     }

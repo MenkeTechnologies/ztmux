@@ -2641,15 +2641,15 @@ pub unsafe fn server_client_reset_state(c: *mut client) {
         } else if (*c).overlay_draw.is_none() {
             cursor = 0;
             tty_window_offset(tty, &raw mut ox, &raw mut oy, &raw mut sx, &raw mut sy);
-            if (*wp).xoff + (*s).cx >= ox
-                && (*wp).xoff + (*s).cx <= ox + sx
-                && (*wp).yoff + (*s).cy >= oy
-                && (*wp).yoff + (*s).cy <= oy + sy
+            if (*wp).xoff as u32 + (*s).cx >= ox
+                && (*wp).xoff as u32 + (*s).cx <= ox + sx
+                && (*wp).yoff as u32 + (*s).cy >= oy
+                && (*wp).yoff as u32 + (*s).cy <= oy + sy
             {
                 cursor = 1;
 
-                cx = (*wp).xoff + (*s).cx - ox;
-                cy = (*wp).yoff + (*s).cy - oy;
+                cx = (*wp).xoff as u32 + (*s).cx - ox;
+                cy = (*wp).yoff as u32 + (*s).cy - oy;
 
                 if status_at_line(c) == 0 {
                     cy += status_line_size(c);

@@ -122,9 +122,9 @@ unsafe fn cmd_resize_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
             // cover, so ask for one row more when the pane is against it.
             let status = window_get_pane_status(w);
             if y != i32::MAX
-                && ((status == pane_status::PANE_STATUS_TOP && (*wp).yoff == 1)
+                && ((status == pane_status::PANE_STATUS_TOP && (*wp).yoff as u32 == 1)
                     || (status == pane_status::PANE_STATUS_BOTTOM
-                        && (*wp).yoff + (*wp).sy == (*w).sy - 1))
+                        && (*wp).yoff as u32 + (*wp).sy == (*w).sy - 1))
             {
                 y += 1;
             }
@@ -304,7 +304,7 @@ let mut y = (*m).y as c_int + (*m).oy as c_int;
             // Top right corner.
             let new_sx = clamp(x - (*lc).xoff as c_int);
             let new_sy = clamp((*lc).sy as c_int + (ly - y));
-            layout_set_size(lc, new_sx as u32, new_sy as u32, (*lc).xoff, (y + 1) as u32);
+            layout_set_size(lc, new_sx as u32, new_sy as u32, (*lc).xoff as u32, (y + 1) as u32);
             resizes += 1;
         } else if (lx == left || lx == left + 1) && ly == bottom {
             // Bottom left corner.
@@ -313,13 +313,13 @@ let mut y = (*m).y as c_int + (*m).oy as c_int;
             if new_sy < PANE_MINIMUM as c_int {
                 return;
             }
-            layout_set_size(lc, new_sx as u32, new_sy as u32, (x + 1) as u32, (*lc).yoff);
+            layout_set_size(lc, new_sx as u32, new_sy as u32, (x + 1) as u32, (*lc).yoff as u32);
             resizes += 1;
         } else if (lx == right + 1 || lx == right) && ly == bottom {
             // Bottom right corner.
             let new_sx = clamp(x - (*lc).xoff as c_int);
             let new_sy = clamp(y - (*lc).yoff as c_int);
-            layout_set_size(lc, new_sx as u32, new_sy as u32, (*lc).xoff, (*lc).yoff);
+            layout_set_size(lc, new_sx as u32, new_sy as u32, (*lc).xoff as u32, (*lc).yoff as u32);
             resizes += 1;
         } else if lx == right {
             // Right border.
@@ -327,7 +327,7 @@ let mut y = (*m).y as c_int + (*m).oy as c_int;
             if new_sx < PANE_MINIMUM as c_int {
                 return;
             }
-            layout_set_size(lc, new_sx as u32, (*lc).sy, (*lc).xoff, (*lc).yoff);
+            layout_set_size(lc, new_sx as u32, (*lc).sy, (*lc).xoff as u32, (*lc).yoff as u32);
             resizes += 1;
         } else if lx == left {
             // Left border.
@@ -335,7 +335,7 @@ let mut y = (*m).y as c_int + (*m).oy as c_int;
             if new_sx < PANE_MINIMUM as c_int {
                 return;
             }
-            layout_set_size(lc, new_sx as u32, (*lc).sy, (x + 1) as u32, (*lc).yoff);
+            layout_set_size(lc, new_sx as u32, (*lc).sy, (x + 1) as u32, (*lc).yoff as u32);
             resizes += 1;
         } else if ly == bottom {
             // Bottom border.
@@ -343,7 +343,7 @@ let mut y = (*m).y as c_int + (*m).oy as c_int;
             if new_sy < PANE_MINIMUM as c_int {
                 return;
             }
-            layout_set_size(lc, (*lc).sx, new_sy as u32, (*lc).xoff, (*lc).yoff);
+            layout_set_size(lc, (*lc).sx, new_sy as u32, (*lc).xoff as u32, (*lc).yoff as u32);
             resizes += 1;
         } else if ly == top {
             // Top border (move instead of resize).

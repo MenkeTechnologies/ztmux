@@ -1147,8 +1147,8 @@ pub unsafe fn tty_window_offset1(
             *ox = 0;
             *oy = 0;
         } else {
-            cx = (*wp).xoff + (*(*wp).screen).cx;
-            cy = (*wp).yoff + (*(*wp).screen).cy;
+            cx = (*wp).xoff as u32 + (*(*wp).screen).cx;
+            cy = (*wp).yoff as u32 + (*(*wp).screen).cy;
 
             if cx < *sx {
                 *ox = 0;
@@ -2009,8 +2009,8 @@ pub unsafe fn tty_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i32 {
             &raw mut (*ttyctx).wsy,
         );
 
-        (*ttyctx).yoff = (*wp).yoff;
-        (*ttyctx).ryoff = (*wp).yoff;
+        (*ttyctx).yoff = (*wp).yoff as u32;
+        (*ttyctx).ryoff = (*wp).yoff as u32;
         if status_at_line(c) == 0 {
             (*ttyctx).yoff += status_line_size(c);
         }
@@ -2034,8 +2034,8 @@ pub unsafe fn tty_draw_images(c: *mut client, wp: *mut window_pane, s: *mut scre
             ttyctx.orlower = (*s).rlower;
             ttyctx.orupper = (*s).rupper;
 
-            ttyctx.xoff = (*wp).xoff;
-            ttyctx.rxoff = (*wp).xoff;
+            ttyctx.xoff = (*wp).xoff as u32;
+            ttyctx.rxoff = (*wp).xoff as u32;
             ttyctx.sx = (*wp).sx;
             ttyctx.sy = (*wp).sy;
 

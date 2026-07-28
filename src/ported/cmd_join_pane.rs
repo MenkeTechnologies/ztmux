@@ -203,8 +203,8 @@ unsafe fn cmd_join_pane_place(
         }
 
         if xoff != (*lc).xoff as c_int || yoff != (*lc).yoff as c_int {
-            (*lc).xoff = xoff as u32;
-            (*lc).yoff = yoff as u32;
+            (*lc).xoff = (xoff as u32) as i32;
+            (*lc).yoff = (yoff as u32) as i32;
             layout_fix_panes(w, null_mut());
         }
         notify_window(c"window-layout-changed", w);
@@ -298,8 +298,8 @@ unsafe fn cmd_join_pane_move(
         }
 
         if xoff != (*lc).xoff as c_int || yoff != (*lc).yoff as c_int {
-            (*lc).xoff = xoff as u32;
-            (*lc).yoff = yoff as u32;
+            (*lc).xoff = (xoff as u32) as i32;
+            (*lc).yoff = (yoff as u32) as i32;
             layout_fix_panes(w, null_mut());
             notify_window(c"window-layout-changed", w);
             server_redraw_window(w);
@@ -374,8 +374,8 @@ let mut y = (*m).y as c_int + (*m).oy as c_int;
         let lx = (*m).lx as c_int + (*m).ox as c_int;
 
         if x != lx || y != ly {
-            (*lc).xoff = ((*lc).xoff as c_int + (x - lx)) as u32;
-            (*lc).yoff = ((*lc).yoff as c_int + (y - ly)) as u32;
+            (*lc).xoff = (((*lc).xoff as c_int + (x - lx)) as u32) as i32;
+            (*lc).yoff = (((*lc).yoff as c_int + (y - ly)) as u32) as i32;
             layout_fix_panes(w, null_mut());
             server_redraw_window(w);
             server_redraw_window_borders(w);

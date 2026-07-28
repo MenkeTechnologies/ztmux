@@ -58,8 +58,8 @@ unsafe fn cmd_rotate_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
             tailq_insert_head::<_, discr_entry>(&raw mut (*w).panes, wp);
 
             lc = (*wp).layout_cell;
-            xoff = (*wp).xoff;
-            yoff = (*wp).yoff;
+            xoff = (*wp).xoff as u32;
+            yoff = (*wp).yoff as u32;
 
             sx = (*wp).sx;
             sy = (*wp).sy;
@@ -82,8 +82,8 @@ unsafe fn cmd_rotate_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
             if !(*wp).layout_cell.is_null() {
                 (*(*wp).layout_cell).wp = wp;
             }
-            (*wp).xoff = xoff;
-            (*wp).yoff = yoff;
+            (*wp).xoff = (xoff) as i32;
+            (*wp).yoff = (yoff) as i32;
             window_pane_resize(wp, sx, sy);
 
             wp = tailq_prev::<_, _, discr_entry>((*w).active);
@@ -96,8 +96,8 @@ unsafe fn cmd_rotate_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
             tailq_insert_tail::<_, discr_entry>(&raw mut (*w).panes, wp);
 
             lc = (*wp).layout_cell;
-            xoff = (*wp).xoff;
-            yoff = (*wp).yoff;
+            xoff = (*wp).xoff as u32;
+            yoff = (*wp).yoff as u32;
             sx = (*wp).sx;
             sy = (*wp).sy;
             for wp_ in
@@ -120,8 +120,8 @@ unsafe fn cmd_rotate_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
             if !(*wp).layout_cell.is_null() {
                 (*(*wp).layout_cell).wp = wp;
             }
-            (*wp).xoff = xoff;
-            (*wp).yoff = yoff;
+            (*wp).xoff = (xoff) as i32;
+            (*wp).yoff = (yoff) as i32;
             window_pane_resize(wp, sx, sy);
 
             wp = tailq_next::<_, _, discr_entry>((*w).active);

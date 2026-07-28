@@ -1468,8 +1468,15 @@ struct window_pane {
     sx: u32,
     sy: u32,
 
-    xoff: u32,
-    yoff: u32,
+    /// C `vendor/tmux/tmux.h:1518`: `int xoff` / `int yoff`.
+    ///
+    /// Signed: a floating pane can be positioned partly off an edge, so the
+    /// offset legitimately goes negative. Stored unsigned, -1 became ~4.29e9
+    /// and every downstream comparison overflowed. Read sites cast back to u32
+    /// because the C promotes `int + u_int` to unsigned, so the arithmetic they
+    /// do is unchanged; only the ability to hold and test a negative is new.
+    xoff: i32,
+    yoff: i32,
 
     flags: window_pane_flags,
 
@@ -1741,8 +1748,10 @@ struct layout_cell {
     sx: u32,
     sy: u32,
 
-    xoff: u32,
-    yoff: u32,
+    /// C `vendor/tmux/tmux.h:1276`: `int xoff` / `int yoff`. Signed for the
+    /// same reason as `window_pane` — a floating cell can sit off an edge.
+    xoff: i32,
+    yoff: i32,
 
     wp: *mut window_pane,
     cells: layout_cells,
