@@ -186,8 +186,10 @@ unsafe fn cmd_resize_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
                     return cmd_retval::CMD_RETURN_ERROR;
                 }
             } else {
+                // `-U`/`-L` negate; the C does it on an int and wraps, and the
+                // argument range is INT_MIN..INT_MAX, so INT_MIN must not panic.
                 let adjust = if flag == 'L' || flag == 'U' {
-                    -adjust
+                    adjust.wrapping_neg()
                 } else {
                     adjust
                 };

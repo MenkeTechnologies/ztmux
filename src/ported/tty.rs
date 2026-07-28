@@ -2660,49 +2660,6 @@ pub unsafe fn tty_cmd_alignmenttest(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
-/// Redraw a run of a line, skipping the parts an overlay covers.
-/// C `vendor/tmux/tty.c`: `void tty_cmd_redrawline(struct tty *tty, const struct tty_ctx *ctx)`
-pub unsafe fn tty_cmd_redrawline(tty: *mut tty, ctx: *const tty_ctx) {
-    unsafe {
-        let mut i = 0;
-        let mut x = 0;
-        let mut rx = 0;
-        let mut ry = 0;
-
-        if !tty_clamp_line(
-            tty,
-            ctx,
-            (*ctx).ocx,
-            (*ctx).ocy,
-            (*ctx).num,
-            &raw mut i,
-            &raw mut x,
-            &raw mut rx,
-            &raw mut ry,
-        ) {
-            return;
-        }
-        let r = tty_check_overlay_range(tty, x, ry, rx);
-        for j in 0..(*r).used as usize {
-            let rr = *(*r).ranges.add(j);
-            if rr.nx == 0 {
-                continue;
-            }
-            tty_draw_line(
-                tty,
-                (*ctx).s,
-                (*ctx).ocx + i + rr.px - x,
-                (*ctx).ocy,
-                rr.nx,
-                rr.px,
-                ry,
-                &raw const (*ctx).defaults,
-                (*ctx).palette,
-            );
-        }
-    }
-}
-
 /// C `vendor/tmux/tty.c:2034`: `void tty_cmd_cell(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_cell(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {

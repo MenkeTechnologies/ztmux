@@ -202,8 +202,6 @@ cfg_pub_mods! {
     mod window_customize;
     #[path = "ported/window_tree.rs"]
     mod window_tree;
-    #[path = "ported/window_visible.rs"]
-    mod window_visible;
     #[path = "ported/xmalloc.rs"]
     mod xmalloc;
 }
@@ -313,7 +311,6 @@ use crate::{
     window_copy::{window_copy_add, *},
     window_customize::WINDOW_CUSTOMIZE_MODE,
     window_tree::WINDOW_TREE_MODE,
-    window_visible::*,
     xmalloc::*,
 };
 
@@ -1232,10 +1229,6 @@ struct screen {
 }
 
 const SCREEN_WRITE_SYNC: i32 = 0x1;
-/// C `vendor/tmux/tmux.h:1090`: a floating pane covers part of this one.
-const SCREEN_WRITE_OBSCURED: i32 = 0x2;
-/// C `vendor/tmux/tmux.h:1091`: the obscured test has already run for this ctx.
-const SCREEN_WRITE_CHECKED_IF_OBSCURED: i32 = 0x4;
 
 // Screen write context.
 type screen_write_init_ctx_cb = Option<unsafe fn(*mut screen_write_ctx, *mut tty_ctx)>;

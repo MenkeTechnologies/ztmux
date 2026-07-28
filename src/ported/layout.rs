@@ -883,8 +883,8 @@ pub unsafe fn layout_resize_pane_shrink(
         }
 
         // Change the cells
-        if size > (-needed) as u32 {
-            size = (-needed) as u32;
+        if size > needed.wrapping_neg() as u32 {
+            size = needed.wrapping_neg() as u32;
         }
         layout_resize_adjust(w, lcadd, type_, size as c_int);
         layout_resize_adjust(w, lcremove, type_, -(size as c_int));
