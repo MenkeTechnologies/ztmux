@@ -346,8 +346,6 @@ pub unsafe fn screen_write_clear_dirty(wp: *mut window_pane) {
     }
 }
 
-
-
 /// Whether a floating pane overlaps this write context's pane, so the cheap
 /// whole-screen escape sequences must not be used.
 /// C `vendor/tmux/screen-write.c`: `static int screen_write_pane_is_obscured(struct screen_write_ctx *ctx)`
@@ -1489,7 +1487,7 @@ pub unsafe fn screen_write_alignmenttest(ctx: *mut screen_write_ctx) {
         #[cfg(feature = "sixel")]
         {
             if crate::image_::image_free_all(s) && !(*ctx).wp.is_null() {
-                screen_write_redraw_pane(ctx, &raw mut ttyctx);
+                (*(*ctx).wp).flags |= window_pane_flags::PANE_REDRAW;
             }
         }
 
@@ -1508,6 +1506,8 @@ pub unsafe fn screen_write_alignmenttest(ctx: *mut screen_write_ctx) {
 
         screen_write_collect_clear(ctx, 0, screen_size_y(s) - 1);
         if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_alignmenttest, &raw mut ttyctx);
         }
@@ -1551,6 +1551,8 @@ pub unsafe fn screen_write_insertcharacter(ctx: *mut screen_write_ctx, mut nx: u
         screen_write_collect_flush(ctx, 0, "screen_write_insertcharacter");
         ttyctx.num = nx;
         if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_insertcharacter, &raw mut ttyctx);
         }
@@ -1594,6 +1596,8 @@ pub unsafe fn screen_write_deletecharacter(ctx: *mut screen_write_ctx, mut nx: u
         screen_write_collect_flush(ctx, 0, "screen_write_deletecharacter");
         ttyctx.num = nx;
         if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_deletecharacter, &raw mut ttyctx);
         }
@@ -1637,6 +1641,8 @@ pub unsafe fn screen_write_clearcharacter(ctx: *mut screen_write_ctx, mut nx: u3
         screen_write_collect_flush(ctx, 0, "screen_write_clearcharacter");
         ttyctx.num = nx;
         if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_clearcharacter, &raw mut ttyctx);
         }
@@ -1679,6 +1685,8 @@ pub unsafe fn screen_write_insertline(ctx: *mut screen_write_ctx, mut ny: u32, b
             screen_write_collect_flush(ctx, 0, "screen_write_insertline");
             ttyctx.num = ny;
             if !screen_write_should_draw_line(ctx, (*s).cy) {
+            } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+                screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
                 tty_write(tty_cmd_insertline, &raw mut ttyctx);
             }
@@ -1705,6 +1713,8 @@ pub unsafe fn screen_write_insertline(ctx: *mut screen_write_ctx, mut ny: u32, b
 
         ttyctx.num = ny;
         if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_insertline, &raw mut ttyctx);
         }
@@ -1747,6 +1757,8 @@ pub unsafe fn screen_write_deleteline(ctx: *mut screen_write_ctx, mut ny: u32, b
             screen_write_collect_flush(ctx, 0, "screen_write_deleteline");
             ttyctx.num = ny;
             if !screen_write_should_draw_line(ctx, (*s).cy) {
+            } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+                screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
                 tty_write(tty_cmd_deleteline, &raw mut ttyctx);
             }
@@ -1772,6 +1784,8 @@ pub unsafe fn screen_write_deleteline(ctx: *mut screen_write_ctx, mut ny: u32, b
         screen_write_collect_flush(ctx, 0, "screen_write_deleteline");
         ttyctx.num = ny;
         if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_deleteline, &raw mut ttyctx);
         }
@@ -1953,6 +1967,8 @@ pub unsafe fn screen_write_reverseindex(ctx: *mut screen_write_ctx, bg: u32) {
             ttyctx.bg = bg;
 
             if !screen_write_should_draw_line(ctx, (*s).cy) {
+            } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+                screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
                 tty_write(tty_cmd_reverseindex, &raw mut ttyctx);
             }
@@ -2029,7 +2045,7 @@ pub unsafe fn screen_write_linefeed(ctx: *mut screen_write_ctx, wrapped: bool, b
                     crate::image_::image_check_line(s, rupper, rlower - rupper)
                 };
                 if redraw && !(*ctx).wp.is_null() {
-                        (*(*ctx).wp).flags |= window_pane_flags::PANE_REDRAW;
+                    (*(*ctx).wp).flags |= window_pane_flags::PANE_REDRAW;
                 }
             }
             grid_view_scroll_region_up(gd, (*s).rupper, (*s).rlower, bg);
@@ -2062,7 +2078,7 @@ pub unsafe fn screen_write_scrollup(ctx: *mut screen_write_ctx, mut lines: u32, 
         #[cfg(feature = "sixel")]
         {
             if crate::image_::image_scroll_up(s, lines) && !(*ctx).wp.is_null() {
-                    (*(*ctx).wp).flags |= window_pane_flags::PANE_REDRAW;
+                (*(*ctx).wp).flags |= window_pane_flags::PANE_REDRAW;
             }
         }
 
@@ -2105,6 +2121,8 @@ pub unsafe fn screen_write_scrolldown(ctx: *mut screen_write_ctx, mut lines: u32
         screen_write_collect_flush(ctx, 0, "screen_write_scrolldown");
         ttyctx.num = lines;
         if !screen_write_should_draw_line(ctx, (*s).cy) {
+        } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
             tty_write(tty_cmd_scrolldown, &raw mut ttyctx);
         }
@@ -2132,7 +2150,7 @@ pub unsafe fn screen_write_clearendofscreen(ctx: *mut screen_write_ctx, bg: u32)
         #[cfg(feature = "sixel")]
         {
             if crate::image_::image_check_line(s, (*s).cy, sy - (*s).cy) && !(*ctx).wp.is_null() {
-                screen_write_redraw_pane(ctx, &raw mut ttyctx);
+                (*(*ctx).wp).flags |= window_pane_flags::PANE_REDRAW;
             }
         }
 
@@ -2217,7 +2235,7 @@ pub unsafe fn screen_write_clearstartofscreen(ctx: *mut screen_write_ctx, bg: u3
         #[cfg(feature = "sixel")]
         {
             if crate::image_::image_check_line(s, 0, (*s).cy - 1) && !(*ctx).wp.is_null() {
-                screen_write_redraw_pane(ctx, &raw mut ttyctx);
+                (*(*ctx).wp).flags |= window_pane_flags::PANE_REDRAW;
             }
         }
 
@@ -2293,7 +2311,7 @@ pub unsafe fn screen_write_clearscreen(ctx: *mut screen_write_ctx, bg: u32) {
         #[cfg(feature = "sixel")]
         {
             if crate::image_::image_free_all(s) && !(*ctx).wp.is_null() {
-                screen_write_redraw_pane(ctx, &raw mut ttyctx);
+                (*(*ctx).wp).flags |= window_pane_flags::PANE_REDRAW;
             }
         }
 
@@ -2921,6 +2939,8 @@ pub unsafe fn screen_write_cell(ctx: *mut screen_write_ctx, gc: *const grid_cell
             screen_write_collect_flush(ctx, 0, "screen_write_cell");
             ttyctx.num = width;
             if !screen_write_should_draw_line(ctx, (*s).cy) {
+            } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
+                screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
                 tty_write(tty_cmd_insertcharacter, &raw mut ttyctx);
             }
