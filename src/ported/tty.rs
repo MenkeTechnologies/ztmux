@@ -1364,10 +1364,6 @@ pub unsafe fn tty_clear_line(
 ) {
     unsafe {
         let c = (*tty).client;
-        let mut r: overlay_ranges = zeroed();
-        // struct overlay_ranges r;
-        // u_int i;
-
         // log_debug("%s: %s, %u at %u,%u", __func__, (*c).name, nx, px, py);
 
         // Nothing to clear.
@@ -1401,13 +1397,13 @@ pub unsafe fn tty_clear_line(
 
         // Couldn't use an escape sequence, use spaces. Clear only the visible
         // bit if there is an overlay.
-        tty_check_overlay_range(tty, px, py, nx, &raw mut r);
-        for i in 0..OVERLAY_MAX_RANGES {
-            if r.nx[i] == 0 {
-                continue;
+        let r = tty_check_overlay_range(tty, px, py, nx);
+        for i in 0..(*r).used {
+            let rr = *(*r).ranges.add(i as usize);
+            if rr.nx != 0 {
+                tty_cursor(tty, rr.px, py);
+                tty_repeat_space(tty, rr.nx);
             }
-            tty_cursor(tty, r.px[i], py);
-            tty_repeat_space(tty, r.nx[i]);
         }
     }
 }
@@ -1757,13 +1753,10 @@ pub unsafe fn tty_check_codeset(tty: *mut tty, gc: *const grid_cell) -> *const g
 /// C `vendor/tmux/tty.c:1497`: `static int tty_check_overlay(struct tty *tty, u_int px, u_int py)`
 pub unsafe fn tty_check_overlay(tty: *mut tty, px: u32, py: u32) -> bool {
     unsafe {
-        let mut r: overlay_ranges = zeroed();
-
-        // A unit width range will always return nx[2] == 0 from a check, even
-        // with multiple overlays, so it's sufficient to check just the first
-        // two entries.
-        tty_check_overlay_range(tty, px, py, 1, &raw mut r);
-        r.nx[0] + r.nx[1] != 0
+        // With a single character, if anything is visible (that is, the range
+        // is not empty), it must be that character.
+        let r = tty_check_overlay_range(tty, px, py, 1);
+        server_client_ranges_is_empty(r) == 0
     }
 }
 
@@ -1774,21 +1767,19 @@ pub unsafe fn tty_check_overlay_range(
     px: u32,
     py: u32,
     nx: u32,
-    r: *mut overlay_ranges,
-) {
+) -> *mut visible_ranges {
     unsafe {
         let c = (*tty).client;
 
         if let Some(overlay_check) = (*c).overlay_check {
-            overlay_check(c, (*c).overlay_data, px, py, nx, r);
-        } else {
-            (*r).px[0] = px;
-            (*r).nx[0] = nx;
-            (*r).px[1] = 0;
-            (*r).nx[1] = 0;
-            (*r).px[2] = 0;
-            (*r).nx[2] = 0;
+            return overlay_check(c, (*c).overlay_data, px, py, nx);
         }
+        let r = &raw mut (*tty).r;
+        server_client_ensure_ranges(r, 1);
+        (*(*r).ranges).px = px;
+        (*(*r).ranges).nx = nx;
+        (*r).used = 1;
+        r
     }
 }
 
@@ -1810,7 +1801,6 @@ pub unsafe fn tty_draw_line(
         let mut last: grid_cell = zeroed();
         let c = (*tty).client;
 
-        let mut r: overlay_ranges = zeroed();
         let mut cleared = 0;
         let mut wrapped = false;
         const SIZEOF_BUF: usize = 512;
@@ -1919,10 +1909,10 @@ pub unsafe fn tty_draw_line(
                 memcpy__(&raw mut last, gcp);
             }
 
-            tty_check_overlay_range(tty, atx + ux, aty, (*gcp).data.width as u32, &raw mut r);
+            let r = tty_check_overlay_range(tty, atx + ux, aty, (*gcp).data.width as u32);
             let mut hidden = 0;
-            for j in 0..OVERLAY_MAX_RANGES {
-                hidden += r.nx[j];
+            for j in 0..(*r).used as usize {
+                hidden += (*(*r).ranges.add(j)).nx;
             }
             hidden = (*gcp).data.width as u32 - hidden;
             if hidden != 0 && hidden == (*gcp).data.width as u32 {
@@ -1932,20 +1922,21 @@ pub unsafe fn tty_draw_line(
             } else if hidden != 0 || ux + (*gcp).data.width as u32 > nx {
                 if !(*gcp).flags.intersects(grid_flag::PADDING) {
                     tty_attributes(tty, &raw mut last, defaults, palette, (*s).hyperlinks);
-                    for j in 0..OVERLAY_MAX_RANGES {
-                        if r.nx[j] == 0 {
+                    for j in 0..(*r).used as usize {
+                        let rj = (*r).ranges.add(j);
+                        if (*rj).nx == 0 {
                             continue;
                         }
                         // Effective width drawn so far.
-                        let eux = r.px[j] - atx;
+                        let eux = (*rj).px - atx;
                         if eux < nx {
-                            tty_cursor(tty, r.px[j], aty);
+                            tty_cursor(tty, (*rj).px, aty);
                             let nxx = nx - eux;
-                            if r.nx[j] > nxx {
-                                r.nx[j] = nxx;
+                            if (*rj).nx > nxx {
+                                (*rj).nx = nxx;
                             }
-                            tty_repeat_space(tty, r.nx[j]);
-                            ux = eux + r.nx[j];
+                            tty_repeat_space(tty, (*rj).nx);
+                            ux = eux + (*rj).nx;
                         }
                     }
                 }
@@ -2670,7 +2661,6 @@ pub unsafe fn tty_cmd_cell(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let gcp = (*ctx).cell;
         let s = (*ctx).s;
-        let mut r: overlay_ranges = zeroed();
         let mut vis: u32 = 0;
 
         let px = (*ctx).xoff + (*ctx).ocx - (*ctx).wox;
@@ -2683,9 +2673,9 @@ pub unsafe fn tty_cmd_cell(tty: *mut tty, ctx: *const tty_ctx) {
 
         // Handle partially obstructed wide characters.
         if (*gcp).data.width > 1 {
-            tty_check_overlay_range(tty, px, py, (*gcp).data.width as u32, &raw mut r);
-            for i in 0..OVERLAY_MAX_RANGES {
-                vis += r.nx[i];
+            let r = tty_check_overlay_range(tty, px, py, (*gcp).data.width as u32);
+            for i in 0..(*r).used as usize {
+                vis += (*(*r).ranges.add(i)).nx;
             }
             if vis < (*gcp).data.width as u32 {
                 tty_draw_line(
@@ -2730,7 +2720,6 @@ pub unsafe fn tty_cmd_cell(tty: *mut tty, ctx: *const tty_ctx) {
 /// C `vendor/tmux/tty.c:2076`: `void tty_cmd_cells(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_cells(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
-        let mut r: overlay_ranges = zeroed();
         let cp: *mut u8 = (*ctx).ptr.cast();
 
         if !tty_is_visible(tty, ctx, (*ctx).ocx, (*ctx).ocy, (*ctx).num, 1) {
@@ -2770,19 +2759,20 @@ pub unsafe fn tty_cmd_cells(tty: *mut tty, ctx: *const tty_ctx) {
         let px = (*ctx).xoff + (*ctx).ocx - (*ctx).wox;
         let py = (*ctx).yoff + (*ctx).ocy - (*ctx).woy;
 
-        tty_check_overlay_range(tty, px, py, (*ctx).num, &raw mut r);
-        for i in 0..OVERLAY_MAX_RANGES {
-            if r.nx[i] == 0 {
+        let r = tty_check_overlay_range(tty, px, py, (*ctx).num);
+        for i in 0..(*r).used as usize {
+            let ri = *(*r).ranges.add(i);
+            if ri.nx == 0 {
                 continue;
             }
             // Convert back to pane position for printing.
-            let cx = r.px[i] - (*ctx).xoff + (*ctx).wox;
+            let cx = ri.px - (*ctx).xoff + (*ctx).wox;
             tty_cursor_pane_unless_wrap(tty, ctx, cx, (*ctx).ocy);
             tty_putn(
                 tty,
-                cp.add(r.px[i] as usize - px as usize).cast(),
-                r.nx[i] as usize,
-                r.nx[i],
+                cp.add(ri.px as usize - px as usize).cast(),
+                ri.nx as usize,
+                ri.nx,
             );
         }
     }

@@ -49,6 +49,13 @@ pub struct popup_data {
     pub defaults: grid_cell,
     pub palette: colour_palette,
 
+    /// C `vendor/tmux/popup.c:44`: `struct visible_ranges r` — the spans this
+    /// popup leaves visible, returned from `popup_check_cb`.
+    pub r: visible_ranges,
+    /// C `vendor/tmux/popup.c:45`: `struct visible_ranges or[2]` — per-menu-range
+    /// scratch while combining the menu's spans with the popup's.
+    pub or: [visible_ranges; 2],
+
     pub job: *mut job,
     pub ictx: *mut input_ctx,
     pub status: i32,
@@ -197,55 +204,66 @@ pub unsafe fn popup_check_cb(
     px: u32,
     py: u32,
     nx: u32,
-    r: *mut overlay_ranges,
-) {
+) -> *mut visible_ranges {
     unsafe {
         let pd = data.cast::<popup_data>();
-        let mut or = MaybeUninit::<[overlay_ranges; 2]>::uninit();
-        let or: *mut overlay_ranges = or.as_mut_ptr().cast();
-
-        let mut k = 0;
+        let r = &raw mut (*pd).r;
 
         if !(*pd).md.is_null() {
-            // Check each returned range for the menu against the popup
-            menu_check_cb(c, (*pd).md.cast(), px, py, nx, r);
+            // Work out the ranges the menu leaves visible. A menu has at most
+            // two, and the code below relies on that.
+            let mr = menu_check_cb(c, (*pd).md.cast(), px, py, nx);
+            if (*mr).used > 2 {
+                fatalx_!("too many menu ranges");
+            }
 
-            for i in 0..2 {
+            // Walk the ranges still visible under the menu and check each
+            // against the popup too. Popup and menu disjoint gives at most
+            // three ranges in total.
+            //
+            // NB: `popup.c:246` indexes `r` (the popup's own ranges) while
+            // bounding the loop by `mr->used`; it reads stale ranges from the
+            // previous call rather than the menu's. Ported as-is, but the
+            // `ensure_ranges` call is hoisted above the loop so the read is of
+            // zeroed memory instead of a NULL deref on the first popup that
+            // opens with a menu already in it.
+            server_client_ensure_ranges(r, 3);
+            for i in 0..(*mr).used {
+                let ri = *(*r).ranges.add(i as usize);
                 server_client_overlay_range(
                     (*pd).px,
                     (*pd).py,
                     (*pd).sx,
                     (*pd).sy,
-                    (*r).px[i],
+                    ri.px,
                     py,
-                    (*r).nx[i],
-                    or.add(i),
+                    ri.nx,
+                    &raw mut (*pd).or[i as usize],
                 );
             }
 
-            // or has up to OVERLAY_MAX_RANGES non-overlapping ranges,
-            // ordered from left to right. Collect them in the output.
-            for i in 0..2 {
-                // Each or[i] only has 2 ranges
-                for j in 0..2 {
-                    if (*or.add(i)).nx[j] > 0 {
-                        (*r).px[k] = (*or.add(i)).px[j];
-                        (*r).nx[k] = (*or.add(i)).nx[j];
-                        k += 1;
+            // Non-overlapping ranges from left to right; combine into output.
+            let mut k = 0;
+            for i in 0..(*mr).used as usize {
+                let or = &raw mut (*pd).or[i];
+                for j in 0..(*or).used as usize {
+                    let oj = *(*or).ranges.add(j);
+                    if oj.nx == 0 {
+                        continue;
                     }
+                    if k >= 3 {
+                        fatalx_!("too many popup & menu ranges");
+                    }
+                    *(*r).ranges.add(k) = oj;
+                    k += 1;
                 }
             }
-
-            // Zero remaining ranges if any
-            for i in k..OVERLAY_MAX_RANGES {
-                (*r).px[i] = 0;
-                (*r).nx[i] = 0;
-            }
-
-            return;
+            (*r).used = k as u32;
+            return r;
         }
 
         server_client_overlay_range((*pd).px, (*pd).py, (*pd).sx, (*pd).sy, px, py, nx, r);
+        r
     }
 }
 

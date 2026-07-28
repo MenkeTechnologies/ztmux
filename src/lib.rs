@@ -202,6 +202,8 @@ cfg_pub_mods! {
     mod window_customize;
     #[path = "ported/window_tree.rs"]
     mod window_tree;
+    #[path = "ported/window_visible.rs"]
+    mod window_visible;
     #[path = "ported/xmalloc.rs"]
     mod xmalloc;
 }
@@ -311,6 +313,7 @@ use crate::{
     window_copy::{window_copy_add, *},
     window_customize::WINDOW_CUSTOMIZE_MODE,
     window_tree::WINDOW_TREE_MODE,
+    window_visible::*,
     xmalloc::*,
 };
 
@@ -1229,6 +1232,10 @@ struct screen {
 }
 
 const SCREEN_WRITE_SYNC: i32 = 0x1;
+/// C `vendor/tmux/tmux.h:1090`: a floating pane covers part of this one.
+const SCREEN_WRITE_OBSCURED: i32 = 0x2;
+/// C `vendor/tmux/tmux.h:1091`: the obscured test has already run for this ctx.
+const SCREEN_WRITE_CHECKED_IF_OBSCURED: i32 = 0x4;
 
 // Screen write context.
 type screen_write_init_ctx_cb = Option<unsafe fn(*mut screen_write_ctx, *mut tty_ctx)>;
@@ -1521,6 +1528,12 @@ struct window_pane {
 
     /// link in list of all panes
     entry: tailq_entry<window_pane>,
+    /// C `vendor/tmux/tmux.h:1367`: `struct visible_ranges r`
+    ///
+    /// Scratch buffer reused by `window_visible_ranges` for this pane, so
+    /// clipping a line does not allocate on every write.
+    r: visible_ranges,
+
     /// link in list of last visited
     sentry: tailq_entry<window_pane>,
     /// z-index link in list of all panes (`window.z_index`)
@@ -2021,6 +2034,11 @@ struct tty {
     mouse_drag_update: Option<unsafe fn(*mut client, *mut mouse_event)>,
     mouse_drag_release: Option<unsafe fn(*mut client, *mut mouse_event)>,
 
+    /// C `vendor/tmux/tmux.h:1737`: `struct visible_ranges r`
+    ///
+    /// Scratch buffer reused by the overlay-check callbacks.
+    r: visible_ranges,
+
     key_timer: event,
     key_tree: *mut tty_key,
 }
@@ -2432,19 +2450,39 @@ RB_GENERATE!(
     server_client_window_cmp
 );
 
-// Visible areas not obstructed by overlays.
-const OVERLAY_MAX_RANGES: usize = 3;
+/// One unobstructed span on a line.
+/// C `vendor/tmux/tmux.h:1250`: `struct visible_range`
 #[repr(C)]
-struct overlay_ranges {
-    px: [u32; OVERLAY_MAX_RANGES],
-    nx: [u32; OVERLAY_MAX_RANGES],
+#[derive(Copy, Clone, Default)]
+struct visible_range {
+    /// Start column.
+    px: u32,
+    /// Length; 0 means the span was fully covered.
+    nx: u32,
+}
+
+/// Visible areas not obstructed by an overlay or a floating pane.
+/// C `vendor/tmux/tmux.h:1256`: `struct visible_ranges`
+///
+/// A growable array rather than a fixed set of slots: each floating pane
+/// stacked over a line can split one span into two, so N floats need up to
+/// N+1 spans. Zero-initialises correctly, which matters because the copies
+/// living on `window_pane` and `tty` come from `xcalloc`.
+#[repr(C)]
+struct visible_ranges {
+    /// Dynamically allocated array of `size` entries.
+    ranges: *mut visible_range,
+    /// Number of entries in use.
+    used: u32,
+    /// Allocated capacity.
+    size: u32,
 }
 
 type prompt_input_cb = Option<unsafe fn(*mut client, NonNull<c_void>, *const u8, i32) -> i32>;
 type prompt_free_cb = Option<unsafe fn(NonNull<c_void>)>;
 
 type overlay_check_cb =
-    Option<unsafe fn(*mut client, *mut c_void, u32, u32, u32, *mut overlay_ranges)>;
+    Option<unsafe fn(*mut client, *mut c_void, u32, u32, u32) -> *mut visible_ranges>;
 type overlay_mode_cb =
     Option<unsafe fn(*mut client, *mut c_void, *mut u32, *mut u32) -> *mut screen>;
 type overlay_draw_cb = Option<unsafe fn(*mut client, *mut c_void, *mut screen_redraw_ctx)>;

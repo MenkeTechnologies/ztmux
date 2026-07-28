@@ -671,6 +671,34 @@ unsafe fn message_layout(c: *mut client) -> Option<MessageLayout> {
     }
 }
 
+/// Shared body of the three overlay-check callbacks below: subtract the
+/// overlay's rect from the queried range, or leave the range whole when the
+/// overlay is not currently laid out. Writes into the client's scratch ranges,
+/// the same buffer `tty_check_overlay_range` uses when there is no overlay.
+unsafe fn overlay_check_rect(
+    c: *mut client,
+    rect: Option<(u32, u32, u32, u32)>,
+    px: u32,
+    py: u32,
+    nx: u32,
+) -> *mut visible_ranges {
+    unsafe {
+        let r = &raw mut (*c).tty.r;
+        match rect {
+            Some((lx, ly, lw, lh)) => {
+                server_client_overlay_range(lx, ly, lw, lh, px, py, nx, r);
+            }
+            None => {
+                server_client_ensure_ranges(r, 1);
+                (*(*r).ranges).px = px;
+                (*(*r).ranges).nx = nx;
+                (*r).used = 1;
+            }
+        }
+        r
+    }
+}
+
 /// Overlay check callback: report the box rect as covered so live panes are
 /// clipped around it (no freeze - the window keeps drawing underneath).
 unsafe fn message_check_cb(
@@ -679,28 +707,10 @@ unsafe fn message_check_cb(
     px: u32,
     py: u32,
     nx: u32,
-    r: *mut overlay_ranges,
-) {
+) -> *mut visible_ranges {
     unsafe {
-        if let Some(l) = message_layout(c) {
-            server_client_overlay_range(
-                l.px as u32,
-                l.py as u32,
-                l.w as u32,
-                l.h as u32,
-                px,
-                py,
-                nx,
-                r,
-            );
-        } else {
-            (*r).px[0] = px;
-            (*r).nx[0] = nx;
-            (*r).px[1] = 0;
-            (*r).nx[1] = 0;
-            (*r).px[2] = 0;
-            (*r).nx[2] = 0;
-        }
+        let rect = message_layout(c).map(|l| (l.px as u32, l.py as u32, l.w as u32, l.h as u32));
+        overlay_check_rect(c, rect, px, py, nx)
     }
 }
 
@@ -828,28 +838,10 @@ unsafe fn prompt_check_cb(
     px: u32,
     py: u32,
     nx: u32,
-    r: *mut overlay_ranges,
-) {
+) -> *mut visible_ranges {
     unsafe {
-        if let Some(l) = prompt_layout(c) {
-            server_client_overlay_range(
-                l.px as u32,
-                l.py as u32,
-                l.w as u32,
-                l.h as u32,
-                px,
-                py,
-                nx,
-                r,
-            );
-        } else {
-            (*r).px[0] = px;
-            (*r).nx[0] = nx;
-            (*r).px[1] = 0;
-            (*r).nx[1] = 0;
-            (*r).px[2] = 0;
-            (*r).nx[2] = 0;
-        }
+        let rect = prompt_layout(c).map(|l| (l.px as u32, l.py as u32, l.w as u32, l.h as u32));
+        overlay_check_rect(c, rect, px, py, nx)
     }
 }
 
@@ -1216,33 +1208,18 @@ unsafe fn hint_layout(c: *mut client) -> Option<HintLayout> {
 /// Overlay check callback: report the bar rect as covered so live panes are
 /// clipped around it - no freeze, the window keeps drawing underneath.
 unsafe fn hint_check_cb(
-    _c: *mut client,
+    c: *mut client,
     data: *mut core::ffi::c_void,
     px: u32,
     py: u32,
     nx: u32,
-    r: *mut overlay_ranges,
-) {
+) -> *mut visible_ranges {
     unsafe {
-        if let Some(l) = data.cast::<HintLayout>().as_ref() {
-            server_client_overlay_range(
-                l.px as u32,
-                l.py as u32,
-                l.w as u32,
-                l.h as u32,
-                px,
-                py,
-                nx,
-                r,
-            );
-        } else {
-            (*r).px[0] = px;
-            (*r).nx[0] = nx;
-            (*r).px[1] = 0;
-            (*r).nx[1] = 0;
-            (*r).px[2] = 0;
-            (*r).nx[2] = 0;
-        }
+        let rect = data
+            .cast::<HintLayout>()
+            .as_ref()
+            .map(|l| (l.px as u32, l.py as u32, l.w as u32, l.h as u32));
+        overlay_check_rect(c, rect, px, py, nx)
     }
 }
 

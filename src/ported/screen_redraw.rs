@@ -823,9 +823,8 @@ pub unsafe fn screen_redraw_draw_borders_cell(ctx: *mut screen_redraw_ctx, i: u3
         let y = (*ctx).oy + j;
 
         if let Some(overlay_check) = (*c).overlay_check {
-            let mut r: overlay_ranges = zeroed();
-            overlay_check(c, (*c).overlay_data, x, y, 1, &raw mut r);
-            if r.nx[0] + r.nx[1] == 0 {
+            let r = overlay_check(c, (*c).overlay_data, x, y, 1);
+            if server_client_ranges_is_empty(r) != 0 {
                 return;
             }
         }

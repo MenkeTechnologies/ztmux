@@ -161,6 +161,32 @@ pub unsafe fn server_client_clear_overlay(c: *mut client) {
     }
 }
 
+/// Grow `r` so it can hold at least `n` ranges.
+/// C `vendor/tmux/server-client.c`: `void server_client_ensure_ranges(struct visible_ranges *r, u_int n)`
+pub unsafe fn server_client_ensure_ranges(r: *mut visible_ranges, n: u32) {
+    unsafe {
+        if (*r).size >= n {
+            return;
+        }
+        (*r).ranges =
+            xrecallocarray__((*r).ranges, (*r).size as usize, n as usize).as_ptr();
+        (*r).size = n;
+    }
+}
+
+/// Whether every range in `r` is zero length, i.e. nothing is visible.
+/// C `vendor/tmux/server-client.c`: `int server_client_ranges_is_empty(struct visible_ranges *r)`
+pub unsafe fn server_client_ranges_is_empty(r: *mut visible_ranges) -> c_int {
+    unsafe {
+        for i in 0..(*r).used {
+            if (*(*r).ranges.add(i as usize)).nx != 0 {
+                return 0;
+            }
+        }
+        1
+    }
+}
+
 /// Given overlay position and dimensions, return parts of the input range which are visible.
 /// C `vendor/tmux/server-client.c:182`: `void server_client_overlay_range(u_int x, u_int y, u_int sx, u_int sy, u_int px, u_int py, u_int nx, struct visible_ranges *r)`
 pub unsafe fn server_client_overlay_range(
@@ -171,32 +197,27 @@ pub unsafe fn server_client_overlay_range(
     px: u32,
     py: u32,
     nx: u32,
-    r: *mut overlay_ranges,
+    r: *mut visible_ranges,
 ) {
     unsafe {
-        // Return up to 2 ranges.
-        (*r).px[2] = 0;
-        (*r).nx[2] = 0;
-
         // Trivial case of no overlap in the y direction.
         if py < y || py > y + sy - 1 {
-            (*r).px[0] = px;
-            (*r).nx[0] = nx;
-            (*r).px[1] = 0;
-            (*r).nx[1] = 0;
+            server_client_ensure_ranges(r, 1);
+            (*(*r).ranges).px = px;
+            (*(*r).ranges).nx = nx;
+            (*r).used = 1;
             return;
         }
+        server_client_ensure_ranges(r, 2);
+        let ranges = (*r).ranges;
 
         // Visible bit to the left of the popup.
         if px < x {
-            (*r).px[0] = px;
-            (*r).nx[0] = x - px;
-            if (*r).nx[0] > nx {
-                (*r).nx[0] = nx;
-            }
+            (*ranges).px = px;
+            (*ranges).nx = (x - px).min(nx);
         } else {
-            (*r).px[0] = 0;
-            (*r).nx[0] = 0;
+            (*ranges).px = 0;
+            (*ranges).nx = 0;
         }
 
         // Visible bit to the right of the popup.
@@ -206,12 +227,13 @@ pub unsafe fn server_client_overlay_range(
         }
         let onx = px + nx;
         if onx > ox {
-            (*r).px[1] = ox;
-            (*r).nx[1] = onx - ox;
+            (*ranges.add(1)).px = ox;
+            (*ranges.add(1)).nx = onx - ox;
         } else {
-            (*r).px[1] = 0;
-            (*r).nx[1] = 0;
+            (*ranges.add(1)).px = 0;
+            (*ranges.add(1)).nx = 0;
         }
+        (*r).used = 2;
     }
 }
 

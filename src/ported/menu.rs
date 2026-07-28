@@ -39,6 +39,9 @@ pub struct menu_data {
 
     pub fs: cmd_find_state,
     pub s: screen,
+    /// C `vendor/tmux/menu.c:41`: `struct visible_ranges r` — the spans this
+    /// menu leaves visible, returned from `menu_check_cb`.
+    pub r: visible_ranges,
 
     pub px: u32,
     pub py: u32,
@@ -214,8 +217,7 @@ pub unsafe fn menu_check_cb(
     px: u32,
     py: u32,
     nx: u32,
-    r: *mut overlay_ranges,
-) {
+) -> *mut visible_ranges {
     unsafe {
         let md = data as *mut menu_data;
         let menu = (*md).menu;
@@ -228,8 +230,9 @@ pub unsafe fn menu_check_cb(
             px,
             py,
             nx,
-            r,
+            &raw mut (*md).r,
         );
+        &raw mut (*md).r
     }
 }
 
