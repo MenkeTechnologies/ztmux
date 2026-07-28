@@ -493,35 +493,46 @@ pub unsafe fn layout_destroy_cell(
             return;
         }
 
-        // Merge the space into the previous or next cell
-        let lcother: *mut layout_cell = if lc == tailq_first(&raw mut (*lcparent).cells) {
-            tailq_next(lc)
+        // A floating cell takes no space in the tiled flow, so removing it must
+        // not hand its size to a neighbour. `layout.c:709`.
+        if layout_cell_is_tiled(lc) == 0 {
+            tailq_remove(&mut (*lcparent).cells, lc);
+            layout_free_cell(lc, 0);
         } else {
-            tailq_prev(lc)
-        };
-
-        if !lcother.is_null() {
-            if (*lcparent).type_ == layout_type::LAYOUT_LEFTRIGHT {
-                layout_resize_adjust(w, lcother, (*lcparent).type_, (*lc).sx as i32 + 1);
+            // Merge the space into the previous or next cell
+            let lcother: *mut layout_cell = if lc == tailq_first(&raw mut (*lcparent).cells) {
+                tailq_next(lc)
             } else {
-                layout_resize_adjust(w, lcother, (*lcparent).type_, (*lc).sy as i32 + 1);
-            }
-        }
+                tailq_prev(lc)
+            };
 
-        // Remove this from the parent's list
-        tailq_remove(&mut (*lcparent).cells, lc);
-        layout_free_cell(lc, 0);
+            if !lcother.is_null() {
+                if (*lcparent).type_ == layout_type::LAYOUT_LEFTRIGHT {
+                    layout_resize_adjust(w, lcother, (*lcparent).type_, (*lc).sx as i32 + 1);
+                } else {
+                    layout_resize_adjust(w, lcother, (*lcparent).type_, (*lc).sy as i32 + 1);
+                }
+            }
+
+            // Remove this from the parent's list
+            tailq_remove(&mut (*lcparent).cells, lc);
+            layout_free_cell(lc, 0);
+        }
 
         // If the parent now has one cell, remove the parent from the tree and
         // replace it by that cell
         let lc = tailq_first(&raw mut (*lcparent).cells);
-        if tailq_next(lc).is_null() {
+        if !lc.is_null() && tailq_next(lc).is_null() {
             tailq_remove(&raw mut (*lcparent).cells, lc);
 
             (*lc).parent = (*lcparent).parent;
             if (*lc).parent.is_null() {
-                (*lc).xoff = 0;
-                (*lc).yoff = 0;
+                // Only a tiled cell anchors at the window origin; a floating
+                // one keeps its own offsets. `layout.c:741`.
+                if layout_cell_is_tiled(lc) != 0 {
+                    (*lc).xoff = 0;
+                    (*lc).yoff = 0;
+                }
                 *lcroot = lc;
             } else {
                 tailq_replace(&mut (*(*lc).parent).cells, lcparent, lc);
