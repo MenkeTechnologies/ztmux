@@ -2394,18 +2394,9 @@ pub unsafe fn screen_write_collect_flush(ctx: *mut screen_write_ctx, scroll_only
     unsafe {
         let s = (*ctx).s;
         let mut items = 0;
-        let mut ttyctx: tty_ctx = zeroed();
 
         if (*ctx).scrolled != 0 {
-            // log_debug("%s: scrolled %u (region %u-%u)", __func__, (*ctx).scrolled, (*s).rupper, (*s).rlower);
-            if (*ctx).scrolled > (*s).rlower - (*s).rupper + 1 {
-                (*ctx).scrolled = (*s).rlower - (*s).rupper + 1;
-            }
-
-            screen_write_initctx(ctx, &raw mut ttyctx, 1);
-            ttyctx.num = (*ctx).scrolled;
-            ttyctx.bg = (*ctx).bg;
-            tty_write(tty_cmd_scrollup, &raw mut ttyctx);
+            screen_write_collect_flush_scrolled(ctx);
         }
         (*ctx).scrolled = 0;
         (*ctx).bg = 8;
@@ -2423,6 +2414,48 @@ pub unsafe fn screen_write_collect_flush(ctx: *mut screen_write_ctx, scroll_only
         (*s).cy = cy;
 
         log_debug!("screen_write_collect_flush: flushed {items} items ({from})",);
+    }
+}
+
+/// Flush collected scrolling.
+/// C `vendor/tmux/screen-write.c:2265`: `static int screen_write_collect_flush_scrolled(struct screen_write_ctx *ctx)`
+///
+/// A scroll escape moves whole terminal rows, so it cannot be clipped per cell:
+/// it would drag a floating pane's rows along with the pane underneath. When a
+/// float overlaps, redraw the pane instead of scrolling.
+unsafe fn screen_write_collect_flush_scrolled(ctx: *mut screen_write_ctx) -> c_int {
+    unsafe {
+        let wp = (*ctx).wp;
+        let s = (*ctx).s;
+        let mut ttyctx: tty_ctx = zeroed();
+
+        screen_write_initctx(ctx, &raw mut ttyctx, 1);
+        if screen_write_pane_is_obscured(ctx) && !wp.is_null() {
+            screen_write_redraw_pane(ctx, &raw mut ttyctx);
+            return 0;
+        }
+
+        log_debug!(
+            "screen_write_collect_flush_scrolled: scrolled {} (region {}-{})",
+            (*ctx).scrolled,
+            (*s).rupper,
+            (*s).rlower,
+        );
+        if (*ctx).scrolled > (*s).rlower - (*s).rupper + 1 {
+            (*ctx).scrolled = (*s).rlower - (*s).rupper + 1;
+        }
+
+        // A pane hanging off the bottom scrolls a shorter region.
+        if !wp.is_null() {
+            let past = (*wp).yoff as c_int + (*wp).sy as c_int - (*(*wp).window).sy as c_int;
+            if past > 0 {
+                ttyctx.orlower -= past as u32;
+            }
+        }
+        ttyctx.num = (*ctx).scrolled;
+        ttyctx.bg = (*ctx).bg;
+        tty_write(tty_cmd_scrollup, &raw mut ttyctx);
+        1
     }
 }
 
