@@ -81,6 +81,7 @@ pub unsafe fn tty_init(tty: *mut tty, c: *mut client) -> i32 {
         (*tty).ccolour = -1;
         (*tty).fg = -1;
         (*tty).bg = -1;
+        (*tty).mouse_last_pane = -1;
 
         if libc::tcgetattr((*c).fd, &raw mut (*tty).tio) != 0 {
             return -1;
@@ -414,6 +415,7 @@ pub unsafe fn tty_start_tty(tty: *mut tty) {
         }
 
         (*tty).mouse_drag_flag = 0;
+        (*tty).mouse_last_pane = -1;
         (*tty).mouse_drag_update = None;
         (*tty).mouse_drag_release = None;
     }

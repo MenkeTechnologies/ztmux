@@ -189,7 +189,7 @@ unsafe fn cmd_display_menu_get_position(
         }
         n = (((*tty).sy - 1) / 2 + h / 2) as i64;
         if n >= (*tty).sy as i64 {
-            format_add!(ft, "popup_centre_y", "{}", (*tty).sy - h,);
+            format_add!(ft, "popup_centre_y", "{}", (*tty).sy.wrapping_sub(h),);
         } else {
             format_add!(ft, "popup_centre_y", "{n}");
         }
@@ -202,9 +202,14 @@ unsafe fn cmd_display_menu_get_position(
             } else {
                 format_add!(ft, "popup_mouse_centre_x", "{n}");
             }
-            n = ((*event).m.y - h / 2) as i64;
+            // `cmd-display-menu.c:198` has no `(long)` cast here, unlike the
+            // `-x` case above, so the C subtracts as u_int and wraps when the
+            // menu is taller than twice the mouse row; the huge result then
+            // fails the `n + h >= tty->sy` test and the clamp branch is taken.
+            // `wrapping_sub` reproduces that instead of panicking.
+            n = (*event).m.y.wrapping_sub(h / 2) as i64;
             if n + h as c_long >= (*tty).sy as i64 {
-                format_add!(ft, "popup_mouse_centre_y", "{}", (*tty).sy - h,);
+                format_add!(ft, "popup_mouse_centre_y", "{}", (*tty).sy.wrapping_sub(h),);
             } else {
                 format_add!(ft, "popup_mouse_centre_y", "{n}");
             }
@@ -214,7 +219,8 @@ unsafe fn cmd_display_menu_get_position(
             } else {
                 format_add!(ft, "popup_mouse_top", "{n}");
             }
-            n = ((*event).m.y - h) as c_long;
+            // Same missing `(long)` cast at `cmd-display-menu.c:209`.
+            n = (*event).m.y.wrapping_sub(h) as c_long;
             if n < 0 {
                 format_add!(ft, "popup_mouse_bottom", "0");
             } else {
@@ -232,7 +238,7 @@ unsafe fn cmd_display_menu_get_position(
         );
         n = top as i64 + (*wp).yoff as i64 - oy as i64 + h as i64;
         if n >= (*tty).sy as i64 {
-            format_add!(ft, "popup_pane_top", "{}", (*tty).sy - h,);
+            format_add!(ft, "popup_pane_top", "{}", (*tty).sy.wrapping_sub(h),);
         } else {
             format_add!(ft, "popup_pane_top", "{n}");
         }

@@ -403,7 +403,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
 /// C `vendor/tmux/key-bindings.c:349`: `void key_bindings_init(void)`
 pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
-    static DEFAULTS: [&str; 268] = [
+    static DEFAULTS: [&str; 269] = [
         // Prefix keys.
         "bind -N 'Send the prefix key' C-b { send-prefix }",
         "bind -N 'Rotate through the panes' C-o { rotate-window }",
@@ -509,6 +509,8 @@ pub unsafe fn key_bindings_init() {
         "bind -n DoubleClick1Pane { select-pane -t=; if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -H; send -X select-word; run -d0.3; send -X copy-pipe-and-cancel } }",
         /* Mouse button 1 triple click on pane. */
         "bind -n TripleClick1Pane { select-pane -t=; if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -H; send -X select-line; run -d0.3; send -X copy-pipe-and-cancel } }",
+        /* Mouse button 1 down on border. */
+        "bind -n MouseDown1Border { select-pane -M }",
         /* Mouse button 1 drag on border. */
         "bind -n MouseDrag1Border { resize-pane -M }",
         "bind -n M-MouseDrag1Border { move-pane -M }",

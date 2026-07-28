@@ -673,17 +673,67 @@ pub unsafe fn window_redraw_active_switch(w: *mut window, mut wp: *mut window_pa
 }
 
 /// C `vendor/tmux/window.c:645`: `struct window_pane *window_get_active_at(struct window *w, u_int x, u_int y)`
+/// ztmux has no pane scrollbars, so the C's `window_pane_full_size_offset`
+/// reduces to the pane's own offset and size and is used inline here.
 pub unsafe fn window_get_active_at(w: *mut window, x: u32, y: u32) -> *mut window_pane {
     unsafe {
-        for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
+        let (x, y) = (x as c_int, y as c_int);
+        let pane_status = window_get_pane_status(w);
+
+        // Prefer a pane's top border status line over the pane above's bottom
+        // border.
+        if pane_status == pane_status::PANE_STATUS_TOP {
+            for wp in tailq_foreach::<_, discr_zentry>(&raw mut (*w).z_index).map(NonNull::as_ptr) {
+                if !window_pane_visible(wp) || window_pane_is_floating(wp) != 0 {
+                    continue;
+                }
+                let (xoff, sx) = ((*wp).xoff as c_int, (*wp).sx as c_int);
+                if x < xoff || x > xoff + sx {
+                    continue;
+                }
+                if y == (*wp).yoff as c_int - 1 {
+                    return wp;
+                }
+            }
+        }
+
+        // Walk the z-index so floating panes are hit before the tiled panes
+        // they sit above.
+        for wp in tailq_foreach::<_, discr_zentry>(&raw mut (*w).z_index).map(NonNull::as_ptr) {
             if !window_pane_visible(wp) {
                 continue;
             }
-            if x < (*wp).xoff || x > (*wp).xoff + (*wp).sx {
-                continue;
-            }
-            if y < (*wp).yoff || y > (*wp).yoff + (*wp).sy {
-                continue;
+            let (xoff, yoff) = ((*wp).xoff as c_int, (*wp).yoff as c_int);
+            let (sx, sy) = ((*wp).sx as c_int, (*wp).sy as c_int);
+
+            if window_pane_is_floating(wp) == 0 {
+                // Tiled: to and including the right border, excluding the
+                // bottom border.
+                if x < xoff || x > xoff + sx {
+                    continue;
+                }
+                if pane_status == pane_status::PANE_STATUS_TOP {
+                    if y < yoff - 1 || y > yoff + sy {
+                        continue;
+                    }
+                } else if y < yoff || y > yoff + sy {
+                    continue;
+                }
+            } else if window_pane_get_pane_lines(wp) == pane_lines::PANE_LINES_NONE {
+                if x < xoff || x >= xoff + sx {
+                    continue;
+                }
+                if y < yoff || y >= yoff + sy {
+                    continue;
+                }
+            } else {
+                // Floating: include all four borders.
+                if x < xoff - 1 || x > xoff + sx {
+                    continue;
+                }
+                if y < yoff - 1 || y > yoff + sy {
+                    continue;
+                }
             }
             return wp;
         }
@@ -968,6 +1018,44 @@ pub unsafe fn window_get_pane_lines(w: *mut window) -> pane_lines {
         options_get_number___::<i32>(&*(*w).options, "pane-border-lines")
             .try_into()
             .unwrap_or(pane_lines::PANE_LINES_SINGLE)
+    }
+}
+
+/// C `vendor/tmux/window.c`: `int window_get_pane_status(struct window *w)`
+///
+/// Border status for tiled panes: the two `*-floating` choices apply only to
+/// floating panes, so a window reads them as off.
+pub unsafe fn window_get_pane_status(w: *mut window) -> pane_status {
+    unsafe {
+        let status = options_get_number___::<i32>(&*(*w).options, "pane-border-status");
+        match pane_status::try_from(status) {
+            Ok(pane_status::PANE_STATUS_TOP_FLOATING)
+            | Ok(pane_status::PANE_STATUS_BOTTOM_FLOATING)
+            | Err(_) => pane_status::PANE_STATUS_OFF,
+            Ok(status) => status,
+        }
+    }
+}
+
+/// C `vendor/tmux/window.c`: `int window_pane_get_pane_status(struct window_pane *wp)`
+///
+/// Border status for one pane. A floating pane reads its own options, and the
+/// `*-floating` choices resolve to plain top/bottom for it.
+pub unsafe fn window_pane_get_pane_status(wp: *mut window_pane) -> pane_status {
+    unsafe {
+        if window_pane_is_floating(wp) == 0 {
+            return window_get_pane_status((*wp).window);
+        }
+        if window_pane_get_pane_lines(wp) == pane_lines::PANE_LINES_NONE {
+            return pane_status::PANE_STATUS_OFF;
+        }
+        let status = options_get_number___::<i32>(&*(*wp).options, "pane-border-status");
+        match pane_status::try_from(status) {
+            Ok(pane_status::PANE_STATUS_TOP_FLOATING) => pane_status::PANE_STATUS_TOP,
+            Ok(pane_status::PANE_STATUS_BOTTOM_FLOATING) => pane_status::PANE_STATUS_BOTTOM,
+            Ok(status) => status,
+            Err(_) => pane_status::PANE_STATUS_OFF,
+        }
     }
 }
 

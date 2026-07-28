@@ -644,6 +644,96 @@ pub unsafe fn server_client_exec(c: *mut client, cmd: *const u8) {
 
 /// Check for mouse keys.
 /// C `vendor/tmux/server-client.c:808`: `static key_code server_client_check_mouse(struct client *c, struct key_event *event)`
+/// Where a mouse event landed.
+/// C `vendor/tmux/tmux.h`: `enum key_code_mouse_location`.
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum where_ {
+    Nowhere,
+    Pane,
+    Status,
+    StatusLeft,
+    StatusRight,
+    StatusDefault,
+    Border,
+}
+
+/// Where inside `wp` the point `px,py` falls: in the pane body, on one of its
+/// borders, or nowhere.
+/// C `vendor/tmux/server-client.c:660`: `static enum key_code_mouse_location server_client_check_mouse_in_pane(struct window_pane *wp, int px, int py, u_int *sl_mpos)`
+///
+/// ztmux has no pane scrollbars, so the C's scrollbar branches and the
+/// `sl_mpos` out-parameter have no counterpart here.
+unsafe fn server_client_check_mouse_in_pane(wp: *mut window_pane, px: c_int, py: c_int) -> where_ {
+    unsafe {
+        let w = (*wp).window;
+        let pane_status = window_pane_get_pane_status(wp);
+        let (xoff, yoff) = ((*wp).xoff as c_int, (*wp).yoff as c_int);
+        let (sx, sy) = ((*wp).sx as c_int, (*wp).sy as c_int);
+
+        let pane_status_line = match pane_status {
+            pane_status::PANE_STATUS_TOP => yoff - 1,
+            pane_status::PANE_STATUS_BOTTOM => yoff + sy,
+            _ => -1, // not used
+        };
+        let bdr_left = xoff - 1;
+
+        // Inside the pane's own extent?
+        if ((pane_status != pane_status::PANE_STATUS_OFF
+            && py != pane_status_line
+            && py != yoff + sy)
+            || (yoff == 0 && py < sy)
+            || (py >= yoff && py < yoff + sy))
+            && px < xoff + sx
+        {
+            // A floating pane owns the border around it, so a point on its
+            // left, top or bottom edge is a border hit rather than a body hit.
+            if window_pane_is_floating(wp) != 0
+                && window_pane_get_pane_lines(wp) != pane_lines::PANE_LINES_NONE
+                && (px == bdr_left || py == yoff - 1 || py == yoff + sy)
+            {
+                return where_::Border;
+            }
+            return where_::Pane;
+        }
+
+        // Otherwise look for a pane whose border the point lies on.
+        for fwp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
+            if (*w).flags.intersects(window_flag::ZOOMED)
+                && !(*fwp).flags.intersects(window_pane_flags::PANE_ZOOMED)
+            {
+                continue;
+            }
+            // A borderless floating pane has no border to hit.
+            if window_pane_is_floating(fwp) != 0
+                && window_pane_get_pane_lines(fwp) == pane_lines::PANE_LINES_NONE
+            {
+                continue;
+            }
+            let (fxoff, fyoff) = ((*fwp).xoff as c_int, (*fwp).yoff as c_int);
+            let (fsx, fsy) = ((*fwp).sx as c_int, (*fwp).sy as c_int);
+            let bdr_top = fyoff - 1;
+            let bdr_bottom = fyoff + fsy;
+            let fbdr_left = fxoff - 1;
+            let bdr_right = fxoff + fsx;
+
+            if py >= fyoff - 1 && py <= fyoff + fsy {
+                if px == bdr_right {
+                    return where_::Border;
+                }
+                // Only a floating pane has a grabbable left border; for tiled
+                // panes that column is the neighbour's right border.
+                if window_pane_is_floating(wp) != 0 && px == fbdr_left {
+                    return where_::Border;
+                }
+            }
+            if px >= fbdr_left && px <= fxoff + fsx && (py == bdr_bottom || py == bdr_top) {
+                return where_::Border;
+            }
+        }
+        where_::Nowhere
+    }
+}
+
 pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -> key_code {
     unsafe {
         let m = &raw mut (*event).m;
@@ -659,10 +749,19 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
         let mut b: u32 = 0;
         let mut sx: u32 = 0;
         let mut sy: u32 = 0;
-        let mut px: u32;
-        let mut py: u32;
+        // Window-relative position of the event; only meaningful once the
+        // not-on-status-line branch below has filled them in.
+        let mut px: u32 = 0;
+        let mut py: u32 = 0;
 
         let mut ignore = 0;
+
+        // Pane the in-progress drag was started on, if any.
+        let lwp: *mut window_pane = if (*c).tty.mouse_last_pane != -1 {
+            window_pane_find_by_id((*c).tty.mouse_last_pane as u32)
+        } else {
+            null_mut()
+        };
 
         let mut key: key_code = 0;
         let mut tv: libc::timeval = zeroed();
@@ -682,16 +781,6 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
         }
         let mut type_ = type_::NoType;
 
-        #[derive(Copy, Clone, Eq, PartialEq)]
-        enum where_ {
-            Nowhere,
-            Pane,
-            Status,
-            StatusLeft,
-            StatusRight,
-            StatusDefault,
-            Border,
-        }
         let mut where_ = where_::Nowhere;
 
         'out: {
@@ -905,36 +994,19 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                 px += (*m).ox;
                 py += (*m).oy;
 
-                let mut wp = null_mut();
-
-                // Try the pane borders if not zoomed.
-                if !(*(*(*s).curw).window).flags.intersects(window_flag::ZOOMED)
-                    && let Some(wp_) = tailq_foreach::<_, discr_entry>(
-                        &raw mut (*(*(*s).curw).window).panes,
-                    )
-                    .find(|wp| {
-                        let wp = wp.as_ptr();
-                        ((*wp).xoff + (*wp).sx == px
-                            && (*wp).yoff <= 1 + py
-                            && (*wp).yoff + (*wp).sy >= py)
-                            || ((*wp).yoff + (*wp).sy == py
-                                && (*wp).xoff <= 1 + px
-                                && (*wp).xoff + (*wp).sx >= px)
-                    })
-                {
-                    wp = wp_.as_ptr();
-                    where_ = where_::Border;
+                // Resolve the pane first, then ask where inside it the point
+                // fell. A drag stays on the pane it was started on, so grabbing
+                // a border does not jump panes as the cursor moves.
+                let wp = if type_ == type_::Drag && !lwp.is_null() {
+                    lwp
+                } else {
+                    window_get_active_at((*(*s).curw).window, px, py)
+                };
+                if wp.is_null() {
+                    return KEYC_UNKNOWN;
                 }
+                where_ = server_client_check_mouse_in_pane(wp, px as c_int, py as c_int);
 
-                // Otherwise try inside the pane.
-                if where_ == where_::Nowhere {
-                    wp = window_get_active_at((*(*s).curw).window, px, py);
-                    if !wp.is_null() {
-                        where_ = where_::Pane;
-                    } else {
-                        return KEYC_UNKNOWN;
-                    }
-                }
                 if where_ == where_::Pane {
                     log_debug!("mouse {},{} on pane %%{}", x, y, (*wp).id);
                 } else if where_ == where_::Border {
@@ -952,6 +1024,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
 
                 (*c).tty.mouse_drag_update = None;
                 (*c).tty.mouse_drag_release = None;
+                (*c).tty.mouse_last_pane = -1;
 
                 // End a mouse drag by passing a MouseDragEnd key corresponding to the button that started the drag.
                 match ((*c).tty.mouse_drag_flag - 1) as u32 {
@@ -1226,6 +1299,16 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                     // Begin a drag by setting the flag to a non-zero value that
                     // corresponds to the mouse button in use.
                     (*c).tty.mouse_drag_flag = MOUSE_BUTTONS(b) as i32 + 1;
+
+                    // Latch the pane the drag started on, but only if one is
+                    // not already latched — a border drag must stay on the pane
+                    // the user grabbed.
+                    if lwp.is_null() {
+                        let wp = window_get_active_at((*(*s).curw).window, px, py);
+                        if !wp.is_null() {
+                            (*c).tty.mouse_last_pane = (*wp).id as i32;
+                        }
+                    }
                 }
                 type_::Wheel => {
                     if MOUSE_BUTTONS(b) == MOUSE_WHEEL_UP {

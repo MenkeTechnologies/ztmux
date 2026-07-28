@@ -10,7 +10,7 @@
 [![CI](https://github.com/MenkeTechnologies/ztmux/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/ztmux/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://menketechnologies.github.io/ztmux/)
 [![Port Report](https://img.shields.io/badge/port-report-8a2be2.svg)](https://menketechnologies.github.io/ztmux/port_report.html)
-[![Parity vs tmux](https://img.shields.io/badge/parity%20vs%20tmux-1121%2F1121%20(100%25)-brightgreen.svg)](parity/PARITY_ROADMAP.md)
+[![Parity vs tmux](https://img.shields.io/badge/parity%20vs%20tmux-1123%2F1123%20(100%25)-brightgreen.svg)](parity/PARITY_ROADMAP.md)
 [![Status](https://img.shields.io/badge/status-100%25%20functional-brightgreen.svg)](docs/BUGS.md)
 [![Reference](https://img.shields.io/badge/reference-tmux%203.x-00ffcc.svg)](https://github.com/tmux/tmux)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -22,7 +22,7 @@
 >
 > *"Not a wrapper. Not control mode. The multiplexer itself."*
 >
-> *"Ported against the C, verified against the C — byte for byte, 1121/1121 parity cases passing."*
+> *"Ported against the C, verified against the C — byte for byte, 1123/1123 parity cases passing."*
 
 ## `[FROM SOURCE, NOT FROM SCRATCH]`
 
@@ -65,7 +65,7 @@ opens its own socket namespace (`ztmux-<uid>`) so it never collides with a runni
 
 **Status: 100% functional.** The port builds, runs, and self-hosts — `ztmux new-session`,
 splits, detach/reattach, the command language, formats, and layouts all work — and the
-parity suite is green at **1121/1121 (100%)** against the vendored tmux. Every bug the harness
+parity suite is green at **1123/1123 (100%)** against the vendored tmux. Every bug the harness
 found has been root-caused and fixed (see [`docs/BUGS.md`](docs/BUGS.md)).
 
 On top of the port, ztmux ships original subcommands with no tmux counterpart — live
@@ -159,7 +159,7 @@ It earns its keep: it root-caused a `#{l:…}` server crash to a dropped pointer
 `format_unescape`, fixed even-horizontal layout rounding and `#{pane_current_command}` on
 macOS, regex backreferences, `#{!:}`, named buffers, loop variables, and the last layout
 divergences — each pinned to a single case and then ported correctly. It now stands at
-**1121/1121 cases passing (100%), byte-for-byte vs the vendored tmux, with zero known
+**1123/1123 cases passing (100%), byte-for-byte vs the vendored tmux, with zero known
 divergences.** See [`parity/PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md) and the bug log
 [`docs/BUGS.md`](docs/BUGS.md).
 
@@ -250,9 +250,10 @@ They fall into a few families:
   sessions: type to filter, Enter switches, `Ctrl-r` renames, `Ctrl-x` kills (with confirm),
   `Ctrl-n` makes a new one. `prefix C-f` toggles a **floating pane** — a real pane on a floating
   layout cell, drawn above the tiled layout, so it moves and resizes like any other pane
-  (`move-pane -P centre`, `move-pane -X10 -Y4`, `resize-pane -x50% -y50%`, `Alt`-drag to move,
-  border-drag to resize); press `prefix C-f` again to close it. `prefix *` opens one directly, and
-  `prefix {` / `}` / `M-{` / `M-}` snap it to a corner at half size.
+  (`move-pane -P centre`, `move-pane -X10 -Y4`, `resize-pane -x50% -y50%`); press `prefix C-f`
+  again to close it. `prefix *` opens one directly, and `prefix {` / `}` / `M-{` / `M-}` snap it
+  to a corner at half size. With `mouse on` it is fully draggable: drag its **top border** to move
+  it, any **other border or corner** to resize, and `Alt`-drag anywhere on it to move it.
   `ztmux modal on` (opt-in) installs zellij-style **modal keybindings**: `Ctrl-p` pane mode,
   `Ctrl-t` tab, `Ctrl-n` resize, `Ctrl-s` scroll, `Ctrl-o` session, `Ctrl-g` lock — each a sticky
   key table entered without a prefix; the hint bar (turned on automatically) shows the current

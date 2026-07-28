@@ -13,7 +13,6 @@
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 use crate::compat::queue::tailq_empty;
 use crate::*;
-use crate::options_::*;
 
 pub static CMD_RESIZE_PANE_ENTRY: cmd_entry = cmd_entry {
     name: "resize-pane",
@@ -119,19 +118,15 @@ unsafe fn cmd_resize_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
                 return cmd_retval::CMD_RETURN_ERROR;
             }
 
-            let status: i32 = options_get_number___(&*(*w).options, "pane-border-status");
-            match pane_status::try_from(status) {
-                Ok(pane_status::PANE_STATUS_TOP) => {
-                    if y != i32::MAX && (*wp).yoff == 1 {
-                        y += 1;
-                    }
-                }
-                Ok(pane_status::PANE_STATUS_BOTTOM) => {
-                    if y != i32::MAX && (*wp).yoff + (*wp).sy == (*w).sy - 1 {
-                        y += 1;
-                    }
-                }
-                Ok(pane_status::PANE_STATUS_OFF) | Err(_) => (),
+            // A pane status line sits in the row the size would otherwise
+            // cover, so ask for one row more when the pane is against it.
+            let status = window_get_pane_status(w);
+            if y != i32::MAX
+                && ((status == pane_status::PANE_STATUS_TOP && (*wp).yoff == 1)
+                    || (status == pane_status::PANE_STATUS_BOTTOM
+                        && (*wp).yoff + (*wp).sy == (*w).sy - 1))
+            {
+                y += 1;
             }
             if window_pane_is_floating(wp) != 0 {
                 if layout_resize_floating_pane_to(

@@ -1690,6 +1690,11 @@ enum pane_status {
     PANE_STATUS_OFF,
     PANE_STATUS_TOP,
     PANE_STATUS_BOTTOM,
+    /// C `vendor/tmux/tmux.h:1474`: `PANE_STATUS_TOP_FLOATING`. Status line on
+    /// floating panes only; tiled panes read it as `PANE_STATUS_OFF`.
+    PANE_STATUS_TOP_FLOATING,
+    /// C `vendor/tmux/tmux.h:1475`: `PANE_STATUS_BOTTOM_FLOATING`.
+    PANE_STATUS_BOTTOM_FLOATING,
 }
 
 /// Layout direction.
@@ -2007,6 +2012,12 @@ struct tty {
     mouse_last_y: u32,
     mouse_last_b: u32,
     mouse_drag_flag: i32,
+    /// C `vendor/tmux/tmux.h:1770`: `int mouse_last_pane`.
+    ///
+    /// Pane id the current drag was started on, or -1. Latching it keeps a
+    /// border drag on the pane the user grabbed instead of re-resolving the
+    /// pane under the cursor on every motion event.
+    mouse_last_pane: i32,
     mouse_drag_update: Option<unsafe fn(*mut client, *mut mouse_event)>,
     mouse_drag_release: Option<unsafe fn(*mut client, *mut mouse_event)>,
 

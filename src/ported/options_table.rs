@@ -40,7 +40,8 @@ static OPTIONS_TABLE_CURSOR_STYLE_LIST: [&str; 7] = [
     "blinking-bar",
     "bar",
 ];
-static OPTIONS_TABLE_PANE_STATUS_LIST: [&str; 3] = ["off", "top", "bottom"];
+static OPTIONS_TABLE_PANE_STATUS_LIST: [&str; 5] =
+    ["off", "top", "bottom", "top-floating", "bottom-floating"];
 static OPTIONS_TABLE_PANE_BORDER_INDICATORS_LIST: [&str; 4] = ["off", "colour", "arrows", "both"];
 static OPTIONS_TABLE_PANE_BORDER_LINES_LIST: [&str; 7] = [
     "single", "double", "heavy", "simple", "number", "spaces", "none",
