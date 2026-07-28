@@ -220,7 +220,7 @@ pub unsafe fn layout_parse(w: *mut window, mut layout: *const u8, cause: *mut *m
 
             // Check this window will fit into the layout.
             loop {
-                let npanes = window_count_panes(w);
+                let npanes = window_count_panes(w, 1);
                 let ncells = layout_count_cells(lc);
                 if npanes > ncells {
                     *cause = format_nul!("have {} panes but need {}", npanes, ncells);

@@ -185,7 +185,7 @@ pub unsafe fn server_kill_pane(wp: *mut window_pane) {
     unsafe {
         let w = (*wp).window;
 
-        if window_count_panes(w) == 1 {
+        if window_count_panes(w, 1) == 1 {
             server_kill_window(w, 1);
             recalculate_sizes();
         } else {

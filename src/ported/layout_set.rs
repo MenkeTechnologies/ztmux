@@ -151,15 +151,11 @@ pub unsafe fn layout_set_even(w: *mut window, type_: layout_type) {
         layout_print_cell((*w).layout_root, __func__, 1);
 
         // Get number of panes.
-        let n = window_count_panes(w);
+        let n = window_count_panes(w, 0);
         if n <= 1 {
             return;
         }
 
-        // Free the old root and construct a new.
-        layout_free(w, 0);
-        let lc = layout_create_cell(null_mut());
-        (*w).layout_root = lc;
         if type_ == layout_type::LAYOUT_LEFTRIGHT {
             sx = (n * (PANE_MINIMUM + 1)) - 1;
             if sx < (*w).sx {
@@ -173,16 +169,24 @@ pub unsafe fn layout_set_even(w: *mut window, type_: layout_type) {
             }
             sx = (*w).sx;
         }
+
+        // Free only the nodes: each pane keeps its own leaf cell, so a floating
+        // cell survives with its flag, size and offsets intact.
+        layout_free(w, 1);
+        let lc = layout_create_cell(null_mut());
+        (*w).layout_root = lc;
         layout_set_size(lc, sx, sy, 0, 0);
         layout_make_node(lc, type_);
 
-        // Build new leaf cells.
+        // Re-parent the existing leaf cells; only tiled ones are resized.
         for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
-            let lcnew = layout_create_cell(lc);
-            layout_make_leaf(lcnew, wp);
-            (*lcnew).sx = (*w).sx;
-            (*lcnew).sy = (*w).sy;
-            tailq_insert_tail(&raw mut (*lc).cells, lcnew);
+            let lcchild = (*wp).layout_cell;
+            tailq_insert_tail(&raw mut (*lc).cells, lcchild);
+            (*lcchild).parent = lc;
+            if layout_cell_is_tiled(lcchild) != 0 {
+                (*lcchild).sx = (*w).sx;
+                (*lcchild).sy = (*w).sy;
+            }
         }
 
         // Spread out cells.
@@ -228,7 +232,7 @@ pub unsafe fn layout_set_main_h(w: *mut window) {
         layout_print_cell((*w).layout_root, __func__, 1);
 
         // Get number of panes.
-        let mut n = window_count_panes(w);
+        let mut n = window_count_panes(w, 0);
         if n <= 1 {
             return;
         }
@@ -340,7 +344,7 @@ pub unsafe fn layout_set_main_h_mirrored(w: *mut window) {
         layout_print_cell((*w).layout_root, __func__, 1);
 
         // Get number of panes.
-        let mut n = window_count_panes(w);
+        let mut n = window_count_panes(w, 0);
         if n <= 1 {
             return;
         }
@@ -449,7 +453,7 @@ pub unsafe fn layout_set_main_v(w: *mut window) {
         layout_print_cell((*w).layout_root, __func__, 1);
 
         // Get number of panes.
-        let mut n = window_count_panes(w);
+        let mut n = window_count_panes(w, 0);
         if n <= 1 {
             return;
         }
@@ -563,7 +567,7 @@ pub unsafe fn layout_set_main_v_mirrored(w: *mut window) {
         layout_print_cell((*w).layout_root, __func__, 1);
 
         // Get number of panes.
-        let mut n = window_count_panes(w);
+        let mut n = window_count_panes(w, 0);
         if n <= 1 {
             return;
         }
@@ -672,7 +676,7 @@ pub unsafe fn layout_set_tiled(w: *mut window) {
         layout_print_cell((*w).layout_root, __func__, 1);
 
         // Get number of panes.
-        let n = window_count_panes(w);
+        let n = window_count_panes(w, 0);
         if n <= 1 {
             return;
         }
@@ -700,8 +704,9 @@ pub unsafe fn layout_set_tiled(w: *mut window) {
             height = PANE_MINIMUM;
         }
 
-        // Free old tree and create a new root.
-        layout_free(w, 0);
+        // Free only the nodes: each pane keeps its own leaf cell, so a floating
+        // cell survives with its flag, size and offsets intact.
+        layout_free(w, 1);
         let lc = layout_create_cell(null_mut());
         (*w).layout_root = lc;
         let mut sx = ((width + 1) * columns) - 1;
@@ -718,39 +723,49 @@ pub unsafe fn layout_set_tiled(w: *mut window) {
         // Create a grid of the cells.
         let mut wp = tailq_first(&raw mut (*w).panes);
         for j in 0..rows {
+            // Skip floating panes: they take no place in the grid.
+            while !wp.is_null() && layout_cell_is_tiled((*wp).layout_cell) == 0 {
+                wp = tailq_next::<_, _, discr_entry>(wp);
+            }
             // If this is the last cell, all done.
             if wp.is_null() {
                 break;
             }
 
-            // Create the new row.
-            let lcrow = layout_create_cell(lc);
-            layout_set_size(lcrow, (*w).sx, height, 0, 0);
-            tailq_insert_tail(&raw mut (*lc).cells, lcrow);
+            let mut lcchild = (*wp).layout_cell;
 
             // If only one column, just use the row directly.
             if n - (j * columns) == 1 || columns == 1 {
-                layout_make_leaf(lcrow, wp);
+                (*lcchild).parent = lc;
+                tailq_insert_tail(&raw mut (*lc).cells, lcchild);
+                layout_set_size(lcchild, (*w).sx, height, 0, 0);
                 wp = tailq_next::<_, _, discr_entry>(wp);
                 continue;
             }
 
-            // Add in the columns.
+            // Create the new row.
+            let lcrow = layout_create_cell(lc);
             layout_make_node(lcrow, layout_type::LAYOUT_LEFTRIGHT);
+            layout_set_size(lcrow, (*w).sx, height, 0, 0);
+            tailq_insert_tail(&raw mut (*lc).cells, lcrow);
+
+            // Add in the columns.
             let mut i = 0;
             for i_ in 0..columns {
                 i = i_;
-                // Create and add a pane cell.
-                let lcchild = layout_create_cell(lcrow);
-                layout_set_size(lcchild, width, height, 0, 0);
-                layout_make_leaf(lcchild, wp);
+                (*lcchild).parent = lcrow;
                 tailq_insert_tail(&raw mut (*lcrow).cells, lcchild);
+                layout_set_size(lcchild, width, height, 0, 0);
 
-                // Move to the next cell.
+                // Move to the next non-floating cell.
                 wp = tailq_next::<_, _, discr_entry>(wp);
+                while !wp.is_null() && layout_cell_is_tiled((*wp).layout_cell) == 0 {
+                    wp = tailq_next::<_, _, discr_entry>(wp);
+                }
                 if wp.is_null() {
                     break;
                 }
+                lcchild = (*wp).layout_cell;
                 i += 1;
             }
 

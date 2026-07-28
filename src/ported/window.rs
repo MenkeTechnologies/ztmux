@@ -795,7 +795,7 @@ pub unsafe fn window_zoom(wp: *mut window_pane) -> i32 {
             return -1;
         }
 
-        if window_count_panes(w) == 1 {
+        if window_count_panes(w, 1) == 1 {
             return -1;
         }
 
@@ -1168,8 +1168,13 @@ pub unsafe fn window_pane_index(wp: *mut window_pane, i: *mut u32) -> i32 {
 }
 
 /// C `vendor/tmux/window.c:975`: `u_int window_count_panes(struct window *w, int with_floating)`
-pub unsafe fn window_count_panes(w: *mut window) -> u32 {
-    unsafe { tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).count() as u32 }
+pub unsafe fn window_count_panes(w: *mut window, with_floating: c_int) -> u32 {
+    unsafe {
+        tailq_foreach::<_, discr_entry>(&raw mut (*w).panes)
+            .map(NonNull::as_ptr)
+            .filter(|&wp| with_floating != 0 || window_pane_is_floating(wp) == 0)
+            .count() as u32
+    }
 }
 
 /// C `vendor/tmux/window.c:988`: `void window_destroy_panes(struct window *w)`

@@ -3182,7 +3182,7 @@ pub unsafe fn format_cb_window_offset_y(ft: *mut format_tree) -> format_table_ty
 pub unsafe fn format_cb_window_panes(ft: *mut format_tree) -> format_table_type {
     unsafe {
         if !(*ft).w.is_null() {
-            return format!("{}", window_count_panes((*ft).w)).into();
+            return format!("{}", window_count_panes((*ft).w, 1)).into();
         }
         format_table_type::None
     }

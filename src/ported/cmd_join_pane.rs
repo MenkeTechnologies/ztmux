@@ -543,7 +543,7 @@ unsafe fn cmd_join_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
             server_status_session(dst_s);
         }
 
-        if window_count_panes(src_w) == 0 {
+        if window_count_panes(src_w, 1) == 0 {
             server_kill_window(src_w, 1);
         } else {
             notify_window(c"window-layout-changed", src_w);

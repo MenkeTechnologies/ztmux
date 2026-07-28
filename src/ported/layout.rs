@@ -103,6 +103,301 @@ unsafe fn layout_cell_has_tiled_child(lc: *mut layout_cell) -> c_int {
     }
 }
 
+/// Whether `lc` is the first cell of its parent that takes part in the tiled
+/// flow, i.e. the one that owns the parent's origin.
+/// C `vendor/tmux/layout.c:293`: `static int layout_cell_is_first_tiled(struct layout_cell *lc)`
+pub unsafe fn layout_cell_is_first_tiled(lc: *mut layout_cell) -> c_int {
+    unsafe {
+        let lcparent = (*lc).parent;
+        if lcparent.is_null() {
+            return layout_cell_is_tiled(lc);
+        }
+        for lcchild in tailq_foreach(&raw mut (*lcparent).cells).map(NonNull::as_ptr) {
+            if layout_cell_is_tiled(lcchild) != 0 || layout_cell_has_tiled_child(lcchild) != 0 {
+                return (lcchild == lc) as c_int;
+            }
+        }
+        0
+    }
+}
+
+/// The first tiled cell at or below `lc`, or null when the subtree is entirely
+/// floating.
+/// C `vendor/tmux/layout.c:309`: `static struct layout_cell *layout_cell_get_first_tiled(struct layout_cell *lc)`
+/// Only live caller is `layout_insert_tile`'s own recursion; upstream exports it
+/// but has no other call site either. Ported for when a hidden float is retiled.
+#[expect(dead_code)]
+pub unsafe fn layout_cell_get_first_tiled(lc: *mut layout_cell) -> *mut layout_cell {
+    unsafe {
+        if layout_cell_is_tiled(lc) != 0 {
+            return lc;
+        }
+        if (*lc).type_ == layout_type::LAYOUT_WINDOWPANE {
+            return null_mut();
+        }
+        for lcchild in tailq_foreach(&raw mut (*lc).cells).map(NonNull::as_ptr) {
+            if layout_cell_is_tiled(lcchild) != 0 {
+                return lcchild;
+            }
+            if (*lcchild).type_ != layout_type::LAYOUT_WINDOWPANE {
+                let lcchild2 = layout_cell_get_first_tiled(lcchild);
+                if !lcchild2.is_null() {
+                    return lcchild2;
+                }
+            }
+        }
+        null_mut()
+    }
+}
+
+/// Walk `direction` (1 = towards the tail) for the next sibling that takes part
+/// in the tiled flow.
+/// C `vendor/tmux/layout.c:662`: `static struct layout_cell *layout_cell_get_neighbour_direction(struct layout_cell *lc, int direction)`
+unsafe fn layout_cell_get_neighbour_direction(
+    lc: *mut layout_cell,
+    direction: c_int,
+) -> *mut layout_cell {
+    unsafe {
+        let mut lcn = lc;
+        loop {
+            lcn = if direction != 0 {
+                tailq_next(lcn)
+            } else {
+                tailq_prev(lcn)
+            };
+            if lcn.is_null()
+                || layout_cell_is_tiled(lcn) != 0
+                || layout_cell_has_tiled_child(lcn) != 0
+            {
+                return lcn;
+            }
+        }
+    }
+}
+
+/// The sibling that should absorb `lc`'s space, skipping floating cells.
+/// C `vendor/tmux/layout.c`: `static struct layout_cell *layout_cell_get_neighbour(struct layout_cell *lc)`
+pub unsafe fn layout_cell_get_neighbour(lc: *mut layout_cell) -> *mut layout_cell {
+    unsafe {
+        let lcparent = (*lc).parent;
+        if lcparent.is_null() {
+            return null_mut();
+        }
+
+        // Prefer the following sibling, except for the last cell which has none.
+        let direction = c_int::from(lc != tailq_last(&raw mut (*lcparent).cells));
+        let lcother = layout_cell_get_neighbour_direction(lc, direction);
+        if !lcother.is_null() {
+            return lcother;
+        }
+        layout_cell_get_neighbour_direction(lc, c_int::from(direction == 0))
+    }
+}
+
+/// Resize `lc` to an absolute size along `type_`.
+/// C `vendor/tmux/layout.c`: `static void layout_resize_set_size(struct window *w, struct layout_cell *lc, enum layout_type type, u_int size)`
+/// Only live caller is `layout_insert_tile`'s own recursion; upstream exports it
+/// but has no other call site either. Ported for when a hidden float is retiled.
+#[expect(dead_code)]
+unsafe fn layout_resize_set_size(
+    w: *mut window,
+    lc: *mut layout_cell,
+    type_: layout_type,
+    size: u32,
+) {
+    unsafe {
+        let change = if type_ == layout_type::LAYOUT_LEFTRIGHT {
+            size as c_int - (*lc).sx as c_int
+        } else {
+            size as c_int - (*lc).sy as c_int
+        };
+        layout_resize_adjust(w, lc, type_, change);
+    }
+}
+
+/// Take `lc` out of the tiled flow, handing its space to a neighbour.
+/// C `vendor/tmux/layout.c`: `int layout_remove_tile(struct window *w, struct layout_cell *lc)`
+pub unsafe fn layout_remove_tile(w: *mut window, lc: *mut layout_cell) -> c_int {
+    unsafe {
+        if (*lc).flags & LAYOUT_CELL_FLOATING != 0 {
+            return 0;
+        }
+
+        let lcneighbour = layout_cell_get_neighbour(lc);
+        if lcneighbour.is_null() {
+            if !(*lc).parent.is_null() {
+                layout_remove_tile(w, (*lc).parent);
+            }
+        } else {
+            let lcparent = (*lcneighbour).parent;
+            if !lcparent.is_null() {
+                let type_ = (*lcparent).type_;
+                // The cell's size plus its border goes to the neighbour.
+                let change = if type_ == layout_type::LAYOUT_TOPBOTTOM {
+                    (*lc).sy as c_int + 1
+                } else {
+                    (*lc).sx as c_int + 1
+                };
+                layout_resize_adjust(w, lcneighbour, type_, change);
+            }
+        }
+
+        // Zero the geometry until the cell is retiled, unless it is the root.
+        if !(*lc).parent.is_null() {
+            layout_set_size(lc, 0, 0, 0, 0);
+        }
+        1
+    }
+}
+
+/// Put `lc` back into the tiled flow, taking space from a neighbour.
+/// C `vendor/tmux/layout.c`: `int layout_insert_tile(struct window *w, struct layout_cell *lc)`
+/// Only live caller is `layout_insert_tile`'s own recursion; upstream exports it
+/// but has no other call site either. Ported for when a hidden float is retiled.
+#[expect(dead_code)]
+pub unsafe fn layout_insert_tile(w: *mut window, lc: *mut layout_cell) -> c_int {
+    unsafe {
+        if lc.is_null() {
+            fatalx("layout cell cannot be null when tiling");
+        }
+
+        let lcparent = (*lc).parent;
+        if (*lc).flags & LAYOUT_CELL_FLOATING != 0 {
+            return 1;
+        }
+
+        if lcparent.is_null() {
+            // Only pane in the layout.
+            layout_set_size(lc, (*w).sx, (*w).sy, 0, 0);
+            return 1;
+        }
+
+        let mut type_ = (*lcparent).type_;
+        let lcneighbour = layout_cell_get_neighbour(lc);
+        let mut size1;
+        if lcneighbour.is_null() {
+            // This becomes the only visible cell in the parent: tile the
+            // parent, then set this cell's split size.
+            layout_insert_tile(w, lcparent);
+            size1 = if type_ == layout_type::LAYOUT_LEFTRIGHT {
+                (*lcparent).sx
+            } else {
+                (*lcparent).sy
+            };
+            layout_resize_set_size(w, lc, type_, size1);
+        } else {
+            // A node neighbour needs a tiled child to check for space against.
+            let lctiled = layout_cell_get_first_tiled(lcneighbour);
+            if lctiled.is_null()
+                || layout_split_check_space((*lctiled).wp, lcneighbour, type_) == 0
+            {
+                return 0;
+            }
+            let mut size2 = 0;
+            let mut saved_size = 0;
+            size1 = 0;
+            layout_split_sizes(
+                lcneighbour,
+                -1,
+                0,
+                type_,
+                &raw mut size1,
+                &raw mut size2,
+                &raw mut saved_size,
+            );
+            layout_resize_set_size(w, lc, type_, size1);
+            layout_resize_set_size(w, lcneighbour, type_, size2);
+        }
+
+        // Set the opposite of the split size to the parent's.
+        if (*lcparent).type_ == layout_type::LAYOUT_LEFTRIGHT {
+            size1 = (*lcparent).sy;
+            type_ = layout_type::LAYOUT_TOPBOTTOM;
+        } else {
+            size1 = (*lcparent).sx;
+            type_ = layout_type::LAYOUT_LEFTRIGHT;
+        }
+        layout_resize_set_size(w, lc, type_, size1);
+
+        1
+    }
+}
+
+/// Whether `lc` is big enough to split along `type_`.
+/// C `vendor/tmux/layout.c:1246`: `static int layout_split_check_space(struct window_pane *wp, struct layout_cell *lc, enum layout_type type)`
+///
+/// ztmux has no pane scrollbars, so the C's `PANE_SCROLLBARS_ALWAYS` minimum
+/// has no counterpart and the plain minimum always applies.
+unsafe fn layout_split_check_space(
+    wp: *mut window_pane,
+    lc: *mut layout_cell,
+    type_: layout_type,
+) -> c_int {
+    unsafe {
+        if (*lc).flags & LAYOUT_CELL_FLOATING != 0 {
+            fatalx("floating cells cannot be split");
+        }
+        let status = window_get_pane_status((*wp).window);
+
+        let minimum = match type_ {
+            layout_type::LAYOUT_LEFTRIGHT => {
+                if (*lc).sx < PANE_MINIMUM * 2 + 1 {
+                    return 0;
+                }
+                return 1;
+            }
+            layout_type::LAYOUT_TOPBOTTOM => {
+                if layout_add_border((*wp).window, lc, status) {
+                    PANE_MINIMUM * 2 + 2
+                } else {
+                    PANE_MINIMUM * 2 + 1
+                }
+            }
+            _ => fatalx("bad layout type"),
+        };
+        c_int::from((*lc).sy >= minimum)
+    }
+}
+
+/// Work out the two halves of a split.
+/// C `vendor/tmux/layout.c`: `static void layout_split_sizes(struct layout_cell *lc, int size, int before, enum layout_type type, u_int *size1, u_int *size2, u_int *saved_size)`
+unsafe fn layout_split_sizes(
+    lc: *mut layout_cell,
+    size: c_int,
+    before: c_int,
+    type_: layout_type,
+    size1: *mut u32,
+    size2: *mut u32,
+    saved_size: *mut u32,
+) {
+    unsafe {
+        let (sx, sy) = ((*lc).sx, (*lc).sy);
+        let ss = if type_ == layout_type::LAYOUT_LEFTRIGHT {
+            sx
+        } else {
+            sy
+        };
+
+        let mut s2 = if size < 0 {
+            ss.div_ceil(2) - 1
+        } else if before != 0 {
+            ss - size as u32 - 1
+        } else {
+            size as u32
+        };
+        if s2 < PANE_MINIMUM {
+            s2 = PANE_MINIMUM;
+        } else if s2 > sx - 2 {
+            // `layout.c` compares against sx here for both types.
+            s2 = ss - 2;
+        }
+
+        *size1 = ss - 1 - s2;
+        *size2 = s2;
+        *saved_size = ss;
+    }
+}
+
 /// C `vendor/tmux/layout.c:124`: `void layout_print_cell(struct layout_cell *lc, const char *hdr, u_int n)`
 pub unsafe fn layout_print_cell(lc: *mut layout_cell, hdr: *const u8, n: u32) {
     unsafe {
@@ -275,8 +570,13 @@ unsafe fn layout_cell_is_top(w: *mut window, mut lc: *mut layout_cell) -> c_int 
     unsafe {
         while lc != (*w).layout_root {
             let next = (*lc).parent;
+            if next.is_null() {
+                return 0;
+            }
+            // "First" means first in the tiled flow: a leading floating sibling
+            // does not stop this cell from being the top one.
             if (*next).type_ == layout_type::LAYOUT_TOPBOTTOM
-                && lc != tailq_first(&raw mut (*next).cells)
+                && layout_cell_is_first_tiled(lc) == 0
             {
                 return 0;
             }
@@ -499,19 +799,18 @@ pub unsafe fn layout_destroy_cell(
             tailq_remove(&mut (*lcparent).cells, lc);
             layout_free_cell(lc, 0);
         } else {
-            // Merge the space into the previous or next cell
-            let lcother: *mut layout_cell = if lc == tailq_first(&raw mut (*lcparent).cells) {
-                tailq_next(lc)
-            } else {
-                tailq_prev(lc)
-            };
-
+            // Merge the space into a neighbour that is part of the tiled flow,
+            // or drop the parent out of the flow when there is none.
+            let lcother = layout_cell_get_neighbour(lc);
             if !lcother.is_null() {
-                if (*lcparent).type_ == layout_type::LAYOUT_LEFTRIGHT {
-                    layout_resize_adjust(w, lcother, (*lcparent).type_, (*lc).sx as i32 + 1);
+                let change = if (*lcparent).type_ == layout_type::LAYOUT_LEFTRIGHT {
+                    (*lc).sx as c_int + 1
                 } else {
-                    layout_resize_adjust(w, lcother, (*lcparent).type_, (*lc).sy as i32 + 1);
-                }
+                    (*lc).sy as c_int + 1
+                };
+                layout_resize_adjust(w, lcother, (*lcparent).type_, change);
+            } else {
+                layout_remove_tile(w, lcparent);
             }
 
             // Remove this from the parent's list
@@ -1334,7 +1633,6 @@ pub unsafe fn layout_split_pane(
     flags: spawn_flags,
 ) -> *mut layout_cell {
     unsafe {
-        let minimum: u32;
         let mut resize_first: u32 = 0;
         let full_size = flags.intersects(SPAWN_FULLSIZE);
 
@@ -1345,12 +1643,6 @@ pub unsafe fn layout_split_pane(
         } else {
             (*wp).layout_cell
         };
-        let status = pane_status::try_from(options_get_number_(
-            (*(*wp).window).options,
-            "pane-border-status",
-        ) as i32)
-        .unwrap();
-
         // Copy the old cell size
         let sx = (*lc).sx;
         let sy = (*lc).sy;
@@ -1358,47 +1650,24 @@ pub unsafe fn layout_split_pane(
         let yoff = (*lc).yoff;
 
         // Check there is enough space for the two new panes
-        match type_ {
-            layout_type::LAYOUT_LEFTRIGHT => {
-                if sx < PANE_MINIMUM * 2 + 1 {
-                    return null_mut();
-                }
-            }
-            layout_type::LAYOUT_TOPBOTTOM => {
-                if layout_add_border((*wp).window, lc, status) {
-                    minimum = PANE_MINIMUM * 2 + 2;
-                } else {
-                    minimum = PANE_MINIMUM * 2 + 1;
-                }
-                if sy < minimum {
-                    return null_mut();
-                }
-            }
-            _ => fatalx("bad layout type"),
+        if layout_split_check_space(wp, lc, type_) == 0 {
+            return null_mut();
         }
 
         // Calculate new cell sizes. size is the target size or -1 for middle
         // split, size1 is the size of the top/left and size2 the bottom/right.
-        let saved_size = if type_ == layout_type::LAYOUT_LEFTRIGHT {
-            sx
-        } else {
-            sy
-        };
-
-        let mut size2 = if size < 0 {
-            saved_size.div_ceil(2) - 1
-        } else if flags.intersects(SPAWN_BEFORE) {
-            saved_size - size as u32 - 1
-        } else {
-            size as u32
-        };
-
-        if size2 < PANE_MINIMUM {
-            size2 = PANE_MINIMUM;
-        } else if size2 > saved_size - 2 {
-            size2 = saved_size - 2;
-        }
-        let size1 = saved_size - 1 - size2;
+        let mut size1 = 0;
+        let mut size2 = 0;
+        let mut saved_size = 0;
+        layout_split_sizes(
+            lc,
+            size,
+            c_int::from(flags.intersects(SPAWN_BEFORE)),
+            type_,
+            &raw mut size1,
+            &raw mut size2,
+            &raw mut saved_size,
+        );
 
         // Which size are we using?
         let new_size = if flags.intersects(SPAWN_BEFORE) {
@@ -1531,8 +1800,12 @@ pub unsafe fn layout_close_pane(wp: *mut window_pane) {
 /// C `vendor/tmux/layout.c:1506`: `int layout_spread_cell(struct window *w, struct layout_cell *parent)`
 pub unsafe fn layout_spread_cell(w: *mut window, parent: *mut layout_cell) -> c_int {
     unsafe {
-        // Count number of cells
-        let number = tailq_foreach(&raw mut (*parent).cells).count() as u32;
+        // Count the cells that take part in the tiled flow; floating ones are
+        // not spread and must not claim a share of the space.
+        let number = tailq_foreach(&raw mut (*parent).cells)
+            .map(NonNull::as_ptr)
+            .filter(|&lc| layout_cell_is_tiled(lc) != 0)
+            .count() as u32;
         if number <= 1 {
             return 0;
         }
@@ -1577,6 +1850,9 @@ pub unsafe fn layout_spread_cell(w: *mut window, parent: *mut layout_cell) -> c_
 
         let mut changed = 0;
         for lc in tailq_foreach(&raw mut (*parent).cells).map(NonNull::as_ptr) {
+            if layout_cell_is_tiled(lc) == 0 {
+                continue;
+            }
             let change = match (*parent).type_ {
                 layout_type::LAYOUT_LEFTRIGHT => {
                     let mut change = each as i32 - (*lc).sx as i32;

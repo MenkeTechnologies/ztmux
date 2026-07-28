@@ -65,7 +65,7 @@ pub unsafe fn cmd_break_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
         }
         server_unzoom_window(w);
 
-        if window_count_panes(w) == 1 {
+        if window_count_panes(w, 1) == 1 {
             if server_link_window(
                 src_s,
                 wl,

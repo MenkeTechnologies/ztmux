@@ -566,7 +566,7 @@ unsafe fn window_tree_build(
             window_tree_type::WINDOW_TREE_SESSION => *tag = (*data).fs.s as u64,
             window_tree_type::WINDOW_TREE_WINDOW => *tag = (*data).fs.wl as u64,
             window_tree_type::WINDOW_TREE_PANE => {
-                if window_count_panes((*(*data).fs.wl).window) == 1 {
+                if window_count_panes((*(*data).fs.wl).window, 1) == 1 {
                     *tag = (*data).fs.wl as u64;
                 } else {
                     *tag = (*data).fs.wp as u64;
@@ -800,7 +800,7 @@ unsafe fn window_tree_draw_window(
         // int colour, active_colour, left, right;
         // char *label;
 
-        let total = window_count_panes(w);
+        let total = window_count_panes(w, 1);
 
         memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
         // display-panes[-active]-colour are STRING/IS_COLOUR options in
