@@ -289,7 +289,7 @@
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>BUILD &amp; RUN</h2>
     <p class="prose">
       Requires a Rust toolchain and a terminfo database (ncurses) &mdash; no C libraries, since the event loop is Rust
-      (<code>src/event_loop</code>, replacing tmux's libevent).
+      (<code>src/extensions/event_loop</code>, replacing tmux's libevent).
       Then the binary <code>ztmux</code> speaks the same commands as tmux &mdash; on its own socket namespace
       (<code>ztmux-&lt;uid&gt;</code>, from <code>$ZTMUX</code>, never <code>$TMUX</code>) so it never collides with a
       running tmux &mdash; plus the extension subcommands:

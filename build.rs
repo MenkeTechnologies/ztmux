@@ -1,5 +1,5 @@
 // ztmux has no C libraries to find or link: the event loop lives in
-// src/event_loop (Rust, replacing libevent) and terminfo is read by
+// src/extensions/event_loop (Rust, replacing libevent) and terminfo is read by
 // terminfo-lean. All this build script does is generate the command grammar,
 // so a build needs nothing but a Rust toolchain — no pkg-config probe, no
 // Homebrew prefix, no -dev packages.

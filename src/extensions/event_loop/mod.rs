@@ -8,6 +8,12 @@
 //! `pkg-config` probe and no Homebrew prefix, and the binary is
 //! self-contained.
 //!
+//! It lives under `src/extensions` because it is ztmux's own code, not a port
+//! of a tmux C file: there is no `vendor/tmux/event.c` to port, only calls
+//! into a library that is now ours. The rest of `src/ported` mirrors tmux
+//! file for file and is held to that by the anti-drift gate; this subtree
+//! answers to its own unit tests instead.
+//!
 //! Only what the port actually calls is implemented. Everything libevent grew
 //! for other users (rate limiting, OpenSSL bufferevents, DNS, HTTP, threading,
 //! `event_base_*` multiplicity) is deliberately absent.

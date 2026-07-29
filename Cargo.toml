@@ -44,7 +44,8 @@ utempter    = []
 utf8proc    = []
 
 # Kept so existing invocations keep working; ztmux links no C libraries any
-# more (the event loop is Rust, see src/event_loop), so neither has any effect.
+# more (the event loop is Rust, see src/extensions/event_loop), so neither has
+# any effect.
 static      = []
 dynamic     = []
 
