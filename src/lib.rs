@@ -98,6 +98,8 @@ cfg_pub_mods! {
     mod format;
     #[path = "ported/format_draw.rs"]
     mod format_draw_;
+    #[path = "ported/fuzzy.rs"]
+    mod fuzzy;
     #[path = "ported/grid.rs"]
     mod grid_;
     #[path = "ported/grid_reader.rs"]
