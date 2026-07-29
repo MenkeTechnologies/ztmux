@@ -3671,9 +3671,14 @@ pub unsafe fn window_copy_search_lr(
 
         let endline = (*gd).hsize + (*gd).sy - 1;
         for ax in first..last {
+            // C runs `for (bx = 0; bx < sgd->sx; bx++)` and then tests
+            // `bx == sgd->sx` to mean "every cell of the search term matched",
+            // so `bx` must be left one past the last index when the loop runs
+            // to completion. A `for bx in 0..sgd->sx` cannot express that — it
+            // stops at `sx - 1`, the test never fires, and no search ever
+            // matches — so the counter is stepped by hand.
             let mut bx = 0;
-            for bx_ in 0..(*sgd).sx {
-                bx = bx_;
+            while bx < (*sgd).sx {
                 let mut px = ax + bx;
                 let mut pywrap = py;
                 // Wrap line.
@@ -3693,6 +3698,7 @@ pub unsafe fn window_copy_search_lr(
                 if !matched {
                     break;
                 }
+                bx += 1;
             }
             if bx == (*sgd).sx {
                 *ppx = ax;
@@ -3719,9 +3725,11 @@ pub unsafe fn window_copy_search_rl(
 
         let mut ax = last;
         while ax > first {
+            // Stepped by hand for the reason given in window_copy_search_lr:
+            // the `bx == sgd->sx` test below only fires if the counter is left
+            // one past the last index when every cell matched.
             let mut bx = 0;
-            for bx_ in 0..(*sgd).sx {
-                bx = bx_;
+            while bx < (*sgd).sx {
                 let mut px = ax - 1 + bx;
                 let mut pywrap = py;
                 // Wrap line.
@@ -3741,6 +3749,7 @@ pub unsafe fn window_copy_search_rl(
                 if !matched {
                     break;
                 }
+                bx += 1;
             }
             if bx == (*sgd).sx {
                 *ppx = ax - 1;
