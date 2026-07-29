@@ -43,8 +43,8 @@ systemd     = []
 utempter    = []
 utf8proc    = []
 
-# configure linking of external libraries
-# defaults to static linking on macOS, and dynamic linking on all other platforms
+# Kept so existing invocations keep working; ztmux links no C libraries any
+# more (the event loop is Rust, see src/event_loop), so neither has any effect.
 static      = []
 dynamic     = []
 
@@ -63,7 +63,6 @@ serde_json   = { version = "1" }
 
 [build-dependencies]
 lalrpop      = { version = "0.22.2", default-features = false }
-pkg-config   = { version = "0.3.32" }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

@@ -218,7 +218,7 @@ pub fn proc_start(name: &CStr) -> *mut tmuxproc {
             _s((*u).version.as_ptr()),
         );
         log_debug!(
-            "using libevent {} {}",
+            "using event loop {} {}",
             _s(event_get_version()),
             _s(event_get_method())
         );

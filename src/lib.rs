@@ -35,8 +35,8 @@ pub(crate) use crate::libc::errno;
 pub(crate) use crate::libc::*;
 pub(crate) use crate::libc::{free_, memcpy_, memcpy__, streq_};
 
-// libevent2
-#[path = "ported/event.rs"]
+// The event loop (a Rust replacement for libevent; see src/event_loop).
+#[path = "event_loop/mod.rs"]
 mod event_;
 use terminfo_lean::expand::ExpandContext;
 

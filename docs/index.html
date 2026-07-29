@@ -237,9 +237,9 @@
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>BUILD</h2>
     <p class="prose">
-      Requires a C <code>libevent</code> and a terminfo database (ncurses), exactly like tmux. On macOS the build links
-      Homebrew's <code>libevent</code> automatically (<code>TMUX_RS_DISABLE_HOMEBREW_LIBS=1</code> to opt out). The binary
-      is <code>ztmux</code>; it speaks the same client/server protocol as tmux but on its <em>own</em> socket
+      Requires a Rust toolchain and a terminfo database (ncurses) — no C libraries: the event loop is Rust
+      (<code>src/event_loop</code>, replacing tmux's libevent), so there is no <code>-dev</code> package to install and
+      nothing to <code>pkg-config</code>. The binary is <code>ztmux</code>; it speaks the same client/server protocol as tmux but on its <em>own</em> socket
       namespace (<code>ztmux-&lt;uid&gt;</code>, resolved from <code>$ZTMUX</code>, never <code>$TMUX</code>) so it never
       collides with a running tmux. It advertises both <code>$TMUX</code> (ecosystem compatibility) and
       <code>$ZTMUX</code> (its own handle) to panes, so tools like <code>ztmux-core</code> and zterminal talk to it.

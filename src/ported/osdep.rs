@@ -88,16 +88,10 @@ pub unsafe fn osdep_get_cwd(fd: i32) -> *const u8 {
 
 #[cfg(target_os = "linux")]
 pub unsafe fn osdep_event_init() -> *mut event_base {
-    unsafe {
-        // On Linux, epoll doesn't work on /dev/null (yes, really).
-        std::env::set_var("EVENT_NOEPOLL", "1");
-
-        let base = event_init();
-
-        std::env::remove_var("EVENT_NOEPOLL");
-
-        base
-    }
+    // C sets EVENT_NOEPOLL here because epoll doesn't work on /dev/null (yes,
+    // really), pushing libevent onto poll. ztmux's own loop uses poll on Linux
+    // for that same reason, so there is nothing to steer.
+    event_init()
 }
 
 // osdep darwin
@@ -170,17 +164,9 @@ pub unsafe fn osdep_get_cwd(fd: i32) -> *const u8 {
 
 #[cfg(target_os = "macos")]
 pub unsafe fn osdep_event_init() -> *mut event_base {
-    unsafe {
-        // On OS X, kqueue and poll are both completely broken and don't
-        // work on anything except socket file descriptors (yes, really).
-        std::env::set_var("EVENT_NOKQUEUE", "1");
-        std::env::set_var("EVENT_NOPOLL", "1");
-
-        let base: *mut event_base = event_init();
-
-        std::env::remove_var("EVENT_NOKQUEUE");
-        std::env::remove_var("EVENT_NOPOLL");
-
-        base
-    }
+    // C sets EVENT_NOKQUEUE and EVENT_NOPOLL here because on macOS both are
+    // completely broken on anything except socket file descriptors (yes,
+    // really), leaving libevent on select. ztmux's own loop uses select on
+    // macOS for that same reason, so there is nothing to steer.
+    event_init()
 }

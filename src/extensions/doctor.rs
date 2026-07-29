@@ -137,9 +137,9 @@ fn collect(socket: &str) -> Vec<Check> {
 fn build_checks(c: &mut Vec<Check>) {
     c.push(Check::ok("build", "ztmux", crate::tmux::getversion()));
 
-    // libevent is linked in; report the runtime version. (We deliberately do
-    // NOT call event_get_method() here: it dereferences the current event base,
-    // which does not exist this early in a client subcommand, and crashes.)
+    // Report the event loop's version. (event_get_method() is deliberately not
+    // called here: it describes the loop the server is running, which does not
+    // exist this early in a client subcommand.)
     // SAFETY: event_get_version() returns a static, NUL-terminated C string.
     let ev_ver = unsafe {
         let v = crate::event_::event_get_version();
@@ -149,7 +149,7 @@ fn build_checks(c: &mut Vec<Check>) {
             CStr::from_ptr(v.cast()).to_string_lossy().into_owned()
         }
     };
-    c.push(Check::ok("build", "libevent", ev_ver));
+    c.push(Check::ok("build", "event-loop", ev_ver));
     c.push(Check::ok(
         "build",
         "platform",
@@ -476,13 +476,13 @@ mod tests {
     }
 
     #[test]
-    fn build_checks_report_real_version_and_libevent() {
+    fn build_checks_report_real_version_and_event_loop() {
         let mut c = Vec::new();
         build_checks(&mut c);
         assert!(c.iter().any(|x| x.name == "ztmux" && !x.value.is_empty()));
         assert!(
             c.iter()
-                .any(|x| x.name == "libevent" && !x.value.is_empty())
+                .any(|x| x.name == "event-loop" && !x.value.is_empty())
         );
     }
 
