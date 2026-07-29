@@ -28,10 +28,21 @@
 #      C-named function over time; kept here until then.
 #      e.g. xstrdup_/__/___, vis_/__, utf8_strvis_, checkshell_.
 #
-#   3. libc / libevent shims — wrappers around C library functions that
-#      are not part of tmux's own source (so they have no vendor/tmux
-#      definition): evtimer_*, evbuffer_*, EVBUFFER_*, fopen, fnmatch,
-#      basename, memcpy_, free_, __bswap_32, etc.
+#   3. libc shims — wrappers around C library functions that are not
+#      part of tmux's own source (so they have no vendor/tmux
+#      definition): fopen, fnmatch, basename, memcpy_, free_,
+#      __bswap_32, etc.
+#
+#   3b. The event loop (src/event_loop) — tmux calls libevent; ztmux
+#      implements that API in Rust instead of linking the C library, so
+#      the crate no longer depends on libevent at all. These names come
+#      from libevent's API (event_*, evbuffer_*, bufferevent_*,
+#      evtimer_*, EVBUFFER_*) or are internal to that implementation
+#      (with_base, dispatch, collect_watches, …). They are NOT part of
+#      tmux's C source and never will be: vendor/tmux calls them, it
+#      does not define them. This subtree is an implementation ztmux
+#      owns, not a port, and the anti-drift rule above does not measure
+#      it — which is also why it carries its own unit tests.
 #
 #   4. Rust glue — genuinely Rust-only helpers with no C analog:
 #      _s, cstr_to_str, concat_array, assume_init_ref, format_nul_, etc.
@@ -42,15 +53,44 @@
 # (then re-add this header)
 # =====================================================================
 
+COLOUR_DEFAULT
+EVBUFFER_DATA
+EVBUFFER_LENGTH
+EVBUFFER_OUTPUT
+KEYC_IS_MOUSE
+KEYC_IS_UNICODE
+MB_CUR_MAX
+MOUSE_BUTTONS
+MOUSE_DRAG
+MOUSE_RELEASE
+MOUSE_WHEEL
+OPTIONS_IS_ARRAY
+OPTIONS_IS_COMMAND
+OPTIONS_IS_NUMBER
+OPTIONS_IS_STRING
+S_ISDIR
+TTY_BLOCK_START
+TTY_BLOCK_STOP
 __bswap_32
 _s
+activate_ready
 args_get_
 args_has_count
 args_print_add_
+arm_write
 assume_init_ref
 basename
+bufferevent_disable
+bufferevent_enable
+bufferevent_free
+bufferevent_get_output
+bufferevent_new
+bufferevent_setwatermark
+bufferevent_write
+bufferevent_write_buffer
 cfg_add_cause_
 checkshell_
+close_signal_pipe
 cmd_display_menu_get_position
 cmd_list_keys_commands
 cmd_list_keys_print_notes
@@ -62,8 +102,8 @@ cmdq_add_format_
 cmdq_error_
 cmdq_insert_hook_
 cmdq_print_
+collect_watches
 colour_256_to_rgb
-COLOUR_DEFAULT
 colour_parse_x11
 concat_array
 control_check_subs_all_panes
@@ -73,6 +113,8 @@ create_temp_file
 cstr_to_str
 cstr_to_str_
 cstring_truncating
+dispatch
+drain_signal_pipe
 encode_cstyle
 encode_cstyle_
 encode_octal
@@ -81,10 +123,30 @@ encode_passthrough
 encode_passthrough_
 environ_log_
 environ_set_
+evbuffer_add
 evbuffer_add_vprintf
-EVBUFFER_DATA
-EVBUFFER_LENGTH
-EVBUFFER_OUTPUT
+evbuffer_drain
+evbuffer_free
+evbuffer_get_length
+evbuffer_new
+evbuffer_pullup
+evbuffer_read
+evbuffer_readline
+evbuffer_readln
+evbuffer_write
+event_active
+event_add
+event_del
+event_get_method
+event_get_version
+event_init
+event_initialized
+event_loop
+event_once
+event_pending
+event_reinit
+event_set
+event_set_log_callback
 evtimer_add
 evtimer_del
 evtimer_initialized
@@ -93,6 +155,7 @@ evtimer_set
 evtimer_set_no_args
 fatalx_c
 file_error_
+find_eol
 fnmatch
 fopen
 format_add_
@@ -103,6 +166,7 @@ gethostname
 glob
 grid_view_x
 grid_view_y
+handle_signal
 i32_to_ordering
 ibuf_add_buf
 ibuf_dequeue
@@ -119,10 +183,11 @@ input_get_fg_client
 input_get_fg_control_client
 input_reply_
 input_start_timer
+install_signal_handler
 is_left_sibling
+is_pending
 is_right_sibling
-KEYC_IS_MOUSE
-KEYC_IS_UNICODE
+is_zero
 layout_add_border
 list_first
 list_foreach
@@ -131,8 +196,8 @@ list_insert_head
 list_next
 list_remove
 log_debug_rs
+log_err
 log_vwrite_rs
-MB_CUR_MAX
 memcpy_
 memcpy__
 memset0
@@ -140,23 +205,16 @@ menu_set_style
 mode_tree_filter_free
 mode_tree_search_free
 mode_tree_start
-MOUSE_BUTTONS
-MOUSE_DRAG
-MOUSE_RELEASE
-MOUSE_WHEEL
 msgbuf_init
 ntop
 open
+open_signal_pipe
 options_get_const
 options_get_number_
 options_get_number___
 options_get_only_
 options_get_only_const
 options_get_string_
-OPTIONS_IS_ARRAY
-OPTIONS_IS_COMMAND
-OPTIONS_IS_NUMBER
-OPTIONS_IS_STRING
 options_map_name_str
 options_set_string_
 paste_buffer_data_
@@ -202,7 +260,9 @@ rb_set_right
 rb_set_root
 regcomp
 regexec
-S_ISDIR
+report_error
+restore_signal_handler
+run_one_turn
 screen_hlimit
 screen_hsize
 screen_redraw_set_context
@@ -224,6 +284,7 @@ session_check_name
 setlocale
 signal_add
 signal_set
+sleep
 status_free_ranges
 status_message_set_
 status_prompt_add_history
@@ -291,13 +352,12 @@ tailq_next
 tailq_prev
 tailq_remove
 tailq_replace
+test_guard
 time
 timerclear
 timersub
 tmux_main
 transmute_ptr
-TTY_BLOCK_START
-TTY_BLOCK_STOP
 tty_full_width
 tty_keys_add_
 tty_puts_
@@ -316,10 +376,14 @@ utf8_strvis_
 utf8_to_string
 vis_
 vis__
+wait
+wait_impl
 window_copy_cmd_refresh_from_pane
 window_pane_visible
-xcalloc_
+with_base
+would_block
 xcalloc1
+xcalloc_
 xrealloc_
 xreallocarray_
 xreallocarray_old
@@ -331,3 +395,4 @@ xstrdup__
 xstrdup___
 yyerror_
 yyparse
+zeroed_event
