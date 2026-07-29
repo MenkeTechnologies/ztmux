@@ -194,6 +194,9 @@ fn build_rows(snap: &Snapshot, stats: &HashMap<i64, ProcStat>) -> Vec<WatchRow> 
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
+    if let Err(rc) = crate::extensions::require_terminal("watch") {
+        return rc;
+    }
     let mut terminal = ratatui::init();
     let _ = execute!(std::io::stdout(), EnableMouseCapture);
     let mut app = App::new(socket.to_string());

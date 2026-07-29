@@ -45,7 +45,7 @@ pub(crate) fn run(socket: &str) -> i32 {
     // at the bottom — reverse so they land at the top of the list.
     items.reverse();
     if items.is_empty() {
-        eprintln!("open: no URLs or paths found in the current pane");
+        eprintln!("ztmux: open: no URLs or paths found in the current pane");
         return 1;
     }
     App::new(socket.to_string(), items).main()
@@ -292,6 +292,9 @@ impl App {
     }
 
     fn main(mut self) -> i32 {
+        if let Err(rc) = crate::extensions::require_terminal("open") {
+            return rc;
+        }
         let mut terminal = ratatui::init();
         let res = (|| -> std::io::Result<()> {
             while !self.quit {

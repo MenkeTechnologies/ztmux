@@ -187,6 +187,9 @@ impl App {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
+    if let Err(rc) = crate::extensions::require_terminal("sessions") {
+        return rc;
+    }
     let mut terminal = ratatui::init();
     let _ = execute!(std::io::stdout(), EnableMouseCapture);
     let mut app = App::new(socket.to_string());

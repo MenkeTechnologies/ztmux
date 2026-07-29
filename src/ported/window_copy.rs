@@ -727,9 +727,12 @@ pub unsafe fn window_copy_get_word(wp: *mut window_pane, x: u32, y: u32) -> Stri
     unsafe {
         let wme: *mut window_mode_entry = tailq_first(&raw mut (*wp).modes);
         let data: *mut window_copy_mode_data = (*wme).data.cast();
-        let gd = (*data).screen.grid;
+        // The backing grid, not the copy-mode screen: the screen carries what
+        // copy mode paints over the pane (the `[0/0]` position indicator), and
+        // its line numbering ignores how far the view is scrolled back.
+        let gd = (*(*data).backing).grid;
 
-        format_grid_word(gd, x, (*gd).hsize + y)
+        format_grid_word(gd, x, (*gd).hsize + y - (*data).oy)
     }
 }
 
@@ -738,9 +741,10 @@ pub unsafe fn window_copy_get_line(wp: *mut window_pane, y: u32) -> String {
     unsafe {
         let wme: *mut window_mode_entry = tailq_first(&raw mut (*wp).modes);
         let data: *mut window_copy_mode_data = (*wme).data.cast();
-        let gd = (*data).screen.grid;
+        // Backing grid and scroll offset, as in window_copy_get_word above.
+        let gd = (*(*data).backing).grid;
 
-        format_grid_line(gd, (*gd).hsize + y)
+        format_grid_line(gd, (*gd).hsize + y - (*data).oy)
     }
 }
 
@@ -6549,7 +6553,12 @@ pub unsafe fn window_copy_cursor_prompt(
             if line == end_line {
                 return;
             }
-            line += add as u32;
+            // C is `line += add` with a u_int line and an int add of -1 or 1,
+            // so stepping up is an unsigned wrap. `add as u32` turns -1 into
+            // 0xffffffff, and `+=` on that panics in a debug build — which is
+            // what `previous-prompt` did, taking the whole server with it. The
+            // loop guard above means the wrap never actually happens.
+            line = line.wrapping_add_signed(add);
 
             if (*grid_get_line(gd, line)).flags.intersects(line_flag) {
                 break;

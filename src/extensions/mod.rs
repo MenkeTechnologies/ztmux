@@ -120,6 +120,26 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "writable",
     "zoom",
 ];
+
+/// Refuse to start a full-screen subcommand when there is no terminal to draw
+/// on, returning the exit code the caller should hand back.
+///
+/// `ratatui::init` panics if it cannot put the terminal into raw mode, which is
+/// what happens when the output is a pipe or a file — so `ztmux dashboard |
+/// cat`, or any of these run from a script, died with a Rust panic and an exit
+/// code of 101 and printed nothing, because the panic hook had already reset
+/// the terminal. Both ends are checked: the UI draws to stdout and reads keys
+/// from stdin.
+pub(crate) fn require_terminal(name: &str) -> Result<(), i32> {
+    use std::io::IsTerminal;
+
+    if std::io::stdout().is_terminal() && std::io::stdin().is_terminal() {
+        return Ok(());
+    }
+    eprintln!("ztmux: {name}: not a terminal");
+    Err(1)
+}
+
 pub(crate) mod active;
 pub(crate) mod age;
 pub(crate) mod ahead;

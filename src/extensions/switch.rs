@@ -168,6 +168,9 @@ impl Picker {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
+    if let Err(rc) = crate::extensions::require_terminal("switcher") {
+        return rc;
+    }
     let mut terminal = ratatui::init();
     let _ = execute!(std::io::stdout(), EnableMouseCapture);
     let mut app = Picker::new(socket.to_string());

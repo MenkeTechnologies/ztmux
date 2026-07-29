@@ -288,6 +288,9 @@ impl App {
 /// Entry point for the `ztmux dashboard` subcommand. `socket` is the resolved
 /// server socket path (from `-S`/`-L`/`$TMUX`). Returns a process exit code.
 pub(crate) fn run(socket: &str) -> i32 {
+    if let Err(rc) = crate::extensions::require_terminal("dashboard") {
+        return rc;
+    }
     let mut terminal = ratatui::init();
     // ratatui::init() sets up raw mode + the alternate screen but NOT mouse
     // reporting, so scroll/click never reached us — enable it explicitly.
