@@ -9,17 +9,21 @@
 
 use crate::tmux::getversion;
 
+/// ANSI Shadow banner (figlet -f "ANSI Shadow" ZTMUX), gradient cyan→magenta→red.
+/// Shared with the `ztmux repl` banner ([`super::repl`]) so the two screens
+/// cannot drift apart.
+pub(crate) const LOGO: &str = concat!(
+    "\x1b[36m ███████╗████████╗███╗   ███╗██╗   ██╗██╗  ██╗\x1b[0m\n",
+    "\x1b[36m ╚══███╔╝╚══██╔══╝████╗ ████║██║   ██║╚██╗██╔╝\x1b[0m\n",
+    "\x1b[35m   ███╔╝    ██║   ██╔████╔██║██║   ██║ ╚███╔╝ \x1b[0m\n",
+    "\x1b[35m  ███╔╝     ██║   ██║╚██╔╝██║██║   ██║ ██╔██╗ \x1b[0m\n",
+    "\x1b[31m ███████╗   ██║   ██║ ╚═╝ ██║╚██████╔╝██╔╝ ██╗\x1b[0m\n",
+    "\x1b[31m ╚══════╝   ╚═╝   ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝\x1b[0m\n",
+);
+
 /// Print the cyberpunk help screen and exit 0.
 pub(crate) fn help() -> ! {
-    // ANSI Shadow banner (figlet -f "ANSI Shadow" ZTMUX), gradient cyan→magenta→red.
-    print!(concat!(
-        "\x1b[36m ███████╗████████╗███╗   ███╗██╗   ██╗██╗  ██╗\x1b[0m\n",
-        "\x1b[36m ╚══███╔╝╚══██╔══╝████╗ ████║██║   ██║╚██╗██╔╝\x1b[0m\n",
-        "\x1b[35m   ███╔╝    ██║   ██╔████╔██║██║   ██║ ╚███╔╝ \x1b[0m\n",
-        "\x1b[35m  ███╔╝     ██║   ██║╚██╔╝██║██║   ██║ ██╔██╗ \x1b[0m\n",
-        "\x1b[31m ███████╗   ██║   ██║ ╚═╝ ██║╚██████╔╝██╔╝ ██╗\x1b[0m\n",
-        "\x1b[31m ╚══════╝   ╚═╝   ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝\x1b[0m\n",
-    ));
+    print!("{LOGO}");
     println!("\x1b[36m ┌──────────────────────────────────────────────────────┐\x1b[0m");
     println!(
         "\x1b[36m │ STATUS: ONLINE  // SIGNAL: ████████░░ // v{}\x1b[36m   │\x1b[0m",

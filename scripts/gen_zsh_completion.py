@@ -477,6 +477,11 @@ EXTENSIONS = [
         "windows that keep panes open after they exit (ztmux extension)",
     ),
     (
+        "repl",
+        [],
+        "interactive console over every ztmux verb (ztmux extension)",
+    ),
+    (
         "autoname",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "windows with a pinned name (automatic-rename off) (ztmux extension)",
@@ -575,6 +580,11 @@ EXTENSIONS = [
         "resurrect",
         [":subcommand:(save restore list)", "--run[re-run each pane's saved command]"],
         "save/restore all sessions across restarts (ztmux extension)",
+    ),
+    (
+        "stack",
+        [":operation:(off unstack refocus expand)", "-t[target window]:window"],
+        "zellij-style pane stacks: toggle, unstack, refocus (ztmux extension)",
     ),
     (
         "open",

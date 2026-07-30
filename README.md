@@ -216,6 +216,13 @@ They fall into a few families:
   `sync`, `limit`, `visual`, `mouse`, …).
 - **Live TUIs** — `dashboard` (full-screen server monitor), `switcher` (fuzzy session/window/
   pane picker), `watch` (top-like per-pane process monitor).
+- **Console** — `repl` runs every line as `ztmux <line>` against the selected socket, with a
+  reedline editor: Tab completes the command word (every command, alias, extension and builtin),
+  a `-`-prefixed word against that verb's own flags, an option's fixed value set (`-o` →
+  `json|jsonl|csv|tsv|table|yaml`), and an extension's subcommand. `verbs [filter]` lists every
+  verb with its description, history persists to `~/.ztmux/repl_history`, and non-terminal stdin
+  falls back to a plain line reader so `echo list-sessions | ztmux repl` stays scriptable. Reach
+  it from inside a session with `bind : display-popup -E "ztmux repl"`.
 - **Actions** — `prune`, `equalize`, `revive`, `clearall`, `retitle`, `bcast`, `layout`, and
   `pick` (batch sync/unmark/clear over a multi-pane mark set).
 - **Automation** — `triggers` runs any ztmux command when a regex matches a pane's output

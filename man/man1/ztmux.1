@@ -96,6 +96,13 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR socket-name ]
 .RB [ \-S
 .IR socket-path ]
+.B repl
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
 .B ps
 .RB [ \-o
 .IR json ]
@@ -1290,6 +1297,60 @@ prints the parsed rules and
 .B ztmux triggers test
 .I text
 reports which rules match a line without running anything.
+.SS ztmux repl
+.B ztmux repl
+opens an interactive console over every ztmux verb: each line is run exactly as
+.B ztmux
+would run it, against the socket selected by
+.BR \-L / \-S ,
+so ported commands and the extensions above are reachable with full line
+editing, persistent history, and completion \(en the standalone counterpart to
+the in-client command prompt
+.RB ( prefix
+.BR : ).
+.B Tab
+completes the command word against every command name, alias, extension, and
+console builtin; a word beginning with
+.B \-
+against that verb's flags (read from the command's own argument template,
+so it cannot drift from the parser); an option's value where the set is fixed
+(for example
+.B \-o
+\(en
+.IR json | jsonl | csv | tsv | table | yaml );
+and an extension's first argument where it names a subcommand.
+.B Shift\-Tab
+steps back through the completion menu.
+The console builtins are
+.B verbs
+.RI [ filter ]
+(list every verb with its description, optionally filtered),
+.B help
+(show the keys),
+.B clear
+(clear the screen), and
+.BR exit / quit .
+.B Ctrl\-C
+abandons the current line,
+.B Ctrl\-D
+leaves the console, and
+.B Ctrl\-R
+searches the history kept in
+.IR ~/.ztmux/repl_history .
+Keys are emacs by default, or vi when
+.I $VISUAL
+or
+.I $EDITOR
+names a vi editor. With non-terminal stdin it reads plain lines instead \(en no
+banner and no completion \(en so
+.B echo list\-sessions | ztmux repl
+stays scriptable. To reach it from inside a session, bind it to a popup:
+.PP
+.RS
+.EX
+bind : display\-popup \-E "ztmux repl"
+.EE
+.RE
 .SS ztmux ps
 .B ztmux ps
 prints a one-shot, pipeable table of every pane's process \(en pane id,

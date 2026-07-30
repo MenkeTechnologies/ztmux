@@ -580,7 +580,11 @@ pub unsafe fn cmd_get_alias(name: *const u8) -> *mut u8 {
             // the output). Pipe those through a pager so the popup stays as a
             // scrollable floating overlay until the user quits (`q`), matching the
             // `prefix T`/`H`/`I`/`G` bindings.
-            const BARE: &[&str] = &["dashboard", "sessions", "switcher", "watch", "events"];
+            // `repl` belongs with them: it is an interactive line editor, so a
+            // pager on its stdout would swallow the prompt and the completion
+            // menu instead of paging anything.
+            const BARE: &[&str] =
+                &["dashboard", "sessions", "switcher", "watch", "events", "repl"];
             let expanded = if BARE.contains(&name_str) {
                 format!("display-popup -E -w 90% -h 90% 'ztmux -S \"${{TMUX%%,*}}\" {name_str}'\0")
             } else {

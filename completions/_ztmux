@@ -2489,6 +2489,10 @@ _ztmux-remain() {
     '--json[machine-readable JSON output]'
 }
 
+_ztmux-repl() {
+  [[ -n ${tmux_describe} ]] && print "interactive console over every ztmux verb (ztmux extension)" && return
+}
+
 _ztmux-autoname() {
   [[ -n ${tmux_describe} ]] && print "windows with a pinned name (automatic-rename off) (ztmux extension)" && return
   _arguments -s \
@@ -2624,6 +2628,13 @@ _ztmux-resurrect() {
   _arguments -s \
     ':subcommand:(save restore list)' \
     '--run[re-run each pane's saved command]'
+}
+
+_ztmux-stack() {
+  [[ -n ${tmux_describe} ]] && print "zellij-style pane stacks: toggle, unstack, refocus (ztmux extension)" && return
+  _arguments -s \
+    ':operation:(off unstack refocus expand)' \
+    '-t[target window]:window'
 }
 
 _ztmux-open() {

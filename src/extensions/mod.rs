@@ -79,6 +79,7 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "pstree",
     "readonly",
     "recent",
+    "repl",
     "remain",
     "remote",
     "resurrect",
@@ -219,6 +220,7 @@ pub(crate) mod readonly;
 pub(crate) mod recent;
 pub(crate) mod remain;
 pub(crate) mod remote;
+pub(crate) mod repl;
 pub(crate) mod respawn;
 pub(crate) mod resurrect;
 pub(crate) mod retitle;
