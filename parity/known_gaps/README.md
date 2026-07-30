@@ -44,8 +44,6 @@ that trip.
 | `opt_tree_mode.sh` | `tree-mode-preview-*` / `tree-mode-*-style` / `switch-mode-match-style` (5) | `mode-tree.c`, `window-tree.c` |
 | `fmt_floating_pane.sh` | `pane_floating_flag` / `pane_x` / `pane_y` / `pane_z` / `pane_pb_*` | floating panes (`new-pane`) |
 | `cmd_switch_mode.sh` | `switch-mode` command | `cmd-switch-mode` |
-| `cmd_copy_mode_missing.sh` | 11 `send-keys -X` commands (`recentre-top-bottom`, `refresh-{on,off,toggle}`, `scroll-exit-{on,off,toggle}`, `cursor-centre-{vertical,horizontal}`, `scroll-to-mouse`, `selection-mode`) | `window-copy.c` command table |
-| `cmd_capture_pane_flags.sh` | `capture-pane -F/-H/-L/-M` | `cmd-capture-pane.c` (needs `GRID_LINE_HYPERLINK`, `window_mode->get_screen`) |
 
 ## Sample proof
 
@@ -61,12 +59,10 @@ fmt_floating_pane.sh
 cmd_switch_mode.sh
   next-3.7:  command switch-mode: unknown flag -h
   ztmux   :  unknown command: switch-mode
-
-cmd_copy_mode_missing.sh
-  next-3.7:  recentre-top-bottom y=11 off=5 / y=6 off=0 / y=23 off=17
-  ztmux   :  recentre-top-bottom y=23 off=17  (unchanged — the command is a no-op)
-
-cmd_capture_pane_flags.sh
-  next-3.7:  the -H/-F/-L/-M captures
-  ztmux   :  command capture-pane: unknown flag -H (and -F, -L, -M)
 ```
+
+`cmd_copy_mode_missing.sh` and `cmd_capture_pane_flags.sh` lived here until the
+copy-mode command table and `capture-pane -F/-H/-L/-M` were ported; they are now
+covered by `parity/cases/1471`–`1477`. The one command that did not graduate with
+them is `scroll-to-mouse`, which needs the scrollbar slider state and is recorded
+under `opt_pane_scrollbars.sh` instead.

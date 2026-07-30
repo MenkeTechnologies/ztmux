@@ -916,6 +916,7 @@ bitflags::bitflags! {
         const DEAD         = 1 << 2; // 0x4
         const START_PROMPT = 1 << 3; // 0x8
         const START_OUTPUT = 1 << 4; // 0x10
+        const HYPERLINK    = 1 << 5; // 0x20
     }
 }
 
@@ -1056,6 +1057,15 @@ struct grid {
     hscrolled: u32,
     hsize: u32,
     hlimit: u32,
+
+    // Monotonic scroll counters. Copy mode snapshots them so an incremental
+    // refresh can tell how much history scrolled in (`scroll_added`) or was
+    // collected off the top (`scroll_collected`) since the snapshot, and
+    // `scroll_generation` invalidates the whole snapshot when the grid is
+    // cleared or reflowed.
+    scroll_added: u32,
+    scroll_collected: u32,
+    scroll_generation: u32,
 
     linedata: *mut grid_line,
 }
@@ -1582,6 +1592,7 @@ struct window_mode {
         ),
     >,
     formats: Option<unsafe fn(*mut window_mode_entry, *mut format_tree)>,
+    get_screen: Option<unsafe fn(*mut window_mode_entry) -> *mut screen>,
 }
 
 // Active window mode.

@@ -22,6 +22,7 @@ pub static WINDOW_COPY_MODE: window_mode = window_mode {
     key_table: Some(window_copy_key_table),
     command: Some(window_copy_command),
     formats: Some(window_copy_formats),
+    get_screen: Some(window_copy_get_screen),
     default_format: None,
     update: None,
     key: None,
@@ -35,6 +36,7 @@ pub static WINDOW_VIEW_MODE: window_mode = window_mode {
     key_table: Some(window_copy_key_table),
     command: Some(window_copy_command),
     formats: Some(window_copy_formats),
+    get_screen: Some(window_copy_get_screen),
     default_format: None,
     update: None,
     key: None,
@@ -85,6 +87,15 @@ pub struct window_copy_cmd_state {
     c: *mut client,
     s: *mut session,
     wl: *mut winlink,
+}
+
+/// C `vendor/tmux/window-copy.c:302`: the recentre-top-bottom cycle position.
+#[repr(i32)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum recentre {
+    RECENTRE_TOP,
+    RECENTRE_MIDDLE,
+    RECENTRE_BOTTOM,
 }
 
 #[repr(i32)]
@@ -144,6 +155,11 @@ pub struct window_copy_mode_data {
     writing: *mut screen,
     ictx: *mut input_ctx,
 
+    // snapshot of backing grid counters
+    sync_added: u32,
+    sync_collected: u32,
+    sync_generation: u32,
+
     viewmode: i32, // view mode entered
 
     oy: u32, // number of lines scrolled up
@@ -163,6 +179,9 @@ pub struct window_copy_mode_data {
     hide_position: bool, // hide position marker
 
     selflag: selflag,
+
+    recentre_state: recentre,
+    recentre_line: u32,
 
     /// word separators
     separators: *const u8,
@@ -211,7 +230,13 @@ pub struct window_copy_mode_data {
     jumpchar: *mut utf8_data,
 
     dragtimer: event,
+
+    refresh_timer: event,
+    refresh_active: i32,
 }
+
+/// C `vendor/tmux/window-copy.c:354`: `#define WINDOW_COPY_REFRESH_INTERVAL 50000`
+const WINDOW_COPY_REFRESH_INTERVAL: i64 = 50000;
 
 /// C `vendor/tmux/window-copy.c:359`: `static void window_copy_scroll_timer(__unused int fd, __unused short events, void *arg)`
 pub unsafe extern "C-unwind" fn window_copy_scroll_timer(
@@ -308,6 +333,128 @@ pub unsafe fn window_copy_clone_screen(
     }
 }
 
+/// Snapshot the source grid's monotonic scroll counters so the next incremental
+/// sync can tell how much history was added or collected since this point.
+/// C `vendor/tmux/window-copy.c:447`: `static void window_copy_sync_snapshot(struct window_copy_mode_data *data, struct grid *src)`
+pub unsafe fn window_copy_sync_snapshot(data: *mut window_copy_mode_data, src: *mut grid) {
+    unsafe {
+        (*data).sync_added = (*src).scroll_added;
+        (*data).sync_collected = (*src).scroll_collected;
+        (*data).sync_generation = (*src).scroll_generation;
+    }
+}
+
+/// Reconcile the backing screen with the live pane grid in place, copying only
+/// the history that scrolled in or was collected since the last snapshot rather
+/// than cloning the whole scrollback. The result is identical to a fresh
+/// `window_copy_clone_screen`, so the caller repositions and redraws the same way
+/// for both paths. Returns 1 on success, or 0 if the caller must fall back to a
+/// full clone (different source pane, geometry or generation change, or counter
+/// deltas that do not add up).
+/// C `vendor/tmux/window-copy.c:464`: `static int window_copy_sync_backing(struct window_mode_entry *wme)`
+unsafe fn window_copy_sync_backing(wme: *mut window_mode_entry) -> bool {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+        let wp: *mut window_pane = (*wme).swp;
+        let src: *mut screen = &raw mut (*wp).base;
+        let dst: *mut screen = (*data).backing;
+        let sg: *mut grid = (*src).grid;
+        let dg: *mut grid = (*dst).grid;
+        let sy = (*sg).sy;
+        let old_hsize = (*dg).hsize;
+        let new_hsize = (*sg).hsize;
+
+        // Only a pane's own live grid is tracked incrementally. A different
+        // source pane (copy-mode -s) goes through clone_screen, which also
+        // trims trailing blank lines that this path does not.
+        if (*data).viewmode != 0 || (*wme).swp != (*wme).wp {
+            return false;
+        }
+
+        // Indices only line up at the same size and generation.
+        if (*sg).sx != (*dg).sx
+            || (*sg).sy != (*dg).sy
+            || (*sg).scroll_generation != (*data).sync_generation
+        {
+            return false;
+        }
+
+        // The counters are monotonic and C subtracts them as u_int, so a
+        // wrapped counter produces a huge delta that the checks below reject
+        // rather than an overflow.
+        let added = (*sg).scroll_added.wrapping_sub((*data).sync_added);
+        let collected = (*sg).scroll_collected.wrapping_sub((*data).sync_collected);
+
+        // Reject anything that does not balance: counter wrap, a history-limit
+        // change that collected past the snapshot, or arithmetic that does not
+        // reproduce the new history size.
+        if added > i32::MAX as u32
+            || collected > i32::MAX as u32
+            || collected > old_hsize
+            || old_hsize.wrapping_add(added) < collected
+            || old_hsize.wrapping_add(added).wrapping_sub(collected) != new_hsize
+        {
+            return false;
+        }
+
+        let kept = old_hsize - collected;
+
+        if added == 0 && collected == 0 {
+            // History is unchanged; only the viewport can have mutated.
+            grid_duplicate_lines(dg, (*dg).hsize, sg, (*sg).hsize, sy);
+        } else {
+            // Drop the oldest lines and shift the rest down.
+            if collected > 0 {
+                grid_free_lines(dg, 0, collected);
+                std::ptr::copy(
+                    (*dg).linedata.add(collected as usize),
+                    (*dg).linedata,
+                    (old_hsize + sy - collected) as usize,
+                );
+                std::ptr::write_bytes(
+                    (*dg).linedata.add((old_hsize + sy - collected) as usize),
+                    0,
+                    collected as usize,
+                );
+            }
+
+            // Resize linedata to the new history plus viewport.
+            if new_hsize + sy != old_hsize + sy - collected {
+                (*dg).linedata =
+                    xreallocarray_((*dg).linedata, (new_hsize + sy) as usize).as_ptr();
+                std::ptr::write_bytes(
+                    (*dg).linedata.add((old_hsize + sy - collected) as usize),
+                    0,
+                    (new_hsize - kept) as usize,
+                );
+            }
+
+            // Set hsize before copying so grid_duplicate_lines does not clamp
+            // the count to the old, smaller grid size.
+            (*dg).hsize = new_hsize;
+
+            // Copy the newly scrolled history, then refresh the viewport.
+            if added > 0 {
+                grid_duplicate_lines(dg, kept, sg, kept, added);
+            }
+            grid_duplicate_lines(dg, new_hsize, sg, new_hsize, sy);
+        }
+
+        (*dg).hscrolled = (*sg).hscrolled;
+
+        // Match clone_screen's backing cursor placement.
+        if (*src).cy > (*dg).sy - 1 {
+            (*dst).cx = 0;
+            (*dst).cy = (*dg).sy - 1;
+        } else {
+            (*dst).cx = (*src).cx;
+            (*dst).cy = (*src).cy;
+        }
+
+        true
+    }
+}
+
 /// C `vendor/tmux/window-copy.c:553`: `static struct window_copy_mode_data *window_copy_common_init(struct window_mode_entry *wme)`
 pub unsafe fn window_copy_common_init(wme: *mut window_mode_entry) -> *mut window_copy_mode_data {
     unsafe {
@@ -353,6 +500,11 @@ pub unsafe fn window_copy_common_init(wme: *mut window_mode_entry) -> *mut windo
             window_copy_scroll_timer,
             NonNull::new(wme).unwrap(),
         );
+        evtimer_set(
+            &raw mut (*data).refresh_timer,
+            window_copy_refresh_timer,
+            NonNull::new(wme).unwrap(),
+        );
 
         data
     }
@@ -380,6 +532,7 @@ pub unsafe fn window_copy_init(
             &raw mut cy,
             ((*wme).swp != (*wme).wp) as i32,
         );
+        window_copy_sync_snapshot(data, (*base).grid);
 
         (*data).cx = cx;
         if cy < screen_hsize((*data).backing) {
@@ -408,6 +561,9 @@ pub unsafe fn window_copy_init(
         }
         screen_write_cursormove(&raw mut ctx, (*data).cx as i32, (*data).cy as i32, 0);
         screen_write_stop(&raw mut ctx);
+
+        (*data).recentre_state = recentre::RECENTRE_MIDDLE;
+        (*data).recentre_line = 0;
 
         &raw mut (*data).screen
     }
@@ -449,6 +605,7 @@ pub unsafe fn window_copy_free(wme: NonNull<window_mode_entry>) {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
 
         evtimer_del(&raw mut (*data).dragtimer);
+        evtimer_del(&raw mut (*data).refresh_timer);
 
         free_((*data).searchmark);
         free_((*data).searchstr);
@@ -860,6 +1017,15 @@ pub unsafe fn window_copy_formats(wme: *mut window_mode_entry, ft: *mut format_t
             c!("copy_cursor_hyperlink"),
             window_copy_cursor_hyperlink_cb,
         );
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:1166`: `static struct screen *window_copy_get_screen(struct window_mode_entry *wme)`
+pub unsafe fn window_copy_get_screen(wme: *mut window_mode_entry) -> *mut screen {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+
+        (*data).backing
     }
 }
 
@@ -2883,29 +3049,315 @@ pub unsafe fn window_copy_cmd_search_forward_incremental(
     }
 }
 
-pub unsafe fn window_copy_cmd_refresh_from_pane(
+/// Reconcile the backing screen with the live pane, incrementally if possible
+/// and otherwise by recloning, then reposition the view. When following, jump
+/// to the bottom so new output stays visible; otherwise keep the same lines on
+/// screen. Driven by the automatic refresh timer.
+/// C `vendor/tmux/window-copy.c:2926`: `static void window_copy_do_refresh(struct window_mode_entry *wme, int follow)`
+unsafe fn window_copy_do_refresh(wme: *mut window_mode_entry, follow: bool) {
+    unsafe {
+        let wp: *mut window_pane = (*wme).swp;
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+
+        if (*data).oy > screen_hsize((*data).backing) {
+            (*data).oy = screen_hsize((*data).backing);
+        }
+        let oy_from_top = screen_hsize((*data).backing) - (*data).oy;
+
+        if !window_copy_sync_backing(wme) {
+            screen_free((*data).backing);
+            free_((*data).backing);
+            (*data).backing = window_copy_clone_screen(
+                &raw mut (*wp).base,
+                &raw mut (*data).screen,
+                null_mut(),
+                null_mut(),
+                ((*wme).swp != (*wme).wp) as i32,
+            );
+        }
+
+        if follow {
+            (*data).cy = screen_size_y(&raw mut (*data).screen) - 1;
+            (*data).cx =
+                window_copy_cursor_limit(wme, screen_hsize((*data).backing) + (*data).cy, 0);
+            (*data).oy = 0;
+        } else if oy_from_top <= screen_hsize((*data).backing) {
+            (*data).oy = screen_hsize((*data).backing) - oy_from_top;
+        } else {
+            (*data).cy = 0;
+            (*data).oy = screen_hsize((*data).backing);
+        }
+
+        window_copy_sync_snapshot(data, (*wp).base.grid);
+        window_copy_size_changed(wme);
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:2960`: `static void window_copy_refresh_arm(struct window_mode_entry *wme)`
+unsafe fn window_copy_refresh_arm(wme: *mut window_mode_entry) {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+        let tv = libc::timeval {
+            tv_sec: (WINDOW_COPY_REFRESH_INTERVAL / 1000000) as _,
+            tv_usec: (WINDOW_COPY_REFRESH_INTERVAL % 1000000) as _,
+        };
+
+        if (*data).refresh_active != 0 {
+            evtimer_add(&raw mut (*data).refresh_timer, &raw const tv);
+        }
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:2973`: `static void window_copy_refresh_timer(__unused int fd, __unused short events, void *arg)`
+pub unsafe extern "C-unwind" fn window_copy_refresh_timer(
+    _fd: i32,
+    _events: i16,
+    wme: NonNull<window_mode_entry>,
+) {
+    unsafe {
+        let wme = wme.as_ptr();
+        let wp: *mut window_pane = (*wme).wp;
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+
+        if tailq_first(&raw mut (*wp).modes) != wme || (*data).refresh_active == 0 {
+            return;
+        }
+
+        // Skip the refresh while a selection is being made, otherwise it would
+        // move; only follow new output if the cursor is still at the bottom.
+        if (*wp).flags.intersects(window_pane_flags::PANE_UNSEENCHANGES)
+            && (*data).screen.sel.is_null()
+            && (*data).cursordrag == cursordrag::CURSORDRAG_NONE
+        {
+            let follow =
+                (*data).oy == 0 && (*data).cy == screen_size_y(&raw mut (*data).screen) - 1;
+            window_copy_do_refresh(wme, follow);
+            window_copy_redraw_screen(wme);
+            // The timer runs outside key handling, so force a repaint.
+            (*wp).flags |= window_pane_flags::PANE_REDRAW;
+            (*wp).flags &= !window_pane_flags::PANE_UNSEENCHANGES;
+        }
+
+        window_copy_refresh_arm(wme);
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:3002`: `static void window_copy_refresh_start(struct window_mode_entry *wme)`
+unsafe fn window_copy_refresh_start(wme: *mut window_mode_entry) {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+
+        // Do not refresh a view of another pane (copy-mode -s): the source may
+        // disappear and changes are not tracked on this pane.
+        if (*data).viewmode != 0 || (*wme).swp != (*wme).wp || (*data).refresh_active != 0 {
+            return;
+        }
+        (*data).refresh_active = 1;
+        window_copy_refresh_arm(wme);
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:3017`: `static void window_copy_refresh_stop(struct window_mode_entry *wme)`
+unsafe fn window_copy_refresh_stop(wme: *mut window_mode_entry) {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+
+        (*data).refresh_active = 0;
+        evtimer_del(&raw mut (*data).refresh_timer);
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:3026`: `static enum window_copy_cmd_action window_copy_cmd_refresh_on(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_refresh_on(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
+    unsafe {
+        window_copy_refresh_start((*cs).wme);
+        window_copy_cmd_action::WINDOW_COPY_CMD_NOTHING
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:3033`: `static enum window_copy_cmd_action window_copy_cmd_refresh_off(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_refresh_off(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
+    unsafe {
+        window_copy_refresh_stop((*cs).wme);
+        window_copy_cmd_action::WINDOW_COPY_CMD_NOTHING
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:3040`: `static enum window_copy_cmd_action window_copy_cmd_refresh_toggle(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_refresh_toggle(
+    cs: *mut window_copy_cmd_state,
+) -> window_copy_cmd_action {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*(*cs).wme).data.cast();
+
+        if (*data).refresh_active != 0 {
+            window_copy_refresh_stop((*cs).wme);
+        } else {
+            window_copy_refresh_start((*cs).wme);
+        }
+        window_copy_cmd_action::WINDOW_COPY_CMD_NOTHING
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:3052`: `static enum window_copy_cmd_action window_copy_cmd_recentre_top_bottom(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_recentre_top_bottom(
     cs: *mut window_copy_cmd_state,
 ) -> window_copy_cmd_action {
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
-        let wp: *mut window_pane = (*wme).swp;
         let data: *mut window_copy_mode_data = (*wme).data.cast();
+        let cy = (*data).cy;
+        let sy = screen_size_y(&raw mut (*data).screen) - 1;
+        let sm = sy / 2;
 
-        if (*data).viewmode != 0 {
-            return window_copy_cmd_action::WINDOW_COPY_CMD_NOTHING;
+        let backing_row = screen_hsize((*data).backing) + cy - (*data).oy;
+        if (*data).recentre_line != backing_row {
+            (*data).recentre_state = recentre::RECENTRE_MIDDLE;
+            (*data).recentre_line = backing_row;
         }
 
-        screen_free((*data).backing);
-        free_((*data).backing);
-        (*data).backing = window_copy_clone_screen(
-            &raw mut (*wp).base,
-            &raw mut (*data).screen,
-            null_mut(),
-            null_mut(),
-            ((*wme).swp != (*wme).wp) as i32,
-        );
+        // The state names the NEXT target, so each invocation both consumes the
+        // current one and advances the cycle.
+        let target = match (*data).recentre_state {
+            recentre::RECENTRE_MIDDLE => {
+                (*data).recentre_state = recentre::RECENTRE_TOP;
+                recentre::RECENTRE_MIDDLE
+            }
+            recentre::RECENTRE_TOP => {
+                (*data).recentre_state = recentre::RECENTRE_BOTTOM;
+                recentre::RECENTRE_TOP
+            }
+            recentre::RECENTRE_BOTTOM => {
+                (*data).recentre_state = recentre::RECENTRE_MIDDLE;
+                recentre::RECENTRE_BOTTOM
+            }
+        };
 
-        window_copy_size_changed(wme);
+        // C reads data->oy into `oy` before the cycle bookkeeping above as well,
+        // then re-reads it here; nothing in between can change it.
+        let oy = (*data).oy;
+        // Every branch below adjusts the cursor row by the SIGNED change in the
+        // scroll offset, which the C expresses as u_int arithmetic that wraps:
+        // scrolling up lowers data->oy, so `data->oy - oy` is a negative delta
+        // carried as a huge unsigned value and `cy +` wraps it back down. Plain
+        // Rust adds and subtracts panic on exactly the common case (scroll up
+        // from a scrolled-back view), so each one is spelled wrapping here.
+        match target {
+            recentre::RECENTRE_MIDDLE => {
+                if cy < sm {
+                    window_copy_scroll_down(wme, sm - cy);
+                } else if cy > sm {
+                    window_copy_scroll_up(wme, cy - sm);
+                }
+                if (*data).oy != oy {
+                    (*data).cy = cy.wrapping_add((*data).oy.wrapping_sub(oy));
+                }
+            }
+            recentre::RECENTRE_TOP => {
+                window_copy_scroll_up(wme, cy);
+                (*data).cy = cy.wrapping_sub(oy.wrapping_sub((*data).oy));
+            }
+            recentre::RECENTRE_BOTTOM => {
+                window_copy_scroll_down(wme, sy - cy);
+                (*data).cy = cy.wrapping_add((*data).oy.wrapping_sub(oy));
+            }
+        }
+        window_copy_update_selection(wme, 0, 0);
+
+        window_copy_cmd_action::WINDOW_COPY_CMD_REDRAW
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:2317`: `static enum window_copy_cmd_action window_copy_cmd_scroll_exit_on(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_scroll_exit_on(
+    cs: *mut window_copy_cmd_state,
+) -> window_copy_cmd_action {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*(*cs).wme).data.cast();
+
+        (*data).scroll_exit = true;
+
+        window_copy_cmd_action::WINDOW_COPY_CMD_NOTHING
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:2327`: `static enum window_copy_cmd_action window_copy_cmd_scroll_exit_off(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_scroll_exit_off(
+    cs: *mut window_copy_cmd_state,
+) -> window_copy_cmd_action {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*(*cs).wme).data.cast();
+
+        (*data).scroll_exit = false;
+
+        window_copy_cmd_action::WINDOW_COPY_CMD_NOTHING
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:2337`: `static enum window_copy_cmd_action window_copy_cmd_scroll_exit_toggle(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_scroll_exit_toggle(
+    cs: *mut window_copy_cmd_state,
+) -> window_copy_cmd_action {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*(*cs).wme).data.cast();
+
+        (*data).scroll_exit = !(*data).scroll_exit;
+
+        window_copy_cmd_action::WINDOW_COPY_CMD_NOTHING
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:2189`: `static enum window_copy_cmd_action window_copy_cmd_selection_mode(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_selection_mode(
+    cs: *mut window_copy_cmd_state,
+) -> window_copy_cmd_action {
+    unsafe {
+        let wme: *mut window_mode_entry = (*cs).wme;
+        let so: *mut options = (*(*cs).s).options;
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+        // C reads `args_string(cs->wargs, 0)`, its per-command re-parse of the
+        // argument vector; this port keeps the whole `send-keys -X` vector in
+        // cs.args, where index 0 is the command name and the argument is at 1
+        // (args_string returns an empty string, not NULL, past the end).
+        let s = args_string((*cs).args, 1);
+
+        let eq = |lit: &'static str| strcasecmp_(s, lit) == std::cmp::Ordering::Equal;
+        if s.is_null() || *s == b'\0' || eq("char") || eq("c") {
+            (*data).selflag = selflag::SEL_CHAR;
+        } else if eq("word") || eq("w") {
+            (*data).separators = options_get_string_(so, "word-separators");
+            (*data).selflag = selflag::SEL_WORD;
+        } else if eq("line") || eq("l") {
+            (*data).selflag = selflag::SEL_LINE;
+        }
+        window_copy_cmd_action::WINDOW_COPY_CMD_NOTHING
+    }
+}
+
+/// C `vendor/tmux/window-copy.c`: `static enum window_copy_cmd_action window_copy_cmd_centre_vertical(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_centre_vertical(
+    cs: *mut window_copy_cmd_state,
+) -> window_copy_cmd_action {
+    unsafe {
+        let wme: *mut window_mode_entry = (*cs).wme;
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+
+        window_copy_update_cursor(wme, (*data).cx, (*(*wme).wp).sy / 2);
+        window_copy_update_selection(wme, 1, 0);
+        window_copy_cmd_action::WINDOW_COPY_CMD_REDRAW
+    }
+}
+
+/// C `vendor/tmux/window-copy.c`: `static enum window_copy_cmd_action window_copy_cmd_centre_horizontal(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_centre_horizontal(
+    cs: *mut window_copy_cmd_state,
+) -> window_copy_cmd_action {
+    unsafe {
+        let wme: *mut window_mode_entry = (*cs).wme;
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+
+        window_copy_update_cursor(wme, (*(*wme).wp).sx / 2, (*data).cy);
+        window_copy_update_selection(wme, 1, 0);
         window_copy_cmd_action::WINDOW_COPY_CMD_REDRAW
     }
 }
@@ -2919,7 +3371,7 @@ struct window_copy_cmd_table_entry {
     f: unsafe fn(*mut window_copy_cmd_state) -> window_copy_cmd_action,
 }
 
-static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 85] = [
+static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 94] = [
     window_copy_cmd_table_entry {
         command: "append-selection",
         minargs: 0,
@@ -3101,6 +3553,20 @@ static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 85] = [
         maxargs: 0,
         clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_EMACS_ONLY,
         f: window_copy_cmd_cursor_up,
+    },
+    window_copy_cmd_table_entry {
+        command: "cursor-centre-vertical",
+        minargs: 0,
+        maxargs: 0,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_EMACS_ONLY,
+        f: window_copy_cmd_centre_vertical,
+    },
+    window_copy_cmd_table_entry {
+        command: "cursor-centre-horizontal",
+        minargs: 0,
+        maxargs: 0,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_EMACS_ONLY,
+        f: window_copy_cmd_centre_horizontal,
     },
     window_copy_cmd_table_entry {
         command: "end-of-line",
@@ -3341,6 +3807,13 @@ static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 85] = [
         f: window_copy_cmd_previous_word,
     },
     window_copy_cmd_table_entry {
+        command: "recentre-top-bottom",
+        minargs: 0,
+        maxargs: 0,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_ALWAYS,
+        f: window_copy_cmd_recentre_top_bottom,
+    },
+    window_copy_cmd_table_entry {
         command: "rectangle-on",
         minargs: 0,
         maxargs: 0,
@@ -3362,11 +3835,25 @@ static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 85] = [
         f: window_copy_cmd_rectangle_toggle,
     },
     window_copy_cmd_table_entry {
-        command: "refresh-from-pane",
+        command: "refresh-on",
         minargs: 0,
         maxargs: 0,
-        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_ALWAYS,
-        f: window_copy_cmd_refresh_from_pane,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_NEVER,
+        f: window_copy_cmd_refresh_on,
+    },
+    window_copy_cmd_table_entry {
+        command: "refresh-off",
+        minargs: 0,
+        maxargs: 0,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_NEVER,
+        f: window_copy_cmd_refresh_off,
+    },
+    window_copy_cmd_table_entry {
+        command: "refresh-toggle",
+        minargs: 0,
+        maxargs: 0,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_NEVER,
+        f: window_copy_cmd_refresh_toggle,
     },
     window_copy_cmd_table_entry {
         command: "scroll-bottom",
@@ -3388,6 +3875,27 @@ static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 85] = [
         maxargs: 0,
         clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_ALWAYS,
         f: window_copy_cmd_scroll_down_and_cancel,
+    },
+    window_copy_cmd_table_entry {
+        command: "scroll-exit-on",
+        minargs: 0,
+        maxargs: 0,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_ALWAYS,
+        f: window_copy_cmd_scroll_exit_on,
+    },
+    window_copy_cmd_table_entry {
+        command: "scroll-exit-off",
+        minargs: 0,
+        maxargs: 0,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_ALWAYS,
+        f: window_copy_cmd_scroll_exit_off,
+    },
+    window_copy_cmd_table_entry {
+        command: "scroll-exit-toggle",
+        minargs: 0,
+        maxargs: 0,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_ALWAYS,
+        f: window_copy_cmd_scroll_exit_toggle,
     },
     window_copy_cmd_table_entry {
         command: "scroll-middle",
@@ -3479,6 +3987,13 @@ static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 85] = [
         maxargs: 0,
         clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_ALWAYS,
         f: window_copy_cmd_select_word,
+    },
+    window_copy_cmd_table_entry {
+        command: "selection-mode",
+        minargs: 0,
+        maxargs: 1,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_ALWAYS,
+        f: window_copy_cmd_selection_mode,
     },
     window_copy_cmd_table_entry {
         command: "set-mark",

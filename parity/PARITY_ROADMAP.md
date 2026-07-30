@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1166/1166 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 cases.
+**1173/1173 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 cases.
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
 (full-size split with a pre-existing split) crashed the server on a u32 underflow
@@ -132,9 +132,38 @@ of them server crashes:
   corrected against the C.
 
 Two gaps the block proved are unported rather than wrong went to
-`parity/known_gaps/`: 11 missing `send-keys -X` commands
-(`cmd_copy_mode_missing.sh`) and `capture-pane -F/-H/-L/-M`
-(`cmd_capture_pane_flags.sh`).
+`parity/known_gaps/` and were then ported (Round-9 below), so both files are gone
+again and their behaviour is covered by cases 1471–1477.
+
+Round-9 port:
+
+Closing those two gaps. The copy-mode command table gained the 10 entries
+next-3.7 has and this port did not — `refresh-{on,off,toggle}`,
+`scroll-exit-{on,off,toggle}`, `recentre-top-bottom`,
+`cursor-centre-{vertical,horizontal}` and `selection-mode` — and lost
+`refresh-from-pane`, which upstream replaced with an automatic refresh. That
+refresh is the substantial half: `window_copy_sync_snapshot`/`sync_backing`/
+`do_refresh`/`refresh_arm`/`refresh_timer`/`refresh_start`/`refresh_stop`, which
+reconcile the backing screen incrementally against the live pane using the grid's
+monotonic scroll counters (`scroll_added`/`scroll_collected`/`scroll_generation`,
+`tmux.h:898`, maintained at `grid.c:470`, `:508`, `:521`, `:559`, `:1611`). Along
+the way `grid_collect_history` gained its `all` parameter and the caller that uses
+it, `session_update_history` (`session.c:765`), so a changed `history-limit` now
+collects the history that no longer fits.
+
+`capture-pane` gained `-F`, `-H`, `-L` and `-M`, which needed the
+`GRID_LINE_HYPERLINK` line flag (`tmux.h:804`) and the `get_screen` callback on
+`struct window_mode` (`tmux.h:1180`) as substrate.
+
+Porting `recentre-top-bottom` surfaced one more crash of the family this suite
+keeps finding: the C adjusts the cursor row by the signed change in the scroll
+offset as wrapping `u_int` arithmetic, which panics as a plain Rust add on the
+common case of recentring a scrolled-back view. Fixed with explicit wrapping ops
+and pinned by case 1471.
+
+`scroll-to-mouse` is the one command that did not graduate: it drags the scrollbar
+slider (`wp->sb_slider_h`, `tty.mouse_slider_mpos`), so it belongs to the unported
+pane-scrollbars subsystem and is recorded there.
 
 Round-7 fix:
 
@@ -303,10 +332,10 @@ so a regression in ported behavior cannot land.
 
 `parity/known_gaps/` is the inverse of `parity/cases/`: next-3.7 features ztmux
 does **not** implement yet, each pinned by a case that is expected to *diverge*
-from the reference. The 8 cases cover ~60 individual options/format-vars/commands
-(pane scrollbars, the theme system, copy-mode line numbers, floating-pane format
-vars, `switch-mode`, 11 `send-keys -X` commands, `capture-pane -F/-H/-L/-M`, …),
-each tied to an unported C area. Run them with the
+from the reference. The 6 cases cover ~45 individual options/format-vars/commands
+(pane scrollbars and the `scroll-to-mouse` command that drags their slider, the
+theme system, copy-mode line numbers, floating-pane format vars, `switch-mode`,
+…), each tied to an unported C area. Run them with the
 inverted runner:
 
 ```sh
@@ -317,7 +346,7 @@ The runner is an advisory tripwire — it exits non-zero only when a gap closes
 (the feature got ported and its case should move to `parity/cases/`), so it never
 reddens CI merely because the gaps still exist. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1166/1166 ported surface; they measure
+proof. These gaps do not count against the 1173/1173 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite

@@ -19,8 +19,8 @@ pub static CMD_CAPTURE_PANE_ENTRY: cmd_entry = cmd_entry {
     name: "capture-pane",
     alias: Some("capturep"),
 
-    args: args_parse::new("ab:CeE:JNpPqS:Tt:", 0, 0, None),
-    usage: "[-aCeJNpPqT] [-b buffer-name] [-E end-line] [-S start-line] [-t target-pane]",
+    args: args_parse::new("ab:CeE:FHJLMNpPqS:Tt:", 0, 0, None),
+    usage: "[-aCeFHJLMNpPqT] [-b buffer-name] [-E end-line] [-S start-line] [-t target-pane]",
 
     source: cmd_entry_flag::zeroed(),
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
@@ -98,6 +98,71 @@ unsafe fn cmd_capture_pane_pending(
     }
 }
 
+/// Collect the distinct hyperlink URIs on one grid line, in the order their
+/// first cell appears. Cells carry an id into the screen's hyperlink table, so
+/// a run of cells sharing one link contributes a single URI.
+/// C `vendor/tmux/cmd-capture-pane.c:111`: `static char *cmd_capture_pane_hyperlinks(struct grid *gd, struct screen *s, u_int py, u_int *links, u_int *nlinks, size_t *len)`
+unsafe fn cmd_capture_pane_hyperlinks(
+    gd: *mut grid,
+    s: *mut screen,
+    py: u32,
+    links: *mut u32,
+    nlinks: *mut u32,
+    len: *mut usize,
+) -> *mut u8 {
+    unsafe {
+        let gl: *const grid_line = grid_peek_line(gd, py);
+        let mut gc: grid_cell = zeroed();
+        let mut uri: *const u8 = null();
+        let mut line = xstrdup(c!("")).as_ptr();
+
+        *len = 0;
+
+        if (*s).hyperlinks.is_null() || !(*gl).flags.intersects(grid_line_flag::HYPERLINK) {
+            return line;
+        }
+
+        for i in 0..(*gl).cellused {
+            grid_get_cell(gd, i, py, &raw mut gc);
+            if gc.link == 0 {
+                continue;
+            }
+            let mut j = 0;
+            while j < *nlinks {
+                if *links.add(j as usize) == gc.link {
+                    break;
+                }
+                j += 1;
+            }
+            if j != *nlinks {
+                continue;
+            }
+
+            if !hyperlinks_get(
+                (*s).hyperlinks,
+                gc.link,
+                &raw mut uri,
+                null_mut(),
+                null_mut(),
+            ) {
+                continue;
+            }
+
+            if *nlinks == (*gd).sx {
+                break;
+            }
+            *links.add(*nlinks as usize) = gc.link;
+            *nlinks += 1;
+
+            if *len != 0 {
+                line = cmd_capture_pane_append(line, len, c!(" "), 1);
+            }
+            line = cmd_capture_pane_append(line, len, uri, strlen(uri));
+        }
+        line
+    }
+}
+
 /// C `vendor/tmux/cmd-capture-pane.c:151`: `static char *cmd_capture_pane_history(struct args *args, struct cmdq_item *item, struct window_pane *wp, size_t *len)`
 unsafe fn cmd_capture_pane_history(
     args: *mut args,
@@ -117,8 +182,9 @@ unsafe fn cmd_capture_pane_history(
         let mut cause: *mut u8 = null_mut();
         let mut line: *mut u8;
 
-        let mut linelen: usize;
+        let mut linelen: usize = 0;
 
+        let s: *mut screen;
         let sx = screen_size_x(&raw mut (*wp).base);
         if args_has(args, 'a') {
             gd = (*wp).base.saved_grid;
@@ -129,7 +195,22 @@ unsafe fn cmd_capture_pane_history(
                 }
                 return xstrdup(c!("")).as_ptr();
             }
+            s = &raw mut (*wp).base;
+        } else if args_has(args, 'M') {
+            // -M captures what the pane's mode is showing (its own screen)
+            // rather than the pane's backing grid.
+            let wme: *mut window_mode_entry = tailq_first(&raw mut (*wp).modes);
+            if !wme.is_null()
+                && let Some(get_screen) = (*(*wme).mode).get_screen
+            {
+                s = get_screen(wme);
+                gd = (*s).grid;
+            } else {
+                s = &raw mut (*wp).base;
+                gd = (*wp).base.grid;
+            }
         } else {
+            s = &raw mut (*wp).base;
             gd = (*wp).base.grid;
         }
 
@@ -209,12 +290,86 @@ unsafe fn cmd_capture_pane_history(
         if !join_lines && !args_has(args, 'N') {
             flags |= grid_string_flags::GRID_STRING_TRIM_SPACES;
         }
+        let number_lines = args_has(args, 'L');
+        let show_flags = args_has(args, 'F');
+        let hyperlinks = args_has(args, 'H');
+        let mut links: *mut u32 = null_mut();
+        let mut nlinks: u32 = 0;
+        if hyperlinks {
+            links = xreallocarray_(links, (*gd).sx as usize).as_ptr();
+        }
 
+        let mut b: [u8; 64] = [0; 64];
         let mut buf = null_mut();
         for i in top..=bottom {
-            line = grid_string_cells(gd, 0, i, sx, &raw mut gc, flags, (*wp).screen);
-            linelen = strlen(line);
+            if hyperlinks {
+                line = cmd_capture_pane_hyperlinks(
+                    gd,
+                    s,
+                    i,
+                    links,
+                    &raw mut nlinks,
+                    &raw mut linelen,
+                );
+            } else {
+                line = grid_string_cells(gd, 0, i, sx, &raw mut gc, flags, s);
+                linelen = strlen(line);
+            }
+            if hyperlinks && linelen == 0 {
+                free_(line);
+                continue;
+            }
 
+            if number_lines {
+                // C prints the line number relative to the top of the screen,
+                // so history lines are negative; both arms are the same
+                // subtraction, one in u_int and one in int.
+                let lineno: i32 = if i >= (*gd).hsize {
+                    (i - (*gd).hsize) as i32
+                } else {
+                    i as i32 - (*gd).hsize as i32
+                };
+                let s_ = format!("{lineno} \0");
+                let written = s_.len() - 1;
+                b[..s_.len()].copy_from_slice(s_.as_bytes());
+                buf = cmd_capture_pane_append(buf, len, b.as_ptr(), written);
+            }
+            if show_flags {
+                let gl_flags = (*grid_peek_line(gd, i)).flags;
+                let mut cp = 0usize;
+
+                if gl_flags.intersects(grid_line_flag::DEAD) {
+                    b[cp] = b'D';
+                    cp += 1;
+                }
+                if gl_flags.intersects(grid_line_flag::HYPERLINK) {
+                    b[cp] = b'H';
+                    cp += 1;
+                }
+                if gl_flags.intersects(grid_line_flag::START_OUTPUT) {
+                    b[cp] = b'O';
+                    cp += 1;
+                }
+                if gl_flags.intersects(grid_line_flag::START_PROMPT) {
+                    b[cp] = b'P';
+                    cp += 1;
+                }
+                if gl_flags.intersects(grid_line_flag::WRAPPED) {
+                    b[cp] = b'W';
+                    cp += 1;
+                }
+                if gl_flags.intersects(grid_line_flag::EXTENDED) {
+                    b[cp] = b'X';
+                    cp += 1;
+                }
+                if cp == 0 {
+                    b[cp] = b'-';
+                    cp += 1;
+                }
+                b[cp] = b' ';
+                cp += 1;
+                buf = cmd_capture_pane_append(buf, len, b.as_ptr(), cp);
+            }
             buf = cmd_capture_pane_append(buf, len, line, linelen);
 
             gl = grid_peek_line(gd, i);
@@ -224,6 +379,10 @@ unsafe fn cmd_capture_pane_history(
             }
 
             free_(line);
+        }
+        free_(links);
+        if buf.is_null() {
+            buf = xstrdup(c!("")).as_ptr();
         }
         buf
     }

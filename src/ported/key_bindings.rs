@@ -404,7 +404,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
 /// C `vendor/tmux/key-bindings.c:349`: `void key_bindings_init(void)`
 pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
-    static DEFAULTS: [&str; 269] = [
+    static DEFAULTS: [&str; 271] = [
         // Prefix keys.
         "bind -N 'Send the prefix key' C-b { send-prefix }",
         "bind -N 'Rotate through the panes' C-o { rotate-window }",
@@ -544,6 +544,8 @@ pub unsafe fn key_bindings_init() {
         "bind -Tcopy-mode C-b { send -X cursor-left }",
         "bind -Tcopy-mode C-g { send -X clear-selection }",
         "bind -Tcopy-mode C-k { send -X copy-pipe-end-of-line-and-cancel }",
+        "bind -Tcopy-mode C-l { send -X recentre-top-bottom }",
+        "bind -Tcopy-mode M-l { send -X cursor-centre-horizontal }",
         "bind -Tcopy-mode C-n { send -X cursor-down }",
         "bind -Tcopy-mode C-p { send -X cursor-up }",
         "bind -Tcopy-mode C-r { command-prompt -T search -ip'(search up)' -I'#{pane_search_string}' { send -X search-backward-incremental '%%' } }",
@@ -564,7 +566,7 @@ pub unsafe fn key_bindings_init() {
         "bind -Tcopy-mode g { command-prompt -p'(goto line)' { send -X goto-line '%%' } }",
         "bind -Tcopy-mode n { send -X search-again }",
         "bind -Tcopy-mode q { send -X cancel }",
-        "bind -Tcopy-mode r { send -X refresh-from-pane }",
+        "bind -Tcopy-mode r { send -X refresh-toggle }",
         "bind -Tcopy-mode t { command-prompt -1p'(jump to forward)' { send -X jump-to-forward '%%' } }",
         "bind -Tcopy-mode Home { send -X start-of-line }",
         "bind -Tcopy-mode End { send -X end-of-line }",
@@ -670,7 +672,7 @@ pub unsafe fn key_bindings_init() {
         "bind -Tcopy-mode-vi n { send -X search-again }",
         "bind -Tcopy-mode-vi o { send -X other-end }",
         "bind -Tcopy-mode-vi q { send -X cancel }",
-        "bind -Tcopy-mode-vi r { send -X refresh-from-pane }",
+        "bind -Tcopy-mode-vi r { send -X refresh-toggle }",
         "bind -Tcopy-mode-vi t { command-prompt -1p'(jump to forward)' { send -X jump-to-forward '%%' } }",
         "bind -Tcopy-mode-vi v { send -X rectangle-toggle }",
         "bind -Tcopy-mode-vi w { send -X next-word }",

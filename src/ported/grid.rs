@@ -160,6 +160,9 @@ unsafe fn grid_extended_cell(
             fatalx("offset too big");
         }
         (*gl).flags |= grid_line_flag::EXTENDED;
+        if (*gc).link != 0 {
+            (*gl).flags |= grid_line_flag::HYPERLINK;
+        }
 
         // A tab cell stores its width in the extended entry's `data` slot
         // rather than an encoded utf8_char (grid_get_cell1 reconstructs it via
@@ -338,7 +341,7 @@ unsafe fn grid_free_line(gd: *mut grid, py: c_uint) {
 
 /// Free several lines.
 /// C `vendor/tmux/grid.c:364`: `void grid_free_lines(struct grid *gd, u_int py, u_int ny)`
-unsafe fn grid_free_lines(gd: *mut grid, py: c_uint, ny: c_uint) {
+pub unsafe fn grid_free_lines(gd: *mut grid, py: c_uint, ny: c_uint) {
     unsafe {
         for yy in py..(py + ny) {
             grid_free_line(gd, yy);
@@ -356,6 +359,9 @@ pub fn grid_create(sx: u32, sy: u32, hlimit: u32) -> *mut grid {
         hscrolled: 0,
         hsize: 0,
         hlimit,
+        scroll_added: 0,
+        scroll_collected: 0,
+        scroll_generation: 0,
         linedata: if sy != 0 {
             xcalloc_::<grid_line>(sy as usize).as_ptr()
         } else {
@@ -438,13 +444,17 @@ unsafe fn grid_trim_history(gd: *mut grid, ny: c_uint) {
 
 /// Collect lines from the history if at the limit. Free the top (oldest) 10% and shift up.
 /// C `vendor/tmux/grid.c:447`: `void grid_collect_history(struct grid *gd, int all)`
-pub unsafe fn grid_collect_history(gd: *mut grid) {
+pub unsafe fn grid_collect_history(gd: *mut grid, all: bool) {
     unsafe {
         if (*gd).hsize == 0 || (*gd).hsize < (*gd).hlimit {
             return;
         }
 
-        let mut ny = (*gd).hlimit / 10;
+        let mut ny = if all {
+            (*gd).hsize - (*gd).hlimit
+        } else {
+            (*gd).hlimit / 10
+        };
         if ny < 1 {
             ny = 1;
         }
@@ -456,6 +466,7 @@ pub unsafe fn grid_collect_history(gd: *mut grid) {
         grid_trim_history(gd, ny);
 
         (*gd).hsize -= ny;
+        (*gd).scroll_collected += ny;
         if (*gd).hscrolled > (*gd).hsize {
             (*gd).hscrolled = (*gd).hsize;
         }
@@ -490,6 +501,7 @@ pub unsafe fn grid_scroll_history(gd: *mut grid, bg: c_uint) {
         grid_compact_line(&mut (*(*gd).linedata.add((*gd).hsize as usize)));
         (*(*gd).linedata.add((*gd).hsize as usize)).time = CURRENT_TIME;
         (*gd).hsize += 1;
+        (*gd).scroll_added += 1;
     }
 }
 
@@ -501,6 +513,7 @@ pub unsafe fn grid_clear_history(gd: *mut grid) {
 
         (*gd).hscrolled = 0;
         (*gd).hsize = 0;
+        (*gd).scroll_generation += 1;
 
         (*gd).linedata = xreallocarray_((*gd).linedata, (*gd).sy as usize).as_ptr();
     }
@@ -540,6 +553,7 @@ pub unsafe fn grid_scroll_history_region(
         // Move history offset down
         (*gd).hscrolled += 1;
         (*gd).hsize += 1;
+        (*gd).scroll_added += 1;
     }
 }
 
@@ -1728,6 +1742,7 @@ pub unsafe fn grid_reflow(gd: *mut grid, sx: u32) {
         free((*gd).linedata.cast());
         (*gd).linedata = (*target).linedata;
         free(target.cast());
+        (*gd).scroll_generation += 1;
     }
 }
 
@@ -2167,7 +2182,7 @@ mod tests {
                 grid_set_cell(gd, 0, y, &gc);
             }
 
-            grid_collect_history(gd);
+            grid_collect_history(gd, false);
             // hlimit/10 == 1 line trimmed, and the rest shift up by one.
             assert_eq!((*gd).hsize, 9);
             // The oldest line ('0') is gone; history row 0 is now the old '1'.

@@ -72,7 +72,7 @@ pub unsafe fn grid_view_clear_history(gd: *mut grid, bg: u32) {
         }
 
         for _ in 0..(*gd).sy {
-            grid_collect_history(gd);
+            grid_collect_history(gd, false);
             grid_scroll_history(gd, bg);
         }
         if last < (*gd).sy {
@@ -96,7 +96,7 @@ pub unsafe fn grid_view_clear(gd: *mut grid, mut px: u32, mut py: u32, nx: u32, 
 pub unsafe fn grid_view_scroll_region_up(gd: *mut grid, mut rupper: u32, mut rlower: u32, bg: u32) {
     unsafe {
         if (*gd).flags & GRID_HISTORY != 0 {
-            grid_collect_history(gd);
+            grid_collect_history(gd, false);
             if rupper == 0 && rlower == (*gd).sy - 1 {
                 grid_scroll_history(gd, bg);
             } else {

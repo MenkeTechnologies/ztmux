@@ -210,7 +210,11 @@ _ztmux-capture-pane() {
     '-C[escape non-printable characters as octal \\ooo]' \
     '-e[include escape sequences for attributes etc]' \
     '-E[specify last line to capture]:line number (- means last line)' \
+    '-F[include the line flags at the start of each line]' \
+    '-H[capture only the hyperlinks on each line]' \
     '(-N)-J[join wrapped lines and preserve trailing space]' \
+    '-L[include the line number at the start of each line]' \
+    '-M[use the screen of the mode the pane is in]' \
     '(-J)-N[preserve trailing space]' \
     '-q[ignore errors when trying to access alternate screen]' \
     '(-b)-p[print data to stdout]' \

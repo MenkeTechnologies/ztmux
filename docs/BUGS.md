@@ -77,7 +77,67 @@ Two divergences the round proved are unported features rather than defects went 
 (`recentre-top-bottom`, `refresh-{on,off,toggle}`, `scroll-exit-{on,off,toggle}`,
 `cursor-centre-{vertical,horizontal}`, `scroll-to-mouse`, `selection-mode`) and
 `capture-pane -F/-H/-L/-M`, the last of which also needs `GRID_LINE_HYPERLINK` and
-the mode `get_screen` callback.
+the mode `get_screen` callback. Both were ported immediately afterwards — see the
+next section — so the only one still open is `scroll-to-mouse`, which belongs to
+the unported pane-scrollbars subsystem.
+
+### 6. `recentre-top-bottom` took the server down (found while porting it)
+
+- **Symptom:** the first `recentre-top-bottom` from any scrolled-back view exited
+  the server.
+- **Root cause:** each branch adjusts the cursor row by the **signed** change in
+  the scroll offset, which the C writes as `data->cy = cy + (data->oy - oy)` in
+  `u_int`. Scrolling up lowers `data->oy`, so that inner subtraction is a negative
+  delta carried as a huge unsigned value and the outer add wraps it back down
+  (23 + (5 - 17) = 11). Both operations panic in a Rust debug build, and the
+  common case — recentring a view that is scrolled back — hits them immediately.
+- **Fix:** `wrapping_add`/`wrapping_sub` on all three branches
+  (`src/ported/window_copy.rs`), with the reason in a comment.
+- **Pinned by:** `parity/cases/1471_copy_mode_recentre_and_centre.sh`, which drives
+  two full cycles plus the clamped cases at the top and bottom of the history.
+
+## 2026-07-30 (port round: the two gaps above)
+
+Closing the two gaps the parity round recorded. Nothing here was a defect in
+already-ported code except bug 6 above; the rest is next-3.7 surface that had no
+ztmux counterpart.
+
+- **Copy-mode command table** — ported the 10 missing entries: `refresh-on`,
+  `refresh-off`, `refresh-toggle`, `scroll-exit-on`, `scroll-exit-off`,
+  `scroll-exit-toggle`, `recentre-top-bottom`, `cursor-centre-vertical`,
+  `cursor-centre-horizontal` and `selection-mode`. `refresh-from-pane`, which the
+  port carried and next-3.7 does not, is gone: upstream replaced that one-shot
+  reclone with the automatic refresh below, and the `r` binding in both copy-mode
+  key tables now maps to `refresh-toggle` as the C does (`key-bindings.c:538`,
+  `:648`), with `C-l`/`M-l` added (`:515`, `:516`).
+- **The automatic refresh subsystem behind those commands** —
+  `window_copy_sync_snapshot`, `window_copy_sync_backing`, `window_copy_do_refresh`,
+  `window_copy_refresh_arm`, `window_copy_refresh_timer`, `window_copy_refresh_start`
+  and `window_copy_refresh_stop`, plus the `refresh_timer`/`refresh_active` and
+  `recentre_state`/`recentre_line` fields. The incremental sync needs the grid's
+  monotonic scroll counters (`scroll_added`, `scroll_collected`,
+  `scroll_generation`, `tmux.h:898`), which are now maintained at all five C sites
+  (`grid.c:470`, `:508`, `:521`, `:559`, `:1611`).
+- **`grid_collect_history` gained its `all` parameter** (`grid.c:447`) and the
+  caller that passes it: `session_update_history` (`session.c:765`), which applies
+  a changed `history-limit` to every pane in a session, wired to the option hook at
+  `options.c:1313`. Neither existed here before, so raising `history-limit` never
+  collected the history that no longer fit.
+- **`capture-pane -F/-H/-L/-M`** — the flag string was `ab:CeE:JNpPqS:Tt:` against
+  the C's `ab:CeE:FHJLMNpPqS:Tt:`. Ported `cmd_capture_pane_hyperlinks`
+  (`cmd-capture-pane.c:111`), the per-line number and flag prefixes, and the `-M`
+  screen selection, which needed two pieces of substrate: the `GRID_LINE_HYPERLINK`
+  line flag (`tmux.h:804`, set at `grid.c:189`) and the `get_screen` callback on
+  `struct window_mode` (`tmux.h:1180`), implemented by copy mode and view mode.
+- **Still unported:** `scroll-to-mouse`. It drags the scrollbar slider, so it needs
+  `wp->sb_slider_h` (`tmux.h:1301`) and `tty.mouse_slider_mpos` (`tmux.h:1769`) —
+  state that only exists with the pane-scrollbars subsystem, recorded separately in
+  `parity/known_gaps/opt_pane_scrollbars.sh`.
+
+Covered by `parity/cases/1471`–`1477`: the recentre cycle and both centre commands,
+the scroll-exit flag through all three commands and `copy-mode -e`, `selection-mode`
+with every spelling of its argument, the refresh commands, and `capture-pane`
+`-L`/`-F`/`-H`/`-M` including their combinations.
 
 ## 2026-07-13
 

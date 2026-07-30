@@ -862,6 +862,35 @@ pub unsafe fn session_renumber_windows(s: *mut session) {
     }
 }
 
+/// Apply a new history-limit to every pane in the session, collecting the
+/// history that no longer fits.
+/// C `vendor/tmux/session.c:765`: `void session_update_history(struct session *s)`
+pub unsafe fn session_update_history(s: *mut session) {
+    unsafe {
+        let limit = options_get_number_((*s).options, "history-limit") as u32;
+        for wl in rb_foreach(&raw mut (*s).windows).map(std::ptr::NonNull::as_ptr) {
+            for wp in tailq_foreach::<_, discr_entry>(&raw mut (*(*wl).window).panes)
+                .map(std::ptr::NonNull::as_ptr)
+            {
+                let gd = (*wp).base.grid;
+
+                let osize = (*gd).hsize;
+                (*gd).hlimit = limit;
+                grid_collect_history(gd, true);
+
+                if (*gd).hsize != osize {
+                    log_debug!(
+                        "session_update_history: %{} {} -> {}",
+                        (*wp).id,
+                        osize,
+                        (*gd).hsize
+                    );
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
