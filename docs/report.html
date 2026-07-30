@@ -58,12 +58,12 @@
   </header>
 
   <main class="tutorial-main">
-    <div class="status-banner"><strong>Status: 100% functional &mdash; building, running, and self-hosting its own tooling.</strong> ztmux is the tmux program itself &mdash; server and client &mdash; reimplemented from the C in Rust. It builds and runs (<code>ztmux new-session</code>, <code>ztmux attach</code>), passes its <strong>1107-case parity suite at 100% (byte-for-byte vs upstream tmux, zero known divergences)</strong>, logs every bug its harnesses catch in <a href="BUGS.md">BUGS.md</a> &mdash; fixed, or still open and named &mdash; and ships original extensions the C tmux has no equivalent for.</div>
+    <div class="status-banner"><strong>Status: 100% functional &mdash; building, running, and self-hosting its own tooling.</strong> ztmux is the tmux program itself &mdash; server and client &mdash; reimplemented from the C in Rust. It builds and runs (<code>ztmux new-session</code>, <code>ztmux attach</code>), passes its <strong>1173-case parity suite at 100% (byte-for-byte vs upstream tmux, zero known divergences)</strong>, logs every bug its harnesses catch in <a href="BUGS.md">BUGS.md</a> &mdash; fixed, or still open and named &mdash; and ships original extensions the C tmux has no equivalent for.</div>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>PARITY VS tmux</h2>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-val green">1107</div><div class="stat-label">Cases passing</div></div>
-      <div class="stat-card"><div class="stat-val">1107</div><div class="stat-label">Total parity cases</div></div>
+      <div class="stat-card"><div class="stat-val green">1173</div><div class="stat-label">Cases passing</div></div>
+      <div class="stat-card"><div class="stat-val">1173</div><div class="stat-label">Total parity cases</div></div>
       <div class="stat-card"><div class="stat-val green">100%</div><div class="stat-label">vs tmux next-3.7</div></div>
       <div class="stat-card"><div class="stat-val green">0</div><div class="stat-label">Known divergences</div></div>
     </div>
@@ -72,9 +72,18 @@
       through the vendored <code>tmux</code> (reference) and <code>ztmux</code> (port) and compares byte-for-byte &mdash;
       the same shape as the sibling ports (<a href="https://github.com/MenkeTechnologies/zshrs">zshrs</a> vs
       <code>zsh</code>, <a href="https://github.com/MenkeTechnologies/strykelang">strykelang</a> vs <code>perl</code>).
-      The suite has grown from a handful of format cases to <strong>1107</strong> covering formats, arithmetic,
-      conditionals, string ops, options, buffers, windows, panes, and layouts &mdash; and every one now passes
-      byte-for-byte, with zero known divergences.
+      The suite has grown from a handful of format cases to <strong>1173</strong> &mdash; <strong>686</strong> single-format
+      cases (<code>*.fmt</code>) and <strong>487</strong> multi-command shell scenarios (<code>*.sh</code>) &mdash; covering
+      formats, arithmetic, conditionals, string ops, options, buffers, windows, panes, layouts, copy mode and
+      <code>capture-pane</code>, and every one now passes byte-for-byte, with zero known divergences.
+    </p>
+    <p class="prose">
+      Behaviour ztmux does <em>not</em> implement yet is tracked in the mirror-image suite,
+      <code>parity/known_gaps/</code> &mdash; <strong>6</strong> cases that are expected to <em>diverge</em> from the
+      reference, which is the proof the feature is unported. Its runner goes red only when a gap unexpectedly
+      <em>closes</em> (promote the case to <code>parity/cases/</code>), so it is an advisory tripwire rather than a
+      blocking gate. The remaining gaps are pane scrollbars, floating-pane formats, copy-mode line numbers, prompt
+      cursor, tree mode, and <code>switch-mode</code>.
     </p>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>REPOSITORY LAYOUT</h2>
@@ -82,15 +91,15 @@
     <table class="hud">
       <thead><tr><th>Path</th><th>What</th></tr></thead>
       <tbody>
-        <tr><td><code>src/ported/</code></td><td>The tmux port &mdash; <strong>138</strong> modules plus <strong>23</strong> compat shims that mirror <code>vendor/tmux</code> one-to-one. Held to C-name fidelity by the anti-drift gate.</td></tr>
-        <tr><td><code>src/extensions/</code></td><td>Original ztmux features with no C counterpart &mdash; structured output, the dashboard and fuzzy-switcher TUIs, and the family of pipeable client subcommands (see <em>Extensions</em>). Exempt from the gate.</td></tr>
+        <tr><td><code>src/ported/</code></td><td>The tmux port &mdash; <strong>141</strong> modules plus <strong>23</strong> compat shims that mirror <code>vendor/tmux</code> one-to-one, <strong>123k</strong> lines. Held to C-name fidelity by the anti-drift gate.</td></tr>
+        <tr><td><code>src/extensions/</code></td><td>Original ztmux features with no C counterpart, <strong>33k</strong> lines &mdash; structured output, the Rust event loop, the ratatui UI layer, the dashboard and fuzzy-switcher TUIs, and the family of pipeable client subcommands (see <em>Extensions</em>). Exempt from the gate.</td></tr>
         <tr><td><code>src/lib.rs</code>, <code>src/main.rs</code></td><td>Crate roots: the module tree (which re-points every ported module's file into <code>ported/</code>) plus the binary entry.</td></tr>
         <tr><td><code>vendor/tmux</code></td><td>Read-only, SHA-pinned reference &mdash; see <em>How the port is built</em>.</td></tr>
       </tbody>
     </table>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXTENSIONS &mdash; BEYOND tmux</h2>
-    <p class="prose">Because ztmux owns the whole stack, it adds capabilities upstream tmux does not have. They are plain clients &mdash; they re-invoke the ztmux binary and read its own machine-readable output, so they need no linkage to the server internals. The foundation is structured output plus the two interactive TUIs:</p>
+    <p class="prose">Because ztmux owns the whole stack, it adds capabilities upstream tmux does not have. <code>ztmux verbs</code> counts <strong>112</strong> of them today, alongside the <strong>91</strong> ported tmux commands and their <strong>78</strong> aliases. Most are plain clients &mdash; they re-invoke the ztmux binary and read its own machine-readable output, so they need no linkage to the server internals; the ratatui UI layer is the exception and lives in the server's draw path (see below). The foundation is structured output plus the two interactive TUIs:</p>
     <table class="hud">
       <thead><tr><th>Feature</th><th>Invocation</th><th>What</th></tr></thead>
       <tbody>
@@ -211,8 +220,53 @@
         <tr><td><code>ztmux prune</code></td><td>Remove dead/empty/idle server objects.</td></tr>
         <tr><td><code>ztmux revive</code></td><td>Revive every dead pane in place.</td></tr>
         <tr><td><code>ztmux retitle</code></td><td>Label every pane with its running command.</td></tr>
+        <tr><td><code>ztmux triggers</code></td><td>Run a ztmux command when a regex matches a pane's output (arm/disarm/list/test/wizard).</td></tr>
       </tbody>
     </table>
+    <p class="prose"><strong>// DISCOVERY &amp; CONSOLE</strong> &mdash; no server required for <code>verbs</code>:</p>
+    <table class="hud">
+      <thead><tr><th>Command</th><th>What</th></tr></thead>
+      <tbody>
+        <tr><td><code>ztmux verbs</code></td><td>Every verb ztmux answers to &mdash; ported commands, aliases, extensions and console builtins &mdash; with a one-line description, filterable and <code>-o json</code> capable. Built from the command table and the extension list themselves.</td></tr>
+        <tr><td><code>ztmux repl</code></td><td>A reedline console that runs each line as <code>ztmux &lt;line&gt;</code> against the selected socket: Tab completes the verb, a <code>-</code>-prefixed flag, an option's fixed value set and an extension's subcommand; history persists to <code>~/.ztmux/repl_history</code>, and non-terminal stdin falls back to a plain line reader. Emacs or vi keys, from the first of <code>$ZTMUX_REPL_EDIT_MODE</code>, <code>@ztmux-repl-edit-mode</code>, <code>status-keys</code> and <code>$VISUAL</code>/<code>$EDITOR</code> that names a mode.</td></tr>
+      </tbody>
+    </table>
+    <p class="prose"><strong>// INTERACTIVE &amp; ZELLIJ-STYLE</strong> &mdash; ratatui surfaces, modal keys, persistence:</p>
+    <table class="hud">
+      <thead><tr><th>Command</th><th>What</th></tr></thead>
+      <tbody>
+        <tr><td><code>ztmux modal</code></td><td>Zellij-style modal keybindings &mdash; <code>Ctrl-p</code> pane, <code>Ctrl-t</code> tab, <code>Ctrl-n</code> resize, <code>Ctrl-s</code> scroll, <code>Ctrl-o</code> session, <code>Ctrl-g</code> lock &mdash; each a sticky key table entered without a prefix. Off by default, since the entry keys are intercepted globally.</td></tr>
+        <tr><td><code>ztmux open</code></td><td>Scans the current pane for URLs and file paths and shows a ratatui picker: Enter opens the selection (URL in <code>open</code>/<code>xdg-open</code>, file in <code>$EDITOR</code> at its <code>file:line</code>), <code>y</code> copies it to the tmux buffer and OS clipboard.</td></tr>
+        <tr><td><code>ztmux resurrect</code></td><td>Saves every session/window/pane &mdash; layout, cwd and command &mdash; to <code>~/.ztmux/resurrect/</code> and restores them into a fresh server. <code>@ztmux-resurrect-auto on</code> spawns a pidfile-guarded daemon that re-saves every 15 minutes.</td></tr>
+        <tr><td><code>ztmux sessions</code></td><td>Zellij-style session manager: a ratatui list of sessions &mdash; type to filter, Enter switches, <code>Ctrl-r</code> renames, <code>Ctrl-x</code> kills with confirm, <code>Ctrl-n</code> makes a new one.</td></tr>
+        <tr><td><code>ztmux stack</code></td><td>Zellij-style pane stack (in <code>@ztmux-zellij-mode</code>): the focused pane fills the column, the rest collapse to one-row title bars.</td></tr>
+        <tr><td><code>ztmux tabs</code></td><td>Zellij-style top tab bar of windows &mdash; session badge, active tab highlighted; restores your prior status settings on <code>tabs off</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>THE RATATUI UI LAYER</h2>
+    <p class="prose">
+      tmux paints its interactive surfaces &mdash; menus, clock mode, display-panes &mdash; by the <em>server</em> writing
+      cells into a screen or straight to the tty, not by a program that owns a terminal. <code>src/extensions/ratatui_ui.rs</code>
+      bridges that: it lays a ratatui widget tree into a <code>Buffer</code>, then translates every <code>Cell</code> into a
+      tmux <code>grid_cell</code> emitted through <code>screen_write_cell</code> (overlay and mode screens) or
+      <code>tty_cell</code> (direct-to-tty overlays). That bridge is what lets ztmux add surfaces the C tmux has no
+      equivalent for without leaving its draw model: a which-key <strong>hint bar</strong> on the prefix, a floating
+      <strong>command palette</strong> with inline completion, ratatui <strong>clock</strong> and <strong>display-panes</strong>,
+      edit-scrollback-in-<code>$EDITOR</code>, and multi-pane <strong>selective sync</strong> whose state is shown on the pane
+      border (synced red, selected orange, trigger-armed cyan) where pane output can never overwrite it.
+    </p>
+    <p class="prose">
+      A separate opt-in, <code>@ztmux-zellij-mode on</code>, insets every pane by a one-cell ring and draws a rounded frame
+      with the pane's name &mdash; the zellij model, where a program cannot draw on the frame. <code>prefix C-f</code> toggles a
+      <strong>floating pane</strong>: a real pane on a floating layout cell above the tiled layout, so it moves and resizes
+      like any other pane (<code>move-pane -P centre</code>, <code>resize-pane -x50% -y50%</code>) and is fully draggable with
+      <code>mouse on</code>. Panes underneath are clipped around it, and a client redraw composites every visible cell &mdash;
+      content, borders, pane status lines, floats &mdash; into a cached scene of spans before writing, so a float never costs a
+      second pass over the terminal. Rendered screens are compared against the vendored tmux through a real VT emulator, not
+      just model state. <code>@ztmux-ratatui off</code> disables the whole renderer for a classic plain-tmux server, which
+      leaves the default draw path and the byte-for-byte parity suite untouched.
+    </p>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>HOW THE PORT IS BUILT</h2>
     <p class="prose">Two references, both vendored under <code>vendor/</code> as plain, read-only, SHA-pinned copies so the clone is self-contained:</p>
@@ -223,7 +277,7 @@
         <tr><td>src/ported/</td><td>the ztmux port</td><td>The living code we own and evolve toward safe, idiomatic Rust</td></tr>
       </tbody>
     </table>
-    <p class="prose">Every ported function carries a back-link to its C origin as a doc comment, e.g. <code>/// C <code>vendor/tmux/grid.c:320</code>: <code>grid_create()</code></code>. The <a href="port_report.html">port report</a> tracks per-function C&rarr;Rust coverage: <strong>2,127</strong> of tmux's <strong>2,696</strong> functions ported so far.</p>
+    <p class="prose">Every ported function carries a back-link to its C origin as a doc comment, e.g. <code>/// C <code>vendor/tmux/grid.c:320</code>: <code>grid_create()</code></code>. The <a href="port_report.html">port report</a> tracks per-function C&rarr;Rust coverage: <strong>2,318</strong> of tmux's <strong>2,696</strong> functions ported so far.</p>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>BUGS THE HARNESS CAUGHT</h2>
     <p class="prose">Verifying against C at every step turns "looks right" into "is right." A sample of faults the harnesses root-caused to a single line &mdash; the parity suite and unit tests, plus a sweep that drives every command against a private socket and, for the paths that only run with a client attached (modes, redraw, status), against a real client on a pty. Aborts are keyed on crash reports rather than on "is the server still up," since a dying client can legitimately take the server with it. Each fault below is now locked by a regression test or a build gate (the full log, including what is still open, is in <a href="BUGS.md">BUGS.md</a>):</p>
@@ -234,7 +288,7 @@
       <li><b>Destroying a pane rebuilt its mode against the dead window</b> &mdash; <code>window_pane_destroy</code> called <code>window_pane_reset_mode_all</code>, the <em>interactive</em> teardown that resizes the next mode, redraws and notifies. C calls <code>window_pane_free_modes</code>, which the port was missing entirely, so tearing down a pane rebuilt the customize-mode tree against a window that was already gone.</li>
       <li><b>Freeing a pointer Rust never allocated</b> &mdash; <code>session_group_find</code> mirrored C's throwaway stack struct used as the <code>RB_FIND</code> key. In Rust <code>(*sg).name = &hellip;</code> is a <em>place assignment</em>, so it <b>drops the previous value</b> &mdash; uninitialized stack garbage that happened to look like an owned string. <code>ztmux new-session -t ggg</code> called <code>free()</code> on a junk pointer and aborted the server. Fixed by searching with <code>rb_find_by</code>: same descent, no fabricated key node.</li>
       <li><b>Mouse-driven TUIs froze mid-pane</b> &mdash; a stale <code>- 1</code> in the SGR-mouse encoder (<code>input_keys.rs</code>) dropped the sequence's <code>M</code>/<code>m</code> terminator after <code>xsnprintf</code> was corrected to exclude the NUL. ztmux wrote <code>\033[&lt;35;69;44</code> with no terminator; crossterm blocked in <code>read()</code> waiting for an end byte that never came, so rich ratatui/crossterm panes locked up on any click or focus change while keyboard input still worked.</li>
-      <li><b>ztmux hijacked real tmux's socket</b> &mdash; it resolved its default socket from <code>$TMUX</code>, so launched inside a tmux pane it connected to tmux's server and spoke protocol 8 at it (<code>server exited unexpectedly</code>). Fixed to resolve only from <code>$ZTMUX</code> and advertise both <code>$TMUX</code> and <code>$ZTMUX</code> to panes, so the two multiplexers run side by side.</li>
+      <li><b>ztmux hijacked real tmux's socket</b> &mdash; it resolved its default socket from <code>$TMUX</code>, so launched inside a tmux pane it connected to tmux's server and spoke protocol 8 at it (<code>server exited unexpectedly</code>). Fixed to ignore <code>$TMUX</code> for resolution entirely &mdash; without <code>-L</code>/<code>-S</code> it always resolves its own <code>ztmux-&lt;uid&gt;/default</code> socket &mdash; while still exporting <code>$TMUX</code> to its panes, pointed at that socket, so ecosystem tools that only test whether the variable is set keep working. The two multiplexers now run side by side, or nested.</li>
       <li><b>Server crash on <code>bind-key h</code> then <code>l</code></b> &mdash; the red-black tree's delete rebalance (<code>rb_remove_color</code>, <code>compat/tree.rs</code>) rotated around the wrong node. Rebinding a key that already had a default removed the old node first, corrupting the key-bindings tree and segfaulting the server on startup.</li>
       <li><b>Powerline glyphs rendered as <code>\202\202\202</code></b> &mdash; <code>utf8_strvis</code>'s inner loop never advanced the source pointer (the C is <code>while (++src &lt; end &hellip;)</code>), so each multibyte UTF-8 character was re-read and mangled into raw bytes plus octal escapes.</li>
       <li><b>even-* layouts off by one</b> &mdash; <code>layout_spread_cell</code> dumped the leftover column on the last pane instead of handing it to the leading cells; an 80-col two-pane split came out <code>39|40</code> instead of tmux's <code>40|39</code>.</li>
@@ -248,7 +302,8 @@
       <code>fn</code> is added under <code>src/ported/</code> whose name has no counterpart in <code>vendor/tmux</code>.
       <code>src/extensions/</code> is exempt by design &mdash; it is original code, not a mirror of C &mdash; exactly as
       <code>#[cfg(test)]</code> blocks are skipped. Pre-existing exceptions (libc and event-loop wrappers, Rust glue) are
-      frozen in an allowlist: an audit trail to burn down, not a free pass.
+      frozen in an allowlist, <code>tests/data/fake_fn_allowlist.txt</code> &mdash; <strong>289</strong> entries today: an
+      audit trail to burn down, not a free pass.
     </p>
     <p class="prose">
       Two more gates grew out of the bugs above, because each was a <em>class</em> rather than a one-off &mdash; the
@@ -271,12 +326,20 @@
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>TESTING</h2>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-val green">1107/1107</div><div class="stat-label">Parity cases (100%)</div></div>
-      <div class="stat-card"><div class="stat-val">1708</div><div class="stat-label">Unit tests</div></div>
-      <div class="stat-card"><div class="stat-val">2189</div><div class="stat-label">C fns ported</div></div>
-      <div class="stat-card"><div class="stat-val">125k</div><div class="stat-label">Lines of Rust</div></div>
+      <div class="stat-card"><div class="stat-val green">1173/1173</div><div class="stat-label">Parity cases (100%)</div></div>
+      <div class="stat-card"><div class="stat-val">1,766</div><div class="stat-label">Unit tests</div></div>
+      <div class="stat-card"><div class="stat-val">2,318</div><div class="stat-label">C fns ported (of 2,696)</div></div>
+      <div class="stat-card"><div class="stat-val">160k</div><div class="stat-label">Lines of Rust</div></div>
     </div>
-    <p class="prose">Four layers stack: byte-for-byte <strong>parity</strong> against the vendored tmux; in-tree <strong>unit tests</strong> for pure logic (red-black tree invariants under randomized insert/delete, UTF-8 round-trips, layout arithmetic, and the extensions' rendering via ratatui's headless backend); a <strong>crash gate</strong> (<code>tests/server_survives_bad_targets.rs</code>) that drives the real binary on a private socket and asserts the server survives commands whose target resolves to nothing; and the <strong>anti-drift gates</strong> above.</p>
+    <p class="prose">Several layers stack:</p>
+    <ul class="steps">
+      <li><b>Parity</b> &mdash; byte-for-byte against the vendored tmux, <strong>1173</strong> cases, blocking in CI. <code>parity/known_gaps/</code> holds the inverse suite as an advisory tripwire.</li>
+      <li><b>Unit tests</b> &mdash; in-tree, for pure logic: red-black tree invariants under randomized insert/delete, UTF-8 round-trips, layout arithmetic, and the extensions' rendering through ratatui's headless backend.</li>
+      <li><b>Crash gate</b> &mdash; <code>tests/server_survives_bad_targets.rs</code> drives the real binary on a private socket and asserts the server survives commands whose target resolves to nothing.</li>
+      <li><b>Anti-drift gates</b> &mdash; the three build gates above (<code>ported_fn_names_match_c</code>, <code>no_c_alloc_for_rust_types</code>, <code>no_key_code_truncation</code>).</li>
+      <li><b>Upstream regress scripts</b> &mdash; <code>regress/</code> carries <strong>32</strong> of tmux's own regression scripts, run against the ztmux binary via <code>make -C regress</code>. Its <code>Makefile</code> currently ignores failures, so it is a diagnostic harness rather than a gate, and it is not wired into CI.</li>
+      <li><b>Fuzzing</b>, two kinds &mdash; an in-process <code>cargo-fuzz</code> (libFuzzer) target over <code>colour_find_rgb</code> for panics and assertion failures, and <strong>differential fuzzing</strong> (<code>fuzz/diff/</code>) that treats real tmux as the oracle: the same generated input drives both binaries and their output is diffed byte-for-byte. Its <code>input</code> mode generates random streams of printables, C0 controls, CSI/SGR/OSC/DCS sequences and wide/combining UTF-8 and compares <code>capture-pane -p</code>; its <code>copy</code> mode runs random copy-mode motion and selection commands and compares the resulting paste buffer. Reduced failures are checked in under <code>fuzz/diff/repros/</code>.</li>
+    </ul>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>"DONE RIGHT"</h2>
     <ol class="steps">
@@ -291,8 +354,8 @@
       Requires a Rust toolchain and a terminfo database (ncurses) &mdash; no C libraries, since the event loop is Rust
       (<code>src/extensions/event_loop</code>, replacing tmux's libevent).
       Then the binary <code>ztmux</code> speaks the same commands as tmux &mdash; on its own socket namespace
-      (<code>ztmux-&lt;uid&gt;</code>, from <code>$ZTMUX</code>, never <code>$TMUX</code>) so it never collides with a
-      running tmux &mdash; plus the extension subcommands:
+      (<code>ztmux-&lt;uid&gt;/</code> under <code>$TMUX_TMPDIR</code> or <code>/tmp</code>, never adopted from <code>$TMUX</code>)
+      so it never collides with a running tmux &mdash; plus the extension subcommands:
     </p>
     <table class="hud">
       <thead><tr><th>Command</th><th>Does</th></tr></thead>

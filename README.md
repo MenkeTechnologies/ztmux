@@ -225,8 +225,13 @@ They fall into a few families:
   a `-`-prefixed word against that verb's own flags, an option's fixed value set (`-o` →
   `json|jsonl|csv|tsv|table|yaml`), and an extension's subcommand. `verbs [filter]` lists every
   verb with its description, history persists to `~/.ztmux/repl_history`, and non-terminal stdin
-  falls back to a plain line reader so `echo list-sessions | ztmux repl` stays scriptable. Reach
-  it from inside a session with `bind : display-popup -E "ztmux repl"`.
+  falls back to a plain line reader so `echo list-sessions | ztmux repl` stays scriptable. The
+  editor is keyed emacs or vi, from the first source that names a mode: `$ZTMUX_REPL_EDIT_MODE`
+  (`vi`/`emacs`, for a one-off console), `@ztmux-repl-edit-mode` (`set -g @ztmux-repl-edit-mode
+  vi`), the server's `status-keys`, then `$VISUAL`/`$EDITOR` naming a vi editor — so a vi-keyed
+  tmux config keys the console the same way without extra setup, and `help` prints the mode in
+  use and where it came from. Reach it from inside a session with
+  `bind : display-popup -E "ztmux repl"`.
 - **Actions** — `prune`, `equalize`, `revive`, `clearall`, `retitle`, `bcast`, `layout`, and
   `pick` (batch sync/unmark/clear over a multi-pane mark set).
 - **Automation** — `triggers` runs any ztmux command when a regex matches a pane's output

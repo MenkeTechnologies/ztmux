@@ -22,10 +22,19 @@
 //! Builtins: `verbs [filter]` lists every verb with its description, `help`
 //! shows the keys, `clear` clears the screen, `exit`/`quit` (or Ctrl-D) leave.
 //! Ctrl-C abandons the current line. History persists to `~/.ztmux/repl_history`.
-//! Emacs keys by default, vi keys when `$VISUAL`/`$EDITOR` names a vi editor
-//! (the same test tmux uses to pick its own mode keys). Piped stdin falls back
-//! to a plain line reader — no banner, no completion — so `echo list-sessions |
-//! ztmux repl` stays scriptable.
+//!
+//! The line editor is keyed emacs or vi, resolved at startup by the first of
+//! these that names a mode (see [`repl_keys`]):
+//!   1. `$ZTMUX_REPL_EDIT_MODE` — `vi` or `emacs`;
+//!   2. `@ztmux-repl-edit-mode` on the server (`set -g @ztmux-repl-edit-mode
+//!      vi`), the console's own option;
+//!   3. `status-keys` on the server, the option tmux keys its own command
+//!      prompt with, so the console follows the same config;
+//!   4. `$VISUAL`/`$EDITOR` naming a vi editor — the test tmux itself applies
+//!      when it picks `status-keys` at startup.
+//!
+//! Piped stdin falls back to a plain line reader — no banner, no completion —
+//! so `echo list-sessions | ztmux repl` stays scriptable.
 
 use std::borrow::Cow;
 use std::io::{BufRead, IsTerminal, Write};
@@ -41,7 +50,7 @@ use crate::cmd_::{CMD_TABLE, cmd_find};
 use crate::tmux::getversion;
 
 use super::completion_spec::EXTENSION_SPEC;
-use super::tmux_query::{Snapshot, poll, ztmux_cmd};
+use super::tmux_query::{Snapshot, poll, query_lines, ztmux_cmd};
 use super::verbs::{Verb, all_verbs, colored, paint, print_verbs, strip_ansi};
 
 /// The console's own commands, which never reach the server. `verbs` is also a
@@ -209,7 +218,7 @@ fn split_words(line: &str) -> Vec<String> {
 /// Run one console line. Returns `false` to leave the console. Server-bound
 /// lines re-invoke this binary against the same socket, so they are parsed and
 /// dispatched by exactly the code path `ztmux <line>` uses.
-fn run_one(socket: &str, line: &str) -> bool {
+fn run_one(socket: &str, line: &str, mode: Option<KeyMode>) -> bool {
     let words = split_words(line);
     let Some((verb, rest)) = words.split_first() else {
         return true;
@@ -218,7 +227,7 @@ fn run_one(socket: &str, line: &str) -> bool {
     match verb.as_str() {
         "exit" | "quit" => return false,
         "help" => {
-            print_help();
+            print_help(mode);
             return true;
         }
         "verbs" => {
@@ -241,11 +250,12 @@ fn run_one(socket: &str, line: &str) -> bool {
     true
 }
 
-/// Non-tty stdin: a plain line reader, since reedline needs a terminal.
+/// Non-tty stdin: a plain line reader, since reedline needs a terminal. There
+/// is no line editor here, so `help` reports no key mode.
 fn run_piped(socket: &str) -> i32 {
     for line in std::io::stdin().lock().lines() {
         let Ok(line) = line else { break };
-        if !run_one(socket, &line) {
+        if !run_one(socket, &line, None) {
             break;
         }
     }
@@ -326,7 +336,7 @@ fn box_lines(line: &str, color: bool) -> [String; 3] {
 }
 
 /// `help` — the console's own keys and builtins.
-fn print_help() {
+fn print_help(mode: Option<KeyMode>) {
     let color = colored();
     // Pad before colouring: SGR escapes have no printed width, so padding a
     // coloured string would leave the second column ragged.
@@ -342,6 +352,32 @@ fn print_help() {
     println!("  {} abandon the current line", key("Ctrl-C"));
     println!("  {} leave the console", key("Ctrl-D"));
     println!("  {} search history", key("Ctrl-R"));
+    if let Some(mode) = mode {
+        if mode.keys == ReplKeys::Vi {
+            println!("  {} leave insert mode (the prompt becomes `:`)", key("Esc"));
+        }
+        println!();
+        for line in key_mode_lines(mode) {
+            println!("  {} {line}", key(""));
+        }
+    }
+}
+
+/// The `help` lines naming the key set in use, where it came from, and how to
+/// change it — the resolution order is invisible otherwise.
+fn key_mode_lines(mode: KeyMode) -> [String; 2] {
+    let name = match mode.keys {
+        ReplKeys::Vi => "vi",
+        ReplKeys::Emacs => "emacs",
+    };
+    let other = match mode.keys {
+        ReplKeys::Vi => "emacs",
+        ReplKeys::Emacs => "vi",
+    };
+    [
+        format!("{name} keys, from {}", mode.source),
+        format!("`set -g {REPL_KEYS_OPT} {other}` or {REPL_KEYS_ENV}={other} to change"),
+    ]
 }
 
 /// Byte index of the word under the cursor and that word's text.
@@ -456,6 +492,66 @@ fn vi_mode() -> bool {
     editor.contains("vi")
 }
 
+/// The console's own edit-mode option, read off the server so it can be set
+/// from `.tmux.conf` like every other ztmux option.
+const REPL_KEYS_OPT: &str = "@ztmux-repl-edit-mode";
+
+/// Overrides both options, for a one-off console without touching the server.
+const REPL_KEYS_ENV: &str = "ZTMUX_REPL_EDIT_MODE";
+
+/// Which key set the line editor uses.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ReplKeys {
+    Emacs,
+    Vi,
+}
+
+/// A resolved key set and the config that named it, so `help` can say where
+/// the mode came from instead of leaving the user to guess.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct KeyMode {
+    keys: ReplKeys,
+    source: &'static str,
+}
+
+/// A configured value naming a key set. `vi`/`vim`/`nvim` and `emacs` are
+/// accepted in any case; anything else (including the empty string an unset
+/// `show-options -q` returns) names no mode and defers to the next source.
+fn parse_keys(value: &str) -> Option<ReplKeys> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "vi" | "vim" | "nvim" => Some(ReplKeys::Vi),
+        "emacs" => Some(ReplKeys::Emacs),
+        _ => None,
+    }
+}
+
+/// Pick the key set from the first source that names one: `$ZTMUX_REPL_EDIT_MODE`,
+/// `@ztmux-repl-edit-mode`, `status-keys`, then the `$VISUAL`/`$EDITOR` test.
+fn repl_keys(socket: &str) -> KeyMode {
+    let option = |name: &str| {
+        query_lines(socket, &["show-options", "-gqv", name])
+            .into_iter()
+            .next()
+    };
+    if let Some(keys) = std::env::var(REPL_KEYS_ENV).ok().as_deref().and_then(parse_keys) {
+        return KeyMode {
+            keys,
+            source: REPL_KEYS_ENV,
+        };
+    }
+    // Each option is only asked for if the one before it named no mode, so a
+    // console started against a dead server costs at most the two queries.
+    for source in [REPL_KEYS_OPT, "status-keys"] {
+        if let Some(keys) = option(source).as_deref().and_then(parse_keys) {
+            return KeyMode { keys, source };
+        }
+    }
+    KeyMode {
+        keys: if vi_mode() { ReplKeys::Vi } else { ReplKeys::Emacs },
+        source: "$VISUAL/$EDITOR",
+    }
+}
+
 fn run_interactive(socket: &str) -> i32 {
     print_banner(socket);
 
@@ -467,14 +563,18 @@ fn run_interactive(socket: &str) -> i32 {
         .with_columns(4)
         .with_column_padding(2);
 
-    let edit_mode: Box<dyn EditMode> = if vi_mode() {
-        let mut insert = default_vi_insert_keybindings();
-        install_menu_bindings(&mut insert);
-        Box::new(Vi::new(insert, default_vi_normal_keybindings()))
-    } else {
-        let mut emacs = default_emacs_keybindings();
-        install_menu_bindings(&mut emacs);
-        Box::new(Emacs::new(emacs))
+    let mode = repl_keys(socket);
+    let edit_mode: Box<dyn EditMode> = match mode.keys {
+        ReplKeys::Vi => {
+            let mut insert = default_vi_insert_keybindings();
+            install_menu_bindings(&mut insert);
+            Box::new(Vi::new(insert, default_vi_normal_keybindings()))
+        }
+        ReplKeys::Emacs => {
+            let mut emacs = default_emacs_keybindings();
+            install_menu_bindings(&mut emacs);
+            Box::new(Emacs::new(emacs))
+        }
     };
 
     let mut editor = Reedline::create()
@@ -494,7 +594,7 @@ fn run_interactive(socket: &str) -> i32 {
     loop {
         match editor.read_line(&prompt) {
             Ok(Signal::Success(line)) | Ok(Signal::HostCommand(line)) => {
-                if !run_one(socket, &line) {
+                if !run_one(socket, &line, Some(mode)) {
                     break;
                 }
             }
@@ -679,6 +779,44 @@ mod tests {
             }
         }
         assert_eq!(strip_ansi("\x1b[36m├─┤\x1b[0m").chars().count(), 3);
+    }
+
+    #[test]
+    fn edit_mode_values_parse_the_way_the_options_spell_them() {
+        // What `show-options -gqv status-keys` prints for the CHOICE option,
+        // and what `set -g @ztmux-repl-edit-mode …` is documented to take.
+        assert_eq!(parse_keys("vi"), Some(ReplKeys::Vi));
+        assert_eq!(parse_keys("emacs"), Some(ReplKeys::Emacs));
+        // A `$EDITOR`-shaped value in the env override still names vi.
+        assert_eq!(parse_keys("vim"), Some(ReplKeys::Vi));
+        assert_eq!(parse_keys("nvim"), Some(ReplKeys::Vi));
+        assert_eq!(parse_keys(" Vi\n"), Some(ReplKeys::Vi));
+        // Unset (`-q` prints nothing) and junk must defer to the next source
+        // rather than silently picking a mode.
+        assert_eq!(parse_keys(""), None);
+        assert_eq!(parse_keys("   "), None);
+        assert_eq!(parse_keys("on"), None);
+        assert_eq!(parse_keys("vi-insert"), None);
+    }
+
+    #[test]
+    fn help_names_the_key_set_its_source_and_the_other_mode() {
+        let vi = key_mode_lines(KeyMode {
+            keys: ReplKeys::Vi,
+            source: "status-keys",
+        });
+        assert_eq!(vi[0], "vi keys, from status-keys");
+        // The suggested value is the mode not in use, so copying the line
+        // actually changes something.
+        assert!(vi[1].contains("@ztmux-repl-edit-mode emacs"), "{}", vi[1]);
+        assert!(vi[1].contains("ZTMUX_REPL_EDIT_MODE=emacs"), "{}", vi[1]);
+
+        let emacs = key_mode_lines(KeyMode {
+            keys: ReplKeys::Emacs,
+            source: "$VISUAL/$EDITOR",
+        });
+        assert_eq!(emacs[0], "emacs keys, from $VISUAL/$EDITOR");
+        assert!(emacs[1].contains("@ztmux-repl-edit-mode vi"), "{}", emacs[1]);
     }
 
     #[test]
