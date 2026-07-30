@@ -2,6 +2,83 @@
 
 Fixes to the ztmux port, most recent first.
 
+## 2026-07-30
+
+A parity round aimed at the areas the previous bug rounds came out of, rather than
+at new commands: the copy-mode command table and its format variables, the grid as
+read back through `capture-pane`, the signed offset arithmetic in layout and
+resize, and the popup/menu argument parsers. Coverage before the round was 3 cases
+against 91 copy-mode table entries and 2 cases that called `capture-pane` at all.
+The 32 new cases (`parity/cases/1439`–`1470`) found five bugs, two of them server
+crashes; the suite is 1166/1166.
+
+### 1. `append-selection` took the server down
+
+- **Symptom:** in copy mode, `copy-line` followed by `begin-selection` and
+  `append-selection` exited the server. Any append onto an existing buffer did it;
+  an append with no buffer yet did not.
+- **Root cause:** `paste_set` (`src/ported/paste.rs`) ended with
+  `notify_paste_buffer(name, …)` using the **caller's** name. C uses `pb->name` —
+  the copy `paste_set` itself just made (`vendor/tmux/paste.c`). That difference is
+  invisible in C, where `paste_get_top` hands back an `xstrdup`, but
+  `window_copy_append_selection` here borrows the name straight out of the buffer
+  it is about to replace, and `paste_free(old)` drops that string before the notify
+  reads it: a use-after-free.
+- **Fix:** notify with the new buffer's own name, as the C does.
+- **Pinned by:** `parity/cases/1448_copy_mode_copy_to_buffer.sh`.
+
+### 2. `capture-pane -S -5` took the server down
+
+- **Symptom:** any negative `-S`/`-E` (capture N lines back into history) exited
+  the server in a debug build.
+- **Root cause:** `top = gd->hsize + n` with `n` an `int` and `hsize` a `u_int` is
+  an unsigned wrap in C that lands on the intended history line. Written as a plain
+  Rust add (`src/ported/cmd_capture_pane.rs`) it is an overflow panic. Same shape as
+  the earlier `tty_cursor` and `previous-prompt` fixes.
+- **Fix:** `wrapping_add_signed` on both the `-S` and `-E` paths, with the reason in
+  a comment.
+- **Pinned by:** `parity/cases/1454_capture_pane_ranges.sh`.
+
+### 3. `#{selection_mode}` and `#{search_timed_out}` never expanded
+
+- **Symptom:** both format variables expanded to nothing where tmux prints
+  `char`/`word`/`line` and `0`/`1`.
+- **Root cause:** `window_copy_formats` (`src/ported/window_copy.rs`) had dropped
+  the `selflag` switch and the timeout entry present at `window-copy.c:1139`
+  and `:1152`.
+- **Fix:** ported both blocks.
+- **Pinned by:** `parity/cases/1443_copy_mode_selection_formats.sh`,
+  `1447_copy_mode_search_formats.sh`.
+
+### 4. A failed search kept the previous search's match count
+
+- **Symptom:** after a search that matched nothing, `#{search_count}` still
+  reported the count from the previous search instead of expanding empty.
+- **Root cause:** `window_copy_clear_marks` (`window-copy.c:4805`) resets
+  `searchcount = -1` and `searchmore = 0` before freeing the mark array; the port
+  only freed the array, and `-1` is what suppresses the format entirely.
+- **Fix:** reset both fields, as the C does.
+- **Pinned by:** `parity/cases/1447_copy_mode_search_formats.sh`.
+
+### 5. Percentages over 100% were rejected
+
+- **Symptom:** `resize-pane -x 150%` failed with `width too large`; tmux resolves
+  it to 120 and lets the layout clamp it to the window.
+- **Root cause:** `args_string_percentage` and `args_string_percentage_and_expand`
+  (`src/ported/arguments.rs`) bounded the percentage numerator at 100. The C bounds
+  it at 1000 (`arguments.c:1013`, `:1081`) and clamps the *product* against
+  min/max. A unit test had encoded the wrong bound.
+- **Fix:** ported the 1000 bound to both functions; the test now asserts the C's
+  behaviour (150% of 200 is 300; only a numerator past 1000 is "too large").
+- **Pinned by:** `parity/cases/1462_resize_pane_bounds.sh`.
+
+Two divergences the round proved are unported features rather than defects went to
+`parity/known_gaps/`: 11 `send-keys -X` commands absent from the copy-mode table
+(`recentre-top-bottom`, `refresh-{on,off,toggle}`, `scroll-exit-{on,off,toggle}`,
+`cursor-centre-{vertical,horizontal}`, `scroll-to-mouse`, `selection-mode`) and
+`capture-pane -F/-H/-L/-M`, the last of which also needs `GRID_LINE_HYPERLINK` and
+the mode `get_screen` callback.
+
 ## 2026-07-13
 
 A memory-ownership round: convert C `char *` struct fields to owned Rust types and

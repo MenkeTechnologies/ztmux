@@ -322,7 +322,13 @@ pub unsafe fn paste_set(
         rb_insert::<_, discr_name_entry>(&raw mut PASTE_BY_NAME, pb);
         rb_insert::<_, discr_time_entry>(&raw mut PASTE_BY_TIME, pb);
 
-        notify_paste_buffer(name, false);
+        // C notifies with `pb->name`, the copy this call just made, NOT the
+        // caller's `name`. That matters here in a way it does not in C: when
+        // the caller borrowed its name out of the buffer being replaced (as
+        // window_copy_append_selection does via paste_get_top), paste_free
+        // above has already dropped that string, so reading `name` again is a
+        // use-after-free that takes the server down.
+        notify_paste_buffer(&(*pb).name, false);
     }
     0
 }

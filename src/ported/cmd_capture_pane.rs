@@ -152,7 +152,12 @@ unsafe fn cmd_capture_pane_history(
             } else if n < 0 && (-n) as u32 > (*gd).hsize {
                 top = 0;
             } else {
-                top = (*gd).hsize + n as u32;
+                // C computes `gd->hsize + n` with n an int and hsize a u_int,
+                // so a negative n converts to u_int and the sum wraps back down
+                // to the intended history line. Written as a plain Rust add it
+                // is an overflow that panics the server in a debug build for
+                // every negative -S.
+                top = (*gd).hsize.wrapping_add_signed(n as i32);
             }
             if top > (*gd).hsize + (*gd).sy - 1 {
                 top = (*gd).hsize + (*gd).sy - 1;
@@ -177,7 +182,8 @@ unsafe fn cmd_capture_pane_history(
             } else if n < 0 && (-n) as u32 > (*gd).hsize {
                 bottom = 0;
             } else {
-                bottom = (*gd).hsize + n as u32;
+                // Same wrap as -S above.
+                bottom = (*gd).hsize.wrapping_add_signed(n as i32);
             }
             if bottom > (*gd).hsize + (*gd).sy - 1 {
                 bottom = (*gd).hsize + (*gd).sy - 1;

@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1130/1130 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 cases.
+**1166/1166 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 cases.
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
 (full-size split with a pre-existing split) crashed the server on a u32 underflow
@@ -95,6 +95,46 @@ commands: hooks (set/show), environment scopes, buffer append/auto-name,
 link/unlink/join/break/swap/kill-pane and -window, clear-history, last-pane,
 window-size/resize-window, select-layout (tiled/main-vertical), next-layout,
 status-position/justify, prefix, remain-on-exit/allow-rename/automatic-rename.
+
+Round-8 fixes:
+
+The 1439–1470 block was written against the areas the last few bug rounds came
+out of rather than against new commands: the copy-mode command table and its
+formats (3 cases before this block, against 91 table entries), the grid as seen
+through `capture-pane` (2 cases before this block), the signed offset arithmetic
+in layout/resize, and the popup/menu argument parsers. It found five bugs, two
+of them server crashes:
+
+- **`#{selection_mode}` and `#{search_timed_out}` never expanded** (1443, 1447)
+  — `window_copy_formats` (`window-copy.c:1139`, `:1152`) dropped the `selflag`
+  switch and the timeout entry, so both expanded empty where tmux prints
+  `char`/`word`/`line` and `0`/`1`.
+- **a failed search kept the previous search's match count** (1447) —
+  `window_copy_clear_marks` (`window-copy.c:4805`) resets `searchcount = -1` and
+  `searchmore = 0`; the port only freed the mark array, so after a search that
+  matched nothing `#{search_count}` still reported the earlier count instead of
+  expanding empty.
+- **`append-selection` took the server down** (1448) — `paste_set` notified with
+  the caller's `name`, and `window_copy_append_selection` borrows that name out
+  of the very buffer being replaced (via `paste_get_top`, which in C returns an
+  `xstrdup`). By the time the notify ran, `paste_free(old)` had dropped the
+  string. C notifies with `pb->name`, the copy `paste_set` just made; now so
+  does the port.
+- **`capture-pane -S -5` took the server down** (1454) — `gd->hsize + n` with a
+  negative `int` is an unsigned wrap in C and an overflow panic in a Rust debug
+  build. Now `wrapping_add_signed` on both the `-S` and `-E` paths, the same
+  shape as the earlier `tty_cursor` and `previous-prompt` fixes.
+- **percentages over 100% were rejected** (1462) — `args_string_percentage` and
+  `args_string_percentage_and_expand` bounded the numerator at 100 where the C
+  bounds it at 1000 (`arguments.c:1013`, `:1081`), so `resize-pane -x 150%`
+  failed with "width too large" instead of resolving to 120 and letting the
+  layout clamp it to the window. A unit test had encoded the wrong bound and was
+  corrected against the C.
+
+Two gaps the block proved are unported rather than wrong went to
+`parity/known_gaps/`: 11 missing `send-keys -X` commands
+(`cmd_copy_mode_missing.sh`) and `capture-pane -F/-H/-L/-M`
+(`cmd_capture_pane_flags.sh`).
 
 Round-7 fix:
 
@@ -263,9 +303,10 @@ so a regression in ported behavior cannot land.
 
 `parity/known_gaps/` is the inverse of `parity/cases/`: next-3.7 features ztmux
 does **not** implement yet, each pinned by a case that is expected to *diverge*
-from the reference. The 6 cases cover ~45 individual options/format-vars/commands
+from the reference. The 8 cases cover ~60 individual options/format-vars/commands
 (pane scrollbars, the theme system, copy-mode line numbers, floating-pane format
-vars, `switch-mode`, …), each tied to an unported C area. Run them with the
+vars, `switch-mode`, 11 `send-keys -X` commands, `capture-pane -F/-H/-L/-M`, …),
+each tied to an unported C area. Run them with the
 inverted runner:
 
 ```sh
@@ -276,7 +317,7 @@ The runner is an advisory tripwire — it exits non-zero only when a gap closes
 (the feature got ported and its case should move to `parity/cases/`), so it never
 reddens CI merely because the gaps still exist. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1130/1130 ported surface; they measure
+proof. These gaps do not count against the 1166/1166 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite

@@ -834,12 +834,19 @@ pub unsafe fn window_copy_formats(wme: *mut window_mode_entry, ft: *mut format_t
             format_add!(ft, "selection_present", "0");
         }
 
+        match (*data).selflag {
+            selflag::SEL_CHAR => format_add!(ft, "selection_mode", "char"),
+            selflag::SEL_WORD => format_add!(ft, "selection_mode", "word"),
+            selflag::SEL_LINE => format_add!(ft, "selection_mode", "line"),
+        }
+
         format_add!(
             ft,
             "search_present",
             "{}",
             !(*data).searchmark.is_null() as i32,
         );
+        format_add!(ft, "search_timed_out", "{}", (*data).timeout);
         if (*data).searchcount != -1 {
             format_add!(ft, "search_count", "{}", (*data).searchcount,);
             format_add!(ft, "search_count_partial", "{}", (*data).searchmore,);
@@ -4817,6 +4824,9 @@ pub unsafe fn window_copy_search_marks(
 pub unsafe fn window_copy_clear_marks(wme: *mut window_mode_entry) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
+
+        (*data).searchcount = -1;
+        (*data).searchmore = 0;
 
         free_((*data).searchmark);
         (*data).searchmark = null_mut();

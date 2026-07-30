@@ -1128,7 +1128,10 @@ pub unsafe fn args_string_percentage(
             copy = xstrdup(value).as_ptr();
             *copy.add(valuelen - 1) = b'\0';
 
-            let tmp = strtonum(copy, 0, 100);
+            // C `arguments.c:1013` bounds the numerator at 1000, not 100: a
+            // percentage over 100% is legal and is clamped later by whatever
+            // consumes it (resize-pane clamps to the window).
+            let tmp = strtonum(copy, 0, 1000);
             free_(copy);
             ll = match tmp {
                 Ok(n) => n,
@@ -1207,7 +1210,8 @@ pub unsafe fn args_string_percentage_and_expand(
             *copy.add(valuelen - 1) = b'\0';
 
             f = format_single_from_target(item, copy);
-            let tmp = strtonum(f, 0, 100);
+            // C `arguments.c:1081`: numerator bound is 1000, as above.
+            let tmp = strtonum(f, 0, 1000);
             free_(f);
             free_(copy);
             ll = match tmp {
@@ -1732,13 +1736,18 @@ mod tests {
         }
     }
 
-    // arguments.c:1005: a percentage numerator outside 0..100 fails via strtonum
-    // ("too large").
+    // arguments.c:1013: the numerator is bounded at 1000, so 150% is accepted
+    // and resolves to 200 * 150 / 100; only a numerator past 1000 fails via
+    // strtonum ("too large").
     #[test]
     fn string_percentage_bad_numerator() {
         unsafe {
             let mut cause: *mut u8 = null_mut();
             let n = args_string_percentage(c!("150%"), 0, 1000, 200, &raw mut cause);
+            assert_eq!(n, 300);
+            assert!(cause.is_null());
+
+            let n = args_string_percentage(c!("1500%"), 0, 1000, 200, &raw mut cause);
             assert_eq!(n, 0);
             assert_eq!(read_cstr(cause), b"too large");
             free_(cause);
