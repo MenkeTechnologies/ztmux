@@ -88,7 +88,7 @@ jobs:
   # source ztmux ports (vendor/tmux, next-3.7) and diff byte-for-byte. The
   # reference is BUILT from vendor/tmux — not apt's tmux, whose version differs
   # and produces false diffs (layout rounding, div-by-zero formatting, etc.).
-  # Blocking gate now that the suite is reliably green (1080/1080); a parity
+  # Blocking gate now that the suite is reliably green (1173/1173); a parity
   # regression fails CI. Not in the release-build `needs:` so an artifact still
   # builds, but the failure log is uploaded and the pipeline goes red (see
   # parity/PARITY_ROADMAP.md).

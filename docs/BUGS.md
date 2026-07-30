@@ -400,10 +400,13 @@ single-case parity verifier (`parity/verify_one.sh`).
   "server exited unexpectedly"; ztmux and tmux could not run side by side.
 - **Root cause:** ztmux resolved its default socket from `$TMUX`, so when launched
   inside a tmux pane it connected to tmux's server and spoke protocol 8 at it.
-- **Fix:** ztmux resolves its socket only from `$ZTMUX` (never `$TMUX`), and
-  advertises both `$TMUX` (ecosystem compatibility) and `$ZTMUX` (its own handle)
-  to panes — `src/ported/tmux.rs`, `src/ported/environ.rs`,
-  `src/ported/server_client.rs`.
+- **Fix:** ztmux ignores `$TMUX` for socket resolution entirely. Unless `-S`/`-L`
+  is given it always resolves its own socket through `make_label` (`default`
+  under the `ztmux-<uid>` directory), so nesting inside a real tmux pane can
+  never put it on tmux's socket (`src/ported/tmux.rs:605`). It still *exports*
+  `$TMUX` to its panes, pointing at its own socket, because the ecosystem
+  (powerline, tpm, prompts) detects a multiplexer by that variable being set; it
+  deliberately introduces no `$ZTMUX` variable (`src/ported/environ.rs:301`).
 
 ### 3. Version string broke config version-gates
 

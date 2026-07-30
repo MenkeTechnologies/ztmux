@@ -9,9 +9,12 @@ This is the all-in-one
 .B ztmux
 manual, modeled on
 .BR zshall (1).
-It concatenates the major sections of the ztmux reference into a single page
-so you can search with
+It is a condensed single-page orientation \(en invocation, concepts, the socket
+namespace, configuration and the port model \(en meant to be searched with
 .RB \` / \|'.
+The complete reference, including every command, option, format and extension,
+is
+.BR ztmux (1).
 .B ztmux
 is a from-source port of
 .BR tmux (1)
@@ -75,22 +78,47 @@ Terminate the server and every session it holds.
 .SH 4. SOCKET NAMESPACE
 .B ztmux
 sockets live under a per-user directory
-.RI ( /tmp/ztmux- UID
-by default), keeping ztmux servers separate from
+.RI ( $TMUX_TMPDIR/ztmux- UID ,
+or
+.RI /tmp/ztmux- UID
+when
+.B $TMUX_TMPDIR
+is unset), keeping ztmux servers separate from
 .BR tmux (1)
 servers on the same host. Override the socket with
 .B \-L
 (name) or
 .B \-S
-(full path).
+(full path). Without either flag ztmux always resolves its own socket and never
+adopts one from
+.BR $TMUX ,
+so running it inside a real tmux pane cannot connect it to that tmux server. It
+still exports
+.B $TMUX
+to its own panes, pointed at its own socket, because the surrounding ecosystem
+detects a multiplexer by that variable being set; there is no
+.B $ZTMUX
+variable.
 .SH 5. CONFIGURATION
-On start the server reads
-.I ~/.ztmux.conf
-(or the file given with
-.BR \-f ),
-a list of
+On start the server reads the first configuration file it finds, or the file
+given with
+.BR \-f .
+The default search path is
+.IR /etc/tmux.conf ,
+.IR ~/.tmux.conf ,
+.IR $XDG_CONFIG_HOME/tmux/tmux.conf ,
+.IR ~/.config/tmux/tmux.conf
+\(en the same paths as
+.BR tmux (1),
+so an existing tmux configuration is picked up unchanged. Each file is a list of
 .B ztmux
-commands run in order.
+commands run in order. Override the whole path at build time with
+.BR $TMUX_CONF .
+Extension state that is not a tmux option \(en trigger rules, resurrect
+snapshots, the
+.B repl
+history \(en lives under
+.IR ~/.ztmux/ .
 .SH 6. THE PORT MODEL
 The ztmux repository vendors a read-only reference under
 .IR vendor/ :

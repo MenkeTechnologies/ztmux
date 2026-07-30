@@ -74,10 +74,12 @@
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>AT A GLANCE</h2>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-val green">1080/1080</div><div class="stat-label">Parity vs tmux next-3.7 (100%)</div></div>
+      <div class="stat-card"><div class="stat-val green">1173/1173</div><div class="stat-label">Parity vs tmux next-3.7 (100%)</div></div>
       <div class="stat-card"><div class="stat-val green">100%</div><div class="stat-label">Functional &mdash; server + client</div></div>
-      <div class="stat-card"><div class="stat-val">1253</div><div class="stat-label">Unit tests</div></div>
-      <div class="stat-card"><div class="stat-val">125k</div><div class="stat-label">Lines of Rust</div></div>
+      <div class="stat-card"><div class="stat-val">1,766</div><div class="stat-label">Unit tests</div></div>
+      <div class="stat-card"><div class="stat-val">160k</div><div class="stat-label">Lines of Rust</div></div>
+      <div class="stat-card"><div class="stat-val">2,318</div><div class="stat-label">C fns ported (of 2,696)</div></div>
+      <div class="stat-card"><div class="stat-val">112</div><div class="stat-label">Original extensions</div></div>
     </div>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>BEYOND tmux</h2>
@@ -89,16 +91,20 @@
       <a class="hub-card" href="report.html#"><h3>Structured output</h3><p><code>list-* -o json|jsonl|csv|tsv|table</code> &mdash; typed, machine-readable output for every list command, from the same <code>#{&hellip;}</code> format engine.</p></a>
       <a class="hub-card" href="report.html#"><h3>ztmux dashboard</h3><p>A ratatui TUI: the live session&rarr;window&rarr;pane tree, per-pane detail, server stats + sparkline, kill-with-confirm.</p></a>
       <a class="hub-card" href="report.html#"><h3>ztmux switcher</h3><p>A fuzzy picker over every session, window, and pane &mdash; type to filter, Enter to jump.</p></a>
+      <a class="hub-card" href="report.html#"><h3>Ratatui UI layer</h3><p>Original interactive surfaces drawn with ratatui instead of tmux's server draw: prefix hint bar, command palette, clock, display-panes, floating panes, and zellij-style frames, tabs, stacks and modal keys.</p></a>
+      <a class="hub-card" href="report.html#"><h3>Triggers &amp; resurrect</h3><p><code>triggers</code> runs any ztmux command when a regex matches a pane's output; <code>resurrect</code> saves and restores the whole server across restarts.</p></a>
     </div>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>CLIENT EXTENSIONS</h2>
     <p class="prose">
       Beyond the interactive <code>dashboard</code> and <code>switch</code> TUIs, ztmux ships a family of original
-      client subcommands with no tmux counterpart &mdash; each one a one-shot that resolves the running server over the
-      structured <code>list-* -o json</code> query layer. The inspection verbs are pipeable tables that also emit
+      client subcommands with no tmux counterpart &mdash; <strong>112</strong> of them, alongside the <strong>91</strong>
+      ported tmux commands and their <strong>78</strong> aliases. Most are one-shots that resolve the running server over
+      the structured <code>list-* -o json</code> query layer. The inspection verbs are pipeable tables that also emit
       <code>-o json</code> / <code>--json</code>; the action verbs are <strong>dry-run by default</strong> and only
-      mutate when passed <code>-f</code> / <code>--force</code>. They all live in <code>src/extensions/</code> and are
-      exempt from the anti-drift gate.
+      mutate when passed <code>-f</code> / <code>--force</code>; the interactive ones take over the terminal, so bind
+      them to a key or run them in a popup. They all live in <code>src/extensions/</code> and are exempt from the
+      anti-drift gate. <code>ztmux verbs</code> lists the current set, and needs no server.
     </p>
     <p class="prose"><strong>// INSPECTION</strong> &mdash; read-only, pipeable, <code>-o json</code> capable:</p>
     <table class="hud">
@@ -216,6 +222,20 @@
         <tr><td><code>ztmux verbs</code></td><td>List every verb (commands, aliases, extensions) with descriptions; filterable, <code>-o json</code>.</td></tr>
       </tbody>
     </table>
+    <p class="prose"><strong>// INTERACTIVE &amp; ZELLIJ-STYLE</strong> &mdash; ratatui surfaces, modal keys, and persistence:</p>
+    <table class="hud">
+      <thead><tr><th>Command</th><th>Does</th></tr></thead>
+      <tbody>
+        <tr><td><code>ztmux dashboard</code></td><td>Live ratatui server dashboard.</td></tr>
+        <tr><td><code>ztmux switcher</code></td><td>Interactive session/window/pane picker.</td></tr>
+        <tr><td><code>ztmux modal</code></td><td>Zellij-style modal keybindings: pane/tab/resize/session/lock modes.</td></tr>
+        <tr><td><code>ztmux open</code></td><td>Pick a URL or file path out of the current pane and open it.</td></tr>
+        <tr><td><code>ztmux resurrect</code></td><td>Save/restore all sessions across restarts.</td></tr>
+        <tr><td><code>ztmux sessions</code></td><td>Zellij-style session manager: switch/rename/kill/new.</td></tr>
+        <tr><td><code>ztmux stack</code></td><td>Zellij-style pane stacks: toggle, unstack, refocus.</td></tr>
+        <tr><td><code>ztmux tabs</code></td><td>Zellij-style top tab bar of windows.</td></tr>
+      </tbody>
+    </table>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>SITEMAP</h2>
     <div class="hub-cards">
@@ -242,9 +262,12 @@
       Requires a Rust toolchain and a terminfo database (ncurses) — no C libraries: the event loop is Rust
       (<code>src/extensions/event_loop</code>, replacing tmux's libevent), so there is no <code>-dev</code> package to install and
       nothing to <code>pkg-config</code>. The binary is <code>ztmux</code>; it speaks the same client/server protocol as tmux but on its <em>own</em> socket
-      namespace (<code>ztmux-&lt;uid&gt;</code>, resolved from <code>$ZTMUX</code>, never <code>$TMUX</code>) so it never
-      collides with a running tmux. It advertises both <code>$TMUX</code> (ecosystem compatibility) and
-      <code>$ZTMUX</code> (its own handle) to panes, so tools like <code>ztmux-core</code> and zterminal talk to it.
+      namespace (<code>$TMUX_TMPDIR</code> or <code>/tmp</code>, then <code>ztmux-&lt;uid&gt;/</code>) so it never collides with a
+      running tmux: unless <code>-L</code>/<code>-S</code> says otherwise it always resolves its own socket and never adopts
+      one from <code>$TMUX</code>, so nesting it inside a real tmux pane cannot put it on that server's socket. It does
+      <em>export</em> <code>$TMUX</code> to its panes &mdash; pointing at its own socket, since the ecosystem (powerline,
+      tpm, prompts) detects a multiplexer by that variable being set &mdash; and introduces no <code>$ZTMUX</code>
+      variable of its own.
     </p>
 
     <footer style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-dim);font-size:11px;font-family:'Share Tech Mono',monospace;">

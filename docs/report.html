@@ -267,6 +267,24 @@
       just model state. <code>@ztmux-ratatui off</code> disables the whole renderer for a classic plain-tmux server, which
       leaves the default draw path and the byte-for-byte parity suite untouched.
     </p>
+    <p class="prose">Everything here is configured with ordinary tmux user options, so it all sets from the config file. Unless noted these are global (<code>set -g</code>) and read live, taking effect on the next redraw:</p>
+    <table class="hud">
+      <thead><tr><th>Option</th><th>Default</th><th>What</th></tr></thead>
+      <tbody>
+        <tr><td><code>@ztmux-ratatui</code></td><td>on</td><td>Master switch for the ratatui renderer &mdash; palette, menus, clock, display-panes, hint bar. <code>off</code> gives a classic plain-tmux server.</td></tr>
+        <tr><td><code>@ztmux-hint</code></td><td>off</td><td>The which-key hint bar on the prefix. <code>modal on</code> turns it on and saves the prior value in <code>@ztmux-modal-saved-hint</code>.</td></tr>
+        <tr><td><code>@ztmux-zellij-mode</code></td><td>off</td><td>The framed look: every pane inset by a one-cell ring, drawn with a rounded named box. <code>@ztmux-pane-names</code> is a back-compat alias.</td></tr>
+        <tr><td><code>@ztmux-pane-name-format</code></td><td><code>#{pane_index}: #{pane_current_command}</code></td><td>tmux format expanded per pane for the name in that frame.</td></tr>
+        <tr><td><code>@ztmux-float-autohide</code></td><td>off</td><td>Hide a floating pane while a tiled pane has focus (the zellij model), bringing it back on <code>prefix C-f</code>. Also settable per window.</td></tr>
+        <tr><td><code>@ztmux-tab-bar</code></td><td>unset</td><td>Set by <code>ztmux tabs</code>; the status options it overwrote are saved in <code>@ztmux-tab-saved-*</code>. Drive it through <code>tabs on</code>/<code>off</code>.</td></tr>
+        <tr><td><code>@ztmux-modal</code></td><td>unset</td><td>Set by <code>ztmux modal</code>. Drive it through <code>modal on</code>/<code>off</code>, which also installs and removes the root entry keys.</td></tr>
+        <tr><td><code>@ztmux-stacked</code></td><td>unset</td><td>Per-window; set by <code>ztmux stack</code> to mark the window stacked.</td></tr>
+        <tr><td><code>@ztmux-resurrect-auto</code></td><td>off</td><td>The first client to attach spawns a pidfile-guarded daemon that re-saves every 15 minutes.</td></tr>
+        <tr><td><code>@ztmux-resurrect-restore</code></td><td>off</td><td>A fresh server also restores the last snapshot once, on start.</td></tr>
+        <tr><td><code>@ztmux-repl-edit-mode</code></td><td>follows <code>status-keys</code></td><td>Key set for the <code>repl</code> editor (<code>vi</code>/<code>emacs</code>); <code>$ZTMUX_REPL_EDIT_MODE</code> overrides it for one console.</td></tr>
+        <tr><td><code>@ztmux_sel</code></td><td>unset</td><td>Per-pane; set by <code>prefix C-s</code> to mark the pane a member of the multi-pane sync set.</td></tr>
+      </tbody>
+    </table>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>HOW THE PORT IS BUILT</h2>
     <p class="prose">Two references, both vendored under <code>vendor/</code> as plain, read-only, SHA-pinned copies so the clone is self-contained:</p>

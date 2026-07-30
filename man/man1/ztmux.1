@@ -2932,6 +2932,164 @@ column. With
 (or
 .BR \-\-json )
 it emits the same rows as a machine-readable array.
+.SS ztmux open
+.B ztmux open
+captures the active pane (visible screen plus recent scrollback), scans it for
+URLs and file paths, and shows a ratatui picker. Type to filter;
+.B Enter
+opens the selection \(en a URL in the OS opener
+.RB ( open
+or
+.BR xdg\-open ),
+a file in
+.B $EDITOR
+(at its line when the token is
+.IR file : line ),
+a directory revealed in the file manager \(en and
+.B y
+copies it instead, to both the ztmux paste buffer and the OS clipboard. It reads
+through
+.B capture\-pane
+and acts through the OS and
+.BR "ztmux set\-buffer" ,
+so it needs no server linkage. Being a full-screen picker it wants a terminal:
+bind it to a key or run it in a popup, for example
+.BR "bind o display\-popup \-E 'ztmux open'" .
+.SS ztmux sessions
+.B ztmux sessions
+opens a zellij-style session manager: a full-screen ratatui list of the server's
+sessions where typing filters,
+.B Enter
+switches to the highlighted session,
+.B Ctrl\-r
+renames it,
+.B Ctrl\-x
+kills it (with a confirmation), and
+.B Ctrl\-n
+creates a new one. Like the picker it reads the server through
+.B list\-* \-o json
+and acts through
+.B ztmux
+commands. It requires a terminal.
+.SS ztmux tabs
+.B ztmux tabs
+turns the status line into a zellij-style tab bar: moved to the top, a session
+badge on the left, and each window a
+.RB ` " #I #W " '
+segment with the current one highlighted. The bottom is left free for the
+ratatui hint bar, matching zellij's top-tabs / bottom-hints layout.
+Subcommands are
+.B toggle
+(the default),
+.BR on ,
+and
+.BR off .
+It is fully reversible:
+.B on
+first saves the prior value of every status option it touches into
+.BR @ztmux\-tab\-saved\-* ,
+and
+.B off
+restores them, so a custom status line comes back untouched.
+.SS ztmux stack
+.B ztmux stack
+toggles a zellij-style pane stack for a window: the active pane stays flexible
+and absorbs the height while every other pane collapses to a single title row.
+With no argument it toggles;
+.B off
+(or
+.BR unstack )
+leaves stacked mode and
+.B refocus
+(or
+.BR expand )
+re-establishes the geometry around whichever pane is now active, which is what
+the focus hook calls.
+.B \-t
+.I window
+selects the window to act on (the default is the active one). The state is the
+per-window option
+.BR @ztmux\-stacked ;
+entering and leaving both reset the window to
+.BR even\-vertical ,
+so the layout in force before the first
+.B stack
+call is not restored.
+.B prefix +
+is bound to it, and it is meant to be used with the framed zellij look
+.RB ( "@ztmux\-zellij\-mode on" ).
+.SS ztmux modal
+.B ztmux modal
+installs zellij-style modal keybindings:
+.B Ctrl\-p
+pane mode,
+.B Ctrl\-t
+tab mode,
+.B Ctrl\-n
+resize mode,
+.B Ctrl\-s
+scroll (copy) mode,
+.B Ctrl\-o
+session mode, and
+.B Ctrl\-g
+lock. Each mode is a key table whose bindings re-assert the table, so it stays
+sticky until
+.BR Enter ,
+.B Escape
+or
+.B q
+returns to the root table; the entry keys themselves live in the root table, so
+they fire with no prefix exactly as zellij does. Subcommands are
+.B toggle
+(the default),
+.BR on ,
+and
+.BR off .
+It is
+.B off
+by default because those root
+.B Ctrl\-*
+keys are then intercepted globally \(en the zellij trade-off \(en and it shadows
+.B Ctrl\-n
+and
+.B Ctrl\-p
+for programs inside panes.
+.B modal on
+also turns the hint bar on so the active mode's keys are visible, saving the
+prior
+.B @ztmux\-hint
+value;
+.B modal off
+removes the entry keys and restores both the prefix and that value.
+.SS ztmux resurrect
+.B ztmux resurrect
+persists the whole server across restarts, which tmux itself does not do.
+.B ztmux resurrect
+.RB ( save ,
+the default) walks every session, window and pane and writes its shape \(en
+window names and layout strings, and each pane's working directory and running
+command \(en to a timestamped file under
+.IR ~/.ztmux/resurrect/ .
+.B ztmux resurrect restore
+.RI [ file ]
+.RB [ \-\-run ]
+reads the newest save (or
+.IR file )
+back and recreates the sessions: windows in order, the right number of panes
+each in its saved directory, and the exact tiled geometry from the saved layout.
+A shell pane comes back exactly; an arbitrary running program cannot be resumed,
+so panes return as a shell in the right directory unless
+.B \-\-run
+is given, which re-sends each pane's saved command. Sessions whose name already
+exists are skipped, never clobbered.
+.B ztmux resurrect list
+shows the saved snapshots. For continuum-style automatic persistence set
+.BR "@ztmux\-resurrect\-auto on" :
+the first client to attach spawns a detached, pidfile-guarded daemon
+.RB ( "ztmux resurrect autosave" ,
+one per server) that re-saves every 15 minutes; add
+.B "@ztmux\-resurrect\-restore on"
+and a fresh server also restores the last snapshot once on start.
 .SS Default key bindings
 For convenience each extension is also bound under the prefix key (these
 bindings are original to
@@ -2963,13 +3121,148 @@ show the stats report
 show the tree diagram
 .RE
 .PP
-Each opens the tool in a
+Each of those opens the tool in a
 .B display\-popup
 pointed at the current server, so they work from any attached client. The
 streaming
 .B events
 subcommand runs until interrupted and is pipe oriented, so it is not bound by
 default.
+.PP
+The rest act on the current pane or window directly rather than through a popup:
+.RS
+.TP
+.B prefix C\-f
+toggle the floating pane (focus it, creating one if there is none; pressing it
+on the float returns to the previous pane)
+.TP
+.B prefix e
+edit this pane's scrollback in
+.B $EDITOR
+.TP
+.B prefix C\-s
+select or deselect this pane for multi-pane sync
+.TP
+.B prefix M
+sync every selected pane
+.TP
+.B prefix R
+add a content trigger through the inline wizard
+.TP
+.B prefix +
+toggle the zellij pane stack for this window
+.RE
+.PP
+Two hooks are installed alongside them:
+.B window\-pane\-changed
+re-establishes the stack geometry when the focus moves inside a stacked window,
+and
+.B client\-attached
+starts the resurrect autosave daemon when
+.B @ztmux\-resurrect\-auto
+is set.
+.SS ztmux user options
+The extensions and the ratatui UI are configured with ordinary tmux user
+options, so they can be set from the configuration file like anything else.
+Unless noted they are global
+.RB ( "set \-g" )
+and read live, taking effect on the next redraw.
+.RS
+.TP
+.B @ztmux\-ratatui
+Master switch for the ratatui renderer \(en the command palette, ratatui menus,
+clock, display-panes and hint bar.
+.B On
+by default;
+.B off
+gives a classic plain-tmux server and leaves the default draw path, and the
+byte-for-byte parity suite, untouched.
+.TP
+.B @ztmux\-hint
+Show the which-key hint bar on the prefix. Off by default.
+.B ztmux modal on
+turns it on and saves the previous value in
+.B @ztmux\-modal\-saved\-hint
+so
+.B modal off
+can restore it.
+.TP
+.B @ztmux\-zellij\-mode
+The framed zellij look: every pane inset by a one-cell ring and drawn with a
+rounded box carrying its name. Off by default.
+.B @ztmux\-pane\-names
+is a back-compat alias for the same setting; both accept
+.BR on / 1 / true / yes .
+.TP
+.B @ztmux\-pane\-name\-format
+A tmux format expanded per pane for the name in that frame; the default is
+.RB \` "#{pane_index}: #{pane_current_command}" '.
+.TP
+.B @ztmux\-float\-autohide
+Hide a floating pane while a tiled pane has focus, zellij-style, bringing it
+back on
+.BR "prefix C\-f" .
+Off by default, so a float stays on screen as upstream tmux would keep it. Also
+settable per window
+.RB ( "set \-w" ),
+and toggled from the pane menu's
+.BR "Auto\-Hide Floating Panes" .
+.TP
+.B @ztmux\-tab\-bar
+Set by
+.B ztmux tabs
+to mark the zellij tab bar active; the status options it overwrote are saved
+alongside it in
+.BR @ztmux\-tab\-saved\-* .
+Prefer
+.B ztmux tabs on
+/
+.B off
+over setting it by hand, so the saved originals stay consistent.
+.TP
+.B @ztmux\-modal
+Set by
+.B ztmux modal
+to mark the modal key tables installed. Prefer
+.B ztmux modal on
+/
+.BR off ,
+which also installs and removes the root entry keys.
+.TP
+.B @ztmux\-stacked
+Per-window
+.RB ( "set \-w" ),
+set by
+.B ztmux stack
+to mark the window stacked.
+.TP
+.B @ztmux\-resurrect\-auto
+Spawn the resurrect autosave daemon from the first client to attach: one
+pidfile-guarded process per server, re-saving every 15 minutes.
+.TP
+.B @ztmux\-resurrect\-restore
+Also restore the last snapshot once, on a fresh server start.
+.TP
+.B @ztmux\-repl\-edit\-mode
+Key set for the
+.B repl
+line editor,
+.B vi
+or
+.BR emacs .
+.B $ZTMUX_REPL_EDIT_MODE
+overrides it for one console; with neither set the console follows
+.BR status\-keys ,
+then
+.BR $VISUAL / $EDITOR .
+.TP
+.B @ztmux_sel
+Per-pane
+.RB ( "set \-p" ),
+set by
+.B prefix C\-s
+to mark the pane a member of the multi-pane sync set.
+.RE
 .SH ENVIRONMENT
 .TP
 .B TMUX
@@ -2978,7 +3271,7 @@ the client.
 .TP
 .B TMUX_TMPDIR
 Directory under which the per-user socket directory
-.RI ( tmux- UID )
+.RI ( ztmux- UID )
 is created; defaults to
 .IR /tmp .
 .TP
@@ -2992,15 +3285,33 @@ search path.
 Used to select the editor for interactive editing.
 .SH FILES
 .TP
-.IR $TMUX_TMPDIR /tmux- UID /
+.IR $TMUX_TMPDIR /ztmux- UID /
 The directory holding
 .B ztmux
 server sockets for the user
 .IR UID ;
 by default
-.IR /tmp/tmux- UID / .
+.IR /tmp/ztmux- UID / .
 The default socket is named
 .IR default .
+Keeping the directory distinct from tmux's own
+.RI ( tmux- UID )
+is what lets the two multiplexers run side by side.
+.TP
+.I ~/.ztmux/
+Extension state that is not a tmux option: trigger rules
+.RI ( triggers.json )
+and their fire log
+.RI ( triggers.log ),
+resurrect snapshots
+.RI ( resurrect/ ),
+the
+.B repl
+history
+.RI ( repl_history ),
+and a
+.RI server-crash- pid .txt
+report for any server crash.
 .TP
 .I ~/.tmux.conf
 Default per-user configuration file. The full default search path is
