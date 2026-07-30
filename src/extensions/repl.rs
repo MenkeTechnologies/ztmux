@@ -40,15 +40,14 @@ use reedline::{
 use crate::cmd_::{CMD_TABLE, cmd_find};
 use crate::tmux::getversion;
 
+use super::completion_spec::EXTENSION_SPEC;
 use super::tmux_query::{Snapshot, poll, ztmux_cmd};
+use super::verbs::{Verb, all_verbs, colored, paint, print_verbs, strip_ansi};
 
-// `VERB_DESCRIPTIONS` and `EXTENSION_SPEC`, harvested at build time from
-// `completions/_ztmux` so the console and the shell offer the same vocabulary.
-// See the `completions` module in build.rs.
-include!(concat!(env!("OUT_DIR"), "/completion_spec.rs"));
-
-/// The console's own commands, which never reach the server.
-const BUILTINS: &[(&str, &str)] = &[
+/// The console's own commands, which never reach the server. `verbs` is also a
+/// real subcommand (`ztmux verbs`); in here it runs in-process, so the listing
+/// costs nothing.
+pub(crate) const BUILTINS: &[(&str, &str)] = &[
     ("clear", "clear the screen (console builtin)"),
     ("exit", "leave the console (console builtin)"),
     ("help", "show the console keys and builtins (console builtin)"),
@@ -67,82 +66,9 @@ pub(crate) fn run(socket: &str) -> i32 {
     }
 }
 
-/// What a verb is, for the `verbs` listing.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Kind {
-    Command,
-    Alias,
-    Extension,
-    Builtin,
-}
-
-impl Kind {
-    /// Section heading and colour used by [`print_verbs`].
-    const fn label(self) -> (&'static str, &'static str) {
-        match self {
-            Kind::Command => ("COMMANDS", "36"),
-            Kind::Alias => ("ALIASES", "34"),
-            Kind::Extension => ("EXTENSIONS", "35"),
-            Kind::Builtin => ("CONSOLE", "33"),
-        }
-    }
-}
-
-/// One completable/listable verb.
-struct Verb {
-    name: &'static str,
-    kind: Kind,
-    /// The command an alias stands for; the description otherwise.
-    description: Cow<'static, str>,
-}
-
-/// Every verb the console accepts: the ported commands and their aliases, the
-/// ztmux extensions, and the console builtins. Sourced from `CMD_TABLE` and
-/// `EXTENSION_COMMANDS`, so nothing here can drift from what actually runs.
-fn all_verbs() -> Vec<Verb> {
-    let mut verbs: Vec<Verb> = Vec::new();
-    for entry in CMD_TABLE {
-        verbs.push(Verb {
-            name: entry.name,
-            kind: Kind::Command,
-            description: Cow::Borrowed(describe(entry.name).unwrap_or(entry.usage)),
-        });
-        if let Some(alias) = entry.alias {
-            verbs.push(Verb {
-                name: alias,
-                kind: Kind::Alias,
-                description: Cow::Owned(format!("alias for {}", entry.name)),
-            });
-        }
-    }
-    for &name in super::EXTENSION_COMMANDS {
-        verbs.push(Verb {
-            name,
-            kind: Kind::Extension,
-            description: Cow::Borrowed(describe(name).unwrap_or("ztmux extension")),
-        });
-    }
-    for &(name, description) in BUILTINS {
-        verbs.push(Verb {
-            name,
-            kind: Kind::Builtin,
-            description: Cow::Borrowed(description),
-        });
-    }
-    verbs.sort_by_key(|v| v.name);
-    verbs
-}
-
-/// The one-line description harvested for `name`, if the zsh completion has one.
-fn describe(name: &str) -> Option<&'static str> {
-    VERB_DESCRIPTIONS
-        .binary_search_by(|(v, _)| (*v).cmp(name))
-        .ok()
-        .map(|i| VERB_DESCRIPTIONS[i].1)
-}
-
 /// What an extension verb completes: `(options, option values, positional
-/// vocabulary)` — [`ExtensionSpec`] without the verb it is keyed by.
+/// vocabulary)` — a [`super::completion_spec::ExtensionSpec`] without the verb
+/// it is keyed by.
 type Vocabulary = (
     &'static [&'static str],
     &'static [(&'static str, &'static [&'static str])],
@@ -326,39 +252,6 @@ fn run_piped(socket: &str) -> i32 {
     0
 }
 
-/// Whether to colour output: a terminal, and `NO_COLOR` unset.
-fn colored() -> bool {
-    std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none()
-}
-
-/// Wrap `s` in SGR `code` when colouring.
-fn paint(s: &str, code: &str, color: bool) -> String {
-    if color {
-        format!("\x1b[{code}m{s}\x1b[0m")
-    } else {
-        s.to_string()
-    }
-}
-
-/// Strip SGR sequences, for measuring a coloured string's printed width.
-fn strip_ansi(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
-        if c != '\x1b' {
-            out.push(c);
-            continue;
-        }
-        // CSI …m — drop everything through the final byte.
-        for c in chars.by_ref() {
-            if c.is_ascii_alphabetic() {
-                break;
-            }
-        }
-    }
-    out
-}
-
 /// The startup banner: the ZTMUX logo, a boxed summary line (version and verb
 /// totals), and the live server counts for the socket the console targets.
 fn print_banner(socket: &str) {
@@ -449,51 +342,6 @@ fn print_help() {
     println!("  {} abandon the current line", key("Ctrl-C"));
     println!("  {} leave the console", key("Ctrl-D"));
     println!("  {} search history", key("Ctrl-R"));
-}
-
-/// `verbs [filter]` — every verb grouped by kind, with its description. The
-/// optional filter keeps verbs whose name or description contains it.
-fn print_verbs(filter: Option<&str>) {
-    let color = colored();
-    let verbs = all_verbs();
-    let matches = |v: &Verb| match filter {
-        Some(f) => v.name.contains(f) || v.description.contains(f),
-        None => true,
-    };
-    let width = verbs
-        .iter()
-        .filter(|v| matches(v))
-        .map(|v| v.name.len())
-        .max()
-        .unwrap_or(0);
-
-    let mut total = 0;
-    for kind in [Kind::Command, Kind::Alias, Kind::Extension, Kind::Builtin] {
-        let group: Vec<&Verb> = verbs
-            .iter()
-            .filter(|v| v.kind == kind && matches(v))
-            .collect();
-        if group.is_empty() {
-            continue;
-        }
-        total += group.len();
-        let (label, code) = kind.label();
-        println!(
-            "{}",
-            paint(&format!("{label} ({})", group.len()), code, color)
-        );
-        for v in group {
-            println!(
-                "  {:<width$}  {}",
-                v.name,
-                paint(&v.description, "2", color)
-            );
-        }
-        println!();
-    }
-    if total == 0 {
-        println!("no verb matches {}", filter.unwrap_or(""));
-    }
 }
 
 /// Byte index of the word under the cursor and that word's text.
@@ -804,18 +652,6 @@ mod tests {
         // An empty quoted word survives as an empty argument.
         assert_eq!(split_words("rename-session ''"), ["rename-session", ""]);
         assert!(split_words("   ").is_empty());
-    }
-
-    #[test]
-    fn every_extension_verb_has_a_description() {
-        // The banner and `verbs` read descriptions out of the harvested table;
-        // a missing one means completions/_ztmux is stale for that verb.
-        let missing: Vec<&str> = super::super::EXTENSION_COMMANDS
-            .iter()
-            .copied()
-            .filter(|name| describe(name).is_none())
-            .collect();
-        assert!(missing.is_empty(), "no zsh completion for: {missing:?}");
     }
 
     #[test]

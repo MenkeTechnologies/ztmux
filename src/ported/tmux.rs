@@ -743,6 +743,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     | b"mouse"
                     | b"triggers"
                     | b"repl"
+                    | b"verbs"
             ) {
                 let sock = if SOCKET_PATH.is_null() {
                     String::new()
@@ -860,6 +861,7 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                     b"utf8" => crate::extensions::utf8::run(&sock),
                     b"mouse" => crate::extensions::mouse::run(&sock),
                     b"repl" => crate::extensions::repl::run(&sock),
+                    b"verbs" => crate::extensions::verbs::run(&sock),
                     _ => crate::extensions::dashboard::run(&sock),
                 };
                 std::process::exit(code);

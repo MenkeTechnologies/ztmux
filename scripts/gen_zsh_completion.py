@@ -482,6 +482,15 @@ EXTENSIONS = [
         "interactive console over every ztmux verb (ztmux extension)",
     ),
     (
+        "verbs",
+        [
+            ":filter:",
+            "-o[output format]:format:(json)",
+            "--json[machine-readable JSON output]",
+        ],
+        "list every verb ztmux answers to, with descriptions (ztmux extension)",
+    ),
+    (
         "autoname",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "windows with a pinned name (automatic-rename off) (ztmux extension)",

@@ -216,6 +216,10 @@ They fall into a few families:
   `sync`, `limit`, `visual`, `mouse`, …).
 - **Live TUIs** — `dashboard` (full-screen server monitor), `switcher` (fuzzy session/window/
   pane picker), `watch` (top-like per-pane process monitor).
+- **Discovery** — `verbs [filter]` lists every verb ztmux answers to (ported commands, aliases,
+  extensions, console builtins) with a one-line description, grouped by kind: `ztmux verbs pane`
+  narrows to the pane-related ones, `-o json` emits `{verb, kind, description}` rows. It is built
+  from the command table and the extension list themselves, and needs no server.
 - **Console** — `repl` runs every line as `ztmux <line>` against the selected socket, with a
   reedline editor: Tab completes the command word (every command, alias, extension and builtin),
   a `-`-prefixed word against that verb's own flags, an option's fixed value set (`-o` →

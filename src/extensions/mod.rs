@@ -112,6 +112,7 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "user",
     "utf8",
     "vcs",
+    "verbs",
     "viewers",
     "visual",
     "watch",
@@ -154,6 +155,7 @@ pub(crate) mod changes;
 pub(crate) mod clear;
 pub(crate) mod cmd;
 pub(crate) mod commit;
+pub(crate) mod completion_spec;
 pub(crate) mod conflicts;
 pub(crate) mod connected;
 pub(crate) mod constrain;
@@ -253,6 +255,7 @@ pub(crate) mod usage;
 pub(crate) mod user;
 pub(crate) mod utf8;
 pub(crate) mod vcs;
+pub(crate) mod verbs;
 pub(crate) mod viewers;
 pub(crate) mod visual;
 pub(crate) mod watch;

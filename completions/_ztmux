@@ -2493,6 +2493,14 @@ _ztmux-repl() {
   [[ -n ${tmux_describe} ]] && print "interactive console over every ztmux verb (ztmux extension)" && return
 }
 
+_ztmux-verbs() {
+  [[ -n ${tmux_describe} ]] && print "list every verb ztmux answers to, with descriptions (ztmux extension)" && return
+  _arguments -s \
+    ':filter:' \
+    '-o[output format]:format:(json)' \
+    '--json[machine-readable JSON output]'
+}
+
 _ztmux-autoname() {
   [[ -n ${tmux_describe} ]] && print "windows with a pinned name (automatic-rename off) (ztmux extension)" && return
   _arguments -s \

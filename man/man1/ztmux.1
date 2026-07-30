@@ -99,6 +99,12 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .B repl
 .br
 .B ztmux
+.B verbs
+.RI [ filter ]
+.RB [ \-o
+.IR json ]
+.br
+.B ztmux
 .RB [ \-L
 .IR socket-name ]
 .RB [ \-S
@@ -1297,6 +1303,28 @@ prints the parsed rules and
 .B ztmux triggers test
 .I text
 reports which rules match a line without running anything.
+.SS ztmux verbs
+.B ztmux verbs
+.RI [ filter ]
+lists every verb ztmux answers to \(en the ported tmux commands, their aliases,
+the extensions above, and the console builtins \(en each with a one-line
+description, grouped by kind and sorted by name. Where
+.B ztmux list-commands
+prints usage strings for the ported commands only, this covers the whole
+surface. A
+.I filter
+keeps the verbs whose name or description contains it, so
+.B ztmux verbs pane
+finds the pane-related verbs however they are named. The listing is built from
+the command table and the extension list themselves, so it can neither name a
+verb that does not run nor omit one that does.
+.B \-o
+.I json
+(or
+.BR \-\-json )
+emits the rows as a JSON array of
+.RB { verb , kind , description }.
+It needs no server.
 .SS ztmux repl
 .B ztmux repl
 opens an interactive console over every ztmux verb: each line is run exactly as
