@@ -2,6 +2,31 @@
 
 Fixes to the ztmux port, most recent first.
 
+## Open
+
+### `prompt_type` still carries two types next-3.7 removed
+
+- **Symptom:** `show-prompt-history -T target` prints `History for target:` and
+  `clear-prompt-history -T target` silently succeeds. The vendored next-3.7
+  rejects both with `invalid type: target`. Same for `window-target`.
+- **Root cause:** ztmux's `prompt_type` (`src/lib.rs`) is the pre-split
+  four-value enum — `command`, `search`, `target`, `window-target`, with
+  `PROMPT_NTYPES = 4`. next-3.7 moved the prompt into `prompt.c` and cut the
+  enum to two (`tmux.h:2061`, `PROMPT_NTYPES 2`), so `prompt_type()` maps
+  anything else to `PROMPT_TYPE_INVALID`.
+- **Scope:** it is not only the enum. `prompt_complete` (`prompt.c:1538`) now
+  completes **commands only**, and only at offset zero — the target, session and
+  window-menu completion that ztmux still carries in `status.rs`
+  (`status_prompt_complete_window_menu`, `status_prompt_complete_session`,
+  `status_prompt_menu_callback`) has no counterpart upstream. Closing this means
+  removing that subsystem, not just shrinking the enum.
+- **Found by:** driving `show-prompt-history`/`clear-prompt-history`/
+  `command-prompt -T` through `parity/verify_one.sh` against the reference while
+  lining the prompt types up for the `struct prompt` port. No existing case
+  covered the prompt types, which is why the suite was green over it.
+- **Not yet pinned by a case:** a case added now would go red until the fix
+  lands, so it belongs with the fix.
+
 ## 2026-07-30
 
 A parity round aimed at the areas the previous bug rounds came out of, rather than
