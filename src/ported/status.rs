@@ -659,13 +659,24 @@ pub unsafe fn status_message_redraw(c: *mut client) -> i32 {
             messageline = lines - 1;
         }
 
-        let mut len = screen_write_strlen!("{}", _s((*c).message_string_ptr()));
-        if len > (*c).tty.sx as usize {
-            len = (*c).tty.sx as usize;
-        }
-
         let ft = format_create_defaults(null_mut(), c, null_mut(), null_mut(), null_mut());
-        style_apply(&raw mut gc, (*s).options, c!("message-style"), ft);
+        memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
+
+        // The message is placed into the format tree rather than drawn
+        // directly, so `message-format` decides how it is wrapped and styled.
+        // When styles are to be ignored, `#` is doubled first so format_draw
+        // treats the content as literal text rather than as directives.
+        if (*c).message_ignore_styles != 0 {
+            let msg = status_message_escape((*c).message_string_ptr());
+            format_add!(ft, "message", "{}", _s(msg));
+            free_(msg);
+        } else {
+            format_add!(ft, "message", "{}", _s((*c).message_string_ptr()));
+        }
+        format_add!(ft, "command_prompt", "{}", 0);
+
+        let msgfmt = options_get_string_((*s).options, "message-format");
+        let expanded = format_expand_time(ft, msgfmt);
         format_free(ft);
 
         screen_write_start(&raw mut ctx, (*sl).active);
@@ -682,25 +693,17 @@ pub unsafe fn status_message_redraw(c: *mut client) -> i32 {
             screen_write_putc(&raw mut ctx, &raw const gc, b' ');
         }
         screen_write_cursormove(&raw mut ctx, 0, messageline as i32, 0);
-        if (*c).message_ignore_styles != 0 {
-            screen_write_nputs!(
-                &raw mut ctx,
-                len as isize,
-                &raw mut gc,
-                "{}",
-                _s((*c).message_string_ptr()),
-            );
-        } else {
-            format_draw(
-                &raw mut ctx,
-                &raw const gc,
-                (*c).tty.sx,
-                cstr_to_str((*c).message_string_ptr()),
-                null_mut(),
-                0,
-            );
-        }
+        format_draw(
+            &raw mut ctx,
+            &raw const gc,
+            (*c).tty.sx,
+            cstr_to_str(expanded),
+            null_mut(),
+            0,
+        );
         screen_write_stop(&raw mut ctx);
+
+        free_(expanded);
 
         if grid_compare((*(*sl).active).grid, old_screen.grid) == 0 {
             screen_free(&raw mut old_screen);
@@ -708,6 +711,31 @@ pub unsafe fn status_message_redraw(c: *mut client) -> i32 {
         }
         screen_free(&raw mut old_screen);
         1
+    }
+}
+
+/// Double every `#` so `format_draw` renders the string literally instead of
+/// reading `#[...]` in it as style directives — used for messages that asked
+/// for styles to be ignored.
+/// C `vendor/tmux/status.c:429`: `static char *status_message_escape(const char *s)`
+pub unsafe fn status_message_escape(s: *const u8) -> *mut u8 {
+    unsafe {
+        let len = libc::strlen(s);
+        let bytes = std::slice::from_raw_parts(s, len);
+        let n = bytes.iter().filter(|&&b| b == b'#').count();
+
+        let out: *mut u8 = xmalloc(len + n + 1).as_ptr().cast();
+        let mut p = out;
+        for &b in bytes {
+            if b == b'#' {
+                *p = b'#';
+                p = p.add(1);
+            }
+            *p = b;
+            p = p.add(1);
+        }
+        *p = b'\0';
+        out
     }
 }
 
@@ -726,6 +754,11 @@ pub unsafe fn status_prompt_set<T>(
 ) {
     unsafe {
         server_client_clear_overlay(c);
+
+        // Resolve the prompt's cursor from the session options up front, the
+        // way prompt_create does upstream, so a later `set-option` cannot
+        // change the cursor of a prompt that is already open.
+        crate::prompt_::prompt_set_options(c, (*c).session);
 
         let ft = if !fs.is_null() {
             format_create_from_state(null_mut(), c, fs)
@@ -924,6 +957,21 @@ pub unsafe fn status_prompt_redraw(c: *mut client) -> i32 {
 
             memcpy__(&raw mut cursorgc, &raw const gc);
             cursorgc.attr ^= grid_attr::GRID_ATTR_REVERSE;
+
+            // The terminal's own cursor is what `prompt-cursor-style` and
+            // `prompt-cursor-colour` control, and vi command mode gets its own
+            // pair so the mode is visible without reading the prompt text.
+            // These are the screen's *defaults*, which is how the cursor is
+            // restored when the prompt closes.
+            if (*c).prompt_mode == prompt_mode::PROMPT_COMMAND {
+                (*(*sl).active).default_cstyle = (*c).prompt_command_cstyle;
+                (*(*sl).active).default_mode = (*c).prompt_command_cmode;
+                (*(*sl).active).default_ccolour = (*c).prompt_command_ccolour;
+            } else {
+                (*(*sl).active).default_cstyle = (*c).prompt_cstyle;
+                (*(*sl).active).default_mode = (*c).prompt_cmode;
+                (*(*sl).active).default_ccolour = (*c).prompt_ccolour;
+            }
 
             let mut start = format_width(cstr_to_str((*c).prompt_string_ptr()));
             if start > (*c).tty.sx {

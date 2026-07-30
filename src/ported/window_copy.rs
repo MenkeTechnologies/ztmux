@@ -78,6 +78,18 @@ pub enum window_copy_cmd_clear {
     WINDOW_COPY_CMD_CLEAR_EMACS_ONLY,
 }
 
+/// C `vendor/tmux/window-copy.c:225`: `enum window_copy_line_numbers` — the
+/// values of the `copy-mode-line-numbers` choice option, in table order.
+#[repr(i32)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum window_copy_line_numbers {
+    WINDOW_COPY_LINE_NUMBERS_OFF,
+    WINDOW_COPY_LINE_NUMBERS_DEFAULT,
+    WINDOW_COPY_LINE_NUMBERS_ABSOLUTE,
+    WINDOW_COPY_LINE_NUMBERS_RELATIVE,
+    WINDOW_COPY_LINE_NUMBERS_HYBRID,
+}
+
 #[repr(C)]
 pub struct window_copy_cmd_state {
     wme: *mut window_mode_entry,
@@ -177,6 +189,11 @@ pub struct window_copy_mode_data {
     rectflag: bool,      // in rectangle copy mode?
     scroll_exit: bool,   // exit on scroll to end?
     hide_position: bool, // hide position marker
+    /// C `vendor/tmux/window-copy.c:294`: `int line_numbers`. Whether this mode
+    /// entry may show line numbers at all; `copy-mode-line-numbers` then picks
+    /// which kind. View mode (`window_copy_view_init`) clears it, so `#[popup]`
+    /// output panes never get a gutter.
+    line_numbers: bool,
 
     selflag: selflag,
 
@@ -484,6 +501,7 @@ pub unsafe fn window_copy_common_init(wme: *mut window_mode_entry) -> *mut windo
 
         (*data).jumptype = window_copy::WINDOW_COPY_OFF;
         (*data).jumpchar = null_mut();
+        (*data).line_numbers = true;
 
         screen_init(
             &raw mut (*data).screen,
@@ -549,7 +567,8 @@ pub unsafe fn window_copy_init(
         if !(*base).hyperlinks.is_null() {
             (*data).screen.hyperlinks = hyperlinks_copy((*base).hyperlinks);
         }
-        (*data).screen.cx = (*data).cx;
+        (*data).screen.cx =
+            window_copy_cursor_offset(wme, (*data).cx, screen_size_x(&raw mut (*data).screen));
         (*data).screen.cy = (*data).cy;
         (*data).mx = (*data).cx;
         (*data).my = screen_hsize((*data).backing) + (*data).cy - (*data).oy;
@@ -559,7 +578,12 @@ pub unsafe fn window_copy_init(
         for i in 0..screen_size_y(&raw mut (*data).screen) {
             window_copy_write_line(wme, &raw mut ctx, i);
         }
-        screen_write_cursormove(&raw mut ctx, (*data).cx as i32, (*data).cy as i32, 0);
+        screen_write_cursormove(
+            &raw mut ctx,
+            window_copy_cursor_offset(wme, (*data).cx, screen_size_x(&raw mut (*data).screen)) as i32,
+            (*data).cy as i32,
+            0,
+        );
         screen_write_stop(&raw mut ctx);
 
         (*data).recentre_state = recentre::RECENTRE_MIDDLE;
@@ -584,6 +608,7 @@ pub unsafe fn window_copy_view_init(
 
         let data = window_copy_common_init(wme);
         (*data).viewmode = 1;
+        (*data).line_numbers = false;
 
         (*data).backing = Box::leak(Box::new(zeroed())) as *mut screen;
         screen_init((*data).backing, sx, screen_size_y(base), u32::MAX);
@@ -963,8 +988,24 @@ pub unsafe fn window_copy_search_match_cb(ft: *mut format_tree) -> format_table_
 pub unsafe fn window_copy_formats(wme: *mut window_mode_entry, ft: *mut format_tree) {
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
+        let hsize = screen_hsize((*data).backing);
+
+        let gl = grid_get_line((*(*data).backing).grid, hsize - (*data).oy);
+        format_add!(ft, "top_line_time", "{}", (*gl).time);
 
         format_add!(ft, "scroll_position", "{}", (*data).oy);
+        // Absolute numbering counts real scrollback lines, so the position
+        // indicator has to count the same thing the gutter shows.
+        let (position, limit) = if window_copy_line_number_is_absolute(wme) {
+            (
+                hsize - (*data).oy + 1,
+                hsize + screen_size_y((*data).backing),
+            )
+        } else {
+            ((*data).oy, hsize)
+        };
+        format_add!(ft, "copy_position", "{}", position);
+        format_add!(ft, "copy_position_limit", "{}", limit);
         format_add!(ft, "rectangle_toggle", "{}", (*data).rectflag as i32);
 
         format_add!(ft, "copy_cursor_x", "{}", (*data).cx);
@@ -5537,6 +5578,7 @@ pub unsafe fn window_copy_update_style(
 pub unsafe fn window_copy_write_one(
     wme: *mut window_mode_entry,
     ctx: *mut screen_write_ctx,
+    px: u32,
     py: u32,
     fy: u32,
     nx: u32,
@@ -5549,7 +5591,7 @@ pub unsafe fn window_copy_write_one(
         let gd: *mut grid = (*(*data).backing).grid;
         let mut gc: grid_cell = zeroed();
 
-        screen_write_cursormove(ctx, 0, py as i32, 0);
+        screen_write_cursormove(ctx, px as i32, py as i32, 0);
         for fx in 0..nx {
             grid_get_cell(gd, fx, fy, &raw mut gc);
             if fx + gc.data.width as u32 <= nx {
@@ -5560,6 +5602,134 @@ pub unsafe fn window_copy_write_one(
     }
 }
 
+/// The line-number mode in force for this pane: `off` when this mode entry has
+/// line numbers disabled outright, otherwise whatever `copy-mode-line-numbers`
+/// says.
+/// C `vendor/tmux/window-copy.c:5020`: `static int window_copy_line_number_mode(struct window_mode_entry *wme)`
+pub unsafe fn window_copy_line_number_mode(wme: *mut window_mode_entry) -> window_copy_line_numbers {
+    unsafe {
+        let wp: *mut window_pane = (*wme).wp;
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+        let oo: *mut options = (*(*wp).window).options;
+
+        if !(*data).line_numbers {
+            return window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_OFF;
+        }
+        match options_get_number_(oo, "copy-mode-line-numbers") {
+            1 => window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_DEFAULT,
+            2 => window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_ABSOLUTE,
+            3 => window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_RELATIVE,
+            4 => window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_HYBRID,
+            _ => window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_OFF,
+        }
+    }
+}
+
+/// True when the gutter counts real scrollback lines rather than an offset from
+/// the cursor, which is what `copy_position` reports against.
+/// C `vendor/tmux/window-copy.c:5032`: `static int window_copy_line_number_is_absolute(struct window_mode_entry *wme)`
+pub unsafe fn window_copy_line_number_is_absolute(wme: *mut window_mode_entry) -> bool {
+    unsafe {
+        matches!(
+            window_copy_line_number_mode(wme),
+            window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_ABSOLUTE
+                | window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_RELATIVE
+                | window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_HYBRID
+        )
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:5047`: `static int window_copy_line_numbers_active(struct window_mode_entry *wme)`
+pub unsafe fn window_copy_line_numbers_active(wme: *mut window_mode_entry) -> bool {
+    unsafe {
+        window_copy_line_number_mode(wme) != window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_OFF
+    }
+}
+
+/// Width of the line-number gutter, including its trailing space; 0 when no
+/// numbers are shown. Wide enough for every line in the backing screen, and
+/// never narrower than three digits so the content does not shift as the
+/// scrollback grows past each power of ten.
+/// C `vendor/tmux/window-copy.c:5054`: `static u_int window_copy_line_number_width(struct window_mode_entry *wme)`
+pub unsafe fn window_copy_line_number_width(wme: *mut window_mode_entry) -> u32 {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+
+        if !window_copy_line_numbers_active(wme) {
+            return 0;
+        }
+
+        let mut lines = screen_hsize((*data).backing) + screen_size_y((*data).backing) + 1;
+        let mut digits = 1;
+        while lines >= 10 {
+            lines /= 10;
+            digits += 1;
+        }
+        if digits < 3 {
+            digits = 3;
+        }
+        digits + 1
+    }
+}
+
+/// Map a content column to its screen column, past the gutter. A column at or
+/// beyond the content width lands on the last cell, where the `$` marker goes.
+/// C `vendor/tmux/window-copy.c:5074`: `static u_int window_copy_cursor_offset(struct window_mode_entry *wme, u_int cx, u_int sx)`
+pub unsafe fn window_copy_cursor_offset(wme: *mut window_mode_entry, cx: u32, sx: u32) -> u32 {
+    unsafe {
+        let width = window_copy_line_number_width(wme);
+        if width == 0 {
+            return cx;
+        }
+        let content = if width >= sx { 1 } else { sx - width };
+        if cx >= content {
+            return sx - 1;
+        }
+        width + cx
+    }
+}
+
+/// The inverse of [`window_copy_cursor_offset`]: a screen column back to the
+/// content column, clamping anything inside the gutter to the first one.
+/// C `vendor/tmux/window-copy.c:5091`: `static u_int window_copy_cursor_unoffset(struct window_mode_entry *wme, u_int vx, u_int sx)`
+pub unsafe fn window_copy_cursor_unoffset(wme: *mut window_mode_entry, mut vx: u32, sx: u32) -> u32 {
+    unsafe {
+        let width = window_copy_line_number_width(wme);
+        if width == 0 {
+            return vx;
+        }
+        let content = if width >= sx { 1 } else { sx - width };
+        if vx < width {
+            return 0;
+        }
+        vx -= width;
+        if vx >= content {
+            return content - 1;
+        }
+        vx
+    }
+}
+
+/// Turn the gutter on or off for a pane already in copy mode.
+/// C `vendor/tmux/window-copy.c:5111`: `void window_copy_set_line_numbers(struct window_pane *wp, int enabled)`
+pub unsafe fn window_copy_set_line_numbers(wp: *mut window_pane, enabled: bool) {
+    unsafe {
+        let wme = tailq_first(&raw mut (*wp).modes);
+        if wme.is_null() || (*wme).mode != &raw const WINDOW_COPY_MODE {
+            return;
+        }
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+        if data.is_null() || (*data).line_numbers == enabled {
+            return;
+        }
+        (*data).line_numbers = enabled;
+        window_copy_redraw_screen(wme);
+    }
+}
+
+/// Draw one line of the copy-mode screen: the line-number gutter, the content
+/// shifted past it, the position indicator on the top line, and the `$` marker
+/// when the cursor sits past the end of the content.
 /// C `vendor/tmux/window-copy.c:5143`: `static void window_copy_write_line(struct window_mode_entry *wme, struct screen_write_ctx *ctx, u_int py)`
 pub unsafe fn window_copy_write_line(
     wme: *mut window_mode_entry,
@@ -5571,111 +5741,127 @@ pub unsafe fn window_copy_write_line(
         let data: *mut window_copy_mode_data = (*wme).data.cast();
         let s: *mut screen = &raw mut (*data).screen;
         let oo: *mut options = (*(*wp).window).options;
-        let gl: *mut grid_line;
         let mut gc: grid_cell = zeroed();
         let mut mgc: grid_cell = zeroed();
         let mut cgc: grid_cell = zeroed();
         let mut mkgc: grid_cell = zeroed();
-        let mut hdr: [u8; 512] = zeroed();
-        let mut tmp: [u8; 512] = zeroed();
-        let t: *mut u8;
-        let mut size: usize;
+        let mut ln_gc: grid_cell = zeroed();
+        let mut cur_ln_gc: grid_cell = zeroed();
+        let sx = screen_size_x(s);
         let hsize = screen_hsize((*data).backing);
 
-        style_apply(&raw mut gc, oo, c!("mode-style"), null_mut());
+        let width = window_copy_line_number_width(wme);
+        let content_sx = if width >= sx {
+            1
+        } else if width != 0 {
+            sx - width
+        } else {
+            sx
+        };
+
+        screen_write_cursormove(ctx, 0, py as i32, 0);
+        screen_write_clearline(ctx, 8);
+
+        let ft = format_create_defaults(null_mut(), null_mut(), null_mut(), null_mut(), wp);
+
+        style_apply(&raw mut gc, oo, c!("copy-mode-position-style"), ft);
         gc.flags |= grid_flag::NOPALETTE;
-        style_apply(&raw mut mgc, oo, c!("copy-mode-match-style"), null_mut());
+        style_apply(&raw mut mgc, oo, c!("copy-mode-match-style"), ft);
         mgc.flags |= grid_flag::NOPALETTE;
-        style_apply(
-            &raw mut cgc,
-            oo,
-            c!("copy-mode-current-match-style"),
-            null_mut(),
-        );
+        style_apply(&raw mut cgc, oo, c!("copy-mode-current-match-style"), ft);
         cgc.flags |= grid_flag::NOPALETTE;
-        style_apply(&raw mut mkgc, oo, c!("copy-mode-mark-style"), null_mut());
+        style_apply(&raw mut mkgc, oo, c!("copy-mode-mark-style"), ft);
         mkgc.flags |= grid_flag::NOPALETTE;
 
-        if py == 0 && (*s).rupper < (*s).rlower && !(*data).hide_position {
-            gl = grid_get_line((*(*data).backing).grid, hsize - (*data).oy);
-            if (*gl).time == 0 {
-                _ = xsnprintf_!((&raw mut tmp).cast(), 512, "[{}/{}]", (*data).oy, hsize,);
-            } else {
-                t = format_pretty_time((*gl).time, 1);
-                _ = xsnprintf_!(
-                    (&raw mut tmp).cast(),
-                    512,
-                    "{} [{}/{}]",
-                    _s(t),
-                    (*data).oy,
-                    hsize,
-                );
-                free_(t);
-            }
+        if width != 0 {
+            style_apply(&raw mut ln_gc, oo, c!("copy-mode-line-number-style"), ft);
+            ln_gc.flags |= grid_flag::NOPALETTE;
+            style_apply(
+                &raw mut cur_ln_gc,
+                oo,
+                c!("copy-mode-current-line-number-style"),
+                ft,
+            );
+            cur_ln_gc.flags |= grid_flag::NOPALETTE;
 
-            if (*data).searchmark.is_null() {
-                if (*data).timeout != 0 {
-                    size = xsnprintf_!(
-                        (&raw mut hdr).cast(),
-                        512,
-                        "(timed out) {}",
-                        _s(&raw const tmp as *mut u8)
-                    )
-                    .unwrap() as usize;
+            let current = py == (*data).cy;
+            let absolute = hsize - (*data).oy + py + 1;
+            let mode = window_copy_line_number_mode(wme);
+            let line_number = if mode == window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_DEFAULT {
+                // The old scroll-offset numbering: distance from the top line.
+                if py < (*data).oy {
+                    (*data).oy - py
                 } else {
-                    size = xsnprintf_!(
-                        (&raw mut hdr).cast(),
-                        512,
-                        "{}",
-                        _s(&raw const tmp as *const u8)
-                    )
-                    .unwrap() as usize;
+                    py - (*data).oy
                 }
-            } else if (*data).searchcount == -1 {
-                size = xsnprintf_!(
-                    (&raw mut hdr).cast(),
-                    512,
-                    "{}",
-                    _s(&raw const tmp as *const u8)
-                )
-                .unwrap() as usize;
+            } else if mode == window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_ABSOLUTE
+                || (mode == window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_HYBRID && current)
+            {
+                absolute
+            } else if py > (*data).cy {
+                py - (*data).cy
             } else {
-                size = xsnprintf_!(
-                    (&raw mut hdr).cast(),
-                    512,
-                    "({}{} results) {}",
-                    (*data).searchcount,
-                    if (*data).searchmore != 0 { "+" } else { "" },
-                    _s(&raw const tmp as *const u8)
-                )
-                .unwrap() as usize;
-            }
-            if size > screen_size_x(s) as usize {
-                size = screen_size_x(s) as usize;
-            }
-            screen_write_cursormove(ctx, screen_size_x(s) as i32 - size as i32, 0, 0);
-            screen_write_puts!(ctx, &raw mut gc, "{}", _s((&raw const hdr).cast::<u8>()));
-        } else {
-            size = 0;
-        }
-
-        if size < screen_size_x(s) as usize {
-            window_copy_write_one(
-                wme,
+                (*data).cy - py
+            };
+            screen_write_cursormove(ctx, 0, py as i32, 0);
+            // C: `screen_write_nputs(ctx, width, gc, "%*u ", width - 1, n)` —
+            // the number right-aligned in `width - 1` columns, then a space.
+            screen_write_nputs!(
                 ctx,
-                py,
-                hsize - (*data).oy + py,
-                screen_size_x(s) - size as u32,
-                &raw mut mgc,
-                &raw mut cgc,
-                &raw mut mkgc,
+                width as isize,
+                if current {
+                    &raw mut cur_ln_gc
+                } else {
+                    &raw mut ln_gc
+                },
+                "{:>1$} ",
+                line_number,
+                width as usize - 1,
             );
         }
 
-        if py == (*data).cy && (*data).cx == screen_size_x(s) {
-            screen_write_cursormove(ctx, screen_size_x(s) as i32 - 1, py as i32, 0);
+        window_copy_write_one(
+            wme,
+            ctx,
+            width,
+            py,
+            hsize - (*data).oy + py,
+            content_sx,
+            &raw mut mgc,
+            &raw mut cgc,
+            &raw mut mkgc,
+        );
+
+        if py == 0 && (*s).rupper < (*s).rlower && !(*data).hide_position {
+            let value = options_get_string_(oo, "copy-mode-position-format");
+            if *value != b'\0' {
+                let expanded = format_expand(ft, value);
+                if *expanded != b'\0' {
+                    screen_write_cursormove(ctx, width as i32, 0, 0);
+                    format_draw(
+                        ctx,
+                        &raw mut gc,
+                        content_sx,
+                        cstr_to_str(expanded),
+                        null_mut(),
+                        0,
+                    );
+                }
+                free_(expanded);
+            }
+        }
+
+        if py == (*data).cy && (*data).cx >= content_sx {
+            screen_write_cursormove(
+                ctx,
+                window_copy_cursor_offset(wme, (*data).cx, screen_size_x(s)) as i32,
+                py as i32,
+                0,
+            );
             screen_write_putc(ctx, &raw const GRID_DEFAULT_CELL, b'$');
         }
+
+        format_free(ft);
     }
 }
 
@@ -5722,11 +5908,36 @@ pub unsafe fn window_copy_redraw_lines(wme: *mut window_mode_entry, py: u32, ny:
         let data: *mut window_copy_mode_data = (*wme).data.cast();
         let mut ctx: screen_write_ctx = zeroed();
 
+        // With a line-number gutter every visible line has to be redrawn into
+        // the mode's own screen, because the numbers are relative to the cursor
+        // and so change on any move, not just on the lines that were touched.
+        if window_copy_line_number_width(wme) != 0 {
+            screen_write_start(&raw mut ctx, &raw mut (*data).screen);
+            for i in py..(py + ny) {
+                window_copy_write_line(wme, &raw mut ctx, i);
+            }
+            screen_write_cursormove(
+                &raw mut ctx,
+                window_copy_cursor_offset(wme, (*data).cx, screen_size_x(&raw mut (*data).screen))
+                    as i32,
+                (*data).cy as i32,
+                0,
+            );
+            screen_write_stop(&raw mut ctx);
+            (*wp).flags |= window_pane_flags::PANE_REDRAW;
+            return;
+        }
+
         screen_write_start_pane(&raw mut ctx, wp, null_mut());
         for i in py..(py + ny) {
             window_copy_write_line(wme, &raw mut ctx, i);
         }
-        screen_write_cursormove(&raw mut ctx, (*data).cx as i32, (*data).cy as i32, 0);
+        screen_write_cursormove(
+            &raw mut ctx,
+            window_copy_cursor_offset(wme, (*data).cx, screen_size_x(&raw mut (*data).screen)) as i32,
+            (*data).cy as i32,
+            0,
+        );
         screen_write_stop(&raw mut ctx);
     }
 }
@@ -5866,7 +6077,12 @@ pub unsafe fn window_copy_update_cursor(wme: *mut window_mode_entry, mut cx: u32
             window_copy_redraw_lines(wme, (*data).cy, 1);
         } else {
             screen_write_start_pane(&raw mut ctx, wp, null_mut());
-            screen_write_cursormove(&raw mut ctx, (*data).cx as i32, (*data).cy as i32, 0);
+            screen_write_cursormove(
+            &raw mut ctx,
+            window_copy_cursor_offset(wme, (*data).cx, screen_size_x(&raw mut (*data).screen)) as i32,
+            (*data).cy as i32,
+            0,
+        );
             screen_write_stop(&raw mut ctx);
         }
     }
@@ -5978,8 +6194,20 @@ pub unsafe fn window_copy_set_selection(
         }
 
         // Set colours and selection.
-        style_apply(&raw mut gc, oo, c!("mode-style"), null_mut());
+        let ft = format_create_defaults(null_mut(), null_mut(), null_mut(), null_mut(), wp);
+        style_apply(&raw mut gc, oo, c!("copy-mode-selection-style"), ft);
         gc.flags |= grid_flag::NOPALETTE;
+        format_free(ft);
+        // Clip the selection past the line-number gutter, and shift the
+        // endpoints into screen coordinates, so a drag selects content only.
+        let mut clipx = window_copy_line_number_width(wme);
+        if clipx >= screen_size_x(s) {
+            clipx = screen_size_x(s) - 1;
+        }
+        if window_copy_line_numbers_active(wme) {
+            sx = window_copy_cursor_offset(wme, sx, screen_size_x(s));
+            endsx = window_copy_cursor_offset(wme, endsx, screen_size_x(s));
+        }
         screen_set_selection(
             s,
             sx,
@@ -5987,6 +6215,7 @@ pub unsafe fn window_copy_set_selection(
             endsx,
             endsy,
             (*data).rectflag as u32,
+            clipx,
             (*data).modekeys,
             &raw mut gc,
         );
@@ -7139,7 +7368,12 @@ pub unsafe fn window_copy_scroll_up(wme: *mut window_mode_entry, mut ny: u32) {
         if !(*s).sel.is_null() && screen_size_y(s) > ny {
             window_copy_write_line(wme, &raw mut ctx, screen_size_y(s) - ny - 1);
         }
-        screen_write_cursormove(&raw mut ctx, (*data).cx as i32, (*data).cy as i32, 0);
+        screen_write_cursormove(
+            &raw mut ctx,
+            window_copy_cursor_offset(wme, (*data).cx, screen_size_x(&raw mut (*data).screen)) as i32,
+            (*data).cy as i32,
+            0,
+        );
         screen_write_stop(&raw mut ctx);
     }
 }
@@ -7178,7 +7412,12 @@ pub unsafe fn window_copy_scroll_down(wme: *mut window_mode_entry, mut ny: u32) 
         } else if ny == 1 {
             window_copy_write_line(wme, &raw mut ctx, 1);
         } /* nuke position */
-        screen_write_cursormove(&raw mut ctx, (*data).cx as i32, (*data).cy as i32, 0);
+        screen_write_cursormove(
+            &raw mut ctx,
+            window_copy_cursor_offset(wme, (*data).cx, screen_size_x(&raw mut (*data).screen)) as i32,
+            (*data).cy as i32,
+            0,
+        );
         screen_write_stop(&raw mut ctx);
     }
 }
@@ -7221,6 +7460,10 @@ pub unsafe fn window_copy_move_mouse(m: *mut mouse_event) {
             return;
         }
 
+        // Mouse coordinates are screen columns; the cursor is tracked in
+        // content columns, so the gutter has to come back off.
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+        let x = window_copy_cursor_unoffset(wme, x, screen_size_x(&raw mut (*data).screen));
         window_copy_update_cursor(wme, x, y);
     }
 }
@@ -7253,6 +7496,7 @@ pub unsafe fn window_copy_start_drag(c: *mut client, m: *mut mouse_event) {
         (*c).tty.mouse_drag_release = Some(window_copy_drag_release);
 
         let data: *mut window_copy_mode_data = (*wme).data.cast();
+        let mut x = window_copy_cursor_unoffset(wme, x, screen_size_x(&raw mut (*data).screen));
         let yg = screen_hsize((*data).backing) + y - (*data).oy;
         if x < (*data).selrx || x > (*data).endselrx || yg != (*data).selry {
             (*data).selflag = selflag::SEL_CHAR;
@@ -7315,6 +7559,7 @@ pub unsafe fn window_copy_drag_update(c: *mut client, m: *mut mouse_event) {
         if cmd_mouse_at(wp.as_ptr(), m, &raw mut x, &raw mut y, 0) != 0 {
             return;
         }
+        let x = window_copy_cursor_unoffset(wme, x, screen_size_x(&raw mut (*data).screen));
         let old_cx = (*data).cx;
         let old_cy = (*data).cy;
 
@@ -7452,6 +7697,241 @@ unsafe fn window_copy_acquire_cursor_down(
         }
         if window_copy_update_selection(wme, 1, no_reset) != 0 {
             window_copy_redraw_lines(wme, oldy, nd);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::options_::{options_create, options_default, options_set_number};
+    use std::sync::Mutex;
+
+    // These build a window/pane/options fixture by hand and mutate no
+    // process-globals except GLOBAL_OPTIONS on first use, which is serialized.
+    static LN_LOCK: Mutex<()> = Mutex::new(());
+
+    /// A window pane in copy mode with `hlimit` lines of scrollback, enough of
+    /// the tree filled in for the line-number helpers to resolve their options.
+    struct Fixture {
+        wme: *mut window_mode_entry,
+        wp: *mut window_pane,
+        w: *mut window,
+        oo: *mut options,
+        backing: *mut screen,
+        data: *mut window_copy_mode_data,
+    }
+
+    unsafe fn fixture(sx: u32, sy: u32, hlimit: u32) -> Fixture {
+        unsafe {
+            if GLOBAL_OPTIONS.is_null() {
+                GLOBAL_OPTIONS = options_create(null_mut());
+                for oe in &OPTIONS_TABLE {
+                    if oe.scope & OPTIONS_TABLE_SERVER != 0 {
+                        options_default(GLOBAL_OPTIONS, oe);
+                    }
+                }
+            }
+            let oo = options_create(null_mut());
+            for oe in &OPTIONS_TABLE {
+                if oe.scope & OPTIONS_TABLE_WINDOW != 0 {
+                    options_default(oo, oe);
+                }
+            }
+
+            let backing = Box::into_raw(Box::new(zeroed::<screen>()));
+            screen_init(backing, sx, sy, hlimit);
+            // Fill the scrollback so screen_hsize reports hlimit lines.
+            for _ in 0..hlimit {
+                grid_scroll_history((*backing).grid, 8);
+            }
+
+            let w = Box::into_raw(Box::new(zeroed::<window>()));
+            (*w).options = oo;
+
+            let wp = Box::into_raw(Box::new(zeroed::<window_pane>()));
+            (*wp).window = w;
+
+            let data = Box::into_raw(Box::new(zeroed::<window_copy_mode_data>()));
+            (*data).backing = backing;
+            (*data).line_numbers = true;
+
+            let wme = Box::into_raw(Box::new(zeroed::<window_mode_entry>()));
+            (*wme).wp = wp;
+            (*wme).data = data.cast();
+
+            Fixture {
+                wme,
+                wp,
+                w,
+                oo,
+                backing,
+                data,
+            }
+        }
+    }
+
+    unsafe fn teardown(f: Fixture) {
+        unsafe {
+            drop(Box::from_raw(f.wme));
+            drop(Box::from_raw(f.data));
+            drop(Box::from_raw(f.wp));
+            drop(Box::from_raw(f.w));
+            screen_free(f.backing);
+            drop(Box::from_raw(f.backing));
+            options_free(f.oo);
+        }
+    }
+
+    unsafe fn set_mode(f: &Fixture, mode: &str) {
+        unsafe {
+            let idx = ["off", "default", "absolute", "relative", "hybrid"]
+                .iter()
+                .position(|m| *m == mode)
+                .unwrap();
+            options_set_number(f.oo, "copy-mode-line-numbers", idx as i64);
+        }
+    }
+
+    // window_copy_line_number_width (window-copy.c:5054): wide enough for the
+    // largest line number in the backing screen plus a trailing space, and never
+    // narrower than three digits — so the content does not shift sideways as the
+    // scrollback crosses each power of ten.
+    #[test]
+    fn line_number_width_has_a_three_digit_floor_and_grows_with_scrollback() {
+        let _g = LN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe {
+            // 24 visible + 0 scrollback + 1 = 25 -> 2 digits, floored to 3, +1.
+            let f = fixture(80, 24, 0);
+            set_mode(&f, "absolute");
+            assert_eq!(window_copy_line_number_width(f.wme), 4);
+            teardown(f);
+
+            // 24 + 900 + 1 = 925 -> 3 digits, +1.
+            let f = fixture(80, 24, 900);
+            set_mode(&f, "absolute");
+            assert_eq!(window_copy_line_number_width(f.wme), 4);
+            teardown(f);
+
+            // 24 + 9999 + 1 = 10024 -> 5 digits, +1.
+            let f = fixture(80, 24, 9999);
+            set_mode(&f, "absolute");
+            assert_eq!(window_copy_line_number_width(f.wme), 6);
+            teardown(f);
+
+            // Off means no gutter at all, whatever the scrollback.
+            let f = fixture(80, 24, 9999);
+            set_mode(&f, "off");
+            assert_eq!(window_copy_line_number_width(f.wme), 0);
+            teardown(f);
+        }
+    }
+
+    // A mode entry with line numbers disabled (view mode, or copy mode entered
+    // from a mouse event) never gets a gutter even when the option asks for one.
+    #[test]
+    fn line_numbers_disabled_on_the_entry_beats_the_option() {
+        let _g = LN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe {
+            let f = fixture(80, 24, 100);
+            set_mode(&f, "absolute");
+            assert!(window_copy_line_numbers_active(f.wme));
+
+            (*f.data).line_numbers = false;
+            assert!(!window_copy_line_numbers_active(f.wme));
+            assert_eq!(window_copy_line_number_width(f.wme), 0);
+            assert!(!window_copy_line_number_is_absolute(f.wme));
+            teardown(f);
+        }
+    }
+
+    // Only the modes that count real scrollback lines are "absolute", which is
+    // what decides whether #{copy_position} counts lines or scroll offset.
+    #[test]
+    fn only_line_counting_modes_are_absolute() {
+        let _g = LN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe {
+            let f = fixture(80, 24, 100);
+            for (mode, want) in [
+                ("off", false),
+                ("default", false),
+                ("absolute", true),
+                ("relative", true),
+                ("hybrid", true),
+            ] {
+                set_mode(&f, mode);
+                assert_eq!(
+                    window_copy_line_number_is_absolute(f.wme),
+                    want,
+                    "mode {mode}"
+                );
+            }
+            teardown(f);
+        }
+    }
+
+    // window_copy_cursor_offset/unoffset (window-copy.c:5074, :5091) map between
+    // content columns and screen columns. They must round-trip for every column
+    // inside the content, and a column past the end must land on the last cell,
+    // which is where the `$` end-of-line marker is drawn.
+    #[test]
+    fn cursor_offset_round_trips_and_clamps_past_the_content() {
+        let _g = LN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe {
+            let f = fixture(80, 24, 100);
+            set_mode(&f, "absolute");
+            let width = window_copy_line_number_width(f.wme);
+            assert_eq!(width, 4);
+            let content = 80 - width;
+
+            for cx in 0..content {
+                let vx = window_copy_cursor_offset(f.wme, cx, 80);
+                assert_eq!(vx, width + cx, "cx {cx}");
+                assert_eq!(window_copy_cursor_unoffset(f.wme, vx, 80), cx, "cx {cx}");
+            }
+
+            // At or past the content width the cursor sits on the last column.
+            assert_eq!(window_copy_cursor_offset(f.wme, content, 80), 79);
+            assert_eq!(window_copy_cursor_offset(f.wme, content + 50, 80), 79);
+
+            // A click inside the gutter selects the first content column.
+            for vx in 0..width {
+                assert_eq!(window_copy_cursor_unoffset(f.wme, vx, 80), 0, "vx {vx}");
+            }
+            // ...and one past the end clamps to the last content column.
+            assert_eq!(window_copy_cursor_unoffset(f.wme, 79, 80), content - 1);
+
+            // With no gutter both are the identity.
+            set_mode(&f, "off");
+            for cx in [0, 1, 40, 79] {
+                assert_eq!(window_copy_cursor_offset(f.wme, cx, 80), cx);
+                assert_eq!(window_copy_cursor_unoffset(f.wme, cx, 80), cx);
+            }
+            teardown(f);
+        }
+    }
+
+    // A pane narrower than the gutter still has to leave one usable column, or
+    // the content width underflows and every cursor mapping is nonsense.
+    #[test]
+    fn a_pane_narrower_than_the_gutter_keeps_one_content_column() {
+        let _g = LN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe {
+            let f = fixture(3, 24, 100);
+            set_mode(&f, "absolute");
+            assert_eq!(window_copy_line_number_width(f.wme), 4);
+
+            // width >= sx pins the content to one column. Column 0 is still
+            // mapped as width + cx, which is off the right of a pane this
+            // narrow — the C does the same (window-copy.c:5079), and a pane
+            // that small cannot show a gutter usefully either way.
+            assert_eq!(window_copy_cursor_offset(f.wme, 0, 3), 4);
+            // Anything at or past the single content column clamps on-screen.
+            assert_eq!(window_copy_cursor_offset(f.wme, 1, 3), 2);
+            assert_eq!(window_copy_cursor_offset(f.wme, 5, 3), 2);
+            // Every screen column is inside the gutter, so all map back to 0.
+            assert_eq!(window_copy_cursor_unoffset(f.wme, 2, 3), 0);
+            teardown(f);
         }
     }
 }

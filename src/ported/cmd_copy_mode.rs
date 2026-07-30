@@ -84,10 +84,17 @@ unsafe fn cmd_copy_mode_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
         } else {
             wp
         };
-        if window_pane_set_mode(wp, swp, &raw const WINDOW_COPY_MODE, null_mut(), args) == 0
-            && args_has(args, 'M')
-        {
-            window_copy_start_drag(c, &raw mut (*event).m);
+        // Entering copy mode from a mouse event means the user is about to
+        // select with the mouse, so the line-number gutter stays off — it would
+        // shift the content out from under the pointer.
+        let line_numbers = event.is_null() || !KEYC_IS_MOUSE((*event).key);
+        if window_pane_set_mode(wp, swp, &raw const WINDOW_COPY_MODE, null_mut(), args) == 0 {
+            window_copy_set_line_numbers(wp, line_numbers);
+            if args_has(args, 'M') {
+                window_copy_start_drag(c, &raw mut (*event).m);
+            }
+        } else {
+            window_copy_set_line_numbers(wp, line_numbers);
         }
         if args_has(args, 'u') {
             window_copy_pageup(wp, 0);

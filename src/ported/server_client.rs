@@ -2966,6 +2966,7 @@ pub unsafe fn server_client_check_redraw(c: *mut client) {
                 server_client_set_title(c);
                 server_client_set_path(c);
             }
+            server_client_set_progress_bar(c);
             redraw_screen(c);
         }
 
@@ -3030,6 +3031,26 @@ pub unsafe fn server_client_set_path(c: *mut client) {
             (*c).path = Some(std::ffi::CStr::from_ptr((path).cast()).to_owned());
             tty_set_path(&raw mut (*c).tty, (*c).path_ptr());
         }
+    }
+}
+
+/// Push the active pane's progress bar out to this client's terminal, when it
+/// differs from what the client was last sent.
+/// C `vendor/tmux/server-client.c:2400`: `static void
+/// server_client_set_progress_bar(struct client *c)`
+pub unsafe fn server_client_set_progress_bar(c: *mut client) {
+    unsafe {
+        let s = (*c).session;
+
+        if (*s).curw.is_null() || (*(*(*s).curw).window).active.is_null() {
+            return;
+        }
+        let pane_pb = (*(*(*(*s).curw).window).active).base.progress_bar;
+        if pane_pb == (*c).progress_bar {
+            return;
+        }
+        (*c).progress_bar = pane_pb;
+        tty_set_progress_bar(&raw mut (*c).tty, &raw const (*c).progress_bar);
     }
 }
 

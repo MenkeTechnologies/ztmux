@@ -2595,6 +2595,35 @@ pub unsafe fn format_cb_pane_pid(ft: *mut format_tree) -> format_table_type {
     }
 }
 
+/// Callback for `pane_pb_progress`.
+/// C `vendor/tmux/format.c:2339`: `static void *format_cb_pane_pb_progress(struct format_tree *ft)`
+pub unsafe fn format_cb_pane_pb_progress(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if !(*ft).wp.is_null() {
+            return format!("{}", (*(*ft).wp).base.progress_bar.progress).into();
+        }
+        format_table_type::None
+    }
+}
+
+/// Callback for `pane_pb_state`.
+/// C `vendor/tmux/format.c:2350`: `static void *format_cb_pane_pb_state(struct format_tree *ft)`
+pub unsafe fn format_cb_pane_pb_state(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if !(*ft).wp.is_null() {
+            return match (*(*ft).wp).base.progress_bar.state {
+                progress_bar_state::PROGRESS_BAR_HIDDEN => "hidden",
+                progress_bar_state::PROGRESS_BAR_NORMAL => "normal",
+                progress_bar_state::PROGRESS_BAR_ERROR => "error",
+                progress_bar_state::PROGRESS_BAR_INDETERMINATE => "indeterminate",
+                progress_bar_state::PROGRESS_BAR_PAUSED => "paused",
+            }
+            .into();
+        }
+        format_table_type::None
+    }
+}
+
 /// Callback for `pane_pipe`.
 /// C `vendor/tmux/format.c:2316`: `static void *format_cb_pane_pipe(struct format_tree *ft)`
 pub unsafe fn format_cb_pane_pipe(ft: *mut format_tree) -> format_table_type {
@@ -3534,6 +3563,8 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("pane_marked_set", format_cb_pane_marked_set),
     format_table_entry::new("pane_mode", format_cb_pane_mode),
     format_table_entry::new("pane_path", format_cb_pane_path),
+    format_table_entry::new("pane_pb_progress", format_cb_pane_pb_progress),
+    format_table_entry::new("pane_pb_state", format_cb_pane_pb_state),
     format_table_entry::new("pane_pid", format_cb_pane_pid),
     format_table_entry::new("pane_pipe", format_cb_pane_pipe),
     format_table_entry::new("pane_right", format_cb_pane_right),

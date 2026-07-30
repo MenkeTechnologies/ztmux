@@ -30,6 +30,9 @@ static OPTIONS_TABLE_STATUS_JUSTIFY_LIST: [&str; 4] =
     ["left", "centre", "right", "absolute-centre"];
 static OPTIONS_TABLE_STATUS_POSITION_LIST: [&str; 2] = ["top", "bottom"];
 static OPTIONS_TABLE_BELL_ACTION_LIST: [&str; 4] = ["none", "any", "current", "other"];
+/// C `vendor/tmux/options-table.c:114`: `options_table_copy_mode_line_numbers_list`.
+static OPTIONS_TABLE_COPY_MODE_LINE_NUMBERS_LIST: [&str; 5] =
+    ["off", "default", "absolute", "relative", "hybrid"];
 static OPTIONS_TABLE_VISUAL_BELL_LIST: [&str; 3] = ["off", "on", "both"];
 static OPTIONS_TABLE_CURSOR_STYLE_LIST: [&str; 7] = [
     "default",
@@ -262,7 +265,7 @@ macro_rules! options_table_window_hook {
     };
 }
 
-pub static OPTIONS_TABLE: [options_table_entry; 226] = [
+pub static OPTIONS_TABLE: [options_table_entry; 237] = [
     options_table_entry {
         name: "backspace",
         type_: options_table_type::OPTIONS_TABLE_KEY,
@@ -974,6 +977,21 @@ pub static OPTIONS_TABLE: [options_table_entry; 226] = [
         ..options_table_entry::const_default()
     },
     options_table_entry {
+        name: "message-format",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SESSION,
+        default_str: Some(concat!(
+            "#[#{?#{command_prompt},",
+            "#{E:message-command-style},",
+            "#{E:message-style}}]",
+            "#{message}"
+        )),
+        text: c!(
+            "Format string for the prompt and message area. The '#{message}' placeholder is replaced with the content."
+        ),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
         name: "message-line",
         type_: options_table_type::OPTIONS_TABLE_CHOICE,
         scope: OPTIONS_TABLE_SESSION,
@@ -1377,6 +1395,70 @@ pub static OPTIONS_TABLE: [options_table_entry; 226] = [
         ..options_table_entry::const_default()
     },
     options_table_entry {
+        name: "copy-mode-position-format",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE,
+        default_str: Some(concat!(
+            "#[align=right]",
+            "#{t/p:top_line_time}#{?#{e|>:#{top_line_time},0}, ,}",
+            "[#{copy_position}/#{copy_position_limit}]",
+            "#{?search_timed_out, (timed out),",
+            "#{?search_count, (#{search_count}",
+            "#{?search_count_partial,+,} results),}}"
+        )),
+        text: c!("Format of the position indicator in copy mode."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "copy-mode-position-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("#{E:mode-style}"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of position indicator in copy mode."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "copy-mode-selection-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("#{E:mode-style}"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of selection in copy mode."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "copy-mode-current-line-number-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("fg=themeyellow"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of current line number in copy mode."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "copy-mode-line-number-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("fg=themelightgrey,dim"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of line numbers in copy mode."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "copy-mode-line-numbers",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_WINDOW,
+        choices: &OPTIONS_TABLE_COPY_MODE_LINE_NUMBERS_LIST,
+        default_num: 0,
+        text: c!("Line number mode in copy mode."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
         name: "fill-character",
         type_: options_table_type::OPTIONS_TABLE_STRING,
         scope: OPTIONS_TABLE_WINDOW,
@@ -1603,6 +1685,46 @@ pub static OPTIONS_TABLE: [options_table_entry; 226] = [
         default_str: Some(""),
         flags: OPTIONS_TABLE_IS_ARRAY,
         text: c!("The default colour palette for colours zero to 255."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "prompt-cursor-colour",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SESSION,
+        default_str: Some(""),
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        text: c!("Colour of the cursor when in the command prompt."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "prompt-command-cursor-colour",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SESSION,
+        default_str: Some(""),
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        text: c!(
+            "Colour of the cursor in the command prompt when in command mode, if 'status-keys' is set to 'vi'."
+        ),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "prompt-cursor-style",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_SESSION,
+        choices: &OPTIONS_TABLE_CURSOR_STYLE_LIST,
+        default_num: 0,
+        text: c!("Style of the cursor when in the command prompt."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "prompt-command-cursor-style",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_SESSION,
+        choices: &OPTIONS_TABLE_CURSOR_STYLE_LIST,
+        default_num: 0,
+        text: c!(
+            "Style of the cursor in the command prompt when in command mode, if 'status-keys' is set to 'vi'."
+        ),
         ..options_table_entry::const_default()
     },
     options_table_entry {

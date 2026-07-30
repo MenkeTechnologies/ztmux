@@ -60,8 +60,8 @@ impl tty_term_code_entry {
 }
 
 #[rustfmt::skip]
-static TTY_TERM_CODES: [tty_term_code_entry; 232] = const {
-    let mut tmp: [tty_term_code_entry; 232] = unsafe { zeroed() };
+static TTY_TERM_CODES: [tty_term_code_entry; 233] = const {
+    let mut tmp: [tty_term_code_entry; 233] = unsafe { zeroed() };
 
     tmp[tty_code_code::TTYC_ACSC as usize] = tty_term_code_entry::new(tty_code_type::String, c"acsc");
     tmp[tty_code_code::TTYC_AM as usize] = tty_term_code_entry::new(tty_code_type::Flag, c"am");
@@ -287,6 +287,7 @@ static TTY_TERM_CODES: [tty_term_code_entry; 232] = const {
     tmp[tty_code_code::TTYC_SMULX as usize] = tty_term_code_entry::new(tty_code_type::String, c"Smulx");
     tmp[tty_code_code::TTYC_SMUL as usize] = tty_term_code_entry::new(tty_code_type::String, c"smul");
     tmp[tty_code_code::TTYC_SMXX as usize] = tty_term_code_entry::new(tty_code_type::String, c"smxx");
+    tmp[tty_code_code::TTYC_SPB as usize] = tty_term_code_entry::new(tty_code_type::String, c"Spb");
     tmp[tty_code_code::TTYC_SS as usize] = tty_term_code_entry::new(tty_code_type::String, c"Ss");
     tmp[tty_code_code::TTYC_SWD as usize] = tty_term_code_entry::new(tty_code_type::String, c"Swd");
     tmp[tty_code_code::TTYC_SYNC as usize] = tty_term_code_entry::new(tty_code_type::String, c"Sync");

@@ -27,6 +27,11 @@ pub struct screen_sel {
     pub ex: u32,
     pub ey: u32,
 
+    /// C `vendor/tmux/screen.c:39`: columns to the left of this are never in
+    /// the selection. Copy mode sets it to the width of the line-number
+    /// gutter, so dragging a selection cannot select the numbers.
+    pub clipx: u32,
+
     pub cell: grid_cell,
 }
 
@@ -104,6 +109,9 @@ pub unsafe fn screen_init(s: *mut screen, sx: u32, sy: u32, hlimit: u32) {
 
         (*s).write_list = null_mut();
         (*s).hyperlinks = null_mut();
+        // C gets this from the xcalloc'd struct; Rust has no such guarantee, so
+        // the zero value is written out before screen_reinit resets it.
+        (*s).progress_bar = progress_bar::default();
 
         screen_reinit(s);
     }
@@ -142,7 +150,22 @@ pub unsafe fn screen_reinit(s: *mut screen) {
         #[cfg(feature = "sixel")]
         crate::image_::image_free_all(s);
 
+        screen_set_progress_bar(s, progress_bar_state::PROGRESS_BAR_HIDDEN, 0);
         screen_reset_hyperlinks(s);
+    }
+}
+
+/// Set the screen's OSC 9;4 progress bar. A negative `p` leaves the previous
+/// progress alone (the sequence carried no percentage), and an indeterminate
+/// bar keeps its old progress too since it has none of its own.
+/// C `vendor/tmux/screen.c:329`: `void screen_set_progress_bar(struct screen *s,
+/// enum progress_bar_state pbs, int p)`
+pub unsafe fn screen_set_progress_bar(s: *mut screen, pbs: progress_bar_state, p: i32) {
+    unsafe {
+        (*s).progress_bar.state = pbs;
+        if p >= 0 && pbs != progress_bar_state::PROGRESS_BAR_INDETERMINATE {
+            (*s).progress_bar.progress = p;
+        }
     }
 }
 
@@ -493,6 +516,7 @@ pub unsafe fn screen_set_selection(
     ex: u32,
     ey: u32,
     rectangle: u32,
+    clipx: u32,
     modekeys: modekey,
     gc: *mut grid_cell,
 ) {
@@ -510,6 +534,7 @@ pub unsafe fn screen_set_selection(
         (*(*s).sel).sy = sy;
         (*(*s).sel).ex = ex;
         (*(*s).sel).ey = ey;
+        (*(*s).sel).clipx = clipx;
     }
 }
 
@@ -540,6 +565,9 @@ pub unsafe fn screen_check_selection(s: *mut screen, px: u32, py: u32) -> c_int 
         let xx: u32;
 
         if sel.is_null() || (*sel).hidden != 0 {
+            return 0;
+        }
+        if px < (*sel).clipx {
             return 0;
         }
 
@@ -1243,7 +1271,7 @@ mod tests {
 
             let mut gc = GRID_DEFAULT_CELL;
             // Rectangle from (2,1) to (5,3).
-            screen_set_selection(s, 2, 1, 5, 3, 1, modekey::MODEKEY_EMACS, &mut gc);
+            screen_set_selection(s, 2, 1, 5, 3, 1, 0, modekey::MODEKEY_EMACS, &mut gc);
             assert!(!(*s).sel.is_null());
 
             // Inside the rectangle.
@@ -1365,7 +1393,7 @@ mod tests {
 
             // EMACS: sx=2, ex=5 on one line. Cells 2,3,4 selected; 5 dropped.
             let s = new_screen(80, 24, 0);
-            screen_set_selection(s, 2, 1, 5, 1, 0, modekey::MODEKEY_EMACS, &mut gc);
+            screen_set_selection(s, 2, 1, 5, 1, 0, 0, modekey::MODEKEY_EMACS, &mut gc);
             assert_eq!(screen_check_selection(s, 2, 1), 1);
             assert_eq!(screen_check_selection(s, 4, 1), 1);
             assert_eq!(screen_check_selection(s, 5, 1), 0); // bottom-right dropped
@@ -1373,7 +1401,7 @@ mod tests {
             screen_clear_selection(s);
 
             // VI: same coordinates, but the end cell (5) is kept.
-            screen_set_selection(s, 2, 1, 5, 1, 0, modekey::MODEKEY_VI, &mut gc);
+            screen_set_selection(s, 2, 1, 5, 1, 0, 0, modekey::MODEKEY_VI, &mut gc);
             assert_eq!(screen_check_selection(s, 5, 1), 1);
             assert_eq!(screen_check_selection(s, 2, 1), 1);
 
@@ -1393,7 +1421,7 @@ mod tests {
 
             let mut selcell = GRID_DEFAULT_CELL;
             selcell.fg = 42; // distinctive selection foreground
-            screen_set_selection(s, 0, 0, 9, 0, 1, modekey::MODEKEY_EMACS, &mut selcell);
+            screen_set_selection(s, 0, 0, 9, 0, 1, 0, modekey::MODEKEY_EMACS, &mut selcell);
 
             let src = GRID_DEFAULT_CELL; // fg = 8
             let mut dst = GRID_DEFAULT_CELL;
@@ -1579,7 +1607,7 @@ mod tests {
             let mut gc = GRID_DEFAULT_CELL;
 
             // sx=5,sy=1 -> ex=3,ey=3, EMACS, non-rectangle.
-            screen_set_selection(s, 5, 1, 3, 3, 0, modekey::MODEKEY_EMACS, &mut gc);
+            screen_set_selection(s, 5, 1, 3, 3, 0, 0, modekey::MODEKEY_EMACS, &mut gc);
 
             // Middle row: every column selected.
             assert_eq!(screen_check_selection(s, 0, 2), 1);
@@ -1613,7 +1641,7 @@ mod tests {
             let mut gc = GRID_DEFAULT_CELL;
 
             // Rectangle sx=5 -> ex=2 (cursor on the left), rows 1..3.
-            screen_set_selection(s, 5, 1, 2, 3, 1, modekey::MODEKEY_EMACS, &mut gc);
+            screen_set_selection(s, 5, 1, 2, 3, 1, 0, modekey::MODEKEY_EMACS, &mut gc);
 
             assert_eq!(screen_check_selection(s, 3, 2), 1); // inside band
             assert_eq!(screen_check_selection(s, 2, 2), 1); // left edge (ex)

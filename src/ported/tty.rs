@@ -846,6 +846,23 @@ pub unsafe fn tty_set_path(tty: *mut tty, title: *const u8) {
     }
 }
 
+/// Write the OSC 9;4 progress bar out to the terminal, for terminals that
+/// advertise the `Spb` capability.
+/// C `vendor/tmux/tty.c:3199`: `void tty_set_progress_bar(struct tty *tty,
+/// struct progress_bar *pb)`
+pub unsafe fn tty_set_progress_bar(tty: *mut tty, pb: *const progress_bar) {
+    unsafe {
+        if tty_term_has((*tty).term, tty_code_code::TTYC_SPB) {
+            tty_putcode_ii(
+                tty,
+                tty_code_code::TTYC_SPB,
+                (*pb).state as i32,
+                (*pb).progress,
+            );
+        }
+    }
+}
+
 /// C `vendor/tmux/tty.c:751`: `static void tty_force_cursor_colour(struct tty *tty, int c)`
 pub unsafe fn tty_force_cursor_colour(tty: *mut tty, mut c: i32) {
     unsafe {

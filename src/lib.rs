@@ -162,6 +162,8 @@ cfg_pub_mods! {
     mod server_client;
     #[path = "ported/server_fn.rs"]
     mod server_fn;
+    #[path = "ported/prompt.rs"]
+    mod prompt_;
     #[path = "ported/session.rs"]
     mod session_;
     #[path = "ported/sort.rs"]
@@ -776,6 +778,7 @@ enum tty_code_code {
     TTYC_SMUL,
     TTYC_SMULX,
     TTYC_SMXX,
+    TTYC_SPB,
     TTYC_SXL,
     TTYC_SS,
     TTYC_SWD,
@@ -1199,6 +1202,41 @@ enum screen_cursor_style {
     SCREEN_CURSOR_BAR,
 }
 
+/// C `vendor/tmux/tmux.h:1024`: `enum progress_bar_state` — the OSC 9;4 states.
+#[repr(i32)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+enum progress_bar_state {
+    #[default]
+    PROGRESS_BAR_HIDDEN = 0,
+    PROGRESS_BAR_NORMAL = 1,
+    PROGRESS_BAR_ERROR = 2,
+    PROGRESS_BAR_INDETERMINATE = 3,
+    PROGRESS_BAR_PAUSED = 4,
+}
+
+impl progress_bar_state {
+    /// The state for an OSC 9;4 digit, `None` for anything outside `0`-`4`
+    /// (the C compares `*pb < '0' || *pb > '4'` before casting).
+    fn from_digit(d: u8) -> Option<Self> {
+        Some(match d {
+            b'0' => Self::PROGRESS_BAR_HIDDEN,
+            b'1' => Self::PROGRESS_BAR_NORMAL,
+            b'2' => Self::PROGRESS_BAR_ERROR,
+            b'3' => Self::PROGRESS_BAR_INDETERMINATE,
+            b'4' => Self::PROGRESS_BAR_PAUSED,
+            _ => return None,
+        })
+    }
+}
+
+/// C `vendor/tmux/tmux.h:1031`: `struct progress_bar` — OSC 9;4 progress bar.
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+struct progress_bar {
+    state: progress_bar_state,
+    progress: i32,
+}
+
 /// Virtual screen.
 #[repr(C)]
 #[derive(Clone)]
@@ -1248,6 +1286,8 @@ struct screen {
     write_list: *mut screen_write_cline,
 
     hyperlinks: *mut hyperlinks,
+
+    progress_bar: progress_bar,
 }
 
 const SCREEN_WRITE_SYNC: i32 = 0x1;
@@ -2813,6 +2853,9 @@ struct client {
     title: Option<std::ffi::CString>,
     path: Option<std::ffi::CString>,
     cwd: Option<std::ffi::CString>,
+    /// C `vendor/tmux/tmux.h:2179`: the progress bar last written to this
+    /// client's terminal, so a redraw only re-emits `Spb` when it changed.
+    progress_bar: progress_bar,
 
     term_name: Option<std::ffi::CString>,
     term_features: c_int,
@@ -2872,6 +2915,16 @@ struct client {
     prompt_flags: prompt_flags,
     prompt_type: prompt_type,
     prompt_cursor: c_int,
+    /// C `vendor/tmux/prompt.c:45`: the cursor the terminal shows while the
+    /// prompt is open, and the separate one for vi command mode. Resolved once
+    /// per prompt from the `prompt-cursor-*` options by
+    /// [`crate::prompt_::prompt_set_options`].
+    prompt_cstyle: screen_cursor_style,
+    prompt_command_cstyle: screen_cursor_style,
+    prompt_cmode: mode_flag,
+    prompt_command_cmode: mode_flag,
+    prompt_ccolour: c_int,
+    prompt_command_ccolour: c_int,
 
     session: *mut session,
     last_session: *mut session,

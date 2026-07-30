@@ -2537,6 +2537,7 @@ unsafe fn input_exit_osc(ictx: *mut input_ctx) {
                 }
             }
             8 => input_osc_8(ictx, p.cast()),
+            9 => input_osc_9(ictx, p.cast()),
             10 => input_osc_10(ictx, p.cast()),
             11 => input_osc_11(ictx, p.cast()),
             12 => input_osc_12(ictx, p.cast()),
@@ -2894,6 +2895,82 @@ unsafe fn input_get_fg_control_client(wp: *mut window_pane) -> i32 {
         }
     }
     -1
+}
+
+/// Set the progress bar on this pane's screen and repaint what shows it.
+/// C `vendor/tmux/input.c:2993`: `static void input_set_progress_bar(struct
+/// input_ctx *ictx, enum progress_bar_state state, int p)`
+unsafe fn input_set_progress_bar(ictx: *mut input_ctx, state: progress_bar_state, p: i32) {
+    unsafe {
+        screen_set_progress_bar((*ictx).ctx.s, state, p);
+        if !(*ictx).wp.is_null() {
+            server_redraw_window_borders((*(*ictx).wp).window);
+            server_status_window((*(*ictx).wp).window);
+        }
+    }
+}
+
+/// Handle the OSC 9;4 sequence for progress bars.
+///
+/// The grammar is `9;4;<state>[;<progress>]`: a state digit `0`-`4`, and an
+/// optional percentage `0`-`100`. A bare state (or one with an empty trailing
+/// field) sets the state and leaves the previous progress alone. Anything that
+/// does not parse is dropped with a log line, exactly as the C does — a
+/// malformed sequence must never disturb the bar that is already showing.
+/// C `vendor/tmux/input.c:3005`: `static void input_osc_9(struct input_ctx *ictx, const char *p)`
+unsafe fn input_osc_9(ictx: *mut input_ctx, p: *const u8) {
+    unsafe {
+        // Bytes, not a `&str`: this is pane output, so it need not be valid
+        // UTF-8 and must not be able to panic the server on the way in.
+        let pb = std::slice::from_raw_parts(p, libc::strlen(p));
+        let bad = |pb: &[u8]| log_debug!("bad OSC 9;4 {}", String::from_utf8_lossy(pb));
+
+        // Only the "4" sub-parameter is a progress bar; OSC 9 otherwise is a
+        // desktop notification, which tmux does not act on.
+        let Some(rest) = pb.strip_prefix(b"4") else {
+            return;
+        };
+        // `9;4` and `9;4;` alone are neither an error nor a change.
+        if rest.is_empty() || rest == b";" {
+            return;
+        }
+        let Some(rest) = rest.strip_prefix(b";") else {
+            return;
+        };
+
+        let Some(state) = rest.first().copied().and_then(progress_bar_state::from_digit) else {
+            bad(pb);
+            return;
+        };
+        let rest = &rest[1..];
+
+        // A state with no percentage keeps whatever progress was already there.
+        if rest.is_empty() || rest == b";" {
+            input_set_progress_bar(ictx, state, -1);
+            return;
+        }
+        let Some(digits) = rest.strip_prefix(b";") else {
+            bad(pb);
+            return;
+        };
+        // The C accumulates digits and bails the moment the running total passes
+        // 100, so an overlong run can never wrap into a plausible percentage.
+        // Anything that is not a digit ends the run and then fails the C's
+        // end-of-string check, so it is equally rejected here.
+        let mut progress: i32 = 0;
+        for &b in digits {
+            if !b.is_ascii_digit() || progress > 100 {
+                bad(pb);
+                return;
+            }
+            progress = progress * 10 + i32::from(b - b'0');
+        }
+        if progress > 100 {
+            bad(pb);
+            return;
+        }
+        input_set_progress_bar(ictx, state, progress);
+    }
 }
 
 /// Handle the OSC 10 sequence for setting and querying foreground colour.
