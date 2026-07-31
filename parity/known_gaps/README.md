@@ -35,13 +35,12 @@ colour-name parsing), the pane/session status-line options
 (`pane-status-*` / `session-status-*` / `window-pane-status-format`, with
 `status-format[1]`/`[2]` and the `#{R:}` repeat modifier), `copy-mode-line-numbers`
 and its styles, the `prompt-cursor-*` / `prompt-command-cursor-*` / `message-format`
-options, the floating-pane format vars, and `pane-scrollbars*` have already made
-that trip.
+options, the floating-pane format vars, `pane-scrollbars*` and the `tree-mode-*`
+preview/style options have already made that trip.
 
 | Case | Feature gap | Unported area |
 | --- | --- | --- |
-| `opt_tree_mode.sh` | `tree-mode-preview-*` / `tree-mode-*-style` / `switch-mode-match-style` (5) | `mode-tree.c`, `window-tree.c` |
-| `cmd_switch_mode.sh` | `switch-mode` command | `cmd-switch-mode` |
+| `cmd_switch_mode.sh` | `switch-mode` command | `cmd-switch-mode`, `window-switch.c` |
 
 ## Sample proof
 
@@ -56,6 +55,13 @@ copy-mode command table and `capture-pane -F/-H/-L/-M` were ported; they are now
 covered by `parity/cases/1471`–`1477`. `opt_pane_scrollbars.sh` graduated with the
 pane-scrollbars port and is covered by `parity/cases/1483` (the column a reserved
 bar takes) and `1484` (the bar as drawn, captured through a nested client).
+`opt_tree_mode.sh` graduated with the tree-mode preview port: `parity/cases/1485`
+covers the five options themselves, `1486` the choose-tree session preview as
+drawn and `1487` the selection style and the per-pane preview, both captured
+through the same nested client. `switch-mode-match-style` exists as an
+option because next-3.7's table has it, but the mode that reads it
+(`window-switch.c`) is not ported — that unbuilt surface is what
+`cmd_switch_mode.sh` still measures.
 
 The one command still unported is `scroll-to-mouse`, and it has no case here: it
 drags the scrollbar slider, which needs `tty.mouse_scrolling_flag` /

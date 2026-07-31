@@ -1083,7 +1083,13 @@ pub unsafe fn screen_write_hline(
 
 /// Draw a vertical line on screen.
 /// C `vendor/tmux/screen-write.c:795`: `void screen_write_vline(struct screen_write_ctx *ctx, u_int ny, int top, int bottom, const struct grid_cell *gcp)`
-pub unsafe fn screen_write_vline(ctx: *mut screen_write_ctx, ny: u32, top: i32, bottom: i32) {
+pub unsafe fn screen_write_vline(
+    ctx: *mut screen_write_ctx,
+    ny: u32,
+    top: i32,
+    bottom: i32,
+    gcp: *const grid_cell,
+) {
     unsafe {
         let s = (*ctx).s;
         let mut gc: grid_cell = zeroed();
@@ -1091,7 +1097,11 @@ pub unsafe fn screen_write_vline(ctx: *mut screen_write_ctx, ny: u32, top: i32, 
         let cx = (*s).cx;
         let cy = (*s).cy;
 
-        memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
+        if gcp.is_null() {
+            memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
+        } else {
+            memcpy__(&raw mut gc, gcp);
+        }
         gc.attr |= grid_attr::GRID_ATTR_CHARSET;
 
         screen_write_putc(ctx, &raw const gc, if top != 0 { b'w' } else { b'x' });

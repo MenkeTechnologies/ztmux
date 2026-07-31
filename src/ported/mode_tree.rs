@@ -733,6 +733,7 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
 
         let mut gc0: grid_cell = zeroed();
         let mut gc: grid_cell = zeroed();
+        let mut box_gc: grid_cell = zeroed();
 
         'done: {
             if mtd.line_list.is_empty() {
@@ -741,7 +742,9 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
 
             memcpy__(&raw mut gc0, &raw const GRID_DEFAULT_CELL);
             memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
-            style_apply(&raw mut gc, oo, c!("mode-style"), null_mut());
+            style_apply(&raw mut gc, oo, c!("tree-mode-selection-style"), null_mut());
+            memcpy__(&raw mut box_gc, &raw const GRID_DEFAULT_CELL);
+            style_apply(&raw mut box_gc, oo, c!("tree-mode-border-style"), null_mut());
 
             let w = mtd.width;
             let h = mtd.height;
@@ -887,7 +890,7 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
                 w,
                 sy - h,
                 box_lines::BOX_LINES_DEFAULT,
-                null(),
+                &raw const box_gc,
                 None,
             );
 
@@ -907,7 +910,7 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
             };
             if w - 2 >= strlen(text) as u32 {
                 screen_write_cursormove(&raw mut ctx, 1, h as i32, 0);
-                screen_write_puts!(&raw mut ctx, &raw mut gc0, "{}", _s(text));
+                screen_write_puts!(&raw mut ctx, &raw mut box_gc, "{}", _s(text));
 
                 let n = if mtd.no_matches != 0 {
                     "no matches".len()
@@ -916,15 +919,15 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
                 };
 
                 if !mtd.filter.is_null() && w as usize - 2 >= strlen(text) + 10 + n + 2 {
-                    screen_write_puts!(&raw mut ctx, &raw mut gc0, " (filter: ");
+                    screen_write_puts!(&raw mut ctx, &raw mut box_gc, " (filter: ");
                     if mtd.no_matches != 0 {
-                        screen_write_puts!(&raw mut ctx, &raw mut gc, "no matches");
+                        screen_write_puts!(&raw mut ctx, &raw mut box_gc, "no matches");
                     } else {
-                        screen_write_puts!(&raw mut ctx, &raw mut gc0, "active");
+                        screen_write_puts!(&raw mut ctx, &raw mut box_gc, "active");
                     }
-                    screen_write_puts!(&raw mut ctx, &raw mut gc0, ") ");
+                    screen_write_puts!(&raw mut ctx, &raw mut box_gc, ") ");
                 } else {
-                    screen_write_puts!(&raw mut ctx, &raw mut gc0, " ");
+                    screen_write_puts!(&raw mut ctx, &raw mut box_gc, " ");
                 }
             }
             free_(text);

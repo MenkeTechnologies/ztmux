@@ -269,7 +269,7 @@ macro_rules! options_table_window_hook {
     };
 }
 
-pub static OPTIONS_TABLE: [options_table_entry; 241] = [
+pub static OPTIONS_TABLE: [options_table_entry; 246] = [
     options_table_entry {
         name: "backspace",
         type_: options_table_type::OPTIONS_TABLE_KEY,
@@ -1835,6 +1835,16 @@ pub static OPTIONS_TABLE: [options_table_entry; 241] = [
         ..options_table_entry::const_default()
     },
     options_table_entry {
+        name: "switch-mode-match-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE,
+        default_str: Some("bg=cyan fg=black"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of matched characters in switch mode."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
         name: "synchronize-panes",
         type_: options_table_type::OPTIONS_TABLE_FLAG,
         scope: OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE,
@@ -1852,6 +1862,54 @@ pub static OPTIONS_TABLE: [options_table_entry; 241] = [
         text: c!(
             "Maximum number of columns in the 'tiled' layout. A value of 0 means no limit."
         ),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "tree-mode-border-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("bg=themedarkgrey,fg=themelightgrey"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of borders in tree mode."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "tree-mode-preview-format",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE,
+        default_str: Some(concat!(
+            "#{?pane_format,",
+            "#{pane_index}:#{pane_title},",
+            "#{window_index}:#{window_name}}"
+        )),
+        text: c!("Format of the preview indicator in tree mode."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "tree-mode-preview-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some(concat!(
+            "fg=#{?#{||:",
+            "#{&&:#{pane_format},#{pane_active}},",
+            "#{&&:#{window_format},#{window_active}}},",
+            "themered,",
+            "themeblue}"
+        )),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of preview indicator in tree mode."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "tree-mode-selection-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("#{E:mode-style}"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of the selected line in tree mode."),
         ..options_table_entry::const_default()
     },
     options_table_entry {

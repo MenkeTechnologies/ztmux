@@ -1236,7 +1236,10 @@ pub unsafe fn options_string_to_style(
         let is_colour = !oe.is_null() && ((*oe).flags & OPTIONS_TABLE_IS_COLOUR) != 0;
 
         style_set(&mut (*o).style, &GRID_DEFAULT_CELL);
-        (*o).cached = cstr_to_str(s).contains("#{") as i32;
+        // C: `o->cached = (strstr(s, "#{") == NULL)`. A style with no format in
+        // it parses to the same cell every time and is cached; one that has to
+        // be expanded against a format tree never is.
+        (*o).cached = !cstr_to_str(s).contains("#{") as i32;
 
         if !ft.is_null() && (*o).cached == 0 {
             let expanded = format_expand(ft, s);

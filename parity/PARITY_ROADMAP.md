@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1180/1180 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 cases.
+**1183/1183 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 cases.
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
 (full-size split with a pre-existing split) crashed the server on a u32 underflow
@@ -185,6 +185,55 @@ server whose only client is attached inside a pane of the first, then
 `capture-pane -e` on that outer pane — which makes the trough, the slider and
 the padding column byte-comparable against the reference for every position,
 width, padding and scrollbar mode.
+
+Round-11 port — tree-mode preview and styles:
+
+The `opt_tree_mode` gap closed. Five next-3.7 window options landed with the
+drawing behind them: `tree-mode-selection-style` and `tree-mode-border-style` in
+`mode_tree_draw` (`mode-tree.c:840`, `:842`, `:989`, `:1002`–`:1016`), and
+`tree-mode-border-style` / `tree-mode-preview-style` / `tree-mode-preview-format`
+in `window_tree_draw_session` and `window_tree_draw_window` (`window-tree.c:618`,
+`:635`, `:766`, `:783`) through a new `window_tree_border_cell`
+(`window-tree.c:508`) and the next-3.7 `window_tree_draw_label`
+(`window-tree.c:478`), which frames the label with the border cell, clears the
+label row to the border background, and draws the expanded format with
+`format_draw` instead of the previous hand-built `idx:name` string.
+`screen_write_vline` regained the `const struct grid_cell *` parameter its own
+doc comment already claimed (`screen-write.c:795`), so the preview separators and
+the `<`/`>` arrows take the border style.
+
+That work surfaced a real bug in the port. `options_string_to_style`
+(`options.c:1010`) sets `o->cached = (strstr(s, "#{") == NULL)` — a style with no
+format in it parses once and is cached, one that must be expanded never is. The
+port had the test inverted, so every style whose value contains `#{` was cached
+after being parsed *literally* and was never expanded against the format tree.
+That is exactly the shape of these two defaults — `tree-mode-selection-style` is
+`#{E:mode-style}` and `tree-mode-preview-style` picks its colour from
+`#{?…pane_active…}` — and of any user style written as a format. Fixed at
+`options.rs:1239`.
+
+`switch-mode-match-style` is in the table with its C default, but nothing reads
+it: `window-switch.c` is unported and stays a known gap alongside the
+`switch-mode` command.
+
+Case 1485 covers the option surface (defaults, the `,` separator under `-a`,
+style validation, `#{E:}` resolution). Cases 1486 and 1487 cover the preview as
+drawn, through the same nested-client trick as 1484: 1486 the session preview
+under every border/preview-style/format variation, 1487 the selection style and
+the window preview, whose format and styles come from each *pane's* options. The
+item list above the box still differs (next-3.7 builds it from a prefix format
+this port does not have), so both cases capture the preview box only, plus the
+leading SGR run of the selected line for the selection style.
+
+Not ported, and still absent: `mode_tree_draw_help` and the `?` overlay,
+`window_tree_draw_info` and the `preview_is_info` toggle, `window_tree_help`,
+`window_tree_sort`/`window_tree_swap` (next-3.7 replaced mode-tree's static sort
+list with `sortcb`/`swapcb`/`helpcb`), and every `mode_tree_prompt_*` function —
+those need next-3.7's `struct prompt` object, which this port does not have (it
+still carries the pre-split `status_prompt_*` fields on `struct client`). The
+`#[#{E:tree-mode-border-style},acs]x` info/help format strings in `window-tree.c`,
+`window-client.c`, `window-buffer.c` and `window-customize.c` live inside exactly
+those unported functions, so none of them are in the tree yet.
 
 Round-7 fix:
 
@@ -353,9 +402,8 @@ so a regression in ported behavior cannot land.
 
 `parity/known_gaps/` is the inverse of `parity/cases/`: next-3.7 features ztmux
 does **not** implement yet, each pinned by a case that is expected to *diverge*
-from the reference. Two cases remain — the tree-mode preview/style options
-(`mode-tree.c`, `window-tree.c`) and the `switch-mode` command — each tied to an
-unported C area. Run them with the inverted runner:
+from the reference. One case remains — the `switch-mode` command, tied to the
+unported `cmd-switch-mode` / `window-switch.c`. Run it with the inverted runner:
 
 ```sh
 bash parity/run_known_gaps.sh   # "GAP" = still unported (expected); "CLOSED" = ported, promote it
@@ -365,7 +413,7 @@ The runner is an advisory tripwire — it exits non-zero only when a gap closes
 (the feature got ported and its case should move to `parity/cases/`), so it never
 reddens CI merely because the gaps still exist. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1180/1180 ported surface; they measure
+proof. These gaps do not count against the 1183/1183 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite

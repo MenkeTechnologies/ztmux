@@ -13,6 +13,7 @@
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 use crate::*;
 use crate::cmd_::cmd_queue::cmdq_get_callback1;
+use crate::options_::options_get_string_;
 
 const WINDOW_TREE_DEFAULT_COMMAND: &str = "switch-client -Zt '%%'";
 const WINDOW_TREE_DEFAULT_FORMAT: &str = concat!(
@@ -584,30 +585,51 @@ unsafe fn window_tree_draw_label(
     py: u32,
     sx: u32,
     sy: u32,
-    gc: *mut grid_cell,
-    label: *const u8,
+    border_gc: *const grid_cell,
+    label_gc: *const grid_cell,
+    mut label: *const u8,
 ) {
     unsafe {
-        let len = strlen(label);
-        if sx == 0 || sy == 1 || len as u32 > sx {
+        let mut new_label: *mut u8 = null_mut();
+
+        if sx < 5 || sy < 3 {
             return;
         }
-        let ox = (sx - len as u32).div_ceil(2);
+        let mut width = format_width(cstr_to_str(label));
+        if width > sx - 4 {
+            new_label = format_trim_left(label, sx - 4);
+            label = new_label;
+            width = format_width(cstr_to_str(new_label));
+        }
+        if width == 0 {
+            free_(new_label);
+            return;
+        }
+        let ox = (sx - width).div_ceil(2);
         let oy = sy.div_ceil(2);
 
-        if ox > 1 && (ox + len as u32) < sx - 1 && sy >= 3 {
-            screen_write_cursormove(ctx, (px + ox - 1) as i32, (py + oy - 1) as i32, 0);
-            screen_write_box(
-                ctx,
-                len as u32 + 2,
-                3,
-                box_lines::BOX_LINES_DEFAULT,
-                null_mut(),
-                None,
-            );
-        }
+        screen_write_cursormove(ctx, (px + ox - 2) as i32, (py + oy - 1) as i32, 0);
+        screen_write_box(
+            ctx,
+            width + 4,
+            3,
+            box_lines::BOX_LINES_DEFAULT,
+            border_gc,
+            None,
+        );
+        screen_write_cursormove(ctx, (px + ox - 1) as i32, (py + oy) as i32, 0);
+        screen_write_clearcharacter(ctx, width + 2, (*border_gc).bg as u32);
         screen_write_cursormove(ctx, (px + ox) as i32, (py + oy) as i32, 0);
-        screen_write_puts!(ctx, gc, "{}", _s(label));
+        format_draw(ctx, label_gc, width, cstr_to_str(label), null_mut(), 0);
+        free_(new_label);
+    }
+}
+
+/// C `vendor/tmux/window-tree.c:508`: `static void window_tree_border_cell(struct grid_cell *gc, struct options *oo, struct format_tree *ft)`
+unsafe fn window_tree_border_cell(gc: *mut grid_cell, oo: *mut options, ft: *mut format_tree) {
+    unsafe {
+        memcpy__(gc, &raw const GRID_DEFAULT_CELL);
+        style_apply(gc, oo, c!("tree-mode-border-style"), ft);
     }
 }
 
@@ -620,8 +642,6 @@ unsafe fn window_tree_draw_session(
     sy: u32,
 ) {
     unsafe {
-        let oo = (*s).options;
-
         let cx: u32 = (*(*ctx).s).cx;
         let cy: u32 = (*(*ctx).s).cy;
         let mut loop_: u32;
@@ -636,19 +656,10 @@ unsafe fn window_tree_draw_session(
         let mut i: u32;
 
         let mut gc: grid_cell = zeroed();
+        let mut label_gc: grid_cell = zeroed();
         let mut label: *mut u8;
 
         let total = winlink_count(&raw mut (*s).windows);
-
-        memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
-        // display-panes[-active]-colour are STRING/IS_COLOUR options in
-        // next-3.7: expand+parse via style_apply, take fg.
-        let mut cgc: grid_cell = zeroed();
-        style_apply(&raw mut cgc, oo, c!("display-panes-colour"), null_mut());
-        let colour = cgc.fg;
-        let mut acgc: grid_cell = zeroed();
-        style_apply(&raw mut acgc, oo, c!("display-panes-active-colour"), null_mut());
-        let active_colour = acgc.fg;
 
         if sx / total < 24 {
             visible = sx / 24;
@@ -707,21 +718,22 @@ unsafe fn window_tree_draw_session(
             return;
         }
 
+        window_tree_border_cell(&raw mut gc, (*(*(*data).wp).window).options, null_mut());
         if left {
             (*data).left = (cx + 2) as i32;
             screen_write_cursormove(ctx, (cx + 2) as i32, cy as i32, 0);
-            screen_write_vline(ctx, sy, 0, 0);
+            screen_write_vline(ctx, sy, 0, 0, &raw const gc);
             screen_write_cursormove(ctx, cx as i32, (cy + sy / 2) as i32, 0);
-            screen_write_puts!(ctx, &raw const GRID_DEFAULT_CELL, "<");
+            screen_write_puts!(ctx, &raw const gc, "<");
         } else {
             (*data).left = -1;
         }
         if right {
             (*data).right = (cx + sx - 3) as i32;
             screen_write_cursormove(ctx, (cx + sx - 3) as i32, cy as i32, 0);
-            screen_write_vline(ctx, sy, 0, 0);
+            screen_write_vline(ctx, sy, 0, 0, &raw const gc);
             screen_write_cursormove(ctx, (cx + sx - 1) as i32, (cy + sy / 2) as i32, 0);
-            screen_write_puts!(ctx, &raw const GRID_DEFAULT_CELL, ">");
+            screen_write_puts!(ctx, &raw const gc, ">");
         } else {
             (*data).right = -1;
         }
@@ -741,12 +753,20 @@ unsafe fn window_tree_draw_session(
                 continue;
             }
             let w = (*wl).window;
+            let oo = (*w).options;
 
-            if wl == (*s).curw {
-                gc.fg = active_colour as i32;
-            } else {
-                gc.fg = colour as i32;
-            }
+            let ft = format_create(
+                null_mut(),
+                null_mut(),
+                (FORMAT_WINDOW | (*w).id) as i32,
+                format_flags::empty(),
+            );
+            format_defaults(ft, null_mut(), NonNull::new(s), NonNull::new(wl), None);
+
+            window_tree_border_cell(&raw mut gc, oo, ft);
+            memcpy__(&raw mut label_gc, &raw const GRID_DEFAULT_CELL);
+            style_apply(&raw mut label_gc, oo, c!("tree-mode-preview-style"), ft);
+            label_gc.bg = gc.bg;
 
             if left {
                 offset = 3 + (i * each);
@@ -762,20 +782,34 @@ unsafe fn window_tree_draw_session(
             screen_write_cursormove(ctx, (cx + offset) as i32, cy as i32, 0);
             screen_write_preview(ctx, &raw mut (*(*w).active).base, width, sy);
 
-            label = format_nul!(" {}:{} ", (*wl).idx, _s((*w).name_ptr()));
-            if strlen(label) > width as usize {
-                label = format_nul!(" {} ", (*wl).idx);
+            let format = options_get_string_(oo, "tree-mode-preview-format");
+            if *format != b'\0' {
+                label = format_expand(ft, format);
+                if *label != b'\0' {
+                    window_tree_draw_label(
+                        ctx,
+                        cx + offset,
+                        cy,
+                        width,
+                        sy,
+                        &raw const gc,
+                        &raw const label_gc,
+                        label,
+                    );
+                }
+                free_(label);
             }
-            window_tree_draw_label(ctx, cx + offset, cy, width, sy, &raw mut gc, label);
-            free_(label);
 
             if loop_ != end - 1 {
                 screen_write_cursormove(ctx, (cx + offset + width) as i32, cy as i32, 0);
-                screen_write_vline(ctx, sy, 0, 0);
+                screen_write_vline(ctx, sy, 0, 0, &raw const gc);
             }
             loop_ += 1;
 
             i += 1;
+
+            // Upstream next-3.7 leaks this tree; free it here.
+            format_free(ft);
         }
     }
 }
@@ -784,34 +818,25 @@ unsafe fn window_tree_draw_session(
 unsafe fn window_tree_draw_window(
     data: *mut window_tree_modedata,
     s: *mut session,
-    w: *mut window,
+    wl: *mut winlink,
     ctx: *mut screen_write_ctx,
     sx: u32,
     sy: u32,
 ) {
     unsafe {
-        let oo = (*s).options;
+        let w = (*wl).window;
         // struct window_pane *wp;
         let cx = (*(*ctx).s).cx;
         let cy = (*(*ctx).s).cy;
         // u_int loop_, total, visible, each, width, offset;
-        // u_int current, start, end, remaining, i, pane_idx;
-        // struct grid_cell gc;
+        // u_int current, start, end, remaining, i;
+        // struct grid_cell gc, label_gc;
         let mut gc: grid_cell = zeroed();
-        // int colour, active_colour, left, right;
+        let mut label_gc: grid_cell = zeroed();
+        // int left, right;
         // char *label;
 
         let total = window_count_panes(w, 1);
-
-        memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
-        // display-panes[-active]-colour are STRING/IS_COLOUR options in
-        // next-3.7: expand+parse via style_apply, take fg.
-        let mut cgc: grid_cell = zeroed();
-        style_apply(&raw mut cgc, oo, c!("display-panes-colour"), null_mut());
-        let colour: i32 = cgc.fg;
-        let mut acgc: grid_cell = zeroed();
-        style_apply(&raw mut acgc, oo, c!("display-panes-active-colour"), null_mut());
-        let active_colour: i32 = acgc.fg;
 
         let visible = if sx / total < 24 {
             if sx / 24 != 0 { sx / 24 } else { 1 }
@@ -869,21 +894,22 @@ unsafe fn window_tree_draw_window(
             return;
         }
 
+        window_tree_border_cell(&raw mut gc, (*(*(*data).wp).window).options, null_mut());
         if left {
             (*data).left = (cx + 2) as i32;
             screen_write_cursormove(ctx, (cx + 2) as i32, cy as i32, 0);
-            screen_write_vline(ctx, sy, 0, 0);
+            screen_write_vline(ctx, sy, 0, 0, &raw const gc);
             screen_write_cursormove(ctx, cx as i32, (cy + sy / 2) as i32, 0);
-            screen_write_puts!(ctx, &raw const GRID_DEFAULT_CELL, "<");
+            screen_write_puts!(ctx, &raw const gc, "<");
         } else {
             (*data).left = -1;
         }
         if right {
             (*data).right = (cx + sx - 3) as i32;
             screen_write_cursormove(ctx, (cx + sx - 3) as i32, cy as i32, 0);
-            screen_write_vline(ctx, sy, 0, 0);
+            screen_write_vline(ctx, sy, 0, 0, &raw const gc);
             screen_write_cursormove(ctx, (cx + sx - 1) as i32, (cy + sy / 2) as i32, 0);
-            screen_write_puts!(ctx, &raw const GRID_DEFAULT_CELL, ">");
+            screen_write_puts!(ctx, &raw const gc, ">");
         } else {
             (*data).right = -1;
         }
@@ -902,12 +928,26 @@ unsafe fn window_tree_draw_window(
                 loop_ += 1;
                 continue;
             }
+            let oo = (*wp).options;
 
-            if wp == (*w).active {
-                gc.fg = active_colour;
-            } else {
-                gc.fg = colour;
-            }
+            let ft = format_create(
+                null_mut(),
+                null_mut(),
+                (FORMAT_PANE | (*wp).id) as i32,
+                format_flags::empty(),
+            );
+            format_defaults(
+                ft,
+                null_mut(),
+                NonNull::new(s),
+                NonNull::new(wl),
+                NonNull::new(wp),
+            );
+
+            window_tree_border_cell(&raw mut gc, oo, ft);
+            memcpy__(&raw mut label_gc, &raw const GRID_DEFAULT_CELL);
+            style_apply(&raw mut label_gc, oo, c!("tree-mode-preview-style"), ft);
+            label_gc.bg = gc.bg;
 
             let offset = if left { 3 + (i * each) } else { i * each };
             let width = if loop_ == end - 1 {
@@ -919,22 +959,34 @@ unsafe fn window_tree_draw_window(
             screen_write_cursormove(ctx, (cx + offset) as i32, cy as i32, 0);
             screen_write_preview(ctx, &raw mut (*wp).base, width, sy);
 
-            let mut pane_idx: u32 = 0;
-
-            if window_pane_index(wp, &raw mut pane_idx) != 0 {
-                pane_idx = loop_;
+            let format = options_get_string_(oo, "tree-mode-preview-format");
+            if *format != b'\0' {
+                let label = format_expand(ft, format);
+                if *label != b'\0' {
+                    window_tree_draw_label(
+                        ctx,
+                        cx + offset,
+                        cy,
+                        width,
+                        sy,
+                        &raw const gc,
+                        &raw const label_gc,
+                        label,
+                    );
+                }
+                free_(label);
             }
-            let label = format_nul!(" {} ", pane_idx);
-            window_tree_draw_label(ctx, cx + offset, cy, each, sy, &raw mut gc, label);
-            free_(label);
 
             if loop_ != end - 1 {
                 screen_write_cursormove(ctx, (cx + offset + width) as i32, cy as i32, 0);
-                screen_write_vline(ctx, sy, 0, 0);
+                screen_write_vline(ctx, sy, 0, 0, &raw const gc);
             }
             loop_ += 1;
 
             i += 1;
+
+            // Upstream next-3.7 leaks this tree; free it here.
+            format_free(ft);
         }
     }
 }
@@ -966,7 +1018,7 @@ unsafe fn window_tree_draw(
             window_tree_type::WINDOW_TREE_WINDOW => window_tree_draw_window(
                 modedata.cast(),
                 transmute_ptr(sp),
-                (*transmute_ptr(wlp)).window,
+                transmute_ptr(wlp),
                 ctx,
                 sx,
                 sy,

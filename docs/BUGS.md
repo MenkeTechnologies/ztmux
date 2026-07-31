@@ -20,6 +20,33 @@ Fixes to the ztmux port, most recent first.
 
 ## 2026-07-31
 
+### a style written as a format was cached unexpanded, so it never resolved
+
+- **Symptom:** any style option whose value contains `#{…}` drew with the wrong
+  cell. `#{E:mode-style}` produced an underline-colour escape (`ESC[58;5;0m`)
+  instead of mode-style's fg/bg, and a style like
+  `fg=#{?window_active,green,yellow}` drew with no colour at all. Because the
+  result was cached, later `set-option`s to the *referenced* option (here
+  `mode-style`) also stopped showing up.
+- **Root cause:** `options_string_to_style` (`options.c:1010`) sets
+  `o->cached = (strstr(s, "#{") == NULL)` — a style with no format in it parses
+  to the same cell every time and is cached; one that has to be expanded against
+  a format tree never is. The port had the test inverted
+  (`cached = s.contains("#{")`), so exactly the styles that need expanding were
+  marked cached, parsed once *literally* through `style_parse`, and returned from
+  the cache forever after. Styles that could safely be cached were re-parsed on
+  every draw instead.
+- **Fix:** one negation at `options.rs:1239`, restoring the C's sense.
+- **Found by:** porting `tree-mode-selection-style` (default `#{E:mode-style}`)
+  and `tree-mode-preview-style` (default picks its colour from
+  `#{?…pane_active…}`) — neither could have real behaviour with the cache
+  inverted.
+- **Pinned by:** `parity/cases/1486_tree_mode_draw.sh` (a
+  `#{?window_active,…}` preview style) and
+  `parity/cases/1487_tree_mode_selection_and_panes.sh` (the `#{E:mode-style}`
+  default, including its following a later change to `mode-style`), both drawn
+  through the choose-tree preview and compared cell for cell.
+
 ### `width=` and `pad=` in a style were rejected
 
 - **Symptom:** `set-option -g status-style 'bg=red,width=10,pad=2'` failed with
