@@ -1513,6 +1513,10 @@ pub unsafe fn options_push_changes(name: &str) {
             || name == "pane-border-indicators"
             || name == "pane-border-lines"
             || name == "pane-border-status"
+            || name == "pane-scrollbars"
+            || name == "pane-scrollbars-timeout"
+            || name == "pane-scrollbars-position"
+            || name == "pane-scrollbars-style"
         {
             redraw_invalidate_all_scenes();
         }
@@ -1547,7 +1551,35 @@ pub unsafe fn options_push_changes(name: &str) {
             }
         }
 
-        if name == "pane-border-status" {
+        if name == "pane-border-status"
+            || name == "pane-scrollbars"
+            || name == "pane-scrollbars-position"
+        {
+            // The two scrollbar options are cached on the window because the
+            // layout consults them for every pane on every fix.
+            for w in rb_foreach(&raw mut WINDOWS).map(NonNull::as_ptr) {
+                (*w).sb = options_get_number_((*w).options, "pane-scrollbars") as i32;
+                (*w).sb_pos =
+                    options_get_number_((*w).options, "pane-scrollbars-position") as i32;
+                layout_fix_panes(w, null_mut());
+            }
+        }
+
+        if name == "pane-scrollbars" {
+            // Turning the option off (or to a mode that does not auto-hide)
+            // must drop any bar that is currently showing, timer and all.
+            for wp in rb_foreach(&raw mut ALL_WINDOW_PANES) {
+                window_pane_scrollbar_hide(wp.as_ptr());
+            }
+        }
+
+        if name == "pane-scrollbars-style" {
+            for wp in rb_foreach(&raw mut ALL_WINDOW_PANES).map(NonNull::as_ptr) {
+                style_set_scrollbar_style_from_option(
+                    &raw mut (*wp).scrollbar_style,
+                    (*wp).options,
+                );
+            }
             for w in rb_foreach(&raw mut WINDOWS) {
                 layout_fix_panes(w.as_ptr(), null_mut());
             }

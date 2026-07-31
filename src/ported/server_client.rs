@@ -680,14 +680,103 @@ enum where_ {
     StatusRight,
     StatusDefault,
     Border,
+    /// On a pane's scrollbar. The C splits this into
+    /// `KEYC_MOUSE_LOCATION_SCROLLBAR_UP`, `_SLIDER` and `_DOWN` and makes a
+    /// bindable key from each; ztmux's `keyc` mouse table (`keyc_mouse_key.rs`)
+    /// is the older six-location one with no scrollbar key codes to name, so
+    /// the three collapse into one location that binds to nothing. The
+    /// geometry that decides whether a point is on the scrollbar at all is
+    /// ported, so this stays distinct from `Nowhere`.
+    Scrollbar,
+}
+
+/// Kind of mouse event.
+/// C `vendor/tmux/tmux.h`: the `KEYC_TYPE_*` values of `enum key_code_type`.
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum type_ {
+    NoType,
+    Move,
+    Down,
+    Up,
+    Drag,
+    Wheel,
+    Second,
+    Double,
+    Triple,
+}
+
+/// Is this point inside the auto-hide scrollbar interaction area?
+/// C `vendor/tmux/server-client.c:607`: `static int server_client_in_scrollbar_area(struct window_pane *wp, int px, int py)`
+unsafe fn server_client_in_scrollbar_area(wp: *mut window_pane, px: c_int, py: c_int) -> i32 {
+    unsafe {
+        let w = (*wp).window;
+
+        if window_pane_scrollbar_overlay(wp) == 0 {
+            return 0;
+        }
+        if py < (*wp).yoff || py >= (*wp).yoff + (*wp).sy as c_int {
+            return 0;
+        }
+
+        let width = (*wp).scrollbar_style.width as u32;
+        let pad = (*wp).scrollbar_style.pad as u32;
+        let mut total = width + pad;
+        if total == 0 || total > (*wp).sx {
+            total = (*wp).sx;
+        }
+
+        let (start, end);
+        if (*w).sb_pos == PANE_SCROLLBARS_LEFT {
+            start = (*wp).xoff;
+            end = (*wp).xoff + total as c_int - 1;
+        } else {
+            end = (*wp).xoff + (*wp).sx as c_int - 1;
+            start = end - total as c_int + 1;
+        }
+        i32::from(px >= start && px <= end)
+    }
+}
+
+/// Update auto-hide scrollbars for a mouse movement.
+/// C `vendor/tmux/server-client.c:636`: `static void server_client_update_scrollbar_hover(struct client *c, int type, int px, int py)`
+unsafe fn server_client_update_scrollbar_hover(
+    c: *mut client,
+    type_: type_,
+    px: c_int,
+    py: c_int,
+) {
+    unsafe {
+        let w = (*(*(*c).session).curw).window;
+
+        if type_ != type_::Move {
+            return;
+        }
+
+        for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
+            if !window_pane_visible(wp) {
+                continue;
+            }
+            if server_client_in_scrollbar_area(wp, px, py) != 0 {
+                (*wp).sb_auto_hover = 1;
+                window_pane_scrollbar_show(wp, 1);
+            } else {
+                (*wp).sb_auto_hover = 0;
+                window_pane_scrollbar_start_timer(wp);
+            }
+        }
+    }
 }
 
 /// Where inside `wp` the point `px,py` falls: in the pane body, on one of its
 /// borders, or nowhere.
 /// C `vendor/tmux/server-client.c:660`: `static enum key_code_mouse_location server_client_check_mouse_in_pane(struct window_pane *wp, int px, int py, u_int *sl_mpos)`
 ///
-/// ztmux has no pane scrollbars, so the C's scrollbar branches and the
-/// `sl_mpos` out-parameter have no counterpart here.
+/// The C's scrollbar arms have no counterpart here: they return the
+/// `KEYC_MOUSE_LOCATION_SCROLLBAR_*` locations, and ztmux's `keyc` mouse table
+/// (see `keyc_mouse_key.rs`) is the older six-location one with no scrollbar
+/// key codes to name. The `sl_mpos` out-parameter goes with them. What the C
+/// does compute here regardless of location — the reserved scrollbar's effect
+/// on where a pane's borders sit — is ported.
 unsafe fn server_client_check_mouse_in_pane(wp: *mut window_pane, px: c_int, py: c_int) -> where_ {
     unsafe {
         let w = (*wp).window;
@@ -695,12 +784,53 @@ unsafe fn server_client_check_mouse_in_pane(wp: *mut window_pane, px: c_int, py:
         let (xoff, yoff) = ((*wp).xoff as c_int, (*wp).yoff as c_int);
         let (sx, sy) = ((*wp).sx as c_int, (*wp).sy as c_int);
 
+        let sb_overlay = window_pane_scrollbar_overlay(wp);
+
+        // An overlay scrollbar is drawn over the pane's own cells, so it costs
+        // the pane nothing; a reserved one sits outside the pane, and the
+        // column it takes still counts as part of the pane for hit testing.
+        let (mut sb_w, mut sb_pad) = if window_pane_scrollbar_visible(wp) != 0 {
+            let mut sb_w = (*wp).scrollbar_style.width;
+            if sb_overlay != 0 && sb_w > sx {
+                sb_w = sx;
+            }
+            (sb_w, (*wp).scrollbar_style.pad)
+        } else {
+            (0, 0)
+        };
+
         let pane_status_line = match pane_status {
             pane_status::PANE_STATUS_TOP => yoff - 1,
             pane_status::PANE_STATUS_BOTTOM => yoff + sy,
             _ => -1, // not used
         };
-        let bdr_left = xoff - 1;
+        let mut bdr_left = xoff - 1;
+        if sb_overlay == 0 && (*w).sb_pos == PANE_SCROLLBARS_LEFT {
+            bdr_left -= sb_pad + sb_w;
+        }
+
+        // An overlay scrollbar covers pane cells, so a point on it is inside
+        // the pane's extent and is resolved before the extent test below.
+        if sb_overlay != 0
+            && sb_w != 0
+            && py >= yoff
+            && py < yoff + sy
+            && px >= xoff
+            && px < xoff + sx
+        {
+            let (sb_start, sb_end);
+            if (*w).sb_pos == PANE_SCROLLBARS_LEFT {
+                sb_start = xoff;
+                sb_end = sb_start + sb_w - 1;
+            } else {
+                sb_end = xoff + sx - 1;
+                sb_start = sb_end - sb_w + 1;
+            }
+            if px >= sb_start && px <= sb_end {
+                return where_::Scrollbar;
+            }
+            return where_::Pane;
+        }
 
         // Inside the pane's own extent?
         if ((pane_status != pane_status::PANE_STATUS_OFF
@@ -708,8 +838,19 @@ unsafe fn server_client_check_mouse_in_pane(wp: *mut window_pane, px: c_int, py:
             && py != yoff + sy)
             || (yoff == 0 && py < sy)
             || (py >= yoff && py < yoff + sy))
-            && px < xoff + sx
+            && (((*w).sb_pos == PANE_SCROLLBARS_RIGHT && px < xoff + sx + sb_pad + sb_w)
+                || ((*w).sb_pos == PANE_SCROLLBARS_LEFT && px < xoff + sx - sb_pad - sb_w))
         {
+            // The reserved scrollbar's own column.
+            if ((*w).sb_pos == PANE_SCROLLBARS_RIGHT
+                && px >= xoff + sx + sb_pad
+                && px < xoff + sx + sb_pad + sb_w)
+                || ((*w).sb_pos == PANE_SCROLLBARS_LEFT
+                    && px >= xoff - sb_pad - sb_w
+                    && px < xoff - sb_pad)
+            {
+                return where_::Scrollbar;
+            }
             // A floating pane owns the border around it, so a point on its
             // left, top or bottom edge is a border hit rather than a body hit.
             if window_pane_is_floating(wp) != 0
@@ -734,12 +875,27 @@ unsafe fn server_client_check_mouse_in_pane(wp: *mut window_pane, px: c_int, py:
             {
                 continue;
             }
+            // A reserved scrollbar pushes the border out past the column it
+            // took, so the grabbable line moves with it.
+            if window_pane_scrollbar_reserve(fwp) != 0 {
+                sb_w = (*fwp).scrollbar_style.width;
+                sb_pad = (*fwp).scrollbar_style.pad;
+            } else {
+                sb_w = 0;
+                sb_pad = 0;
+            }
             let (fxoff, fyoff) = ((*fwp).xoff as c_int, (*fwp).yoff as c_int);
             let (fsx, fsy) = ((*fwp).sx as c_int, (*fwp).sy as c_int);
             let bdr_top = fyoff - 1;
             let bdr_bottom = fyoff + fsy;
-            let fbdr_left = fxoff - 1;
-            let bdr_right = fxoff + fsx;
+            let mut fbdr_left = fxoff - 1;
+            let bdr_right = if (*w).sb_pos == PANE_SCROLLBARS_LEFT {
+                fbdr_left -= sb_pad + sb_w;
+                fxoff + fsx
+            } else {
+                // PANE_SCROLLBARS_RIGHT or none.
+                fxoff + fsx + sb_pad + sb_w
+            };
 
             if py >= fyoff - 1 && py <= fyoff + fsy {
                 if px == bdr_right {
@@ -792,18 +948,6 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
         let mut tv: libc::timeval = zeroed();
         let sr: *mut style_range;
 
-        #[derive(Copy, Clone, Eq, PartialEq)]
-        enum type_ {
-            NoType,
-            Move,
-            Down,
-            Up,
-            Drag,
-            Wheel,
-            Second,
-            Double,
-            Triple,
-        }
         let mut type_ = type_::NoType;
 
         let mut where_ = where_::Nowhere;
@@ -1014,10 +1158,12 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                     sy
                 );
                 if px > sx || py > sy {
+                    server_client_update_scrollbar_hover(c, type_, -1, -1);
                     return KEYC_UNKNOWN;
                 }
                 px += (*m).ox;
                 py += (*m).oy;
+                server_client_update_scrollbar_hover(c, type_, px as c_int, py as c_int);
 
                 // Resolve the pane first, then ask where inside it the point
                 // fell. A drag stays on the pane it was started on, so grabbing
@@ -1036,9 +1182,13 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                     log_debug!("mouse {},{} on pane %%{}", x, y, (*wp).id);
                 } else if where_ == where_::Border {
                     log_debug!("mouse on pane %%{} border", (*wp).id);
+                } else if where_ == where_::Scrollbar {
+                    log_debug!("mouse on pane %%{} scrollbar", (*wp).id);
                 }
                 (*m).wp = (*wp).id as i32;
                 (*m).w = (*(*wp).window).id as i32;
+            } else {
+                server_client_update_scrollbar_hover(c, type_, -1, -1);
             }
 
             // Stop dragging if needed.
@@ -1061,7 +1211,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDRAGEND1_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDRAGEND1_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDRAGEND1_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         }
                     }
                     crate::MOUSE_BUTTON_2 => {
@@ -1072,7 +1222,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDRAGEND2_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDRAGEND2_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDRAGEND2_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         }
                     }
                     crate::MOUSE_BUTTON_3 => {
@@ -1083,7 +1233,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDRAGEND3_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDRAGEND3_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDRAGEND3_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         }
                     }
                     crate::MOUSE_BUTTON_6 => {
@@ -1094,7 +1244,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDRAGEND6_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDRAGEND6_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDRAGEND6_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         }
                     }
                     crate::MOUSE_BUTTON_7 => {
@@ -1105,7 +1255,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDRAGEND7_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDRAGEND7_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDRAGEND7_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         }
                     }
                     crate::MOUSE_BUTTON_8 => {
@@ -1116,7 +1266,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDRAGEND8_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDRAGEND8_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDRAGEND8_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         }
                     }
                     crate::MOUSE_BUTTON_9 => {
@@ -1127,7 +1277,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDRAGEND9_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDRAGEND9_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDRAGEND9_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         }
                     }
                     crate::MOUSE_BUTTON_10 => {
@@ -1140,7 +1290,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 keyc::KEYC_MOUSEDRAGEND10_STATUS_DEFAULT as u64
                             }
                             where_::Border => keyc::KEYC_MOUSEDRAGEND10_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         }
                     }
                     crate::MOUSE_BUTTON_11 => {
@@ -1153,7 +1303,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 keyc::KEYC_MOUSEDRAGEND11_STATUS_DEFAULT as u64
                             }
                             where_::Border => keyc::KEYC_MOUSEDRAGEND11_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         }
                     }
                     _ => key = keyc::KEYC_MOUSE as u64,
@@ -1174,7 +1324,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                         where_::StatusRight => keyc::KEYC_MOUSEMOVE_STATUS_RIGHT as u64,
                         where_::StatusDefault => keyc::KEYC_MOUSEMOVE_STATUS_DEFAULT as u64,
                         where_::Border => keyc::KEYC_MOUSEMOVE_BORDER as u64,
-                        where_::Nowhere => key,
+                        where_::Nowhere | where_::Scrollbar => key,
                     };
                 }
                 type_::Drag => {
@@ -1194,7 +1344,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                         keyc::KEYC_MOUSEDRAG1_STATUS_DEFAULT as u64
                                     }
                                     where_::Border => keyc::KEYC_MOUSEDRAG1_BORDER as u64,
-                                    where_::Nowhere => key,
+                                    where_::Nowhere | where_::Scrollbar => key,
                                 };
                             }
                             crate::MOUSE_BUTTON_2 => {
@@ -1209,7 +1359,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                         keyc::KEYC_MOUSEDRAG2_STATUS_DEFAULT as u64
                                     }
                                     where_::Border => keyc::KEYC_MOUSEDRAG2_BORDER as u64,
-                                    where_::Nowhere => key,
+                                    where_::Nowhere | where_::Scrollbar => key,
                                 };
                             }
                             crate::MOUSE_BUTTON_3 => {
@@ -1224,7 +1374,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                         keyc::KEYC_MOUSEDRAG3_STATUS_DEFAULT as u64
                                     }
                                     where_::Border => keyc::KEYC_MOUSEDRAG3_BORDER as u64,
-                                    where_::Nowhere => key,
+                                    where_::Nowhere | where_::Scrollbar => key,
                                 };
                             }
                             crate::MOUSE_BUTTON_6 => {
@@ -1239,7 +1389,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                         keyc::KEYC_MOUSEDRAG6_STATUS_DEFAULT as u64
                                     }
                                     where_::Border => keyc::KEYC_MOUSEDRAG6_BORDER as u64,
-                                    where_::Nowhere => key,
+                                    where_::Nowhere | where_::Scrollbar => key,
                                 };
                             }
                             crate::MOUSE_BUTTON_7 => {
@@ -1254,7 +1404,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                         keyc::KEYC_MOUSEDRAG7_STATUS_DEFAULT as u64
                                     }
                                     where_::Border => keyc::KEYC_MOUSEDRAG7_BORDER as u64,
-                                    where_::Nowhere => key,
+                                    where_::Nowhere | where_::Scrollbar => key,
                                 };
                             }
                             crate::MOUSE_BUTTON_8 => {
@@ -1269,7 +1419,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                         keyc::KEYC_MOUSEDRAG8_STATUS_DEFAULT as u64
                                     }
                                     where_::Border => keyc::KEYC_MOUSEDRAG8_BORDER as u64,
-                                    where_::Nowhere => key,
+                                    where_::Nowhere | where_::Scrollbar => key,
                                 };
                             }
                             crate::MOUSE_BUTTON_9 => {
@@ -1284,7 +1434,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                         keyc::KEYC_MOUSEDRAG9_STATUS_DEFAULT as u64
                                     }
                                     where_::Border => keyc::KEYC_MOUSEDRAG9_BORDER as u64,
-                                    where_::Nowhere => key,
+                                    where_::Nowhere | where_::Scrollbar => key,
                                 };
                             }
                             crate::MOUSE_BUTTON_10 => {
@@ -1299,7 +1449,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                         keyc::KEYC_MOUSEDRAG10_STATUS_DEFAULT as u64
                                     }
                                     where_::Border => keyc::KEYC_MOUSEDRAG10_BORDER as u64,
-                                    where_::Nowhere => key,
+                                    where_::Nowhere | where_::Scrollbar => key,
                                 };
                             }
                             crate::MOUSE_BUTTON_11 => {
@@ -1314,7 +1464,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                         keyc::KEYC_MOUSEDRAG11_STATUS_DEFAULT as u64
                                     }
                                     where_::Border => keyc::KEYC_MOUSEDRAG11_BORDER as u64,
-                                    where_::Nowhere => key,
+                                    where_::Nowhere | where_::Scrollbar => key,
                                 };
                             }
                             _ => (),
@@ -1344,7 +1494,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_WHEELUP_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_WHEELUP_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_WHEELUP_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     } else {
                         key = match where_ {
@@ -1354,7 +1504,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_WHEELDOWN_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_WHEELDOWN_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_WHEELDOWN_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                 }
@@ -1368,7 +1518,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 where_::StatusRight => keyc::KEYC_MOUSEUP1_STATUS_RIGHT as u64,
                                 where_::StatusDefault => keyc::KEYC_MOUSEUP1_STATUS_DEFAULT as u64,
                                 where_::Border => keyc::KEYC_MOUSEUP1_BORDER as u64,
-                                where_::Nowhere => key,
+                                where_::Nowhere | where_::Scrollbar => key,
                             };
                         }
                         crate::MOUSE_BUTTON_2 => {
@@ -1379,7 +1529,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 where_::StatusRight => keyc::KEYC_MOUSEUP2_STATUS_RIGHT as u64,
                                 where_::StatusDefault => keyc::KEYC_MOUSEUP2_STATUS_DEFAULT as u64,
                                 where_::Border => keyc::KEYC_MOUSEUP2_BORDER as u64,
-                                where_::Nowhere => key,
+                                where_::Nowhere | where_::Scrollbar => key,
                             };
                         }
                         crate::MOUSE_BUTTON_3 => {
@@ -1390,7 +1540,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 where_::StatusRight => keyc::KEYC_MOUSEUP3_STATUS_RIGHT as u64,
                                 where_::StatusDefault => keyc::KEYC_MOUSEUP3_STATUS_DEFAULT as u64,
                                 where_::Border => keyc::KEYC_MOUSEUP3_BORDER as u64,
-                                where_::Nowhere => key,
+                                where_::Nowhere | where_::Scrollbar => key,
                             };
                         }
                         crate::MOUSE_BUTTON_6 => {
@@ -1401,7 +1551,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 where_::StatusRight => keyc::KEYC_MOUSEUP6_STATUS_RIGHT as u64,
                                 where_::StatusDefault => keyc::KEYC_MOUSEUP6_STATUS_DEFAULT as u64,
                                 where_::Border => keyc::KEYC_MOUSEUP6_BORDER as u64,
-                                where_::Nowhere => key,
+                                where_::Nowhere | where_::Scrollbar => key,
                             };
                         }
                         crate::MOUSE_BUTTON_7 => {
@@ -1412,7 +1562,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 where_::StatusRight => keyc::KEYC_MOUSEUP7_STATUS_RIGHT as u64,
                                 where_::StatusDefault => keyc::KEYC_MOUSEUP7_STATUS_DEFAULT as u64,
                                 where_::Border => keyc::KEYC_MOUSEUP7_BORDER as u64,
-                                where_::Nowhere => key,
+                                where_::Nowhere | where_::Scrollbar => key,
                             };
                         }
                         crate::MOUSE_BUTTON_8 => {
@@ -1423,7 +1573,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 where_::StatusRight => keyc::KEYC_MOUSEUP8_STATUS_RIGHT as u64,
                                 where_::StatusDefault => keyc::KEYC_MOUSEUP8_STATUS_DEFAULT as u64,
                                 where_::Border => keyc::KEYC_MOUSEUP8_BORDER as u64,
-                                where_::Nowhere => key,
+                                where_::Nowhere | where_::Scrollbar => key,
                             };
                         }
                         crate::MOUSE_BUTTON_9 => {
@@ -1434,7 +1584,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 where_::StatusRight => keyc::KEYC_MOUSEUP9_STATUS_RIGHT as u64,
                                 where_::StatusDefault => keyc::KEYC_MOUSEUP9_STATUS_DEFAULT as u64,
                                 where_::Border => keyc::KEYC_MOUSEUP9_BORDER as u64,
-                                where_::Nowhere => key,
+                                where_::Nowhere | where_::Scrollbar => key,
                             };
                         }
                         crate::MOUSE_BUTTON_10 => {
@@ -1446,7 +1596,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 where_::StatusRight => keyc::KEYC_MOUSEUP1_STATUS_RIGHT as u64,
                                 where_::StatusDefault => keyc::KEYC_MOUSEUP1_STATUS_DEFAULT as u64,
                                 where_::Border => keyc::KEYC_MOUSEUP1_BORDER as u64,
-                                where_::Nowhere => key,
+                                where_::Nowhere | where_::Scrollbar => key,
                             };
                         }
                         crate::MOUSE_BUTTON_11 => {
@@ -1457,7 +1607,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                                 where_::StatusRight => keyc::KEYC_MOUSEUP11_STATUS_RIGHT as u64,
                                 where_::StatusDefault => keyc::KEYC_MOUSEUP11_STATUS_DEFAULT as u64,
                                 where_::Border => keyc::KEYC_MOUSEUP11_BORDER as u64,
-                                where_::Nowhere => key,
+                                where_::Nowhere | where_::Scrollbar => key,
                             };
                         }
                         _ => (),
@@ -1472,7 +1622,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDOWN1_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDOWN1_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDOWN1_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_2 => {
@@ -1483,7 +1633,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDOWN2_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDOWN2_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDOWN2_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_3 => {
@@ -1494,7 +1644,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDOWN3_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDOWN3_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDOWN3_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_6 => {
@@ -1505,7 +1655,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDOWN6_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDOWN6_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDOWN6_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_7 => {
@@ -1516,7 +1666,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDOWN7_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDOWN7_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDOWN7_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_8 => {
@@ -1527,7 +1677,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDOWN8_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDOWN8_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDOWN8_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_9 => {
@@ -1538,7 +1688,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDOWN9_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDOWN9_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDOWN9_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_10 => {
@@ -1549,7 +1699,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDOWN10_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDOWN10_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDOWN10_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_11 => {
@@ -1560,7 +1710,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_MOUSEDOWN11_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_MOUSEDOWN11_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_MOUSEDOWN11_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     _ => (),
@@ -1574,7 +1724,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_SECONDCLICK1_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_SECONDCLICK1_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_SECONDCLICK1_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_2 => {
@@ -1585,7 +1735,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_SECONDCLICK2_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_SECONDCLICK2_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_SECONDCLICK2_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_3 => {
@@ -1596,7 +1746,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_SECONDCLICK3_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_SECONDCLICK3_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_SECONDCLICK3_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_6 => {
@@ -1607,7 +1757,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_SECONDCLICK6_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_SECONDCLICK6_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_SECONDCLICK6_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_7 => {
@@ -1618,7 +1768,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_SECONDCLICK7_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_SECONDCLICK7_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_SECONDCLICK7_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_8 => {
@@ -1629,7 +1779,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_SECONDCLICK8_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_SECONDCLICK8_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_SECONDCLICK8_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_9 => {
@@ -1640,7 +1790,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_SECONDCLICK9_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_SECONDCLICK9_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_SECONDCLICK9_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_10 => {
@@ -1651,7 +1801,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_SECONDCLICK10_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_SECONDCLICK10_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_SECONDCLICK10_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_11 => {
@@ -1662,7 +1812,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_SECONDCLICK11_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_SECONDCLICK11_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_SECONDCLICK11_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     _ => (),
@@ -1676,7 +1826,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_DOUBLECLICK1_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_DOUBLECLICK1_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_DOUBLECLICK1_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_2 => {
@@ -1687,7 +1837,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_DOUBLECLICK2_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_DOUBLECLICK2_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_DOUBLECLICK2_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_3 => {
@@ -1698,7 +1848,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_DOUBLECLICK3_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_DOUBLECLICK3_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_DOUBLECLICK3_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_6 => {
@@ -1709,7 +1859,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_DOUBLECLICK6_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_DOUBLECLICK6_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_DOUBLECLICK6_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_7 => {
@@ -1720,7 +1870,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_DOUBLECLICK7_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_DOUBLECLICK7_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_DOUBLECLICK7_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_8 => {
@@ -1731,7 +1881,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_DOUBLECLICK8_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_DOUBLECLICK8_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_DOUBLECLICK8_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_9 => {
@@ -1742,7 +1892,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_DOUBLECLICK9_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_DOUBLECLICK9_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_DOUBLECLICK9_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_10 => {
@@ -1753,7 +1903,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_DOUBLECLICK10_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_DOUBLECLICK10_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_DOUBLECLICK10_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_11 => {
@@ -1764,7 +1914,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_DOUBLECLICK11_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_DOUBLECLICK11_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_DOUBLECLICK11_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     _ => (),
@@ -1778,7 +1928,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_TRIPLECLICK1_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_TRIPLECLICK1_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_TRIPLECLICK1_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_2 => {
@@ -1789,7 +1939,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_TRIPLECLICK2_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_TRIPLECLICK2_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_TRIPLECLICK2_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_3 => {
@@ -1800,7 +1950,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_TRIPLECLICK3_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_TRIPLECLICK3_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_TRIPLECLICK3_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_6 => {
@@ -1811,7 +1961,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_TRIPLECLICK6_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_TRIPLECLICK6_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_TRIPLECLICK6_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_7 => {
@@ -1822,7 +1972,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_TRIPLECLICK7_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_TRIPLECLICK7_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_TRIPLECLICK7_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_8 => {
@@ -1833,7 +1983,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_TRIPLECLICK8_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_TRIPLECLICK8_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_TRIPLECLICK8_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_9 => {
@@ -1844,7 +1994,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_TRIPLECLICK9_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_TRIPLECLICK9_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_TRIPLECLICK9_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_10 => {
@@ -1855,7 +2005,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_TRIPLECLICK10_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_TRIPLECLICK10_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_TRIPLECLICK10_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     crate::MOUSE_BUTTON_11 => {
@@ -1866,7 +2016,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                             where_::StatusRight => keyc::KEYC_TRIPLECLICK11_STATUS_RIGHT as u64,
                             where_::StatusDefault => keyc::KEYC_TRIPLECLICK11_STATUS_DEFAULT as u64,
                             where_::Border => keyc::KEYC_TRIPLECLICK11_BORDER as u64,
-                            where_::Nowhere => key,
+                            where_::Nowhere | where_::Scrollbar => key,
                         };
                     }
                     _ => (),
@@ -2327,7 +2477,8 @@ pub unsafe fn server_client_loop() {
                     server_client_check_pane_resize(wp);
                     server_client_check_pane_buffer(wp);
                 }
-                (*wp).flags &= !window_pane_flags::PANE_REDRAW;
+                (*wp).flags &=
+                    !(window_pane_flags::PANE_REDRAW | window_pane_flags::PANE_REDRAWSCROLLBAR);
             }
             check_window_name(w);
         }
@@ -2654,6 +2805,22 @@ pub unsafe fn server_client_reset_state(c: *mut client) {
                 cx = (*wp).xoff as u32 + (*s).cx - ox;
                 cy = (*wp).yoff as u32 + (*s).cy - oy;
 
+                // An overlay scrollbar is painted over the pane's own cells,
+                // so a cursor underneath it would be drawn on top of the bar.
+                if window_pane_scrollbar_overlay_visible(wp) != 0 {
+                    let mut sb_w = (*wp).scrollbar_style.width as u32;
+                    if sb_w > (*wp).sx {
+                        sb_w = (*wp).sx;
+                    }
+                    if sb_w != 0 && (*w).sb_pos == PANE_SCROLLBARS_LEFT {
+                        if (*s).cx < sb_w {
+                            cursor = 0;
+                        }
+                    } else if sb_w != 0 && (*s).cx >= (*wp).sx - sb_w {
+                        cursor = 0;
+                    }
+                }
+
                 if status_at_line(c) == 0 {
                     cy += status_line_size(c);
                 }
@@ -2681,7 +2848,16 @@ pub unsafe fn server_client_reset_state(c: *mut client) {
                     }
                 }
             }
-            if !mode.intersects(mode_flag::MODE_MOUSE_ALL) {
+            // An auto-hiding scrollbar appears when the pointer arrives over
+            // it, which means the terminal has to report movement with no
+            // button held, not just clicks and drags.
+            //
+            // The C's condition (server-client.c:2091) also has a
+            // `focus-follows-mouse` disjunct. ztmux parses that option but
+            // nothing reads it, so there is nothing here to enable for it.
+            if (*w).sb == PANE_SCROLLBARS_MODAL || (*w).sb == PANE_SCROLLBARS_AUTOHIDE {
+                mode |= mode_flag::MODE_MOUSE_ALL;
+            } else if !mode.intersects(mode_flag::MODE_MOUSE_ALL) {
                 mode |= mode_flag::MODE_MOUSE_BUTTON;
             }
         }
@@ -2885,7 +3061,9 @@ pub unsafe fn server_client_check_redraw(c: *mut client) {
             needed = true;
         } else {
             for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
-                if (*wp).flags.intersects(window_pane_flags::PANE_REDRAW) {
+                if (*wp).flags.intersects(
+                    window_pane_flags::PANE_REDRAW | window_pane_flags::PANE_REDRAWSCROLLBAR,
+                ) {
                     needed = true;
                     break;
                 }
@@ -2912,7 +3090,9 @@ pub unsafe fn server_client_check_redraw(c: *mut client) {
             if !(*c).flags.intersects(client_flag::REDRAWWINDOW) {
                 for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr)
                 {
-                    if (*wp).flags.intersects(window_pane_flags::PANE_REDRAW) {
+                    if (*wp).flags.intersects(
+                        window_pane_flags::PANE_REDRAW | window_pane_flags::PANE_REDRAWSCROLLBAR,
+                    ) {
                         // log_debug("%s: pane %%%u needs redraw", (*c).name, (*wp).id);
                         (*c).redraw_panes |= 1 << bit;
                     }
@@ -2952,6 +3132,19 @@ pub unsafe fn server_client_check_redraw(c: *mut client) {
                 }
                 bit += 1;
                 if !redraw {
+                    // A pane whose scrollbar alone changed is repainted
+                    // without touching its contents. A reserved scrollbar
+                    // sits outside the pane, so there is nothing under it to
+                    // restore; an overlay one is drawn over the pane's own
+                    // cells, and `window_pane_scrollbar_redraw` asks for a
+                    // full PANE_REDRAW in that case instead.
+                    if (*wp)
+                        .flags
+                        .intersects(window_pane_flags::PANE_REDRAWSCROLLBAR)
+                    {
+                        log_debug!("redraw scrollbar %%{}", (*wp).id);
+                        redraw_pane_scrollbar(c, wp);
+                    }
                     continue;
                 }
                 // log_debug("%s: redrawing pane %%%u", __func__, (*wp).id);
@@ -3778,6 +3971,176 @@ pub unsafe fn server_client_print(c: *mut client, parse: i32, evb: *mut evbuffer
         } // out:
         if parse == 0 {
             free_(msg);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::options_::{options_create, options_default, options_free};
+
+    // Window-scope options with the shipped defaults: the mouse hit tests reach
+    // options through `window_pane_get_pane_status` / `_get_pane_lines`.
+    unsafe fn window_options() -> *mut options {
+        unsafe {
+            let o = options_create(null_mut());
+            for oe in &OPTIONS_TABLE {
+                if oe.scope & OPTIONS_TABLE_WINDOW != 0 {
+                    options_default(o, oe);
+                }
+            }
+            o
+        }
+    }
+
+    // One window holding one pane at (xoff, yoff) of size sx by sy, with the
+    // scrollbar mode and position given. `window` and `window_pane` are plain
+    // C-style structs with no Drop impl, so zeroed instances carrying the
+    // geometry and option pointers are enough for the hit tests, which read
+    // nothing else.
+    unsafe fn pane(
+        sb: i32,
+        sb_pos: i32,
+        width: i32,
+        pad: i32,
+    ) -> (*mut options, Box<window>, Box<window_pane>) {
+        unsafe {
+            let oo = window_options();
+            let mut win: Box<window> = Box::new(zeroed());
+            win.sx = 40;
+            win.sy = 10;
+            win.options = oo;
+            win.sb = sb;
+            win.sb_pos = sb_pos;
+            tailq_init(&raw mut win.panes);
+
+            let mut wp: Box<window_pane> = Box::new(zeroed());
+            wp.window = &raw mut *win;
+            wp.options = oo;
+            wp.xoff = 5;
+            wp.yoff = 2;
+            wp.sx = 10; // pane covers columns 5..=14
+            wp.sy = 4; // and rows 2..=5
+            wp.scrollbar_style.width = width;
+            wp.scrollbar_style.pad = pad;
+            wp.sb_auto_visible = 1; // as if the auto-hide timer had not fired
+            tailq_insert_tail::<_, discr_entry>(&raw mut win.panes, &raw mut *wp);
+            (oo, win, wp)
+        }
+    }
+
+    // The hover area of an overlay scrollbar is width+pad columns wide at the
+    // pane's own edge, and only over the pane's rows (server-client.c:607).
+    #[test]
+    fn overlay_scrollbar_hover_area_is_at_the_pane_edge() {
+        unsafe {
+            let (oo, _w, mut wp) = pane(PANE_SCROLLBARS_AUTOHIDE, PANE_SCROLLBARS_RIGHT, 2, 1);
+            let p = &raw mut *wp;
+
+            // Three columns (2 wide + 1 pad) ending at the pane's last column.
+            for px in 12..=14 {
+                assert_eq!(server_client_in_scrollbar_area(p, px, 3), 1, "px {px}");
+            }
+            assert_eq!(server_client_in_scrollbar_area(p, 11, 3), 0);
+            assert_eq!(server_client_in_scrollbar_area(p, 15, 3), 0);
+
+            // Above and below the pane there is no bar to hover.
+            assert_eq!(server_client_in_scrollbar_area(p, 13, 1), 0);
+            assert_eq!(server_client_in_scrollbar_area(p, 13, 6), 0);
+            options_free(oo);
+        }
+    }
+
+    // On the left the same area sits at the pane's first columns.
+    #[test]
+    fn overlay_scrollbar_hover_area_follows_the_position_option() {
+        unsafe {
+            let (oo, _w, mut wp) = pane(PANE_SCROLLBARS_AUTOHIDE, PANE_SCROLLBARS_LEFT, 2, 1);
+            let p = &raw mut *wp;
+
+            for px in 5..=7 {
+                assert_eq!(server_client_in_scrollbar_area(p, px, 3), 1, "px {px}");
+            }
+            assert_eq!(server_client_in_scrollbar_area(p, 8, 3), 0);
+            options_free(oo);
+        }
+    }
+
+    // A reserved (`on`) bar is not an overlay, so it has no hover area at all:
+    // it is always drawn and never auto-hides (server-client.c:614).
+    #[test]
+    fn a_reserved_scrollbar_has_no_hover_area() {
+        unsafe {
+            let (oo, _w, mut wp) = pane(PANE_SCROLLBARS_ALWAYS, PANE_SCROLLBARS_RIGHT, 2, 1);
+            for px in 0..20 {
+                assert_eq!(server_client_in_scrollbar_area(&raw mut *wp, px, 3), 0);
+            }
+            options_free(oo);
+        }
+    }
+
+    // A click on the column a reserved bar took resolves to the scrollbar, not
+    // to the pane body and not to the neighbouring pane's border
+    // (server-client.c:728). Without a bar the same column is a border.
+    #[test]
+    fn a_click_on_a_reserved_bar_is_neither_pane_nor_border() {
+        unsafe {
+            let (oo, _w, mut wp) = pane(PANE_SCROLLBARS_ALWAYS, PANE_SCROLLBARS_RIGHT, 2, 1);
+            let p = &raw mut *wp;
+
+            // Inside the pane body.
+            assert!(server_client_check_mouse_in_pane(p, 10, 3) == where_::Pane);
+            // The pad column still counts as pane, the two bar columns do not.
+            assert!(server_client_check_mouse_in_pane(p, 15, 3) == where_::Pane);
+            assert!(server_client_check_mouse_in_pane(p, 16, 3) == where_::Scrollbar);
+            assert!(server_client_check_mouse_in_pane(p, 17, 3) == where_::Scrollbar);
+            // Past the bar is the pane's border, which the bar pushed out.
+            assert!(server_client_check_mouse_in_pane(p, 18, 3) == where_::Border);
+            options_free(oo);
+        }
+    }
+
+    // With scrollbars off the border sits directly against the pane, so the
+    // geometry above collapses back to the pre-scrollbar layout.
+    #[test]
+    fn without_a_scrollbar_the_border_hugs_the_pane() {
+        unsafe {
+            let (oo, _w, mut wp) = pane(PANE_SCROLLBARS_OFF, PANE_SCROLLBARS_RIGHT, 2, 1);
+            let p = &raw mut *wp;
+
+            assert!(server_client_check_mouse_in_pane(p, 14, 3) == where_::Pane);
+            assert!(server_client_check_mouse_in_pane(p, 15, 3) == where_::Border);
+            options_free(oo);
+        }
+    }
+
+    // An overlay bar covers the pane's own last columns, so a click there is on
+    // the bar while everything left of it is still pane (server-client.c:693).
+    //
+    // The columns just past the pane go to the bar too. The C works out sb_w
+    // and sb_pad from the style whenever the bar is VISIBLE, overlay or not
+    // (server-client.c:673), and the reserved-column test at
+    // server-client.c:728 then uses them without re-checking `sb_overlay` — so
+    // an overlay bar claims a reserved bar's columns as well, and the pane's
+    // own border column goes with them. Ported as-is.
+    #[test]
+    fn an_overlay_bar_takes_clicks_from_the_pane_it_covers() {
+        unsafe {
+            let (oo, _w, mut wp) = pane(PANE_SCROLLBARS_AUTOHIDE, PANE_SCROLLBARS_RIGHT, 2, 0);
+            let p = &raw mut *wp;
+
+            assert!(server_client_check_mouse_in_pane(p, 12, 3) == where_::Pane);
+            // The two columns the overlay actually covers.
+            assert!(server_client_check_mouse_in_pane(p, 13, 3) == where_::Scrollbar);
+            assert!(server_client_check_mouse_in_pane(p, 14, 3) == where_::Scrollbar);
+            // The two it would have reserved, including the border column.
+            assert!(server_client_check_mouse_in_pane(p, 15, 3) == where_::Scrollbar);
+            assert!(server_client_check_mouse_in_pane(p, 16, 3) == where_::Scrollbar);
+            // Nothing beyond: an overlay bar reserves nothing, so the border
+            // loop finds the border back at column 15, which is already taken.
+            assert!(server_client_check_mouse_in_pane(p, 17, 3) == where_::Nowhere);
+            options_free(oo);
         }
     }
 }

@@ -1141,6 +1141,22 @@ enum style_default_type {
     STYLE_DEFAULT_POP,
 }
 
+/// C `vendor/tmux/tmux.h:1479`: `pane-scrollbars` values.
+const PANE_SCROLLBARS_OFF: i32 = 0;
+const PANE_SCROLLBARS_MODAL: i32 = 1;
+const PANE_SCROLLBARS_ALWAYS: i32 = 2;
+const PANE_SCROLLBARS_AUTOHIDE: i32 = 3;
+
+/// C `vendor/tmux/tmux.h:1485`: `pane-scrollbars-position` values.
+const PANE_SCROLLBARS_RIGHT: i32 = 0;
+const PANE_SCROLLBARS_LEFT: i32 = 1;
+
+/// C `vendor/tmux/tmux.h:1489`: fallbacks when the style gives no width or pad.
+const PANE_SCROLLBARS_DEFAULT_PADDING: i32 = 0;
+const PANE_SCROLLBARS_DEFAULT_WIDTH: i32 = 1;
+/// The cell the scrollbar is drawn with — its colours carry the whole look.
+const PANE_SCROLLBARS_CHARACTER: u8 = b' ';
+
 /// Style option.
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -1406,9 +1422,7 @@ enum redraw_span_type {
     REDRAW_SPAN_STATUS,
     /// pane border
     REDRAW_SPAN_BORDER,
-    /// pane scrollbar. ztmux has no pane scrollbars, so this variant is never
-    /// built — it exists so the per-line span arrays keep the C's indexing.
-    #[expect(dead_code)]
+    /// pane scrollbar
     REDRAW_SPAN_SCROLLBAR,
 }
 /// C `vendor/tmux/screen-redraw.c:72`: `#define REDRAW_SPAN_TYPES 6`
@@ -1427,6 +1441,12 @@ const REDRAW_BORDER_D: i32 = 0x8;
 // Span flags.
 /// C `vendor/tmux/screen-redraw.c:81`: `#define REDRAW_BORDER_IS_ARROW 0x1`
 const REDRAW_BORDER_IS_ARROW: i32 = 0x1;
+/// C `vendor/tmux/screen-redraw.c:82`: `#define REDRAW_SCROLLBAR_LEFT 0x2`
+const REDRAW_SCROLLBAR_LEFT: i32 = 0x2;
+/// C `vendor/tmux/screen-redraw.c:83`: `#define REDRAW_SCROLLBAR_RIGHT 0x4`
+const REDRAW_SCROLLBAR_RIGHT: i32 = 0x4;
+/// C `vendor/tmux/screen-redraw.c:84`: `#define REDRAW_SCROLLBAR_OVERLAY 0x8`
+const REDRAW_SCROLLBAR_OVERLAY: i32 = 0x8;
 
 // Draw operations.
 /// C `vendor/tmux/screen-redraw.c:88`: `#define REDRAW_PANE 0x1`
@@ -1439,6 +1459,8 @@ const REDRAW_EMPTY: i32 = 0x4;
 const REDRAW_PANE_BORDER: i32 = 0x8;
 /// C `vendor/tmux/screen-redraw.c:92`: `#define REDRAW_PANE_STATUS 0x10`
 const REDRAW_PANE_STATUS: i32 = 0x10;
+/// C `vendor/tmux/screen-redraw.c:93`: `#define REDRAW_PANE_SCROLLBAR 0x20`
+const REDRAW_PANE_SCROLLBAR: i32 = 0x20;
 /// C `vendor/tmux/screen-redraw.c:94`: `#define REDRAW_STATUS 0x40`
 const REDRAW_STATUS: i32 = 0x40;
 /// C `vendor/tmux/screen-redraw.c:95`: `#define REDRAW_OVERLAY 0x80`
@@ -1489,6 +1511,16 @@ struct redraw_span_data {
     st_wp: *mut window_pane,
     st_offset: u32,
     st_cell_type: cell_type,
+
+    /// `sb.wp`: pane this scrollbar belongs to.
+    sb_wp: *mut window_pane,
+    /// `sb.y`: line within the scrollbar.
+    sb_y: u32,
+    /// `sb.height`: full height of the scrollbar.
+    sb_height: u32,
+    /// `sb.flags`: `REDRAW_SCROLLBAR_LEFT`, `REDRAW_SCROLLBAR_RIGHT` and
+    /// `REDRAW_SCROLLBAR_OVERLAY`.
+    sb_flags: i32,
 }
 
 /// A span of cells of the same type inside a line.
@@ -1706,6 +1738,11 @@ bitflags::bitflags! {
         const PANE_EMPTY = 0x800;
         const PANE_STYLECHANGED = 0x1000;
         const PANE_UNSEENCHANGES = 0x2000;
+        /// C `vendor/tmux/tmux.h:1295`: the pane's scrollbar needs redrawing on
+        /// its own. A reserved scrollbar sits outside the pane's own area, so it
+        /// can be repainted without repainting the pane; an overlay one cannot,
+        /// and takes `PANE_REDRAW` instead.
+        const PANE_REDRAWSCROLLBAR = 0x8000;
     }
 }
 
@@ -1765,6 +1802,19 @@ struct window_pane {
     /// until the mode ends, so an app that repaints inside a sync block costs
     /// one flush rather than one draw per operation.
     sync_dirty: Option<Box<BitStr>>,
+
+    /// C `vendor/tmux/tmux.h:1300`: where the scrollbar slider sits and how tall
+    /// it is, in pane rows. Recomputed on redraw and read back when a drag
+    /// starts, so the grab point stays on the slider.
+    sb_slider_y: u32,
+    sb_slider_h: u32,
+    /// Whether an auto-hiding scrollbar is currently shown, whether the pointer
+    /// is over it, and the timer that hides it again.
+    sb_auto_visible: i32,
+    sb_auto_hover: i32,
+    sb_auto_timer: event,
+    /// C `vendor/tmux/tmux.h:1365`: resolved from `pane-scrollbars-style`.
+    scrollbar_style: style,
 
     ictx: *mut input_ctx,
 
@@ -1903,6 +1953,11 @@ struct window {
     /// Position of the last floating pane created, for cascading placement.
     last_new_pane_x: u32,
     last_new_pane_y: u32,
+
+    /// C `vendor/tmux/tmux.h:1420`: `pane-scrollbars` and its position, cached
+    /// on the window because the layout needs them on every fix.
+    sb: i32,
+    sb_pos: i32,
 
     fill_character: *mut utf8_data,
     flags: window_flag,

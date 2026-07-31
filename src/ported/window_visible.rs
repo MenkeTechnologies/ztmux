@@ -131,6 +131,16 @@ pub unsafe fn window_visible_ranges(
                 continue;
             }
 
+            // A reserved scrollbar sits outside the pane but is still drawn by
+            // it, so the columns it takes obscure whatever is beneath them.
+            let mut sb_w = ((*wp).scrollbar_style.width + (*wp).scrollbar_style.pad) as c_int;
+            let sb_pos = if window_pane_scrollbar_reserve(wp) != 0 {
+                (*w).sb_pos
+            } else {
+                sb_w = 0;
+                0
+            };
+
             let mut i = 0;
             while i < (*r).used as usize {
                 let ri = (*r).ranges.add(i);
@@ -140,13 +150,27 @@ pub unsafe fn window_visible_ranges(
                 }
 
                 let mut lb;
-                let mut rb;
+                let mut rb = 0;
                 if no_border {
                     lb = (*wp).xoff as c_int;
                     rb = (*wp).xoff as c_int + (*wp).sx as c_int - 1;
+                } else if sb_pos == PANE_SCROLLBARS_LEFT {
+                    lb = if (*wp).xoff > sb_w {
+                        (*wp).xoff as c_int - 1 - sb_w
+                    } else {
+                        0
+                    };
                 } else {
+                    // PANE_SCROLLBARS_RIGHT or none.
                     lb = if ((*wp).xoff as u32) > 0 { (*wp).xoff as c_int - 1 } else { 0 };
-                    rb = (*wp).xoff as c_int + (*wp).sx as c_int;
+                }
+                if !no_border {
+                    rb = if sb_pos == PANE_SCROLLBARS_LEFT {
+                        (*wp).xoff as c_int + (*wp).sx as c_int
+                    } else {
+                        // PANE_SCROLLBARS_RIGHT or none.
+                        (*wp).xoff as c_int + (*wp).sx as c_int + sb_w
+                    };
                 }
                 if lb < 0 {
                     lb = 0;

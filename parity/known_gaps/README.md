@@ -21,7 +21,7 @@ blocking CI parity gate.
 
 These are real next-3.7 features with no ztmux counterpart (verified against the
 `next-3.7` reference binary, not the CHANGES text). They are not defects in the
-1080/1080 ported surface — they are unbuilt surface.
+ported surface `parity/cases/` measures — they are unbuilt surface.
 
 ## The cases
 
@@ -31,31 +31,21 @@ to `parity/cases/` (the blocking gate) and deleted here. `pane_zoomed_flag`,
 `session_*_flag`, the terminal-feature flags, `codepoint-widths` /
 `variation-selector-always-wide`, `default-client-command`, `get-clipboard`,
 the `theme` / `dark-theme-*` / `light-theme-*` palette options (plus `themeX`
-colour-name parsing), and the pane/session status-line options
+colour-name parsing), the pane/session status-line options
 (`pane-status-*` / `session-status-*` / `window-pane-status-format`, with
-`status-format[1]`/`[2]` and the `#{R:}` repeat modifier) have already made
+`status-format[1]`/`[2]` and the `#{R:}` repeat modifier), `copy-mode-line-numbers`
+and its styles, the `prompt-cursor-*` / `prompt-command-cursor-*` / `message-format`
+options, the floating-pane format vars, and `pane-scrollbars*` have already made
 that trip.
 
 | Case | Feature gap | Unported area |
 | --- | --- | --- |
-| `opt_pane_scrollbars.sh` | `pane-scrollbars*` (4) | `screen-redraw.c` scrollbar scene (`redraw_draw_scrollbar_span`, `redraw_pane_scrollbar`) |
-| `opt_copy_mode_line_numbers.sh` | `copy-mode-line-numbers` + styles (6) | `window-copy.c` line numbers / position |
-| `opt_prompt_cursor.sh` | `prompt-cursor-*` / `prompt-command-cursor-*` / `message-format` (5) | `status.c` prompt cursor |
 | `opt_tree_mode.sh` | `tree-mode-preview-*` / `tree-mode-*-style` / `switch-mode-match-style` (5) | `mode-tree.c`, `window-tree.c` |
-| `fmt_floating_pane.sh` | `pane_floating_flag` / `pane_x` / `pane_y` / `pane_z` / `pane_pb_*` | floating panes (`new-pane`) |
 | `cmd_switch_mode.sh` | `switch-mode` command | `cmd-switch-mode` |
 
 ## Sample proof
 
 ```
-opt_pane_scrollbars.sh
-  next-3.7:  pane-scrollbars off / pane-scrollbars-position right / …
-  ztmux   :  invalid option: pane-scrollbars / invalid option: … 
-
-fmt_floating_pane.sh
-  next-3.7:  0|0|0|1|hidden|0
-  ztmux   :  |||||          (every var expands empty)
-
 cmd_switch_mode.sh
   next-3.7:  command switch-mode: unknown flag -h
   ztmux   :  unknown command: switch-mode
@@ -63,6 +53,14 @@ cmd_switch_mode.sh
 
 `cmd_copy_mode_missing.sh` and `cmd_capture_pane_flags.sh` lived here until the
 copy-mode command table and `capture-pane -F/-H/-L/-M` were ported; they are now
-covered by `parity/cases/1471`–`1477`. The one command that did not graduate with
-them is `scroll-to-mouse`, which needs the scrollbar slider state and is recorded
-under `opt_pane_scrollbars.sh` instead.
+covered by `parity/cases/1471`–`1477`. `opt_pane_scrollbars.sh` graduated with the
+pane-scrollbars port and is covered by `parity/cases/1483` (the column a reserved
+bar takes) and `1484` (the bar as drawn, captured through a nested client).
+
+The one command still unported is `scroll-to-mouse`, and it has no case here: it
+drags the scrollbar slider, which needs `tty.mouse_scrolling_flag` /
+`tty.mouse_slider_mpos` and the `KEYC_MOUSE_LOCATION_SCROLLBAR_*` key codes that
+ztmux's six-location `keyc` mouse table cannot name. Driving it against the
+reference is not possible anyway — with no mouse event to read, the vendored tmux
+takes its own server down, so a case would measure that crash rather than the gap.
+It is recorded in `docs/BUGS.md` instead.

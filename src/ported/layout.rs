@@ -325,15 +325,14 @@ pub unsafe fn layout_insert_tile(w: *mut window, lc: *mut layout_cell) -> c_int 
 
 /// Whether `lc` is big enough to split along `type_`.
 /// C `vendor/tmux/layout.c:1246`: `static int layout_split_check_space(struct window_pane *wp, struct layout_cell *lc, enum layout_type type)`
-///
-/// ztmux has no pane scrollbars, so the C's `PANE_SCROLLBARS_ALWAYS` minimum
-/// has no counterpart and the plain minimum always applies.
 unsafe fn layout_split_check_space(
     wp: *mut window_pane,
     lc: *mut layout_cell,
     type_: layout_type,
 ) -> c_int {
     unsafe {
+        let sb_style = &raw const (*wp).scrollbar_style;
+
         if (*lc).flags & LAYOUT_CELL_FLOATING != 0 {
             fatalx("floating cells cannot be split");
         }
@@ -341,7 +340,14 @@ unsafe fn layout_split_check_space(
 
         let minimum = match type_ {
             layout_type::LAYOUT_LEFTRIGHT => {
-                if (*lc).sx < PANE_MINIMUM * 2 + 1 {
+                // A reserved scrollbar comes out of each half, so a split needs
+                // room for one on top of the two panes.
+                let minimum = if (*(*wp).window).sb == PANE_SCROLLBARS_ALWAYS {
+                    PANE_MINIMUM * 2 + (*sb_style).width as u32 + (*sb_style).pad as u32
+                } else {
+                    PANE_MINIMUM * 2 + 1
+                };
+                if (*lc).sx < minimum {
                     return 0;
                 }
                 return 1;
@@ -638,6 +644,9 @@ pub unsafe fn layout_fix_panes(w: *mut window, skip: *mut window_pane) {
             (*wp).xoff = (*lc).xoff;
             (*wp).yoff = (*lc).yoff;
 
+            let mut sx = (*lc).sx;
+            let mut sy = (*lc).sy;
+
             // ztmux: reserve a 1-cell ring around the pane for its zellij-style
             // frame, so a program can never draw on the frame (inset == 0 unless
             // `@ztmux-pane-names on`, leaving the parity path untouched).
@@ -647,14 +656,44 @@ pub unsafe fn layout_fix_panes(w: *mut window, skip: *mut window_pane) {
                 if status == pane_status::PANE_STATUS_TOP {
                     (*wp).yoff += 1;
                 }
-                window_pane_resize(wp, (*lc).sx, (*lc).sy - 1);
-            } else if inset != 0 && (*lc).sx > 2 * inset && (*lc).sy > 2 * inset {
+                sy -= 1;
+            } else if inset != 0 && sx > 2 * inset && sy > 2 * inset {
                 (*wp).xoff += inset as i32;
                 (*wp).yoff += inset as i32;
-                window_pane_resize(wp, (*lc).sx - 2 * inset, (*lc).sy - 2 * inset);
-            } else {
-                window_pane_resize(wp, (*lc).sx, (*lc).sy);
+                sx -= 2 * inset;
+                sy -= 2 * inset;
             }
+
+            // A reserved scrollbar takes its width plus padding out of the
+            // pane, on whichever side `pane-scrollbars-position` names. A pane
+            // is never shrunk below PANE_MINIMUM to make room — the bar is
+            // simply drawn over it instead.
+            if window_pane_scrollbar_reserve(wp) != 0 {
+                let mut sb_w = (*wp).scrollbar_style.width;
+                let mut sb_pad = (*wp).scrollbar_style.pad;
+                if sb_w < 1 {
+                    sb_w = 1;
+                }
+                if sb_pad < 0 {
+                    sb_pad = 0;
+                }
+                if (*w).sb_pos == PANE_SCROLLBARS_LEFT {
+                    if sx as i32 - sb_w - sb_pad < PANE_MINIMUM as i32 {
+                        (*wp).xoff += sx as i32 - PANE_MINIMUM as i32;
+                        sx = PANE_MINIMUM;
+                    } else {
+                        sx = (sx as i32 - sb_w - sb_pad) as u32;
+                        (*wp).xoff += sb_w + sb_pad;
+                    }
+                } else if sx as i32 - sb_w - sb_pad < PANE_MINIMUM as i32 {
+                    sx = PANE_MINIMUM;
+                } else {
+                    sx = (sx as i32 - sb_w - sb_pad) as u32;
+                }
+                (*wp).flags |= window_pane_flags::PANE_REDRAWSCROLLBAR;
+            }
+
+            window_pane_resize(wp, sx, sy);
 
             if (*wp).xoff != old_xoff
                 || (*wp).yoff != old_yoff
@@ -702,7 +741,15 @@ pub unsafe fn layout_resize_check(w: *mut window, lc: *mut layout_cell, type_: l
             // Space available in this cell only.
             if type_ == layout_type::LAYOUT_LEFTRIGHT {
                 available = (*lc).sx;
-                minimum = PANE_MINIMUM;
+                // A reserved scrollbar's column cannot be given away: it is not
+                // the pane's to shrink into. The C reads the width off the
+                // active pane's style (`layout.c:529`).
+                minimum = if (*w).sb == PANE_SCROLLBARS_ALWAYS {
+                    let sb_style = &raw const (*(*w).active).scrollbar_style;
+                    PANE_MINIMUM + (*sb_style).width as u32 + (*sb_style).pad as u32
+                } else {
+                    PANE_MINIMUM
+                };
             } else {
                 available = (*lc).sy;
                 if layout_add_border(w, lc, status) {

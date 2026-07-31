@@ -216,7 +216,8 @@ unsafe fn screen_write_set_client_cb(ttyctx: *mut tty_ctx, c: *mut client) -> i3
             // Redraw is already deferred to redraw another pane - redraw
             // this one also when that happens.
             // log_debug("%s: adding %%%u to deferred redraw", __func__, (*wp).id);
-            (*wp).flags |= window_pane_flags::PANE_REDRAW;
+            (*wp).flags |=
+                window_pane_flags::PANE_REDRAW | window_pane_flags::PANE_REDRAWSCROLLBAR;
             return -1;
         }
 
@@ -2589,6 +2590,12 @@ unsafe fn screen_write_collect_flush_scrolled(ctx: *mut screen_write_ctx) -> c_i
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
             return 0;
         }
+        // A terminal scroll moves whole rows, which would drag an overlay
+        // scrollbar's cells up with the pane's own. Redraw instead.
+        if !wp.is_null() && window_pane_scrollbar_overlay_visible(wp) != 0 {
+            (*wp).flags |= window_pane_flags::PANE_REDRAW;
+            return 0;
+        }
 
         log_debug!(
             "screen_write_collect_flush_scrolled: scrolled {} (region {}-{})",
@@ -2610,6 +2617,11 @@ unsafe fn screen_write_collect_flush_scrolled(ctx: *mut screen_write_ctx) -> c_i
         ttyctx.num = (*ctx).scrolled;
         ttyctx.bg = (*ctx).bg;
         tty_write(tty_cmd_scrollup, &raw mut ttyctx);
+
+        // The scrollback grew, so the slider is now in the wrong place.
+        if !wp.is_null() {
+            window_pane_scrollbar_redraw(wp);
+        }
         1
     }
 }

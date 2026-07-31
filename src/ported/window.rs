@@ -690,13 +690,44 @@ pub unsafe fn window_redraw_active_switch(w: *mut window, mut wp: *mut window_pa
     }
 }
 
+/// Get full size and offset of a window pane including the area of the
+/// scrollbars if they were visible but not including the border(s).
+/// C `vendor/tmux/window.c:1774`: `static void window_pane_full_size_offset(struct window_pane *wp, int *xoff, int *yoff, u_int *sx, u_int *sy)`
+unsafe fn window_pane_full_size_offset(
+    wp: *mut window_pane,
+    xoff: *mut c_int,
+    yoff: *mut c_int,
+    sx: *mut u32,
+    sy: *mut u32,
+) {
+    unsafe {
+        let w = (*wp).window;
+
+        let sb_w = if window_pane_scrollbar_reserve(wp) != 0 {
+            ((*wp).scrollbar_style.width + (*wp).scrollbar_style.pad) as u32
+        } else {
+            0
+        };
+        if (*w).sb_pos == PANE_SCROLLBARS_LEFT {
+            *xoff = (*wp).xoff - sb_w as c_int;
+            *sx = (*wp).sx + sb_w;
+        } else {
+            // PANE_SCROLLBARS_RIGHT.
+            *xoff = (*wp).xoff;
+            *sx = (*wp).sx + sb_w;
+        }
+        *yoff = (*wp).yoff;
+        *sy = (*wp).sy;
+    }
+}
+
 /// C `vendor/tmux/window.c:645`: `struct window_pane *window_get_active_at(struct window *w, u_int x, u_int y)`
-/// ztmux has no pane scrollbars, so the C's `window_pane_full_size_offset`
-/// reduces to the pane's own offset and size and is used inline here.
 pub unsafe fn window_get_active_at(w: *mut window, x: u32, y: u32) -> *mut window_pane {
     unsafe {
         let (x, y) = (x as c_int, y as c_int);
         let pane_status = window_get_pane_status(w);
+        let (mut xoff, mut yoff) = (0 as c_int, 0 as c_int);
+        let (mut sx, mut sy) = (0u32, 0u32);
 
         // Prefer a pane's top border status line over the pane above's bottom
         // border.
@@ -705,11 +736,17 @@ pub unsafe fn window_get_active_at(w: *mut window, x: u32, y: u32) -> *mut windo
                 if !window_pane_visible(wp) || window_pane_is_floating(wp) != 0 {
                     continue;
                 }
-                let (xoff, sx) = ((*wp).xoff as c_int, (*wp).sx as c_int);
-                if x < xoff || x > xoff + sx {
+                window_pane_full_size_offset(
+                    wp,
+                    &raw mut xoff,
+                    &raw mut yoff,
+                    &raw mut sx,
+                    &raw mut sy,
+                );
+                if x < xoff || x > xoff + sx as c_int {
                     continue;
                 }
-                if y == (*wp).yoff as c_int - 1 {
+                if y == yoff - 1 {
                     return wp;
                 }
             }
@@ -721,8 +758,14 @@ pub unsafe fn window_get_active_at(w: *mut window, x: u32, y: u32) -> *mut windo
             if !window_pane_visible(wp) {
                 continue;
             }
-            let (xoff, yoff) = ((*wp).xoff as c_int, (*wp).yoff as c_int);
-            let (sx, sy) = ((*wp).sx as c_int, (*wp).sy as c_int);
+            window_pane_full_size_offset(
+                wp,
+                &raw mut xoff,
+                &raw mut yoff,
+                &raw mut sx,
+                &raw mut sy,
+            );
+            let (sx, sy) = (sx as c_int, sy as c_int);
 
             if window_pane_is_floating(wp) == 0 {
                 // Tiled: to and including the right border, excluding the
@@ -1316,6 +1359,8 @@ pub unsafe fn window_pane_create(
         (*wp).control_bg = -1;
         (*wp).control_fg = -1;
 
+        style_set_scrollbar_style_from_option(&raw mut (*wp).scrollbar_style, (*wp).options);
+
         (*wp).palette = colour_palette_init();
         colour_palette_from_option(Some(&mut (*wp).palette), (*wp).options);
 
@@ -1324,6 +1369,11 @@ pub unsafe fn window_pane_create(
         window_pane_default_cursor(wp);
 
         screen_init(&raw mut (*wp).status_screen, 1, 1, 0);
+        evtimer_set(
+            &raw mut (*wp).sb_auto_timer,
+            window_pane_scrollbar_timer,
+            NonNull::new_unchecked(wp),
+        );
 
         if gethostname(host.as_mut_ptr(), size_of_val(&host)) == 0 {
             screen_set_title(&raw mut (*wp).base, host.as_ptr());
@@ -1554,7 +1604,9 @@ pub unsafe fn window_pane_set_mode(
         }
 
         (*wp).screen = (*wme).screen;
-        (*wp).flags |= window_pane_flags::PANE_REDRAW | window_pane_flags::PANE_CHANGED;
+        (*wp).flags |= window_pane_flags::PANE_REDRAW
+            | window_pane_flags::PANE_REDRAWSCROLLBAR
+            | window_pane_flags::PANE_CHANGED;
 
         server_redraw_window_borders((*wp).window);
         server_status_window((*wp).window);
@@ -1586,7 +1638,9 @@ pub unsafe fn window_pane_reset_mode(wp: *mut window_pane) {
             log_debug!("{}: no next mode", func);
             (*wp).screen = &raw mut (*wp).base;
         }
-        (*wp).flags |= window_pane_flags::PANE_REDRAW | window_pane_flags::PANE_CHANGED;
+        (*wp).flags |= window_pane_flags::PANE_REDRAW
+            | window_pane_flags::PANE_REDRAWSCROLLBAR
+            | window_pane_flags::PANE_CHANGED;
 
         server_redraw_window_borders((*wp).window);
         server_status_window((*wp).window);
@@ -2237,6 +2291,182 @@ pub unsafe fn window_pane_default_cursor(wp: *mut window_pane) {
 }
 
 /// C `vendor/tmux/window.c:2190`: `int window_pane_mode(struct window_pane *wp)`
+/// True if this pane is meant to have a scrollbar at all.
+///
+/// The alternate screen never gets one: a full-screen application owns the
+/// whole pane and has no scrollback to represent.
+/// C `vendor/tmux/window.c:2196`: `int window_pane_show_scrollbar(struct window_pane *wp)`
+pub unsafe fn window_pane_show_scrollbar(wp: *mut window_pane) -> i32 {
+    unsafe {
+        // C's SCREEN_IS_ALTERNATE(&wp->base) (tmux.h:1494).
+        if !(*wp).base.saved_grid.is_null() {
+            return 0;
+        }
+        let sb = (*(*wp).window).sb;
+        if sb == PANE_SCROLLBARS_ALWAYS
+            || sb == PANE_SCROLLBARS_AUTOHIDE
+            || (sb == PANE_SCROLLBARS_MODAL && window_pane_mode(wp) != WINDOW_PANE_NO_MODE)
+        {
+            return 1;
+        }
+        0
+    }
+}
+
+/// True if the scrollbar takes a column out of the pane rather than drawing
+/// over it — only `on` reserves, since a bar that appears and disappears cannot
+/// keep resizing the pane under the running program.
+/// C `vendor/tmux/window.c:2209`: `int window_pane_scrollbar_reserve(struct window_pane *wp)`
+pub unsafe fn window_pane_scrollbar_reserve(wp: *mut window_pane) -> i32 {
+    unsafe {
+        if window_pane_show_scrollbar(wp) == 0 {
+            return 0;
+        }
+        ((*(*wp).window).sb == PANE_SCROLLBARS_ALWAYS) as i32
+    }
+}
+
+/// C `vendor/tmux/window.c:2226`: `int window_pane_scrollbar_auto_hide(struct window_pane *wp)`
+pub unsafe fn window_pane_scrollbar_auto_hide(wp: *mut window_pane) -> i32 {
+    unsafe {
+        let sb = (*(*wp).window).sb;
+        (sb == PANE_SCROLLBARS_MODAL || sb == PANE_SCROLLBARS_AUTOHIDE) as i32
+    }
+}
+
+/// C `vendor/tmux/window.c:2217`: `int window_pane_scrollbar_visible(struct window_pane *wp)`
+pub unsafe fn window_pane_scrollbar_visible(wp: *mut window_pane) -> i32 {
+    unsafe {
+        if window_pane_show_scrollbar(wp) == 0 {
+            return 0;
+        }
+        if window_pane_scrollbar_auto_hide(wp) == 0 {
+            return 1;
+        }
+        (*wp).sb_auto_visible
+    }
+}
+
+/// C `vendor/tmux/window.c:2233`: `int window_pane_scrollbar_overlay(struct window_pane *wp)`
+pub unsafe fn window_pane_scrollbar_overlay(wp: *mut window_pane) -> i32 {
+    unsafe {
+        if window_pane_show_scrollbar(wp) == 0 {
+            return 0;
+        }
+        window_pane_scrollbar_auto_hide(wp)
+    }
+}
+
+/// C `vendor/tmux/window.c:2240`: `int window_pane_scrollbar_overlay_visible(struct window_pane *wp)`
+pub unsafe fn window_pane_scrollbar_overlay_visible(wp: *mut window_pane) -> i32 {
+    unsafe {
+        (window_pane_scrollbar_overlay(wp) != 0 && window_pane_scrollbar_visible(wp) != 0) as i32
+    }
+}
+
+/// Arm the timer that hides an auto-hiding scrollbar again.
+/// C `vendor/tmux/window.c:2241`: `void window_pane_scrollbar_start_timer(struct window_pane *wp)`
+pub unsafe fn window_pane_scrollbar_start_timer(wp: *mut window_pane) {
+    unsafe {
+        if window_pane_scrollbar_auto_hide(wp) == 0 || (*wp).sb_auto_visible == 0 {
+            return;
+        }
+
+        let delay = options_get_number___::<u64>(
+            &*(*(*wp).window).options,
+            "pane-scrollbars-timeout",
+        );
+        let tv = libc::timeval {
+            tv_sec: (delay / 1000) as _,
+            tv_usec: ((delay % 1000) * 1000) as _,
+        };
+        evtimer_del(&raw mut (*wp).sb_auto_timer);
+        evtimer_add(&raw mut (*wp).sb_auto_timer, &raw const tv);
+    }
+}
+
+/// Redraw after the scrollbar appeared or disappeared. A reserved scrollbar
+/// changes the pane's usable width, so the whole scene has to be rebuilt rather
+/// than the pane alone.
+/// C `vendor/tmux/window.c:2296`: `static void window_pane_scrollbar_redraw_visibility(struct window_pane *wp)`
+pub unsafe fn window_pane_scrollbar_redraw_visibility(wp: *mut window_pane) {
+    unsafe {
+        crate::screen_redraw::redraw_invalidate_scene((*wp).window);
+        (*wp).flags |= window_pane_flags::PANE_REDRAW;
+        server_redraw_window((*wp).window);
+    }
+}
+
+/// Show an auto-hiding scrollbar, optionally arming the hide timer. Called on
+/// the events that should reveal it — scrolling, entering a mode, the pointer
+/// arriving over it.
+/// C `vendor/tmux/window.c:2258`: `void window_pane_scrollbar_show(struct window_pane *wp, int start_timer)`
+pub unsafe fn window_pane_scrollbar_show(wp: *mut window_pane, start_timer: i32) {
+    unsafe {
+        let mut changed = 0;
+        if window_pane_scrollbar_auto_hide(wp) == 0 {
+            return;
+        }
+        if window_pane_show_scrollbar(wp) == 0 {
+            return;
+        }
+        if (*wp).sb_auto_visible == 0 {
+            (*wp).sb_auto_visible = 1;
+            changed = 1;
+        }
+        evtimer_del(&raw mut (*wp).sb_auto_timer);
+        if start_timer != 0 {
+            window_pane_scrollbar_start_timer(wp);
+        }
+        if changed != 0 {
+            window_pane_scrollbar_redraw_visibility(wp);
+        }
+    }
+}
+
+/// C `vendor/tmux/window.c:2277`: `void window_pane_scrollbar_hide(struct window_pane *wp)`
+pub unsafe fn window_pane_scrollbar_hide(wp: *mut window_pane) {
+    unsafe {
+        if event_initialized(&raw mut (*wp).sb_auto_timer) != 0 {
+            evtimer_del(&raw mut (*wp).sb_auto_timer);
+        }
+        (*wp).sb_auto_hover = 0;
+        if (*wp).sb_auto_visible == 0 {
+            return;
+        }
+        (*wp).sb_auto_visible = 0;
+        window_pane_scrollbar_redraw_visibility(wp);
+    }
+}
+
+/// Mark the scrollbar for redraw. An overlay scrollbar is drawn over the pane's
+/// own cells, so it cannot be repainted without repainting the pane.
+/// C `vendor/tmux/window.c:2288`: `void window_pane_scrollbar_redraw(struct window_pane *wp)`
+pub unsafe fn window_pane_scrollbar_redraw(wp: *mut window_pane) {
+    unsafe {
+        if window_pane_scrollbar_overlay_visible(wp) != 0 {
+            (*wp).flags |= window_pane_flags::PANE_REDRAW;
+            return;
+        }
+        (*wp).flags |= window_pane_flags::PANE_REDRAWSCROLLBAR;
+    }
+}
+
+/// The auto-hide timer firing: the pointer is gone and the bar goes with it.
+/// C `vendor/tmux/window.c:2305`: `static void window_pane_scrollbar_timer(int fd, short events, void *arg)`
+pub unsafe extern "C-unwind" fn window_pane_scrollbar_timer(
+    _fd: i32,
+    _events: i16,
+    wp: NonNull<window_pane>,
+) {
+    unsafe {
+        let wp = wp.as_ptr();
+
+        (*wp).sb_auto_hover = 0;
+        window_pane_scrollbar_hide(wp);
+    }
+}
+
 pub unsafe fn window_pane_mode(wp: *mut window_pane) -> i32 {
     unsafe {
         if !tailq_first(&raw mut (*wp).modes).is_null() {

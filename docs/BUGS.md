@@ -144,8 +144,8 @@ Two divergences the round proved are unported features rather than defects went 
 `cursor-centre-{vertical,horizontal}`, `scroll-to-mouse`, `selection-mode`) and
 `capture-pane -F/-H/-L/-M`, the last of which also needs `GRID_LINE_HYPERLINK` and
 the mode `get_screen` callback. Both were ported immediately afterwards — see the
-next section — so the only one still open is `scroll-to-mouse`, which belongs to
-the unported pane-scrollbars subsystem.
+next section — so the only one still open is `scroll-to-mouse`, which needs the
+scrollbar-drag mouse state.
 
 ### 6. `recentre-top-bottom` took the server down (found while porting it)
 
@@ -195,10 +195,14 @@ ztmux counterpart.
   screen selection, which needed two pieces of substrate: the `GRID_LINE_HYPERLINK`
   line flag (`tmux.h:804`, set at `grid.c:189`) and the `get_screen` callback on
   `struct window_mode` (`tmux.h:1180`), implemented by copy mode and view mode.
-- **Still unported:** `scroll-to-mouse`. It drags the scrollbar slider, so it needs
-  `wp->sb_slider_h` (`tmux.h:1301`) and `tty.mouse_slider_mpos` (`tmux.h:1769`) —
-  state that only exists with the pane-scrollbars subsystem, recorded separately in
-  `parity/known_gaps/opt_pane_scrollbars.sh`.
+- **Still unported:** `scroll-to-mouse`. It drags the scrollbar slider. `wp->sb_slider_h`
+  (`tmux.h:1301`) now exists — pane scrollbars are ported and drawn — but the drag
+  itself also needs `tty.mouse_scrolling_flag` / `tty.mouse_slider_mpos`
+  (`tmux.h:1769`) and the `KEYC_MOUSE_LOCATION_SCROLLBAR_*` key codes, and ztmux's
+  `keyc` mouse table is the older six-location one (`PANE`, `STATUS`, `STATUS_LEFT`,
+  `STATUS_RIGHT`, `STATUS_DEFAULT`, `BORDER`) with no scrollbar location to name.
+  `server_client_check_mouse_in_pane` does compute the scrollbar geometry, but the
+  location it resolves to binds to nothing.
 
 Covered by `parity/cases/1471`–`1477`: the recentre cycle and both centre commands,
 the scroll-exit flag through all three commands and `copy-mode -e`, `selection-mode`

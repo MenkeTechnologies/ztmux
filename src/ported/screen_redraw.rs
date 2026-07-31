@@ -49,9 +49,6 @@
 //!
 //! ztmux divergences from the C, all structural rather than behavioural:
 //!
-//! * ztmux has no pane scrollbars, so `REDRAW_SPAN_SCROLLBAR` exists as a span
-//!   type (the per-line span arrays are indexed by it) but is never built and
-//!   never drawn.
 //! * ztmux has no per-pane prompt line, so `redraw_draw_pane_prompt` has no
 //!   counterpart here.
 //! * The build grid is a `Vec` owned by the build context rather than the C's
@@ -79,6 +76,9 @@ fn redraw_flags_to_string(flags: i32) -> String {
     }
     if flags & REDRAW_PANE_STATUS != 0 {
         s.push_str("pane-status ");
+    }
+    if flags & REDRAW_PANE_SCROLLBAR != 0 {
+        s.push_str("scrollbar ");
     }
     if flags & REDRAW_OVERLAY != 0 {
         s.push_str("overlay ");
@@ -315,6 +315,62 @@ unsafe fn redraw_mark_pane_inside(bctx: *mut redraw_build_ctx, wp: *mut window_p
     }
 }
 
+/// Mark scrollbar data.
+/// C `vendor/tmux/screen-redraw.c:444`: `static void redraw_mark_pane_scrollbar(struct redraw_build_ctx *bctx, struct window_pane *wp, int sb_w, int sb_left, int overlay)`
+unsafe fn redraw_mark_pane_scrollbar(
+    bctx: *mut redraw_build_ctx,
+    wp: *mut window_pane,
+    sb_w: i32,
+    sb_left: i32,
+    overlay: i32,
+) {
+    unsafe {
+        let (mut x, mut y) = (0u32, 0u32);
+        let (sx, ex);
+
+        if sb_w == 0 {
+            return;
+        }
+
+        if overlay != 0 && sb_left != 0 {
+            sx = (*wp).xoff;
+            ex = sx + sb_w - 1;
+        } else if overlay != 0 {
+            ex = (*wp).xoff + (*wp).sx as i32 - 1;
+            sx = ex - sb_w + 1;
+        } else if sb_left != 0 {
+            sx = (*wp).xoff - sb_w;
+            ex = (*wp).xoff - 1;
+        } else {
+            sx = (*wp).xoff + (*wp).sx as i32;
+            ex = sx + sb_w - 1;
+        }
+
+        for sy in 0..(*wp).sy {
+            let wy = (*wp).yoff + sy as i32;
+            for wx in sx..=ex {
+                if redraw_window_to_scene(bctx, wx, wy, &raw mut x, &raw mut y) == 0 {
+                    continue;
+                }
+                let bc = redraw_get_build_cell(bctx, x, y);
+                *bc = redraw_build_cell::default();
+                (*bc).data.type_ = redraw_span_type::REDRAW_SPAN_SCROLLBAR;
+                (*bc).data.sb_wp = wp;
+                (*bc).data.sb_y = sy;
+                (*bc).data.sb_height = (*wp).sy;
+                if sb_left != 0 {
+                    (*bc).data.sb_flags |= REDRAW_SCROLLBAR_LEFT;
+                } else {
+                    (*bc).data.sb_flags |= REDRAW_SCROLLBAR_RIGHT;
+                }
+                if overlay != 0 {
+                    (*bc).data.sb_flags |= REDRAW_SCROLLBAR_OVERLAY;
+                }
+            }
+        }
+    }
+}
+
 /// Return if span data belongs to pane, that is: is the cell adjacent to this
 /// pane?
 /// C `vendor/tmux/screen-redraw.c:494`: `static int redraw_data_has_pane(struct redraw_span_data *data, struct window_pane *wp)`
@@ -493,7 +549,12 @@ unsafe fn redraw_mark_border_arrows(
 
 /// Mark pane borders.
 /// C `vendor/tmux/screen-redraw.c:657`: `static void redraw_mark_pane_borders(struct redraw_build_ctx *bctx, struct window_pane *wp, int sb_w, int sb_left)`
-unsafe fn redraw_mark_pane_borders(bctx: *mut redraw_build_ctx, wp: *mut window_pane) {
+unsafe fn redraw_mark_pane_borders(
+    bctx: *mut redraw_build_ctx,
+    wp: *mut window_pane,
+    sb_w: i32,
+    sb_left: i32,
+) {
     unsafe {
         let pane_lines = window_pane_get_pane_lines(wp);
         let floating = window_pane_is_floating(wp);
@@ -505,6 +566,13 @@ unsafe fn redraw_mark_pane_borders(bctx: *mut redraw_build_ctx, wp: *mut window_
 
         let mut left = (*wp).xoff - 1;
         let mut right = (*wp).xoff + (*wp).sx as i32;
+        if sb_w != 0 {
+            if sb_left != 0 {
+                left -= sb_w;
+            } else {
+                right += sb_w;
+            }
+        }
         let mut top = (*wp).yoff - 1;
         let mut bottom = (*wp).yoff + (*wp).sy as i32;
 
@@ -591,11 +659,33 @@ unsafe fn redraw_mark_pane_borders(bctx: *mut redraw_build_ctx, wp: *mut window_
 /// C `vendor/tmux/screen-redraw.c:759`: `static void redraw_mark_pane(struct redraw_build_ctx *bctx, struct window_pane *wp)`
 unsafe fn redraw_mark_pane(bctx: *mut redraw_build_ctx, wp: *mut window_pane) {
     unsafe {
+        let (mut sb_w, mut sb_left, mut overlay) = (0i32, 0i32, 0i32);
+
         if !window_pane_visible(wp) {
             return;
         }
+
+        if window_pane_scrollbar_visible(wp) != 0 {
+            overlay = window_pane_scrollbar_overlay(wp);
+            if overlay != 0 {
+                sb_w = (*wp).scrollbar_style.width + (*wp).scrollbar_style.pad;
+                if sb_w > (*wp).sx as i32 {
+                    sb_w = (*wp).scrollbar_style.width;
+                    if sb_w > (*wp).sx as i32 {
+                        sb_w = (*wp).sx as i32;
+                    }
+                }
+            } else {
+                sb_w = (*wp).scrollbar_style.width + (*wp).scrollbar_style.pad;
+            }
+        }
+        if sb_w != 0 && (*(*bctx).w).sb_pos == PANE_SCROLLBARS_LEFT {
+            sb_left = 1;
+        }
+
         redraw_mark_pane_inside(bctx, wp);
-        redraw_mark_pane_borders(bctx, wp);
+        redraw_mark_pane_borders(bctx, wp, if overlay != 0 { 0 } else { sb_w }, sb_left);
+        redraw_mark_pane_scrollbar(bctx, wp, sb_w, sb_left, overlay);
     }
 }
 
@@ -688,8 +778,13 @@ unsafe fn redraw_compare_data(a: *const redraw_build_cell, b: *const redraw_buil
                     && (*ad).st_offset + 1 == (*bd).st_offset
                     && (*ad).st_cell_type == (*bd).st_cell_type,
             ),
+            redraw_span_type::REDRAW_SPAN_SCROLLBAR => i32::from(
+                (*ad).sb_wp == (*bd).sb_wp
+                    && (*ad).sb_y == (*bd).sb_y
+                    && (*ad).sb_height == (*bd).sb_height
+                    && (*ad).sb_flags == (*bd).sb_flags,
+            ),
             redraw_span_type::REDRAW_SPAN_OUTSIDE | redraw_span_type::REDRAW_SPAN_EMPTY => 1,
-            redraw_span_type::REDRAW_SPAN_SCROLLBAR => 0,
         }
     }
 }
@@ -1088,6 +1183,97 @@ unsafe fn redraw_draw_status_span(
     }
 }
 
+/// Draw a scrollbar span.
+/// C `vendor/tmux/screen-redraw.c:1229`: `static void redraw_draw_scrollbar_span(struct redraw_draw_ctx *dctx, struct redraw_span *span, u_int x, u_int y, u_int n)`
+unsafe fn redraw_draw_scrollbar_span(
+    dctx: *mut redraw_draw_ctx,
+    span: *const redraw_span,
+    x: u32,
+    y: u32,
+    n: u32,
+) {
+    unsafe {
+        let scene = (*dctx).scene;
+        let wp = (*span).data.sb_wp;
+        let s = (*wp).screen;
+        let tty = &raw mut (*(*scene).c).tty;
+        let sb_style = &raw const (*wp).scrollbar_style;
+        let sb_h = (*span).data.sb_height;
+        let sb_y = (*span).data.sb_y;
+
+        let total_height;
+        let pct_view;
+        let mut slider_h;
+        let mut slider_y;
+
+        if window_pane_mode(wp) == WINDOW_PANE_NO_MODE {
+            total_height = screen_size_y(s) + screen_hsize(s);
+            if total_height == 0 {
+                return;
+            }
+            pct_view = f64::from(sb_h) / f64::from(total_height);
+            slider_h = (f64::from(sb_h) * pct_view) as u32;
+            slider_y = sb_h - slider_h;
+        } else {
+            if tailq_first(&raw mut (*wp).modes).is_null() {
+                return;
+            }
+            let (mut cm_y, mut cm_size) = (0u32, 0u32);
+            if window_copy_get_current_offset(wp, &raw mut cm_y, &raw mut cm_size) == 0 {
+                return;
+            }
+            total_height = cm_size + sb_h;
+            if total_height == 0 {
+                return;
+            }
+            pct_view = f64::from(sb_h) / f64::from(total_height);
+            slider_h = (f64::from(sb_h) * pct_view) as u32;
+            slider_y = (f64::from(sb_h + 1) * (f64::from(cm_y) / f64::from(total_height))) as u32;
+        }
+
+        if slider_h < 1 {
+            slider_h = 1;
+        }
+        if slider_y >= sb_h {
+            slider_y = sb_h - 1;
+        }
+
+        (*wp).sb_slider_y = slider_y;
+        (*wp).sb_slider_h = slider_h;
+
+        let gc = (*sb_style).gc;
+        let mut slgc = gc;
+        slgc.fg = gc.bg;
+        slgc.bg = gc.fg;
+        let mut pad_gc: grid_cell = zeroed();
+        tty_default_colours(&raw mut pad_gc, wp);
+
+        let sb_w = (*sb_style).width as u32;
+        let sb_pad = (*sb_style).pad as u32;
+        let off = x - (*span).x;
+
+        tty_cursor(tty, x, y);
+        for i in 0..n {
+            if (*span).data.sb_flags & REDRAW_SCROLLBAR_LEFT != 0 {
+                if off + i >= sb_w && off + i < sb_w + sb_pad {
+                    tty_cell(tty, &raw const pad_gc, &GRID_DEFAULT_CELL, null_mut(), null_mut());
+                    continue;
+                }
+            } else if off + i < sb_pad {
+                tty_cell(tty, &raw const pad_gc, &GRID_DEFAULT_CELL, null_mut(), null_mut());
+                continue;
+            }
+
+            let gcp = if sb_y >= slider_y && sb_y < slider_y + slider_h {
+                &raw const slgc
+            } else {
+                &raw const gc
+            };
+            tty_cell(tty, gcp, &GRID_DEFAULT_CELL, null_mut(), null_mut());
+        }
+    }
+}
+
 /// Draw a span.
 /// C `vendor/tmux/screen-redraw.c:1315`: `static void redraw_draw_span(struct redraw_draw_ctx *dctx, struct redraw_span *span, u_int y)`
 unsafe fn redraw_draw_span(dctx: *mut redraw_draw_ctx, span: *const redraw_span, y: u32) {
@@ -1123,9 +1309,9 @@ unsafe fn redraw_draw_span(dctx: *mut redraw_draw_ctx, span: *const redraw_span,
                 redraw_span_type::REDRAW_SPAN_STATUS => {
                     redraw_draw_status_span(dctx, span, x, y, n);
                 }
-                // ztmux has no pane scrollbars, so no scrollbar span is ever
-                // built and this arm is unreachable.
-                redraw_span_type::REDRAW_SPAN_SCROLLBAR => {}
+                redraw_span_type::REDRAW_SPAN_SCROLLBAR => {
+                    redraw_draw_scrollbar_span(dctx, span, x, y, n);
+                }
             }
         }
     }
@@ -1166,6 +1352,17 @@ unsafe fn redraw_draw_pane_lines(dctx: *mut redraw_draw_ctx, wp: *mut window_pan
                     }
                 }
             }
+            if flags & REDRAW_PANE_SCROLLBAR != 0 {
+                let lines = &(*scene).lines;
+                let spans =
+                    &lines[y as usize].spans[redraw_span_type::REDRAW_SPAN_SCROLLBAR as usize];
+                for i in 0..spans.len() {
+                    let span = spans.as_ptr().add(i);
+                    if (*span).data.sb_wp == wp {
+                        redraw_draw_span(dctx, span, cy);
+                    }
+                }
+            }
         }
     }
 }
@@ -1195,6 +1392,9 @@ unsafe fn redraw_draw_lines(dctx: *mut redraw_draw_ctx, flags: i32) {
                         }
                         t if t == redraw_span_type::REDRAW_SPAN_STATUS as usize => {
                             REDRAW_PANE_STATUS
+                        }
+                        t if t == redraw_span_type::REDRAW_SPAN_SCROLLBAR as usize => {
+                            REDRAW_PANE_SCROLLBAR
                         }
                         _ => 0,
                     };
@@ -1588,7 +1788,15 @@ pub unsafe fn redraw_screen(c: *mut client) {
 /// C `vendor/tmux/screen-redraw.c:1763`: `void redraw_pane(struct client *c, struct window_pane *wp)`
 pub unsafe fn redraw_pane(c: *mut client, wp: *mut window_pane) {
     unsafe {
-        redraw_draw(c, wp, REDRAW_PANE);
+        redraw_draw(c, wp, REDRAW_PANE | REDRAW_PANE_SCROLLBAR);
+    }
+}
+
+/// Draw a pane's scrollbar.
+/// C `vendor/tmux/screen-redraw.c:1780`: `void redraw_pane_scrollbar(struct client *c, struct window_pane *wp)`
+pub unsafe fn redraw_pane_scrollbar(c: *mut client, wp: *mut window_pane) {
+    unsafe {
+        redraw_draw(c, wp, REDRAW_PANE_SCROLLBAR);
     }
 }
 
@@ -1631,5 +1839,242 @@ pub unsafe fn screen_redraw_set_context(c: *mut client, ctx: *mut screen_redraw_
             &raw mut (*ctx).sx,
             &raw mut (*ctx).sy,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A scene-building context over a `w` x `h` window with no scroll offset,
+    // plus the window and pane it describes. `window` and `window_pane` are
+    // plain C-style structs with no Drop impl, so zeroed instances with the few
+    // geometry fields set are enough to drive the marking functions, which read
+    // nothing else.
+    unsafe fn ctx(w: u32, h: u32) -> (redraw_build_ctx, Box<window>, Box<window_pane>) {
+        unsafe {
+            let mut win: Box<window> = Box::new(zeroed());
+            win.sx = w;
+            win.sy = h;
+            win.sb_pos = PANE_SCROLLBARS_RIGHT;
+            let wp: Box<window_pane> = Box::new(zeroed());
+            let bctx = redraw_build_ctx {
+                c: null_mut(),
+                w: &raw mut *win,
+                ox: 0,
+                oy: 0,
+                sx: w,
+                sy: h,
+                ind: 0,
+                cells: vec![redraw_build_cell::default(); (w * h) as usize],
+            };
+            (bctx, win, wp)
+        }
+    }
+
+    // Every scene column that ended up marked as a scrollbar on line `y`.
+    unsafe fn scrollbar_columns(bctx: *mut redraw_build_ctx, y: u32) -> Vec<u32> {
+        unsafe {
+            (0..(*bctx).sx)
+                .filter(|&x| {
+                    (*redraw_get_build_cell(bctx, x, y)).data.type_
+                        == redraw_span_type::REDRAW_SPAN_SCROLLBAR
+                })
+                .collect()
+        }
+    }
+
+    // A reserved bar on the right sits in the columns immediately PAST the
+    // pane, which is where layout_fix_panes left room for it
+    // (screen-redraw.c:465). Its span data records the pane, the line within
+    // the bar and the bar's full height.
+    #[test]
+    fn reserved_scrollbar_marks_the_columns_past_the_pane() {
+        unsafe {
+            let (mut bctx, _win, mut wp) = ctx(20, 4);
+            wp.xoff = 2;
+            wp.yoff = 1;
+            wp.sx = 10;
+            wp.sy = 3;
+
+            redraw_mark_pane_scrollbar(&raw mut bctx, &raw mut *wp, 2, 0, 0);
+
+            // Line 0 is above the pane, so nothing is marked there.
+            assert_eq!(scrollbar_columns(&raw mut bctx, 0), Vec::<u32>::new());
+            for (i, y) in (1..4).enumerate() {
+                assert_eq!(scrollbar_columns(&raw mut bctx, y), vec![12, 13], "line {y}");
+                let d = (*redraw_get_build_cell(&raw mut bctx, 12, y)).data;
+                assert_eq!(d.sb_wp, &raw mut *wp);
+                assert_eq!(d.sb_y, i as u32);
+                assert_eq!(d.sb_height, 3);
+                assert_eq!(d.sb_flags, REDRAW_SCROLLBAR_RIGHT);
+            }
+        }
+    }
+
+    // On the left the reserved bar sits in the columns immediately BEFORE the
+    // pane (screen-redraw.c:462), and the flag flips.
+    #[test]
+    fn reserved_scrollbar_on_the_left_marks_the_columns_before_the_pane() {
+        unsafe {
+            let (mut bctx, _win, mut wp) = ctx(20, 3);
+            wp.xoff = 5;
+            wp.yoff = 0;
+            wp.sx = 10;
+            wp.sy = 3;
+
+            redraw_mark_pane_scrollbar(&raw mut bctx, &raw mut *wp, 2, 1, 0);
+
+            assert_eq!(scrollbar_columns(&raw mut bctx, 0), vec![3, 4]);
+            let d = (*redraw_get_build_cell(&raw mut bctx, 3, 0)).data;
+            assert_eq!(d.sb_flags, REDRAW_SCROLLBAR_LEFT);
+        }
+    }
+
+    // An overlay bar has no column of its own, so it is drawn over the pane's
+    // last (or first) columns instead (screen-redraw.c:456).
+    #[test]
+    fn overlay_scrollbar_marks_columns_inside_the_pane() {
+        unsafe {
+            let (mut bctx, _win, mut wp) = ctx(20, 2);
+            wp.xoff = 4;
+            wp.yoff = 0;
+            wp.sx = 8; // pane covers 4..=11
+            wp.sy = 2;
+
+            redraw_mark_pane_scrollbar(&raw mut bctx, &raw mut *wp, 3, 0, 1);
+            assert_eq!(scrollbar_columns(&raw mut bctx, 0), vec![9, 10, 11]);
+            assert_eq!(
+                (*redraw_get_build_cell(&raw mut bctx, 9, 0)).data.sb_flags,
+                REDRAW_SCROLLBAR_RIGHT | REDRAW_SCROLLBAR_OVERLAY
+            );
+
+            let (mut bctx, _win, _) = ctx(20, 2);
+            redraw_mark_pane_scrollbar(&raw mut bctx, &raw mut *wp, 3, 1, 1);
+            assert_eq!(scrollbar_columns(&raw mut bctx, 0), vec![4, 5, 6]);
+            assert_eq!(
+                (*redraw_get_build_cell(&raw mut bctx, 4, 0)).data.sb_flags,
+                REDRAW_SCROLLBAR_LEFT | REDRAW_SCROLLBAR_OVERLAY
+            );
+        }
+    }
+
+    // A zero-width bar marks nothing at all (screen-redraw.c:453) — that is how
+    // a pane with no visible scrollbar is expressed.
+    #[test]
+    fn zero_width_scrollbar_marks_nothing() {
+        unsafe {
+            let (mut bctx, _win, mut wp) = ctx(10, 2);
+            wp.sx = 10;
+            wp.sy = 2;
+            redraw_mark_pane_scrollbar(&raw mut bctx, &raw mut *wp, 0, 0, 0);
+            assert_eq!(scrollbar_columns(&raw mut bctx, 0), Vec::<u32>::new());
+        }
+    }
+
+    // Columns of a scrollbar join into one span only when they belong to the
+    // same pane, the same line of the bar, the same bar height and the same
+    // flags (screen-redraw.c:870). Unlike a pane span, the x position inside
+    // the bar is not part of the data, so adjacent columns of one line join.
+    #[test]
+    fn scrollbar_cells_join_only_within_one_line_of_one_bar() {
+        unsafe {
+            let mut wp: Box<window_pane> = Box::new(zeroed());
+            let mut other: Box<window_pane> = Box::new(zeroed());
+
+            let cell = |wp: *mut window_pane, y: u32, height: u32, flags: i32| {
+                let mut bc = redraw_build_cell::default();
+                bc.data.type_ = redraw_span_type::REDRAW_SPAN_SCROLLBAR;
+                bc.data.sb_wp = wp;
+                bc.data.sb_y = y;
+                bc.data.sb_height = height;
+                bc.data.sb_flags = flags;
+                bc
+            };
+
+            let a = cell(&raw mut *wp, 2, 5, REDRAW_SCROLLBAR_RIGHT);
+            assert_eq!(redraw_compare_data(&raw const a, &raw const a), 1);
+
+            for b in [
+                cell(&raw mut *other, 2, 5, REDRAW_SCROLLBAR_RIGHT),
+                cell(&raw mut *wp, 3, 5, REDRAW_SCROLLBAR_RIGHT),
+                cell(&raw mut *wp, 2, 6, REDRAW_SCROLLBAR_RIGHT),
+                cell(&raw mut *wp, 2, 5, REDRAW_SCROLLBAR_LEFT),
+            ] {
+                assert_eq!(redraw_compare_data(&raw const a, &raw const b), 0);
+            }
+
+            // A scrollbar cell never joins a cell of another type.
+            let mut pane_cell = redraw_build_cell::default();
+            pane_cell.data.type_ = redraw_span_type::REDRAW_SPAN_PANE;
+            assert_eq!(redraw_compare_data(&raw const a, &raw const pane_cell), 0);
+        }
+    }
+
+    // Window-scope options with the shipped defaults, which is all
+    // `redraw_mark_pane_borders` reads (`pane-border-lines`,
+    // `pane-border-status`).
+    unsafe fn window_options() -> *mut options {
+        unsafe {
+            let o = options_create(null_mut());
+            for oe in &OPTIONS_TABLE {
+                if oe.scope & OPTIONS_TABLE_WINDOW != 0 {
+                    options_default(o, oe);
+                }
+            }
+            o
+        }
+    }
+
+    // Every scene column marked as a border on line `y`.
+    unsafe fn border_columns(bctx: *mut redraw_build_ctx, y: u32) -> Vec<u32> {
+        unsafe {
+            (0..(*bctx).sx)
+                .filter(|&x| {
+                    (*redraw_get_build_cell(bctx, x, y)).data.type_
+                        == redraw_span_type::REDRAW_SPAN_BORDER
+                })
+                .collect()
+        }
+    }
+
+    // A reserved bar pushes the pane's border out past the column it took, so
+    // the border is drawn beyond the bar and not between bar and pane
+    // (screen-redraw.c:676). Without a bar the border hugs the pane.
+    #[test]
+    fn reserved_scrollbar_moves_the_border_past_the_bar() {
+        unsafe {
+            let oo = window_options();
+
+            let check = |sb_w: i32, sb_left: i32| {
+                let (mut bctx, mut win, mut wp) = ctx(20, 5);
+                win.options = oo;
+                wp.window = &raw mut *win;
+                wp.options = oo;
+                wp.xoff = 5;
+                wp.yoff = 1;
+                wp.sx = 8; // pane covers columns 5..=12
+                wp.sy = 3;
+                for y in 0..bctx.sy {
+                    for x in 0..bctx.sx {
+                        redraw_reset_cell(&raw mut bctx, x, y);
+                    }
+                }
+                redraw_mark_pane_borders(&raw mut bctx, &raw mut *wp, sb_w, sb_left);
+                // Line 2 is inside the pane's rows, so only the two side
+                // borders are marked on it.
+                border_columns(&raw mut bctx, 2)
+            };
+
+            // No scrollbar: borders at xoff-1 and xoff+sx.
+            assert_eq!(check(0, 0), vec![4, 13]);
+            // Two reserved columns on the right: the right border moves out by
+            // two, the left one does not move.
+            assert_eq!(check(2, 0), vec![4, 15]);
+            // Two reserved columns on the left: the left border moves out.
+            assert_eq!(check(2, 1), vec![2, 13]);
+
+            options_free(oo);
+        }
     }
 }

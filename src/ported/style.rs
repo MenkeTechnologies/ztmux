@@ -526,6 +526,64 @@ pub unsafe fn style_tostring(sy: *const style) -> *const u8 {
     }
 }
 
+/// Resolve a pane's scrollbar look from `pane-scrollbars-style`.
+///
+/// The table default is parsed first and the user's value laid over it, so a
+/// value that only sets a colour keeps the default width and padding. A user
+/// value that fails to parse falls back to the default rather than leaving the
+/// style half-applied. `width`/`pad` are then clamped to the scrollbar
+/// fallbacks — a zero-width scrollbar would be invisible but still reserve
+/// nothing, which is not a state the redraw code can represent.
+/// C `vendor/tmux/style.c:456`: `void style_set_scrollbar_style_from_option(struct style *sb_style, struct options *oo)`
+pub unsafe fn style_set_scrollbar_style_from_option(sb_style: *mut style, oo: *mut options) {
+    unsafe {
+        style_set(sb_style, &raw const GRID_DEFAULT_CELL);
+
+        let o = options_get(&mut *oo, "pane-scrollbars-style");
+        if o.is_null() {
+            fatalx_!("missing pane-scrollbars-style");
+        }
+        let oe = options_table_entry(o);
+        let default_str = (*oe).default_str.unwrap_or("");
+        let style_str = format_single(
+            null_mut(),
+            default_str,
+            null_mut(),
+            null_mut(),
+            null_mut(),
+            null_mut(),
+        );
+        if style_parse(sb_style, &raw const GRID_DEFAULT_CELL, style_str) != 0 {
+            fatalx_!("bad pane-scrollbars-style default");
+        }
+
+        let s = options_get_string_(oo, "pane-scrollbars-style");
+        if !s.is_null() {
+            let expanded = format_single(
+                null_mut(),
+                cstr_to_str(s),
+                null_mut(),
+                null_mut(),
+                null_mut(),
+                null_mut(),
+            );
+            if style_parse(sb_style, &raw const GRID_DEFAULT_CELL, expanded) != 0 {
+                style_parse(sb_style, &raw const GRID_DEFAULT_CELL, style_str);
+            }
+            free_(expanded);
+        }
+        free_(style_str);
+
+        if (*sb_style).width < 1 {
+            (*sb_style).width = PANE_SCROLLBARS_DEFAULT_WIDTH;
+        }
+        if (*sb_style).pad < 0 {
+            (*sb_style).pad = PANE_SCROLLBARS_DEFAULT_PADDING;
+        }
+        utf8_set(&raw mut (*sb_style).gc.data, PANE_SCROLLBARS_CHARACTER);
+    }
+}
+
 /// C `vendor/tmux/style.c:441`: `struct style *style_add(struct grid_cell *gc, struct options *oo, const char *name, struct format_tree *ft)`
 pub unsafe fn style_add(
     gc: *mut grid_cell,

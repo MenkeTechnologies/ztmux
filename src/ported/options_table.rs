@@ -29,6 +29,10 @@ static OPTIONS_TABLE_STATUS_KEYS_LIST: [&str; 2] = ["emacs", "vi"];
 static OPTIONS_TABLE_STATUS_JUSTIFY_LIST: [&str; 4] =
     ["left", "centre", "right", "absolute-centre"];
 static OPTIONS_TABLE_STATUS_POSITION_LIST: [&str; 2] = ["top", "bottom"];
+/// C `vendor/tmux/options-table.c:66`: note `on` is the third entry, so the
+/// numeric value of `pane-scrollbars` is not a plain boolean.
+static OPTIONS_TABLE_PANE_SCROLLBARS_LIST: [&str; 4] = ["off", "modal", "on", "auto-hide"];
+static OPTIONS_TABLE_PANE_SCROLLBARS_POSITION_LIST: [&str; 2] = ["right", "left"];
 static OPTIONS_TABLE_BELL_ACTION_LIST: [&str; 4] = ["none", "any", "current", "other"];
 /// C `vendor/tmux/options-table.c:114`: `options_table_copy_mode_line_numbers_list`.
 static OPTIONS_TABLE_COPY_MODE_LINE_NUMBERS_LIST: [&str; 5] =
@@ -265,7 +269,7 @@ macro_rules! options_table_window_hook {
     };
 }
 
-pub static OPTIONS_TABLE: [options_table_entry; 237] = [
+pub static OPTIONS_TABLE: [options_table_entry; 241] = [
     options_table_entry {
         name: "backspace",
         type_: options_table_type::OPTIONS_TABLE_KEY,
@@ -1725,6 +1729,45 @@ pub static OPTIONS_TABLE: [options_table_entry; 237] = [
         text: c!(
             "Style of the cursor in the command prompt when in command mode, if 'status-keys' is set to 'vi'."
         ),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "pane-scrollbars",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_WINDOW,
+        choices: &OPTIONS_TABLE_PANE_SCROLLBARS_LIST,
+        default_num: PANE_SCROLLBARS_OFF as i64,
+        text: c!("Pane scrollbar state: off, on, modal, or auto-hide."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "pane-scrollbars-timeout",
+        type_: options_table_type::OPTIONS_TABLE_NUMBER,
+        scope: OPTIONS_TABLE_WINDOW,
+        minimum: 0,
+        maximum: i32::MAX as u32,
+        default_num: 500,
+        unit: c!("milliseconds"),
+        text: c!("Time before modal and auto-hide pane scrollbars disappear."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "pane-scrollbars-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE,
+        default_str: Some("bg=themedarkgrey,fg=themelightgrey,width=1,pad=0"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of the pane scrollbar."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "pane-scrollbars-position",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_WINDOW,
+        choices: &OPTIONS_TABLE_PANE_SCROLLBARS_POSITION_LIST,
+        default_num: PANE_SCROLLBARS_RIGHT as i64,
+        text: c!("Pane scrollbar position."),
         ..options_table_entry::const_default()
     },
     options_table_entry {

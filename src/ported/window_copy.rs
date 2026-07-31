@@ -790,6 +790,7 @@ pub unsafe fn window_copy_pageup1(wme: *mut window_mode_entry, half_page: i32) {
             window_copy_search_marks(wme, null_mut(), (*data).searchregex, 1);
         }
         window_copy_update_selection(wme, 1, 0);
+        window_pane_scrollbar_show((*wme).wp, 1);
         window_copy_redraw_screen(wme);
     }
 }
@@ -857,6 +858,7 @@ pub unsafe fn window_copy_pagedown1(
             window_copy_search_marks(wme, null_mut(), (*data).searchregex, 1);
         }
         window_copy_update_selection(wme, 1, 0);
+        window_pane_scrollbar_show((*wme).wp, 1);
         window_copy_redraw_screen(wme);
 
         false
@@ -1777,6 +1779,7 @@ pub unsafe fn window_copy_cmd_history_bottom(
         let wme: *mut window_mode_entry = (*cs).wme;
         let data: *mut window_copy_mode_data = (*wme).data.cast();
         let s: *mut screen = (*data).backing;
+        let old_oy = (*data).oy;
 
         let oy = screen_hsize(s) + (*data).cy - (*data).oy;
         if (*data).lineflag == line_sel::LINE_SEL_RIGHT_LEFT && oy == (*data).endsely {
@@ -1791,6 +1794,9 @@ pub unsafe fn window_copy_cmd_history_bottom(
             window_copy_search_marks(wme, null_mut(), (*data).searchregex, 1);
         }
         window_copy_update_selection(wme, 1, 0);
+        if (*data).oy != old_oy {
+            window_pane_scrollbar_show((*wme).wp, 1);
+        }
         window_copy_cmd_action::WINDOW_COPY_CMD_REDRAW
     }
 }
@@ -1802,6 +1808,7 @@ pub unsafe fn window_copy_cmd_history_top(
     unsafe {
         let wme: *mut window_mode_entry = (*cs).wme;
         let data: *mut window_copy_mode_data = (*wme).data.cast();
+        let old_oy = (*data).oy;
 
         let oy = screen_hsize((*data).backing) + (*data).cy - (*data).oy;
         if (*data).lineflag == line_sel::LINE_SEL_LEFT_RIGHT && oy == (*data).sely {
@@ -1816,6 +1823,9 @@ pub unsafe fn window_copy_cmd_history_top(
             window_copy_search_marks(wme, null_mut(), (*data).searchregex, 1);
         }
         window_copy_update_selection(wme, 1, 0);
+        if (*data).oy != old_oy {
+            window_pane_scrollbar_show((*wme).wp, 1);
+        }
         window_copy_cmd_action::WINDOW_COPY_CMD_REDRAW
     }
 }
@@ -4159,6 +4169,7 @@ pub unsafe fn window_copy_scroll_to(
     unsafe {
         let data: *mut window_copy_mode_data = (*wme).data.cast();
         let gd: *mut grid = (*(*data).backing).grid;
+        let old_oy = (*data).oy;
 
         (*data).cx = px;
 
@@ -4184,6 +4195,9 @@ pub unsafe fn window_copy_scroll_to(
             window_copy_search_marks(wme, null_mut(), (*data).searchregex, 1);
         }
         window_copy_update_selection(wme, 1, 0);
+        if (*data).oy != old_oy {
+            window_pane_scrollbar_show((*wme).wp, 1);
+        }
         if !no_redraw {
             window_copy_redraw_screen(wme);
         }
@@ -5727,6 +5741,29 @@ pub unsafe fn window_copy_set_line_numbers(wp: *mut window_pane, enabled: bool) 
     }
 }
 
+/// How far back into the history the copy-mode view currently sits, and how
+/// much history there is. The scrollbar slider is positioned from these.
+/// C `vendor/tmux/window-copy.c:5125`: `int window_copy_get_current_offset(struct window_pane *wp, u_int *offset, u_int *size)`
+pub unsafe fn window_copy_get_current_offset(
+    wp: *mut window_pane,
+    offset: *mut u32,
+    size: *mut u32,
+) -> i32 {
+    unsafe {
+        let wme = tailq_first(&raw mut (*wp).modes);
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+
+        if data.is_null() {
+            return 0;
+        }
+        let hsize = screen_hsize((*data).backing);
+
+        *offset = hsize - (*data).oy;
+        *size = hsize;
+        1
+    }
+}
+
 /// Draw one line of the copy-mode screen: the line-number gutter, the content
 /// shifted past it, the position indicator on the top line, and the `$` marker
 /// when the cursor sits past the end of the content.
@@ -5924,11 +5961,19 @@ pub unsafe fn window_copy_redraw_lines(wme: *mut window_mode_entry, py: u32, ny:
                 0,
             );
             screen_write_stop(&raw mut ctx);
-            (*wp).flags |= window_pane_flags::PANE_REDRAW;
+            (*wp).flags |=
+                window_pane_flags::PANE_REDRAW | window_pane_flags::PANE_REDRAWSCROLLBAR;
             return;
         }
 
-        screen_write_start_pane(&raw mut ctx, wp, null_mut());
+        // An overlay scrollbar covers the pane's own cells, so writing
+        // straight to the pane would paint over the bar. Write into the mode's
+        // screen instead and let the scrollbar redraw repaint everything.
+        if window_pane_scrollbar_overlay_visible(wp) != 0 {
+            screen_write_start(&raw mut ctx, &raw mut (*data).screen);
+        } else {
+            screen_write_start_pane(&raw mut ctx, wp, null_mut());
+        }
         for i in py..(py + ny) {
             window_copy_write_line(wme, &raw mut ctx, i);
         }
@@ -5939,6 +5984,8 @@ pub unsafe fn window_copy_redraw_lines(wme: *mut window_mode_entry, py: u32, ny:
             0,
         );
         screen_write_stop(&raw mut ctx);
+
+        window_pane_scrollbar_redraw(wp);
     }
 }
 
@@ -7348,13 +7395,18 @@ pub unsafe fn window_copy_scroll_up(wme: *mut window_mode_entry, mut ny: u32) {
             return;
         }
         (*data).oy -= ny;
+        window_pane_scrollbar_show(wp, 1);
 
         if !(*data).searchmark.is_null() && (*data).timeout == 0 {
             window_copy_search_marks(wme, null_mut(), (*data).searchregex, 1);
         }
         window_copy_update_selection(wme, 0, 0);
 
-        screen_write_start_pane(&raw mut ctx, wp, null_mut());
+        if window_pane_scrollbar_overlay_visible(wp) != 0 {
+            screen_write_start(&raw mut ctx, &raw mut (*data).screen);
+        } else {
+            screen_write_start_pane(&raw mut ctx, wp, null_mut());
+        }
         screen_write_cursormove(&raw mut ctx, 0, 0, 0);
         screen_write_deleteline(&raw mut ctx, ny, 8);
         window_copy_write_lines(wme, &raw mut ctx, screen_size_y(s) - ny, ny);
@@ -7375,6 +7427,7 @@ pub unsafe fn window_copy_scroll_up(wme: *mut window_mode_entry, mut ny: u32) {
             0,
         );
         screen_write_stop(&raw mut ctx);
+        window_pane_scrollbar_redraw(wp);
     }
 }
 
@@ -7397,13 +7450,18 @@ pub unsafe fn window_copy_scroll_down(wme: *mut window_mode_entry, mut ny: u32) 
             return;
         }
         (*data).oy += ny;
+        window_pane_scrollbar_show(wp, 1);
 
         if !(*data).searchmark.is_null() && (*data).timeout == 0 {
             window_copy_search_marks(wme, null_mut(), (*data).searchregex, 1);
         }
         window_copy_update_selection(wme, 0, 0);
 
-        screen_write_start_pane(&raw mut ctx, wp, null_mut());
+        if window_pane_scrollbar_overlay_visible(wp) != 0 {
+            screen_write_start(&raw mut ctx, &raw mut (*data).screen);
+        } else {
+            screen_write_start_pane(&raw mut ctx, wp, null_mut());
+        }
         screen_write_cursormove(&raw mut ctx, 0, 0, 0);
         screen_write_insertline(&raw mut ctx, ny, 8);
         window_copy_write_lines(wme, &raw mut ctx, 0, ny);
@@ -7419,6 +7477,7 @@ pub unsafe fn window_copy_scroll_down(wme: *mut window_mode_entry, mut ny: u32) 
             0,
         );
         screen_write_stop(&raw mut ctx);
+        window_pane_scrollbar_redraw(wp);
     }
 }
 

@@ -269,8 +269,15 @@ unsafe fn cmd_resize_pane_mouse_resize_move_floating(c: *mut client, m: *mut mou
         let lc = (*wp).layout_cell;
         let sx = (*wp).sx as c_int;
         let sy = (*wp).sy as c_int;
-        let left = (*wp).xoff as c_int - 1;
-        let right = (*wp).xoff as c_int + sx;
+        let mut left = (*wp).xoff as c_int - 1;
+        let mut right = (*wp).xoff as c_int + sx;
+        // A reserved scrollbar sits between the pane and its border, so the
+        // grabbable line is that much further out.
+        if window_pane_scrollbar_reserve(wp) != 0 && (*w).sb_pos == PANE_SCROLLBARS_LEFT {
+            left -= (*wp).scrollbar_style.width + (*wp).scrollbar_style.pad;
+        } else if window_pane_scrollbar_reserve(wp) != 0 && (*w).sb_pos == PANE_SCROLLBARS_RIGHT {
+            right += (*wp).scrollbar_style.width + (*wp).scrollbar_style.pad;
+        }
         let top = (*wp).yoff as c_int - 1;
         let bottom = (*wp).yoff as c_int + sy;
 

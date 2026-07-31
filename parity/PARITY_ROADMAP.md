@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1173/1173 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 cases.
+**1180/1180 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 cases.
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
 (full-size split with a pre-existing split) crashed the server on a u32 underflow
@@ -161,9 +161,30 @@ offset as wrapping `u_int` arithmetic, which panics as a plain Rust add on the
 common case of recentring a scrolled-back view. Fixed with explicit wrapping ops
 and pinned by case 1471.
 
-`scroll-to-mouse` is the one command that did not graduate: it drags the scrollbar
-slider (`wp->sb_slider_h`, `tty.mouse_slider_mpos`), so it belongs to the unported
-pane-scrollbars subsystem and is recorded there.
+`scroll-to-mouse` is the one command that did not graduate. Pane scrollbars are now
+ported, so `wp->sb_slider_h` exists, but dragging the slider also needs
+`tty.mouse_scrolling_flag` / `tty.mouse_slider_mpos` and the
+`KEYC_MOUSE_LOCATION_SCROLLBAR_*` key codes, which ztmux's six-location `keyc`
+mouse table has no way to name. It is recorded in `docs/BUGS.md`.
+
+Round-10 port — pane scrollbars:
+
+The `pane-scrollbars*` gap closed: the four options, the scrollbar scene
+(`redraw_mark_pane_scrollbar`, `redraw_draw_scrollbar_span`,
+`redraw_pane_scrollbar` and the `REDRAW_SPAN_SCROLLBAR` span type), the
+`window_pane_scrollbar_*` predicates and the auto-hide timer, the column a
+reserved bar takes out of the pane (`layout_fix_panes`, the split/resize
+minimums, `window_pane_full_size_offset`, `window_visible_ranges`), and the
+mouse hover that reveals an auto-hiding bar.
+
+Case 1483 covers the reserved column, which is visible in `pane_width` /
+`pane_left`. The bar itself is drawn straight to the client's terminal and never
+enters the pane's grid, so `capture-pane` on the pane cannot see it. Case 1484
+observes it the way `regress/am-terminal.sh` observes drawn output — a second
+server whose only client is attached inside a pane of the first, then
+`capture-pane -e` on that outer pane — which makes the trough, the slider and
+the padding column byte-comparable against the reference for every position,
+width, padding and scrollbar mode.
 
 Round-7 fix:
 
@@ -332,11 +353,9 @@ so a regression in ported behavior cannot land.
 
 `parity/known_gaps/` is the inverse of `parity/cases/`: next-3.7 features ztmux
 does **not** implement yet, each pinned by a case that is expected to *diverge*
-from the reference. The 6 cases cover ~45 individual options/format-vars/commands
-(pane scrollbars and the `scroll-to-mouse` command that drags their slider, the
-theme system, copy-mode line numbers, floating-pane format vars, `switch-mode`,
-…), each tied to an unported C area. Run them with the
-inverted runner:
+from the reference. Two cases remain — the tree-mode preview/style options
+(`mode-tree.c`, `window-tree.c`) and the `switch-mode` command — each tied to an
+unported C area. Run them with the inverted runner:
 
 ```sh
 bash parity/run_known_gaps.sh   # "GAP" = still unported (expected); "CLOSED" = ported, promote it
@@ -346,7 +365,7 @@ The runner is an advisory tripwire — it exits non-zero only when a gap closes
 (the feature got ported and its case should move to `parity/cases/`), so it never
 reddens CI merely because the gaps still exist. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1173/1173 ported surface; they measure
+proof. These gaps do not count against the 1180/1180 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite
