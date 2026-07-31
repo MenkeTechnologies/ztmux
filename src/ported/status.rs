@@ -26,7 +26,7 @@ struct status_prompt_menu {
     flag: u8,
 }
 
-pub static PROMPT_TYPE_STRINGS: [&str; 4] = ["command", "search", "target", "window-target"];
+pub static PROMPT_TYPE_STRINGS: [&str; 2] = ["command", "search"];
 
 /// Status prompt history.
 pub static mut STATUS_PROMPT_HLIST: [*mut *mut u8; PROMPT_NTYPES as usize] =
@@ -2139,14 +2139,7 @@ unsafe fn status_prompt_menu_callback(
             } else {
                 format!("-{}{}", (*spm).flag as char, selected)
             };
-            if (*c).prompt_type == prompt_type::PROMPT_TYPE_WINDOW_TARGET {
-                free_((*c).prompt_buffer);
-                let s = format_nul!("{}", completion);
-                (*c).prompt_buffer = utf8_fromcstr(s);
-                (*c).prompt_index = utf8_strlen((*c).prompt_buffer);
-                free_(s);
-                (*c).flags |= client_flag::REDRAWSTATUS;
-            } else if status_prompt_replace_complete(c, Some(&completion)) != 0 {
+            if status_prompt_replace_complete(c, Some(&completion)) != 0 {
                 (*c).flags |= client_flag::REDRAWSTATUS;
             }
         }
@@ -2281,13 +2274,8 @@ unsafe fn status_prompt_complete_window_menu(
                 }
             }
 
-            if (*c).prompt_type == prompt_type::PROMPT_TYPE_WINDOW_TARGET {
-                tmp = format!("{} ({})", (*wl).idx, _s((*(*wl).window).name_ptr()),);
-                list.push(format!("{}", (*wl).idx));
-            } else {
-                tmp = format!("{}:{} ({})", (*s).name, (*wl).idx, _s((*(*wl).window).name_ptr()),);
-                list.push(format!("{}:{}", (*s).name, (*wl).idx));
-            }
+            tmp = format!("{}:{} ({})", (*s).name, (*wl).idx, _s((*(*wl).window).name_ptr()),);
+            list.push(format!("{}:{}", (*s).name, (*wl).idx));
             let item = menu_item {
                 name: Cow::Owned(tmp),
                 key: (b'0' as u64) + list.len() as u64 - 1,
@@ -2414,19 +2402,12 @@ unsafe fn status_prompt_complete(c: *mut client, word: *const u8, mut offset: u3
         let mut out: Option<String> = None;
         let word_str = cstr_to_str(word);
 
-        if *word == b'\0'
-            && (*c).prompt_type != prompt_type::PROMPT_TYPE_TARGET
-            && (*c).prompt_type != prompt_type::PROMPT_TYPE_WINDOW_TARGET
-        {
+        if *word == b'\0' {
             return None;
         }
 
         'found: {
-            if (*c).prompt_type != prompt_type::PROMPT_TYPE_TARGET
-                && (*c).prompt_type != prompt_type::PROMPT_TYPE_WINDOW_TARGET
-                && strncmp(word, c!("-t"), 2) != 0
-                && strncmp(word, c!("-s"), 2) != 0
-            {
+            if strncmp(word, c!("-t"), 2) != 0 && strncmp(word, c!("-s"), 2) != 0 {
                 list = status_prompt_complete_list(word, (offset == 0) as i32);
                 out = if list.is_empty() {
                     None
@@ -2438,22 +2419,10 @@ unsafe fn status_prompt_complete(c: *mut client, word: *const u8, mut offset: u3
                 break 'found;
             }
 
-            if (*c).prompt_type == prompt_type::PROMPT_TYPE_TARGET
-                || (*c).prompt_type == prompt_type::PROMPT_TYPE_WINDOW_TARGET
-            {
-                s = word;
-                flag = b'\0';
-            } else {
-                s = word.add(2);
-                flag = *word.add(1);
-                offset += 2;
-            }
+            s = word.add(2);
+            flag = *word.add(1);
+            offset += 2;
 
-            // If this is a window completion, open the window menu.
-            if (*c).prompt_type == prompt_type::PROMPT_TYPE_WINDOW_TARGET {
-                out = status_prompt_complete_window_menu(c, (*c).session, s, offset, b'\0');
-                break 'found;
-            }
             colon = libc::strchr(s, b':' as i32);
 
             // If there is no colon, complete as a session.

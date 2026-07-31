@@ -4,28 +4,69 @@ Fixes to the ztmux port, most recent first.
 
 ## Open
 
-### `prompt_type` still carries two types next-3.7 removed
+### `link=` in a style is still rejected
 
-- **Symptom:** `show-prompt-history -T target` prints `History for target:` and
-  `clear-prompt-history -T target` silently succeeds. The vendored next-3.7
+- **Symptom:** `set-option -g status-style 'bg=red,link=3'` fails with
+  `invalid style:` under ztmux; next-3.7 accepts it and prints it back.
+- **Root cause:** `style_parse` (`style.c:276`) puts the URI into a global
+  hyperlink set and stores the small id in `sy->link`; `style_tostring`
+  (`style.c:416`) reads it back through `style_link`. ztmux's `struct style` has
+  no `link` field and no such set, so the directive has nowhere to go.
+- **Scope:** unlike `width=`/`pad=`, this one is not just a field — it needs the
+  `style_hyperlinks` store and `style_link`, and the id has to survive
+  `style_copy`/`style_set`, which are whole-struct copies.
+- **Found by:** the same style-directive check that turned up `width=`/`pad=`
+  below.
+
+## 2026-07-31
+
+### `width=` and `pad=` in a style were rejected
+
+- **Symptom:** `set-option -g status-style 'bg=red,width=10,pad=2'` failed with
+  `invalid style:` and left the option unchanged; next-3.7 accepts both, and
+  prints `width=50%` back quoted.
+- **Root cause:** ztmux's `struct style` had neither field, so `style_parse`
+  fell through to `attributes_fromstring` and errored. The directives are how a
+  style carries a size: `pane-scrollbars-style` defaults to `width=1,pad=0`, and
+  `status_message_area` (`status.c`) sizes the message from `message-style`'s
+  width and align.
+- **Fix:** `width`, `width_percentage` and `pad` on `struct style` with
+  `STYLE_WIDTH_DEFAULT`/`STYLE_PAD_DEFAULT` of `-1`, the two parse arms
+  including the `N%` form capped at 100, and the matching `style_tostring`
+  output. `style_set`/`style_copy` are whole-struct copies so they carry the
+  fields already.
+- **Pinned by:** `parity/cases/1482_style_width_pad.sh`, plus three unit tests
+  in `style.rs` covering round-tripping, the unset default, and the malformed
+  forms that must be refused rather than clamped.
+
+### `prompt_type` carried two types next-3.7 removed
+
+- **Symptom:** `show-prompt-history -T target` printed `History for target:` and
+  `clear-prompt-history -T target` silently succeeded. The vendored next-3.7
   rejects both with `invalid type: target`. Same for `window-target`.
-- **Root cause:** ztmux's `prompt_type` (`src/lib.rs`) is the pre-split
+- **Root cause:** ztmux's `prompt_type` (`src/lib.rs`) was the pre-split
   four-value enum — `command`, `search`, `target`, `window-target`, with
   `PROMPT_NTYPES = 4`. next-3.7 moved the prompt into `prompt.c` and cut the
-  enum to two (`tmux.h:2061`, `PROMPT_NTYPES 2`), so `prompt_type()` maps
-  anything else to `PROMPT_TYPE_INVALID`.
-- **Scope:** it is not only the enum. `prompt_complete` (`prompt.c:1538`) now
-  completes **commands only**, and only at offset zero — the target, session and
-  window-menu completion that ztmux still carries in `status.rs`
-  (`status_prompt_complete_window_menu`, `status_prompt_complete_session`,
-  `status_prompt_menu_callback`) has no counterpart upstream. Closing this means
-  removing that subsystem, not just shrinking the enum.
-- **Found by:** driving `show-prompt-history`/`clear-prompt-history`/
+  enum to two (`tmux.h:2061`, `PROMPT_NTYPES 2`), so anything else maps to
+  `PROMPT_TYPE_INVALID`. The history arrays are sized on `PROMPT_NTYPES`, so the
+  extra types also gave `show-prompt-history` two sections upstream does not
+  have.
+- **Fix:** the enum and `PROMPT_TYPE_STRINGS` are cut to `command` and `search`,
+  which drops the two sections and makes the other names invalid. The branches
+  that existed only to serve those types collapse to their remaining arm: the
+  window-target completion menu, and the target-type entry into
+  `status_prompt_complete` that skipped the `-t`/`-s` flag parsing.
+- **Found by:** driving `show-prompt-history` / `clear-prompt-history` /
   `command-prompt -T` through `parity/verify_one.sh` against the reference while
-  lining the prompt types up for the `struct prompt` port. No existing case
-  covered the prompt types, which is why the suite was green over it.
-- **Not yet pinned by a case:** a case added now would go red until the fix
-  lands, so it belongs with the fix.
+  lining the prompt types up for the `struct prompt` port. No case covered the
+  prompt types at all, which is why the suite was green over it.
+- **Pinned by:** `parity/cases/1481_prompt_types.sh`.
+- **Still divergent, separately:** `prompt_complete` (`prompt.c:1538`) now
+  completes **commands only** and only at offset zero, showing matches as an
+  inline underlined list rather than a menu. ztmux still completes sessions and
+  windows behind `-t`/`-s` and shows a menu. That is a different divergence from
+  this one and needs the `struct prompt` completion fields
+  (`complete_list`/`complete_size`/`complete_display`) to close.
 
 ## 2026-07-30
 

@@ -38,6 +38,10 @@ pub static mut STYLE_DEFAULT: style = style {
     range_argument: 0,
     range_string: [0; 16], // ""
 
+    width: STYLE_WIDTH_DEFAULT,
+    width_percentage: 0,
+    pad: STYLE_PAD_DEFAULT,
+
     default_type: style_default_type::STYLE_DEFAULT_BASE,
 };
 
@@ -239,6 +243,28 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
                     } else {
                         (*sy).gc.us = (*base).us;
                     }
+                } else if end > 6 && strncasecmp(tmp, c!("width="), 6) == 0 {
+                    // `width=N%` is resolved against the area the style is
+                    // applied to; a bare `width=N` is a cell count.
+                    let arg = cstr_to_str(tmp.add(6));
+                    if let Some(pct) = arg.strip_suffix('%') {
+                        let Ok(n) = strtonum_::<u32>(pct, 0, 100) else {
+                            break 'error;
+                        };
+                        (*sy).width = n as i32;
+                        (*sy).width_percentage = 1;
+                    } else {
+                        let Ok(n) = strtonum_::<u32>(arg, 0, u32::MAX) else {
+                            break 'error;
+                        };
+                        (*sy).width = n as i32;
+                        (*sy).width_percentage = 0;
+                    }
+                } else if end > 4 && strncasecmp(tmp, c!("pad="), 4) == 0 {
+                    let Ok(n) = strtonum_::<u32>(cstr_to_str(tmp.add(4)), 0, u32::MAX) else {
+                        break 'error;
+                    };
+                    (*sy).pad = n as i32;
                 } else if strcaseeq_(tmp, "none") {
                     (*sy).gc.attr = grid_attr::empty();
                 } else if end > 2 && strncasecmp(tmp, c!("no"), 2) == 0 {
@@ -458,14 +484,37 @@ pub unsafe fn style_tostring(sy: *const style) -> *const u8 {
             .unwrap() as i32;
             comma = c!(",");
         }
-        #[expect(unused_assignments)]
         if !(*gc).attr.is_empty() {
-            _ = xsnprintf_!(
+            off += xsnprintf_!(
                 s.add(off as usize),
                 size_of::<s_type>() - off as usize,
                 "{}{}",
                 _s(comma),
                 attributes_tostring((*gc).attr),
+            )
+            .unwrap() as i32;
+            comma = c!(",");
+        }
+        if (*sy).width >= 0 {
+            off += xsnprintf_!(
+                s.add(off as usize),
+                size_of::<s_type>() - off as usize,
+                "{}width={}{}",
+                _s(comma),
+                (*sy).width,
+                if (*sy).width_percentage != 0 { "%" } else { "" },
+            )
+            .unwrap() as i32;
+            comma = c!(",");
+        }
+        #[expect(unused_assignments)]
+        if (*sy).pad >= 0 {
+            _ = xsnprintf_!(
+                s.add(off as usize),
+                size_of::<s_type>() - off as usize,
+                "{}pad={}",
+                _s(comma),
+                (*sy).pad,
             );
             comma = c!(",");
         }
@@ -603,6 +652,77 @@ mod tests {
     // because style_tostring uses a shared static buffer.
     unsafe fn tostring(sy: *const style) -> String {
         unsafe { cstr_to_str(style_tostring(sy)).to_owned() }
+    }
+
+    // style_parse (style.c:256, :271): `width=` takes a cell count or a
+    // percentage, `pad=` a cell count, and both round-trip through
+    // style_tostring. Out-of-range and malformed values must be refused rather
+    // than clamped, because style_parse restores the whole style on error and a
+    // silently-clamped width would size a scrollbar or message area wrongly.
+    #[test]
+    fn parse_width_and_pad() {
+        let _g = lock();
+        unsafe {
+            let (rc, sy) = parse("width=10");
+            assert_eq!(rc, 0);
+            assert_eq!(sy.width, 10);
+            assert_eq!(sy.width_percentage, 0);
+            assert_eq!(tostring(&raw const sy), "width=10");
+
+            let (rc, sy) = parse("width=50%");
+            assert_eq!(rc, 0);
+            assert_eq!(sy.width, 50);
+            assert_eq!(sy.width_percentage, 1);
+            assert_eq!(tostring(&raw const sy), "width=50%");
+
+            // Zero is a legal width, and distinct from unset.
+            let (rc, sy) = parse("width=0");
+            assert_eq!(rc, 0);
+            assert_eq!(sy.width, 0);
+            assert_eq!(tostring(&raw const sy), "width=0");
+
+            let (rc, sy) = parse("pad=2");
+            assert_eq!(rc, 0);
+            assert_eq!(sy.pad, 2);
+            assert_eq!(tostring(&raw const sy), "pad=2");
+
+            // Both, in either order, print in the fixed order tostring uses.
+            let (rc, sy) = parse("pad=1,width=3");
+            assert_eq!(rc, 0);
+            assert_eq!((sy.width, sy.pad), (3, 1));
+            assert_eq!(tostring(&raw const sy), "width=3,pad=1");
+        }
+    }
+
+    #[test]
+    fn width_and_pad_default_to_unset_and_are_not_printed() {
+        let _g = lock();
+        unsafe {
+            let (rc, sy) = parse("bg=red");
+            assert_eq!(rc, 0);
+            assert_eq!(sy.width, STYLE_WIDTH_DEFAULT);
+            assert_eq!(sy.pad, STYLE_PAD_DEFAULT);
+            assert_eq!(tostring(&raw const sy), "bg=red");
+        }
+    }
+
+    #[test]
+    fn bad_width_and_pad_are_refused() {
+        let _g = lock();
+        unsafe {
+            for bad in [
+                "width=101%", // percentage is capped at 100
+                "width=-1",
+                "width=",
+                "width=abc",
+                "width=10%%",
+                "pad=-1",
+                "pad=",
+                "pad=abc",
+            ] {
+                assert_eq!(parse(bad).0, -1, "{bad}");
+            }
+        }
     }
 
     #[test]

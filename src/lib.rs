@@ -1156,8 +1156,21 @@ struct style {
     range_argument: u32,
     range_string: [u8; 16],
 
+    /// C `vendor/tmux/tmux.h:985`: `width=` and `pad=` on a style, both
+    /// `-1` when unset. `width_percentage` marks a `width=N%` form, which is
+    /// resolved against the area the style is applied to rather than being a
+    /// cell count.
+    width: i32,
+    width_percentage: i32,
+    pad: i32,
+
     default_type: style_default_type,
 }
+
+/// C `vendor/tmux/tmux.h:960`: no `width=` given.
+const STYLE_WIDTH_DEFAULT: i32 = -1;
+/// C `vendor/tmux/tmux.h:961`: no `pad=` given.
+const STYLE_PAD_DEFAULT: i32 = -1;
 
 #[cfg(feature = "sixel")]
 impl crate::compat::queue::Entry<image, discr_all_entry> for image {
@@ -2654,16 +2667,16 @@ struct status_line {
     entries: [status_line_entry; STATUS_LINES_LIMIT],
 }
 
-/// Prompt type.
-const PROMPT_NTYPES: u32 = 4;
+/// Prompt type. C `vendor/tmux/tmux.h:2061`: next-3.7 cut this to two when the
+/// prompt moved into prompt.c — `target` and `window-target` are gone, and with
+/// them the target/session/window-menu completion they selected.
+const PROMPT_NTYPES: u32 = 2;
 #[repr(u32)]
 #[derive(Copy, Clone, Default, Eq, PartialEq, num_enum::TryFromPrimitive)]
 enum prompt_type {
     #[default]
     PROMPT_TYPE_COMMAND = 0,
     PROMPT_TYPE_SEARCH,
-    PROMPT_TYPE_TARGET,
-    PROMPT_TYPE_WINDOW_TARGET,
     PROMPT_TYPE_INVALID = 0xff,
 }
 
