@@ -14,6 +14,7 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "ahead",
     "alerts",
     "autoname",
+    "banner",
     "bcast",
     "borders",
     "buffers",
@@ -147,6 +148,7 @@ pub(crate) mod age;
 pub(crate) mod ahead;
 pub(crate) mod alerts;
 pub(crate) mod autoname;
+pub(crate) mod banner;
 pub(crate) mod bcast;
 pub(crate) mod borders;
 pub(crate) mod buffers;
@@ -227,6 +229,7 @@ pub(crate) mod respawn;
 pub(crate) mod resurrect;
 pub(crate) mod retitle;
 pub(crate) mod sessions;
+pub(crate) mod shell;
 pub(crate) mod shells;
 pub(crate) mod size;
 pub(crate) mod snapshot;

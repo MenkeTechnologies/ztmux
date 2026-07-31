@@ -109,6 +109,13 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR socket-name ]
 .RB [ \-S
 .IR socket-path ]
+.B banner
+.br
+.B ztmux
+.RB [ \-L
+.IR socket-name ]
+.RB [ \-S
+.IR socket-path ]
 .B ps
 .RB [ \-o
 .IR json ]
@@ -1346,7 +1353,9 @@ so it cannot drift from the parser); an option's value where the set is fixed
 .B \-o
 \(en
 .IR json | jsonl | csv | tsv | table | yaml );
-and an extension's first argument where it names a subcommand.
+an extension's first argument where it names a subcommand; and a shell
+builtin's path arguments against the filesystem (directories only for
+.BR cd ).
 .B Shift\-Tab
 steps back through the completion menu.
 The console builtins are
@@ -1355,9 +1364,58 @@ The console builtins are
 (list every verb with its description, optionally filtered),
 .B help
 (show the keys),
+.B banner
+(redraw the opening banner),
 .B clear
 (clear the screen), and
 .BR exit / quit .
+.PP
+On top of those come the shell builtins \(en
+.BR cd ,
+.BR pwd ,
+.BR dir ,
+.BR cat ,
+.BR echo ,
+.BR export ,
+.BR printenv ,
+.BR unset ,
+.BR mkdir ,
+.BR touch ,
+.BR rm ,
+.BR cp ,
+.BR mv ,
+.B ln
+\(en which run in the console process rather than as a spawned line, so the
+working directory and environment they change are inherited by every line run
+afterwards:
+.B cd
+.I ~/src/app
+then
+.B new\-window
+opens the window there, and
+.B export
+.I FOO=bar
+is visible to a later
+.BR run\-shell .
+The listing is
+.B dir
+.RB ( \-a
+all,
+.B \-l
+long,
+.B \-t
+by time,
+.B \-r
+reversed) rather than
+.BR ls ,
+which is already the alias for
+.BR list\-sessions ,
+and the environment builtins are
+.BR export / printenv / unset
+rather than
+.BR setenv / showenv ,
+which are the aliases for
+.BR set\-environment / show\-environment .
 .B Ctrl\-C
 abandons the current line,
 .B Ctrl\-D
@@ -1379,6 +1437,18 @@ stays scriptable. To reach it from inside a session, bind it to a popup:
 bind : display\-popup \-E "ztmux repl"
 .EE
 .RE
+.SS ztmux banner
+.B ztmux banner
+prints the banner the console opens with: the ZTMUX logo, a boxed summary of
+the version and the verb totals, and the live session, window, pane and client
+counts of the socket selected by
+.BR \-L / \-S ,
+or a note that no server is running there. The box is measured on printed
+width, so the borders stay aligned whatever the version and counts are. In the
+console the
+.B banner
+builtin redraws it in place once output has scrolled it away. It needs no
+server.
 .SS ztmux ps
 .B ztmux ps
 prints a one-shot, pipeable table of every pane's process \(en pane id,

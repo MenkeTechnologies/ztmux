@@ -219,12 +219,19 @@ They fall into a few families:
 - **Discovery** — `verbs [filter]` lists every verb ztmux answers to (ported commands, aliases,
   extensions, console builtins) with a one-line description, grouped by kind: `ztmux verbs pane`
   narrows to the pane-related ones, `-o json` emits `{verb, kind, description}` rows. It is built
-  from the command table and the extension list themselves, and needs no server.
+  from the command table and the extension list themselves, and needs no server. `banner` prints
+  the ztmux banner — the logo, the verb totals, and the socket's live session/window/pane/client
+  counts, or that no server is running — which is also the console's opening screen.
 - **Console** — `repl` runs every line as `ztmux <line>` against the selected socket, with a
   reedline editor: Tab completes the command word (every command, alias, extension and builtin),
   a `-`-prefixed word against that verb's own flags, an option's fixed value set (`-o` →
-  `json|jsonl|csv|tsv|table|yaml`), and an extension's subcommand. `verbs [filter]` lists every
-  verb with its description, history persists to `~/.ztmux/repl_history`, and non-terminal stdin
+  `json|jsonl|csv|tsv|table|yaml`), an extension's subcommand, and a shell builtin's path
+  arguments against the filesystem. `verbs [filter]` lists every verb with its description,
+  `banner` redraws the opening banner, and the shell builtins — `cd`, `pwd`, `dir`, `cat`,
+  `echo`, `export`, `printenv`, `unset`, `mkdir`, `touch`, `rm`, `cp`, `mv`, `ln` — run in the
+  console process, so the directory and environment they set are inherited by every line spawned
+  afterwards (`cd ~/src/app` then `new-window` opens the window there). History persists to
+  `~/.ztmux/repl_history`, and non-terminal stdin
   falls back to a plain line reader so `echo list-sessions | ztmux repl` stays scriptable. The
   editor is keyed emacs or vi, from the first source that names a mode: `$ZTMUX_REPL_EDIT_MODE`
   (`vi`/`emacs`, for a one-off console), `@ztmux-repl-edit-mode` (`set -g @ztmux-repl-edit-mode

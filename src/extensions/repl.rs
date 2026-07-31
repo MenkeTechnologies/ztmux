@@ -20,7 +20,13 @@
 //!     (`triggers <Tab>` → list/arm/disarm/…).
 //!
 //! Builtins: `verbs [filter]` lists every verb with its description, `help`
-//! shows the keys, `clear` clears the screen, `exit`/`quit` (or Ctrl-D) leave.
+//! shows the keys, `banner` redraws the opening banner, `clear` clears the
+//! screen, `exit`/`quit` (or Ctrl-D) leave. On top of those come the shell
+//! builtins ([`super::shell`]) — `cd`, `pwd`, `dir`, `cat`, `echo`, `export`,
+//! `printenv`, `unset`, `mkdir`, `touch`, `rm`, `cp`, `mv`, `ln` — which run in
+//! this process, so the directory and environment they change are inherited by
+//! every line spawned afterwards. Their path arguments complete against the
+//! filesystem.
 //! Ctrl-C abandons the current line. History persists to `~/.ztmux/repl_history`.
 //!
 //! The line editor is keyed emacs or vi, resolved at startup by the first of
@@ -46,17 +52,18 @@ use reedline::{
     default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
 };
 
-use crate::cmd_::{CMD_TABLE, cmd_find};
-use crate::tmux::getversion;
+use crate::cmd_::cmd_find;
 
 use super::completion_spec::EXTENSION_SPEC;
-use super::tmux_query::{Snapshot, poll, query_lines, ztmux_cmd};
-use super::verbs::{Verb, all_verbs, colored, paint, print_verbs, strip_ansi};
+use super::shell::{self, Paths};
+use super::tmux_query::{query_lines, ztmux_cmd};
+use super::verbs::{Verb, all_verbs, colored, paint, print_verbs};
 
-/// The console's own commands, which never reach the server. `verbs` is also a
-/// real subcommand (`ztmux verbs`); in here it runs in-process, so the listing
-/// costs nothing.
+/// The console's own commands, which never reach the server. `verbs` and
+/// `banner` are real subcommands too (`ztmux verbs`, `ztmux banner`); in here
+/// they run in-process, so neither costs a spawn.
 pub(crate) const BUILTINS: &[(&str, &str)] = &[
+    ("banner", "redraw the opening banner (console builtin)"),
     ("clear", "clear the screen (console builtin)"),
     ("exit", "leave the console (console builtin)"),
     ("help", "show the console keys and builtins (console builtin)"),
@@ -92,11 +99,14 @@ fn extension_spec(verb: &str) -> Option<Vocabulary> {
         .map(|i| (EXTENSION_SPEC[i].1, EXTENSION_SPEC[i].2, EXTENSION_SPEC[i].3))
 }
 
-/// Every flag `verb` accepts. Ported commands hand back their own
-/// `args_parse` template (`"af:t:"` → `-a -f -t`), which is the exact string
-/// the parser validates against; extension verbs fall back to the harvested
-/// zsh completion. Unknown verbs offer nothing.
+/// Every flag `verb` accepts. Shell builtins hand back their own flag list,
+/// ported commands their `args_parse` template (`"af:t:"` → `-a -f -t`), which
+/// is the exact string the parser validates against; extension verbs fall back
+/// to the harvested zsh completion. Unknown verbs offer nothing.
 fn options(verb: &str) -> Vec<String> {
+    if shell::lookup(verb).is_some() {
+        return shell::flags(verb).iter().map(|o| (*o).to_string()).collect();
+    }
     if let Some((opts, _, _)) = extension_spec(verb) {
         return opts.iter().map(|o| (*o).to_string()).collect();
     }
@@ -234,12 +244,26 @@ fn run_one(socket: &str, line: &str, mode: Option<KeyMode>) -> bool {
             print_verbs(rest.first().map(String::as_str));
             return true;
         }
+        "banner" => {
+            show_banner(socket);
+            return true;
+        }
         "clear" => {
             print!("\x1b[H\x1b[2J");
             let _ = std::io::stdout().flush();
             return true;
         }
         _ => {}
+    }
+
+    // A shell builtin runs here rather than as a spawned line: `cd` and
+    // `export` would otherwise move a child's directory and environment and
+    // then exit, changing nothing the console can see.
+    if let Some(builtin) = shell::lookup(verb) {
+        if let Err(e) = builtin(rest) {
+            eprintln!("ztmux: repl: {verb}: {e}");
+        }
+        return true;
     }
 
     let args: Vec<&str> = words.iter().map(String::as_str).collect();
@@ -262,77 +286,20 @@ fn run_piped(socket: &str) -> i32 {
     0
 }
 
-/// The startup banner: the ZTMUX logo, a boxed summary line (version and verb
-/// totals), and the live server counts for the socket the console targets.
-fn print_banner(socket: &str) {
-    let color = colored();
-    let logo = super::help::LOGO;
-    if color {
-        print!("{logo}");
-    } else {
-        print!("{}", strip_ansi(logo));
-    }
-
-    let commands = CMD_TABLE.len();
-    let extensions = super::EXTENSION_COMMANDS.len();
-    let summary = format!(
-        " REPL // v{} // {commands} commands // {extensions} extensions ",
-        getversion()
-    );
-    for line in box_lines(&summary, color) {
-        println!("{line}");
-    }
-
-    let snap = poll(socket);
-    println!("{}", server_line(socket, &snap, color));
+/// The console's opening screen: the banner ([`super::banner`], also the
+/// `ztmux banner` verb) and the one-line key hint under it. Printed at startup
+/// and again by the `banner` builtin, once output has scrolled it away.
+fn show_banner(socket: &str) {
+    super::banner::print_banner(socket);
     println!(
         "{}",
         paint(
             " Tab completes verbs and options — `verbs` lists them, `help` for keys, Ctrl-D to exit",
             "2",
-            color,
+            colored(),
         )
     );
     println!();
-}
-
-/// One-line server summary under the banner: the socket and its live counts,
-/// or the reason the counts are missing.
-fn server_line(socket: &str, snap: &Snapshot, color: bool) -> String {
-    let socket = if socket.is_empty() { "default" } else { socket };
-    let head = paint(&format!(" socket {socket}"), "2", color);
-    match &snap.error {
-        Some(_) => format!("{head}  {}", paint("// no server running", "31", color)),
-        None => format!(
-            "{head}  {}  {}  {}  {}",
-            count(snap.sessions.len(), "session"),
-            count(snap.windows.len(), "window"),
-            count(snap.panes.len(), "pane"),
-            count(snap.clients.len(), "client"),
-        ),
-    }
-}
-
-/// `1 session` / `2 sessions` — every count in the banner is plural-correct.
-fn count(n: usize, noun: &str) -> String {
-    if n == 1 {
-        format!("{n} {noun}")
-    } else {
-        format!("{n} {noun}s")
-    }
-}
-
-/// The three lines of a single-line box around `line`, sized to its *printed*
-/// width (colour escapes excluded), so the borders stay aligned however long
-/// the version or the verb counts get.
-fn box_lines(line: &str, color: bool) -> [String; 3] {
-    let rule: String = "─".repeat(strip_ansi(line).chars().count());
-    let border = |s: &str| paint(s, "36", color);
-    [
-        border(&format!(" ┌{rule}┐")),
-        format!("{}{line}{}", border(" │"), border("│")),
-        border(&format!(" └{rule}┘")),
-    ]
 }
 
 /// `help` — the console's own keys and builtins.
@@ -345,6 +312,14 @@ fn print_help(mode: Option<KeyMode>) {
     println!("{}", paint("Every line runs as `ztmux <line>`.", "1", color));
     println!();
     for &(name, description) in BUILTINS {
+        println!("  {} {description}", key(name));
+    }
+    println!();
+    println!(
+        "{}",
+        paint("These run in the console itself, so the directory and environment they set are inherited by every later line:", "2", color)
+    );
+    for (name, description) in shell::described() {
         println!("  {} {description}", key(name));
     }
     println!();
@@ -429,6 +404,68 @@ fn plain_suggestions(candidates: Vec<String>, prefix: &str, span: Span) -> Vec<S
     suggestions(owned.iter().map(|c| (c.as_str(), None)), prefix, span)
 }
 
+/// Complete a shell builtin's path argument against the filesystem: the
+/// entries of the directory the typed word names, directories only for `cd`.
+/// The suggestion keeps whatever the word already said (`~/`, `../src/`) and
+/// replaces only its last component, and a directory completes without a
+/// trailing space so the next component can be typed straight on.
+fn path_suggestions(prefix: &str, span: Span, paths: Paths) -> Vec<Suggestion> {
+    // The word splits at its last `/`: everything up to and including it names
+    // the directory to read, the rest is the prefix to match entries against.
+    let (typed_dir, base) = match prefix.rfind('/') {
+        Some(i) => prefix.split_at(i + 1),
+        None => ("", prefix),
+    };
+    let dir = match typed_dir {
+        "" => std::path::PathBuf::from("."),
+        "~/" => match std::env::var_os("HOME") {
+            Some(home) => std::path::PathBuf::from(home),
+            None => return Vec::new(),
+        },
+        other => match other.strip_prefix("~/") {
+            Some(rest) => match std::env::var_os("HOME") {
+                Some(home) => std::path::PathBuf::from(home).join(rest),
+                None => return Vec::new(),
+            },
+            None => std::path::PathBuf::from(other),
+        },
+    };
+
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+    let mut out: Vec<Suggestion> = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !name.starts_with(base) {
+            continue;
+        }
+        // Dotfiles stay out of the way until a `.` is typed, as a shell does.
+        if !base.starts_with('.') && name.starts_with('.') {
+            continue;
+        }
+        // Directory-ness follows symlinks: a symlink to a directory is one to
+        // `cd` into, and gets the same trailing slash.
+        let is_dir = entry.path().is_dir();
+        if paths == Paths::Directories && !is_dir {
+            continue;
+        }
+        let slash = if is_dir { "/" } else { "" };
+        out.push(Suggestion {
+            value: format!("{typed_dir}{name}{slash}"),
+            description: None,
+            style: None,
+            extra: None,
+            span,
+            append_whitespace: !is_dir,
+            display_override: None,
+            match_indices: None,
+        });
+    }
+    out.sort_by(|a, b| a.value.cmp(&b.value));
+    out
+}
+
 impl Completer for ReplCompleter {
     fn complete(&mut self, line: &str, pos: usize) -> Vec<Suggestion> {
         let (start, prefix) = completion_word_start(line, pos);
@@ -449,6 +486,11 @@ impl Completer for ReplCompleter {
 
         if prefix.starts_with('-') {
             return plain_suggestions(options(verb), prefix, span);
+        }
+        // A shell builtin's arguments are paths — completed off the filesystem
+        // rather than out of a fixed vocabulary.
+        if let Some(paths) = shell::path_arguments(verb) {
+            return path_suggestions(prefix, span, paths);
         }
         // The word after an option that takes a fixed set of values.
         if let Some(previous) = words.last().filter(|w| w.starts_with('-')) {
@@ -553,7 +595,7 @@ fn repl_keys(socket: &str) -> KeyMode {
 }
 
 fn run_interactive(socket: &str) -> i32 {
-    print_banner(socket);
+    show_banner(socket);
 
     let completer = Box::new(ReplCompleter {
         verbs: all_verbs(),
@@ -647,6 +689,7 @@ impl Prompt for ReplPrompt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cmd_::CMD_TABLE;
 
     fn values(line: &str) -> Vec<String> {
         let mut completer = ReplCompleter {
@@ -755,33 +798,6 @@ mod tests {
     }
 
     #[test]
-    fn banner_box_borders_match_the_content_width() {
-        // The box is measured on printed width, so neither a longer version
-        // string nor the colour escapes can push the right border out of line.
-        for content in [
-            " REPL // v3.7.32 // 91 commands // 111 extensions ",
-            " REPL // v10.100.1000 // 1 command // 1 extension ",
-            "",
-        ] {
-            for color in [false, true] {
-                let widths: Vec<usize> = box_lines(content, color)
-                    .iter()
-                    .map(|l| strip_ansi(l).chars().count())
-                    .collect();
-                assert_eq!(
-                    widths[0], widths[1],
-                    "top border and content disagree for {content:?} (color: {color})"
-                );
-                assert_eq!(
-                    widths[1], widths[2],
-                    "content and bottom border disagree for {content:?} (color: {color})"
-                );
-            }
-        }
-        assert_eq!(strip_ansi("\x1b[36m├─┤\x1b[0m").chars().count(), 3);
-    }
-
-    #[test]
     fn edit_mode_values_parse_the_way_the_options_spell_them() {
         // What `show-options -gqv status-keys` prints for the CHOICE option,
         // and what `set -g @ztmux-repl-edit-mode …` is documented to take.
@@ -820,15 +836,45 @@ mod tests {
     }
 
     #[test]
-    fn server_line_reports_a_dead_server_instead_of_zero_counts() {
-        let snap = Snapshot {
-            error: Some("no server running".into()),
-            ..Default::default()
-        };
-        assert!(server_line("/tmp/sock", &snap, false).contains("no server running"));
-        let mut live = Snapshot::default();
-        assert!(server_line("", &live, false).contains("0 sessions"));
-        live.sessions.push(super::super::tmux_query::Session::default());
-        assert!(server_line("", &live, false).contains("1 session  "));
+    fn no_console_builtin_shadows_a_command_alias_or_extension() {
+        // Every line that is not a builtin is spawned as `ztmux <line>`, so a
+        // builtin named after a real verb would make that verb unreachable
+        // from the console. `ls` is why the listing is `dir`: it is already the
+        // alias for list-sessions.
+        for (name, _) in shell::described() {
+            for entry in CMD_TABLE {
+                assert_ne!(name, entry.name, "{name} shadows the command {}", entry.name);
+                assert_ne!(Some(name), entry.alias, "{name} shadows an alias of {}", entry.name);
+            }
+            assert!(
+                !super::super::EXTENSION_COMMANDS.contains(&name),
+                "{name} shadows the extension verb {name}"
+            );
+        }
+        assert!(CMD_TABLE.iter().any(|e| e.alias == Some("ls")));
+        assert!(shell::lookup("ls").is_none());
+    }
+
+    #[test]
+    fn shell_builtins_complete_their_flags_and_their_paths() {
+        // Flags come from the builtin's own list, not from any command table.
+        assert_eq!(values("rm -"), vec!["-f", "-r"]);
+        assert_eq!(values("dir -"), vec!["-a", "-l", "-r", "-t"]);
+        // A path argument completes off the filesystem. `/` is the one
+        // directory every platform this builds on has.
+        let root = values("cd /");
+        assert!(!root.is_empty(), "cd / completed nothing");
+        assert!(
+            root.iter().all(|v| v.starts_with('/') && v.ends_with('/')),
+            "cd must offer directories only, each keeping the typed prefix: {root:?}"
+        );
+        // `cd` is directories-only; `cat` takes any entry, so at the same
+        // prefix it can only offer more, never less.
+        let any = values("cat /");
+        assert!(any.len() >= root.len(), "cat / offered fewer entries than cd /: {any:?}");
+        // A prefix narrows to what starts with it, and a builtin that takes no
+        // paths completes nothing.
+        assert!(values("cd /de").iter().all(|v| v.starts_with("/de")));
+        assert!(values("export ").is_empty());
     }
 }

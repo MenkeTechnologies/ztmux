@@ -113,9 +113,14 @@ pub(crate) fn all_verbs() -> Vec<Verb> {
             description: Cow::Borrowed(describe(name).unwrap_or("ztmux extension")),
         });
     }
-    // Console-only builtins. `verbs` itself is both a builtin and an extension
-    // verb; list it once, as the extension, since that is what runs everywhere.
-    for &(name, description) in super::repl::BUILTINS {
+    // Console builtins: the console's own commands and the shell builtins.
+    // `verbs` and `banner` are both builtins and extension verbs; list each
+    // once, as the extension, since that is what runs everywhere.
+    let builtins = super::repl::BUILTINS
+        .iter()
+        .map(|&(name, description)| (name, description))
+        .chain(super::shell::described());
+    for (name, description) in builtins {
         if super::EXTENSION_COMMANDS.contains(&name) {
             continue;
         }
@@ -256,12 +261,16 @@ mod tests {
                 "{name} missing or duplicated"
             );
         }
-        // `verbs` is both an extension and a console builtin: listed once, as
-        // the extension, so the count above holds and the kinds do not clash.
-        let verbs_entry = verbs.iter().find(|v| v.name == "verbs").expect("verbs");
-        assert!(verbs_entry.kind == Kind::Extension);
-        // A console-only builtin still shows up.
+        // `verbs` and `banner` are both extensions and console builtins:
+        // listed once, as the extension, so the count above holds and the
+        // kinds do not clash.
+        for name in ["verbs", "banner"] {
+            let entry = verbs.iter().find(|v| v.name == name).expect(name);
+            assert!(entry.kind == Kind::Extension, "{name} is listed as a builtin");
+        }
+        // A console-only builtin still shows up, shell builtins included.
         assert!(verbs.iter().any(|v| v.name == "help" && v.kind == Kind::Builtin));
+        assert!(verbs.iter().any(|v| v.name == "cd" && v.kind == Kind::Builtin));
     }
 
     #[test]

@@ -77,8 +77,9 @@ fn build_rows(snap: &Snapshot) -> Vec<Row> {
 }
 
 /// Format a duration in seconds as a compact relative age (e.g. `3h`, `2d`).
-/// Matches the single-unit rendering used by [`super::recent`].
-fn ago(secs: i64) -> String {
+/// Matches the single-unit rendering used by [`super::recent`]. Shared with
+/// [`super::shell`], whose `dir -l` dates the same way.
+pub(crate) fn ago(secs: i64) -> String {
     if secs <= 0 {
         return "just now".to_string();
     }

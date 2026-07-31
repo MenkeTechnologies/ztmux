@@ -2497,6 +2497,10 @@ _ztmux-repl() {
   [[ -n ${tmux_describe} ]] && print "interactive console over every ztmux verb (ztmux extension)" && return
 }
 
+_ztmux-banner() {
+  [[ -n ${tmux_describe} ]] && print "the ztmux banner: logo, verb totals and live server counts (ztmux extension)" && return
+}
+
 _ztmux-verbs() {
   [[ -n ${tmux_describe} ]] && print "list every verb ztmux answers to, with descriptions (ztmux extension)" && return
   _arguments -s \
