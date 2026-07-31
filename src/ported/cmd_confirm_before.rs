@@ -105,8 +105,8 @@ unsafe fn cmd_confirm_before_callback(
     c: *mut client,
     cdata: NonNull<cmd_confirm_before_data>,
     s: *const u8,
-    _done: i32,
-) -> i32 {
+    _key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let item = (*cdata.as_ptr()).item;
         let mut retcode: i32 = 1;
@@ -143,7 +143,7 @@ unsafe fn cmd_confirm_before_callback(
             }
             cmdq_continue(item);
         }
-        0
+        prompt_result::PROMPT_CLOSE
     }
 }
 

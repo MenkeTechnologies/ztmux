@@ -1502,7 +1502,7 @@ unsafe fn redraw_set_draw_context(scene: *mut redraw_scene) -> redraw_draw_ctx {
         dctx.active = server_client_get_pane(c);
 
         let mut lines = status_line_size(c);
-        if (*c).message_string.is_some() || (*c).prompt_string.is_some() {
+        if (*c).message_string.is_some() || !(*c).prompt.is_null() {
             lines = if lines == 0 { 1 } else { lines };
         }
         if lines != 0 && options_get_number_(oo, "status-position") == 0 {
@@ -1534,7 +1534,7 @@ unsafe fn redraw_draw(c: *mut client, wp: *mut window_pane, mut flags: i32) {
         if flags & REDRAW_STATUS != 0 {
             let redraw = if (*c).message_string.is_some() {
                 status_message_redraw(c)
-            } else if (*c).prompt_string.is_some() {
+            } else if !(*c).prompt.is_null() {
                 status_prompt_redraw(c)
             } else {
                 status_redraw(c)
@@ -1665,7 +1665,7 @@ unsafe fn redraw_draw(c: *mut client, wp: *mut window_pane, mut flags: i32) {
 
         if flags & REDRAW_STATUS != 0 {
             let mut lines = (*dctx).status_lines;
-            if (*c).message_string.is_some() || (*c).prompt_string.is_some() {
+            if (*c).message_string.is_some() || !(*c).prompt.is_null() {
                 lines = if lines == 0 { 1 } else { lines };
             }
             let y = if (*dctx).flags & REDRAW_STATUS_TOP != 0 {
@@ -1817,7 +1817,7 @@ pub unsafe fn screen_redraw_set_context(c: *mut client, ctx: *mut screen_redraw_
         (*ctx).c = c;
 
         let mut lines = status_line_size(c);
-        if (*c).message_string.is_some() || (*c).prompt_string.is_some() {
+        if (*c).message_string.is_some() || !(*c).prompt.is_null() {
             lines = if lines == 0 { 1 } else { lines };
         }
         if lines != 0 && options_get_number_(oo, "status-position") == 0 {

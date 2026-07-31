@@ -156,7 +156,7 @@ use cmd_break_pane::CMD_BREAK_PANE_ENTRY;
 use cmd_capture_pane::{CMD_CAPTURE_PANE_ENTRY, CMD_CLEAR_HISTORY_ENTRY};
 use cmd_choose_tree::{
     CMD_CHOOSE_BUFFER_ENTRY, CMD_CHOOSE_CLIENT_ENTRY, CMD_CHOOSE_TREE_ENTRY,
-    CMD_CUSTOMIZE_MODE_ENTRY,
+    CMD_CUSTOMIZE_MODE_ENTRY, CMD_SWITCH_MODE_ENTRY,
 };
 use cmd_command_prompt::CMD_COMMAND_PROMPT_ENTRY;
 use cmd_confirm_before::CMD_CONFIRM_BEFORE_ENTRY;
@@ -233,7 +233,7 @@ use cmd_switch_client::CMD_SWITCH_CLIENT_ENTRY;
 use cmd_unbind_key::CMD_UNBIND_KEY_ENTRY;
 use cmd_wait_for::CMD_WAIT_FOR_ENTRY;
 
-pub static CMD_TABLE: [&cmd_entry; 91] = [
+pub static CMD_TABLE: [&cmd_entry; 92] = [
     &CMD_ATTACH_SESSION_ENTRY,
     &CMD_BIND_KEY_ENTRY,
     &CMD_BREAK_PANE_ENTRY,
@@ -322,6 +322,7 @@ pub static CMD_TABLE: [&cmd_entry; 91] = [
     &CMD_SWAP_PANE_ENTRY,
     &CMD_SWAP_WINDOW_ENTRY,
     &CMD_SWITCH_CLIENT_ENTRY,
+    &CMD_SWITCH_MODE_ENTRY,
     &CMD_UNBIND_KEY_ENTRY,
     &CMD_UNLINK_WINDOW_ENTRY,
     &CMD_WAIT_FOR_ENTRY,

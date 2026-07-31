@@ -1345,11 +1345,11 @@ unsafe fn window_tree_command_callback(
     c: *mut client,
     data: NonNull<window_tree_modedata>,
     s: *const u8,
-    _done: i32,
-) -> i32 {
+    _key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         if s.is_null() || *s == b'\0' || (*data.as_ptr()).dead != 0 {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
 
         (*data.as_ptr()).entered = s;
@@ -1369,7 +1369,7 @@ unsafe fn window_tree_command_callback(
             cmdq_get_callback!(window_tree_command_done, data.cast()).as_ptr(),
         );
 
-        0
+        prompt_result::PROMPT_CLOSE
     }
 }
 
@@ -1422,16 +1422,16 @@ unsafe fn window_tree_kill_current_callback(
     c: *mut client,
     data: NonNull<window_tree_modedata>,
     s: *const u8,
-    _: i32,
-) -> i32 {
+    _key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let mtd: *mut mode_tree_data = (*data.as_ptr()).data;
 
         if s.is_null() || *s == b'\0' || (*data.as_ptr()).dead != 0 {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
         if !(*s).eq_ignore_ascii_case(&b'y') || *s.add(1) != b'\0' {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
 
         window_tree_kill_each(data.cast(), mode_tree_get_current(mtd), c, KEYC_NONE);
@@ -1443,7 +1443,7 @@ unsafe fn window_tree_kill_current_callback(
             cmdq_get_callback!(window_tree_command_done, data.as_ptr().cast()).as_ptr(),
         );
 
-        0
+        prompt_result::PROMPT_CLOSE
     }
 }
 
@@ -1452,16 +1452,16 @@ unsafe fn window_tree_kill_tagged_callback(
     c: *mut client,
     data: NonNull<window_tree_modedata>,
     s: *const u8,
-    _: i32,
-) -> i32 {
+    _key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let mtd: *mut mode_tree_data = (*data.as_ptr()).data;
 
         if s.is_null() || *s == b'\0' || (*data.as_ptr()).dead != 0 {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
         if !(*s).eq_ignore_ascii_case(&b'y') || *s.add(1) != b'\0' {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
 
         mode_tree_each_tagged(mtd, Some(window_tree_kill_each), c, KEYC_NONE, 1);
@@ -1478,7 +1478,7 @@ unsafe fn window_tree_kill_tagged_callback(
             .as_ptr(),
         );
 
-        0
+        prompt_result::PROMPT_CLOSE
     }
 }
 
@@ -1653,16 +1653,16 @@ unsafe fn window_tree_key(
                     // redraw/reset block. Guard the action so we still reach it.
                     if !prompt.is_null() {
                         (*data).references += 1;
-                        status_prompt_set(
+                        mode_tree_set_prompt(
+                            (*data).data,
                             c,
-                            null_mut(),
                             prompt,
                             c!(""),
-                            window_tree_kill_current_callback,
-                            window_tree_command_free,
-                            data,
-                            prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
                             prompt_type::PROMPT_TYPE_COMMAND,
+                            prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                            window_tree_kill_current_callback,
+                            Some(window_tree_command_free),
+                            data,
                         );
                         free_(prompt);
                     }
@@ -1675,16 +1675,16 @@ unsafe fn window_tree_key(
                     if tagged != 0 {
                         prompt = format_nul!("Kill {} tagged? ", tagged);
                         (*data).references += 1;
-                        status_prompt_set(
+                        mode_tree_set_prompt(
+                            (*data).data,
                             c,
-                            null_mut(),
                             prompt,
                             c!(""),
-                            window_tree_kill_tagged_callback,
-                            window_tree_command_free,
-                            data,
-                            prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
                             prompt_type::PROMPT_TYPE_COMMAND,
+                            prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                            window_tree_kill_tagged_callback,
+                            Some(window_tree_command_free),
+                            data,
                         );
                         free_(prompt);
                     }
@@ -1697,16 +1697,16 @@ unsafe fn window_tree_key(
                         format_nul!("(current) ")
                     };
                     (*data).references += 1;
-                    status_prompt_set(
+                    mode_tree_set_prompt(
+                        (*data).data,
                         c,
-                        null_mut(),
                         prompt,
                         c!(""),
-                        window_tree_command_callback,
-                        window_tree_command_free,
-                        data,
-                        prompt_flags::PROMPT_NOFORMAT,
                         prompt_type::PROMPT_TYPE_COMMAND,
+                        prompt_flags::PROMPT_NOFORMAT,
+                        window_tree_command_callback,
+                        Some(window_tree_command_free),
+                        data,
                     );
                     free_(prompt);
                 }

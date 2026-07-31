@@ -25,30 +25,45 @@ ported surface `parity/cases/` measures — they are unbuilt surface.
 
 ## The cases
 
-Cases graduate out of this bucket as the feature lands: when a gap starts
-matching next-3.7 byte-for-byte, the runner flags it `CLOSED` and it is promoted
-to `parity/cases/` (the blocking gate) and deleted here. `pane_zoomed_flag`,
-`session_*_flag`, the terminal-feature flags, `codepoint-widths` /
-`variation-selector-always-wide`, `default-client-command`, `get-clipboard`,
-the `theme` / `dark-theme-*` / `light-theme-*` palette options (plus `themeX`
-colour-name parsing), the pane/session status-line options
-(`pane-status-*` / `session-status-*` / `window-pane-status-format`, with
-`status-format[1]`/`[2]` and the `#{R:}` repeat modifier), `copy-mode-line-numbers`
-and its styles, the `prompt-cursor-*` / `prompt-command-cursor-*` / `message-format`
-options, the floating-pane format vars, `pane-scrollbars*` and the `tree-mode-*`
-preview/style options have already made that trip.
+**There are none left.** Every case that lived here has graduated into
+`parity/cases/`: `pane_zoomed_flag`, `session_*_flag`, the terminal-feature
+flags, `codepoint-widths` / `variation-selector-always-wide`,
+`default-client-command`, `get-clipboard`, the `theme` / `dark-theme-*` /
+`light-theme-*` palette options (plus `themeX` colour-name parsing), the
+pane/session status-line options (`pane-status-*` / `session-status-*` /
+`window-pane-status-format`, with `status-format[1]`/`[2]` and the `#{R:}`
+repeat modifier), `copy-mode-line-numbers` and its styles, the
+`prompt-cursor-*` / `prompt-command-cursor-*` / `message-format` options, the
+floating-pane format vars, `pane-scrollbars*`, the `tree-mode-*` preview/style
+options, and — last — `cmd_switch_mode`.
 
-| Case | Feature gap | Unported area |
-| --- | --- | --- |
-| `cmd_switch_mode.sh` | `switch-mode` command | `cmd-switch-mode`, `window-switch.c` |
+The directory is kept, not deleted: it is where the next proven-unported
+behaviour goes. Add a case here the moment a next-3.7 feature is shown to be
+missing, so the gap is measured rather than remembered.
+
+With no cases present `run_known_gaps.sh` reports `no cases in
+parity/known_gaps/*.sh` and exits 2 (it also trips `set -u` on the empty glob
+first). That is the runner saying the directory is empty, not a gap failing; it
+is advisory and not wired into CI. The script is left as-is deliberately —
+teaching it to exit 0 on an empty directory would be editing a measurement tool
+to make its output friendlier.
 
 ## Sample proof
+
+`cmd_switch_mode.sh` was the last one, and it read:
 
 ```
 cmd_switch_mode.sh
   next-3.7:  command switch-mode: unknown flag -h
   ztmux   :  unknown command: switch-mode
 ```
+
+It closed with the `prompt.c` / `window-switch.c` port and is now covered by
+`parity/cases/1488_switch_mode.sh` (the command surface),
+`parity/cases/1489_switch_mode_draw.sh` (the picker as drawn) and
+`parity/cases/1490_switch_mode_kill.sh` (`-k` disposing of the pane), the last
+two captured through a nested client. `switch-mode-match-style` had been in the option table with
+nothing reading it; `window-switch.c:289` is that reader, so the option is live.
 
 `cmd_copy_mode_missing.sh` and `cmd_capture_pane_flags.sh` lived here until the
 copy-mode command table and `capture-pane -F/-H/-L/-M` were ported; they are now
@@ -58,10 +73,7 @@ bar takes) and `1484` (the bar as drawn, captured through a nested client).
 `opt_tree_mode.sh` graduated with the tree-mode preview port: `parity/cases/1485`
 covers the five options themselves, `1486` the choose-tree session preview as
 drawn and `1487` the selection style and the per-pane preview, both captured
-through the same nested client. `switch-mode-match-style` exists as an
-option because next-3.7's table has it, but the mode that reads it
-(`window-switch.c`) is not ported — that unbuilt surface is what
-`cmd_switch_mode.sh` still measures.
+through the same nested client.
 
 The one command still unported is `scroll-to-mouse`, and it has no case here: it
 drags the scrollbar slider, which needs `tty.mouse_scrolling_flag` /

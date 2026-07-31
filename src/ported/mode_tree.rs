@@ -12,6 +12,7 @@
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 use crate::*;
+use crate::options_::options_get_number_;
 
 pub type mode_tree_build_cb = Option<
     unsafe fn(_: NonNull<c_void>, _: *mut mode_tree_sort_criteria, _: *mut u64, _: *const u8),
@@ -77,12 +78,31 @@ pub struct mode_tree_data {
     current: u32,
 
     screen: screen,
+    /// C `vendor/tmux/mode-tree.c:99`: the prompt this tree currently owns
+    /// (search/filter/rename/…), NULL when none is open.
+    prompt: *mut prompt,
+    prompt_data: *mut mode_tree_prompt,
+    prompt_cx: u32,
+    prompt_top: i32,
 
     preview: bool,
     search: *mut u8,
     filter: *mut u8,
     no_matches: i32,
     search_dir: mode_tree_search_dir,
+}
+
+/// Wrapper around a prompt owned by a mode tree. The mode tree holds a
+/// reference while the prompt is alive; the wrapper callbacks forward to the
+/// caller's callbacks and drop that reference when the prompt is freed.
+/// C `vendor/tmux/mode-tree.c:155`: `struct mode_tree_prompt`
+#[repr(C)]
+pub struct mode_tree_prompt {
+    mtd: *mut mode_tree_data,
+    c: *mut client,
+    inputcb: mode_tree_prompt_input_cb,
+    freecb: prompt_free_cb,
+    data: *mut c_void,
 }
 
 #[repr(C)]
@@ -480,6 +500,10 @@ pub unsafe fn mode_tree_start(
             offset: Default::default(),
             current: Default::default(),
             screen: zeroed(),
+            prompt: null_mut(),
+            prompt_data: null_mut(),
+            prompt_cx: 0,
+            prompt_top: 0,
             search: Default::default(),
             filter: if args_has(args, 'f') {
                 xstrdup(args_get_(args, 'f')).as_ptr()
@@ -624,6 +648,7 @@ pub unsafe fn mode_tree_free(mtd: *mut mode_tree_data) {
             server_unzoom_window((*wp).window);
         }
 
+        mode_tree_clear_prompt(mtd);
         mode_tree_free_items(&raw mut (*mtd).children);
         mode_tree_clear_lines(mtd);
         screen_free(&raw mut (*mtd).screen);
@@ -947,8 +972,176 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
             }
         }
         // done:
-        screen_write_cursormove(&raw mut ctx, 0, mtd.current as i32 - mtd.offset as i32, 0);
+        if !mtd.prompt.is_null() {
+            mode_tree_draw_prompt(mtd, &raw mut ctx);
+        } else {
+            mtd.screen.mode &= !mode_flag::MODE_CURSOR;
+            screen_write_cursormove(&raw mut ctx, 0, mtd.current as i32 - mtd.offset as i32, 0);
+        }
         screen_write_stop(&raw mut ctx);
+    }
+}
+
+/// C `vendor/tmux/mode-tree.c:1041`: `static void mode_tree_draw_prompt(struct mode_tree_data *mtd, struct screen_write_ctx *ctx)`
+unsafe fn mode_tree_draw_prompt(mtd: &mut mode_tree_data, ctx: *mut screen_write_ctx) {
+    unsafe {
+        let s = &raw mut mtd.screen;
+        let sx = screen_size_x(s);
+        let sy = screen_size_y(s);
+
+        if sx == 0 || sy == 0 {
+            return;
+        }
+
+        let py = if mtd.prompt_top != 0 { 0 } else { sy - 1 };
+
+        let mut pdd: prompt_draw_data = zeroed();
+        pdd.ctx = ctx;
+        pdd.cursor_x = &raw mut mtd.prompt_cx;
+        pdd.area_x = 0;
+        pdd.area_width = sx;
+        pdd.prompt_line = py;
+
+        (*s).mode |= mode_flag::MODE_CURSOR;
+        prompt_draw(mtd.prompt, &raw mut pdd);
+        screen_write_cursormove(ctx, mtd.prompt_cx as i32, py as i32, 0);
+    }
+}
+
+/// C `vendor/tmux/mode-tree.c:1068`: `void mode_tree_clear_prompt(struct mode_tree_data *mtd)`
+pub unsafe fn mode_tree_clear_prompt(mtd: *mut mode_tree_data) {
+    unsafe {
+        let prompt = (*mtd).prompt;
+        if !prompt.is_null() {
+            (*mtd).prompt = null_mut();
+            prompt_free(prompt);
+            (*mtd).screen.mode &= !mode_flag::MODE_CURSOR;
+        }
+    }
+}
+
+/// C `vendor/tmux/mode-tree.c:1080`: `int mode_tree_has_prompt(struct mode_tree_data *mtd)`
+///
+/// Exported by `tmux.h` but not called anywhere in next-3.7 either; ported so
+/// the mode-tree prompt surface is complete.
+#[expect(dead_code)]
+pub unsafe fn mode_tree_has_prompt(mtd: *mut mode_tree_data) -> i32 {
+    unsafe { !(*mtd).prompt.is_null() as i32 }
+}
+
+/// C `vendor/tmux/mode-tree.c:1086`: `static enum cmd_retval mode_tree_prompt_accept(struct cmdq_item *item, void *data)`
+unsafe fn mode_tree_prompt_accept(item: *mut cmdq_item, data: *mut c_void) -> cmd_retval {
+    unsafe {
+        let mtd: *mut mode_tree_data = data.cast();
+        let c = cmdq_get_client(item);
+        let mut key: key_code = b'y' as key_code;
+
+        if !(*mtd).prompt.is_null() && !c.is_null() {
+            mode_tree_key(mtd, c, &raw mut key, null_mut(), null_mut(), null_mut());
+        }
+
+        mode_tree_remove_ref(mtd);
+        cmd_retval::CMD_RETURN_NORMAL
+    }
+}
+
+/// C `vendor/tmux/mode-tree.c:1100`: `static enum prompt_result mode_tree_prompt_input_callback(void *data, const char *s, enum prompt_key_result key)`
+unsafe fn mode_tree_prompt_input_callback(
+    data: NonNull<c_void>,
+    s: *const u8,
+    key: prompt_key_result,
+) -> prompt_result {
+    unsafe {
+        let mtp: *mut mode_tree_prompt = data.as_ptr().cast();
+
+        if let (Some(inputcb), Some(arg)) = ((*mtp).inputcb, NonNull::new((*mtp).data)) {
+            return inputcb((*mtp).c, arg, s, key);
+        }
+        prompt_result::PROMPT_CLOSE
+    }
+}
+
+/// C `vendor/tmux/mode-tree.c:1111`: `static void mode_tree_prompt_free_callback(void *data)`
+unsafe fn mode_tree_prompt_free_callback(data: NonNull<c_void>) {
+    unsafe {
+        let mtp: *mut mode_tree_prompt = data.as_ptr().cast();
+
+        if (*(*mtp).mtd).prompt_data == mtp {
+            (*(*mtp).mtd).prompt_data = null_mut();
+        }
+        if let (Some(freecb), Some(arg)) = ((*mtp).freecb, NonNull::new((*mtp).data)) {
+            freecb(arg);
+        }
+        mode_tree_remove_ref((*mtp).mtd);
+        free_(mtp);
+    }
+}
+
+/// C `vendor/tmux/mode-tree.c:1124`: `void mode_tree_set_prompt(struct mode_tree_data *mtd, struct client *c, const char *prompt, const char *input, enum prompt_type type, int flags, mode_tree_prompt_input_cb inputcb, prompt_free_cb freecb, void *data)`
+pub unsafe fn mode_tree_set_prompt<T>(
+    mtd: *mut mode_tree_data,
+    c: *mut client,
+    prompt: *const u8,
+    input: *const u8,
+    type_: prompt_type,
+    flags: prompt_flags,
+    inputcb: unsafe fn(*mut client, NonNull<T>, *const u8, prompt_key_result) -> prompt_result,
+    freecb: Option<unsafe fn(NonNull<T>)>,
+    data: *mut T,
+) {
+    unsafe {
+        let s;
+        let oo;
+        if !c.is_null() && !(*c).session.is_null() {
+            s = (*c).session;
+            oo = (*s).options;
+        } else {
+            s = null_mut();
+            oo = GLOBAL_S_OPTIONS;
+        }
+
+        mode_tree_clear_prompt(mtd);
+
+        let mtp: *mut mode_tree_prompt = xcalloc_::<mode_tree_prompt>(1).as_ptr();
+        (*mtp).mtd = mtd;
+        (*mtp).c = c;
+        (*mtp).inputcb = Some(std::mem::transmute::<
+            unsafe fn(*mut client, NonNull<T>, *const u8, prompt_key_result) -> prompt_result,
+            unsafe fn(*mut client, NonNull<c_void>, *const u8, prompt_key_result) -> prompt_result,
+        >(inputcb));
+        (*mtp).freecb = freecb.map(|f| {
+            std::mem::transmute::<unsafe fn(NonNull<T>), unsafe fn(NonNull<c_void>)>(f)
+        });
+        (*mtp).data = data.cast();
+
+        (*mtd).references += 1;
+        (*mtd).prompt_top = i32::from(options_get_number_(oo, "status-position") == 0);
+
+        let mut pd: prompt_create_data = zeroed();
+        prompt_set_options(&raw mut pd, s);
+        pd.prompt = prompt;
+        pd.input = input;
+        pd.type_ = type_;
+        pd.flags = flags | prompt_flags::PROMPT_ISMODE;
+        pd.inputcb = Some(mode_tree_prompt_input_callback);
+        pd.freecb = Some(mode_tree_prompt_free_callback);
+        pd.data = mtp.cast();
+        (*mtd).prompt = prompt_create(&raw const pd);
+        (*mtd).prompt_data = mtp;
+
+        mode_tree_draw(&mut *mtd);
+        (*(*mtd).wp).flags |= window_pane_flags::PANE_REDRAW;
+
+        if flags.intersects(prompt_flags::PROMPT_SINGLE)
+            && flags.intersects(prompt_flags::PROMPT_ACCEPT)
+            && !c.is_null()
+        {
+            (*mtd).references += 1;
+            cmdq_append(
+                c,
+                cmdq_get_callback!(mode_tree_prompt_accept, mtd.cast()).as_ptr(),
+            );
+        }
     }
 }
 
@@ -1087,30 +1280,27 @@ pub unsafe fn mode_tree_search_callback(
     _c: *mut client,
     mtd: NonNull<mode_tree_data>,
     s: *const u8,
-    _done: i32,
-) -> i32 {
+    key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let mtd: *mut mode_tree_data = mtd.as_ptr();
 
         if (*mtd).dead != 0 {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
 
         free_((*mtd).search);
         if s.is_null() || *s == b'\0' {
             (*mtd).search = null_mut();
-            return 0;
+        } else {
+            (*mtd).search = xstrdup(s).as_ptr();
+            mode_tree_search_set(mtd);
         }
-        (*mtd).search = xstrdup(s).as_ptr();
-        mode_tree_search_set(mtd);
 
-        0
-    }
-}
-
-pub unsafe fn mode_tree_search_free(data: NonNull<mode_tree_data>) {
-    unsafe {
-        mode_tree_remove_ref(data.cast().as_ptr());
+        if key == prompt_key_result::PROMPT_KEY_HANDLED {
+            return prompt_result::PROMPT_CONTINUE;
+        }
+        prompt_result::PROMPT_CLOSE
     }
 }
 
@@ -1119,13 +1309,13 @@ pub unsafe fn mode_tree_filter_callback(
     _c: *mut client,
     data: NonNull<mode_tree_data>,
     s: *const u8,
-    _done: i32,
-) -> i32 {
+    key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let mtd: *mut mode_tree_data = data.as_ptr();
 
         if (*mtd).dead != 0 {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
 
         if !(*mtd).filter.is_null() {
@@ -1141,13 +1331,10 @@ pub unsafe fn mode_tree_filter_callback(
         mode_tree_draw(&mut *mtd);
         (*(*mtd).wp).flags |= window_pane_flags::PANE_REDRAW;
 
-        0
-    }
-}
-
-pub unsafe fn mode_tree_filter_free(data: NonNull<mode_tree_data>) {
-    unsafe {
-        mode_tree_remove_ref(data.cast().as_ptr());
+        if key == prompt_key_result::PROMPT_KEY_HANDLED {
+            return prompt_result::PROMPT_CONTINUE;
+        }
+        prompt_result::PROMPT_CLOSE
     }
 }
 
@@ -1257,6 +1444,60 @@ pub unsafe fn mode_tree_key(
         if (*mtd).line_list.is_empty() {
             *key = KEYC_NONE;
             return 1;
+        }
+
+        if !(*mtd).prompt.is_null() {
+            let mut redraw: i32 = 0;
+            let prompt = (*mtd).prompt;
+
+            let mtp = (*mtd).prompt_data;
+            if !mtp.is_null() {
+                (*mtp).c = c;
+            }
+            let result = if KEYC_IS_MOUSE(*key) {
+                if m.is_null()
+                    || MOUSE_BUTTONS((*m).b) != MOUSE_BUTTON_1
+                    || MOUSE_DRAG((*m).b)
+                    || MOUSE_RELEASE((*m).b)
+                    || cmd_mouse_at((*mtd).wp, m, &raw mut x, &raw mut y, 0) != 0
+                {
+                    prompt_key_result::PROMPT_KEY_NOT_HANDLED
+                } else {
+                    let sx = screen_size_x(&raw mut (*mtd).screen);
+                    let py = if (*mtd).prompt_top != 0 {
+                        0
+                    } else {
+                        screen_size_y(&raw mut (*mtd).screen) - 1
+                    };
+                    if y == py {
+                        prompt_mouse(prompt, x, 0, sx, &raw mut redraw)
+                    } else {
+                        prompt_key_result::PROMPT_KEY_NOT_HANDLED
+                    }
+                }
+            } else {
+                prompt_key(prompt, *key, &raw mut redraw)
+            };
+            if (*mtd).prompt_data == mtp && !mtp.is_null() {
+                (*mtp).c = null_mut();
+            }
+
+            // Only an explicit close or the prompt marking itself closed ends
+            // it; cursor movement and editing keep it open.
+            if (*mtd).prompt == prompt
+                && (result == prompt_key_result::PROMPT_KEY_CLOSE || prompt_closed(prompt) != 0)
+            {
+                mode_tree_clear_prompt(mtd);
+            }
+
+            if redraw != 0 || (*mtd).prompt != prompt {
+                mode_tree_draw(&mut *mtd);
+                (*(*mtd).wp).flags |= window_pane_flags::PANE_REDRAW;
+            }
+            if result != prompt_key_result::PROMPT_KEY_NOT_HANDLED {
+                *key = KEYC_NONE;
+                return 0;
+            }
         }
 
         if KEYC_IS_MOUSE(*key) && !m.is_null() {
@@ -1500,17 +1741,17 @@ pub unsafe fn mode_tree_key(
                 mode_tree_build(mtd);
             }
             code::QUESTION_MARK | code::SLASH | code::S_CTRL => {
-                (*mtd).references += 1;
-                status_prompt_set(
+                (*mtd).search_dir = mode_tree_search_dir::MODE_TREE_SEARCH_FORWARD;
+                mode_tree_set_prompt(
+                    mtd,
                     c,
-                    null_mut(),
                     c!("(search) "),
                     c!(""),
-                    mode_tree_search_callback,
-                    mode_tree_search_free,
-                    mtd,
-                    prompt_flags::PROMPT_NOFORMAT,
                     prompt_type::PROMPT_TYPE_SEARCH,
+                    prompt_flags::PROMPT_NOFORMAT,
+                    mode_tree_search_callback,
+                    None,
+                    mtd,
                 );
             }
             code::N => {
@@ -1522,17 +1763,16 @@ pub unsafe fn mode_tree_key(
                 mode_tree_search_set(mtd);
             }
             code::F => {
-                (*mtd).references += 1;
-                status_prompt_set(
+                mode_tree_set_prompt(
+                    mtd,
                     c,
-                    null_mut(),
                     c!("(filter) "),
                     (*mtd).filter,
-                    mode_tree_filter_callback,
-                    mode_tree_filter_free,
-                    mtd,
-                    prompt_flags::PROMPT_NOFORMAT,
                     prompt_type::PROMPT_TYPE_SEARCH,
+                    prompt_flags::PROMPT_NOFORMAT,
+                    mode_tree_filter_callback,
+                    None,
+                    mtd,
                 );
             }
             code::V => {

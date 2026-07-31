@@ -72,7 +72,7 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
         let mut wait = !args_has(args, 'b');
         let mut space = 1;
 
-        if (*tc).prompt_string.is_some() {
+        if !(*tc).prompt.is_null() {
             return cmd_retval::CMD_RETURN_NORMAL;
         }
         if args_has(args, 'i') {
@@ -142,7 +142,7 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
 
         let type_ = args_get(args, b'T');
         if !type_.is_null() {
-            cdata.prompt_type = status_prompt_type(type_);
+            cdata.prompt_type = prompt_type(type_);
             if cdata.prompt_type == prompt_type::PROMPT_TYPE_INVALID {
                 cmdq_error!(item, "unknown type: {}", _s(type_));
                 cmd_command_prompt_free(NonNull::new_unchecked(Box::into_raw(cdata)));
@@ -188,19 +188,19 @@ unsafe fn cmd_command_prompt_callback(
     c: *mut client,
     cdata: NonNull<cmd_command_prompt_cdata>,
     s: *const u8,
-    done: i32,
-) -> i32 {
+    key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let cdata = cdata.as_ptr();
         let mut error: *mut u8 = null_mut();
         let item: *mut cmdq_item = (*cdata).item;
 
         'out: {
-            if s.is_null() {
+            if s.is_null() || key == prompt_key_result::PROMPT_KEY_MOVE {
                 break 'out;
             }
 
-            if done != 0 {
+            if key == prompt_key_result::PROMPT_KEY_CLOSE {
                 if (*cdata).flags.intersects(prompt_flags::PROMPT_INCREMENTAL) {
                     break 'out;
                 }
@@ -209,17 +209,15 @@ unsafe fn cmd_command_prompt_callback(
                 if (*cdata).current != (*cdata).count {
                     let prompt = (*cdata).prompts.add((*cdata).current as usize);
                     status_prompt_update(c, (*prompt).prompt, (*prompt).input);
-                    return 1;
+                    return prompt_result::PROMPT_CONTINUE;
                 }
             }
 
             let mut argc = (*cdata).argc;
             let mut argv = cmd_copy_argv((*cdata).argc, (*cdata).argv);
-            if done == 0 {
+            if key != prompt_key_result::PROMPT_KEY_CLOSE {
                 cmd_append_argv(&raw mut argc, &raw mut argv, s);
-            }
-
-            if done != 0 {
+            } else {
                 cmd_free_argv((*cdata).argc, (*cdata).argv);
                 (*cdata).argc = argc;
                 (*cdata).argv = cmd_copy_argv(argc, argv);
@@ -238,24 +236,32 @@ unsafe fn cmd_command_prompt_callback(
             }
             cmd_free_argv(argc, argv);
 
-            // Check for intervening call to status_prompt_set()
-            if (*c).prompt_data != cdata.cast() {
-                return 1;
+            // An incremental prompt fires its callback on every edit but must
+            // stay open for further typing; only an explicit close (handled
+            // above) ends it.
+            if (*cdata).flags.intersects(prompt_flags::PROMPT_INCREMENTAL) {
+                return prompt_result::PROMPT_CONTINUE;
             }
 
             break 'out;
         }
         // out:
         if !item.is_null() {
+            (*cdata).item = null_mut();
             cmdq_continue(item);
         }
-        0
+        prompt_result::PROMPT_CLOSE
     }
 }
 
 /// C `vendor/tmux/cmd-command-prompt.c:268`: `static void cmd_command_prompt_free(void *data)`
 unsafe fn cmd_command_prompt_free(cdata: NonNull<cmd_command_prompt_cdata>) {
     unsafe {
+        if !(*cdata.as_ptr()).item.is_null() {
+            cmdq_continue((*cdata.as_ptr()).item);
+            (*cdata.as_ptr()).item = null_mut();
+        }
+
         for i in 0u32..(*cdata.as_ptr()).count {
             free_((*(*cdata.as_ptr()).prompts.add(i as usize)).prompt);
             free_((*(*cdata.as_ptr()).prompts.add(i as usize)).input);

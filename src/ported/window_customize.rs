@@ -1334,8 +1334,8 @@ pub unsafe fn window_customize_set_option_callback(
     c: *mut client,
     item: NonNull<window_customize_itemdata>,
     s: *const u8,
-    _done: i32,
-) -> i32 {
+    _key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let item = item.as_ptr();
         let data: *mut window_customize_modedata = (*item).data.cast();
@@ -1346,14 +1346,14 @@ pub unsafe fn window_customize_set_option_callback(
         let mut idx: i32 = (*item).idx;
 
         if s.is_null() || *s == b'\0' || (*data).dead != 0 {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
         if item.is_null() || !window_customize_check_item(data, item, null_mut()) {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
         let o = options_get(&mut *oo, name);
         if o.is_null() {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
         let oe = options_table_entry(o);
 
@@ -1382,7 +1382,7 @@ pub unsafe fn window_customize_set_option_callback(
         mode_tree_draw(&mut *(*data).data);
         (*(*data).wp).flags |= window_pane_flags::PANE_REDRAW;
 
-        0
+        prompt_result::PROMPT_CLOSE
     }
 }
 
@@ -1514,16 +1514,16 @@ pub unsafe fn window_customize_set_option(
             });
 
             (*data).references += 1;
-            status_prompt_set(
+            mode_tree_set_prompt(
+                (*data).data,
                 c,
-                null_mut(),
                 prompt,
                 value,
-                window_customize_set_option_callback,
-                window_customize_free_item_callback,
-                Box::into_raw(new_item),
-                prompt_flags::PROMPT_NOFORMAT,
                 prompt_type::PROMPT_TYPE_COMMAND,
+                prompt_flags::PROMPT_NOFORMAT,
+                window_customize_set_option_callback,
+                Some(window_customize_free_item_callback),
+                Box::into_raw(new_item),
             );
 
             free_(prompt);
@@ -1582,8 +1582,8 @@ pub unsafe fn window_customize_set_command_callback(
     c: *mut client,
     item: NonNull<window_customize_itemdata>,
     s: *const u8,
-    _done: i32,
-) -> i32 {
+    _key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let item = item.as_ptr();
         let data: *mut window_customize_modedata = (*item).data;
@@ -1592,10 +1592,10 @@ pub unsafe fn window_customize_set_command_callback(
 
         'fail: {
             if s.is_null() || *s == b'\0' || (*data).dead != 0 {
-                return 0;
+                return prompt_result::PROMPT_CLOSE;
             }
             if item.is_null() || window_customize_get_key(item, null_mut(), &raw mut bd) == 0 {
-                return 0;
+                return prompt_result::PROMPT_CLOSE;
             }
 
             let cmdlist = match cmd_parse_from_string(cstr_to_str(s), None) {
@@ -1612,13 +1612,13 @@ pub unsafe fn window_customize_set_command_callback(
             mode_tree_draw(&mut *(*data).data);
             (*(*data).wp).flags |= window_pane_flags::PANE_REDRAW;
 
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
         // 'fail:
         *error = (*error).to_ascii_uppercase();
         status_message_set!(c, -1, 1, false, 0, "{}", _s(error));
         free_(error);
-        0
+        prompt_result::PROMPT_CLOSE
     }
 }
 
@@ -1627,18 +1627,18 @@ pub unsafe fn window_customize_set_note_callback(
     _c: *mut client,
     item: NonNull<window_customize_itemdata>,
     s: *const u8,
-    _done: i32,
-) -> i32 {
+    _key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let item = item.as_ptr();
         let data: *mut window_customize_modedata = (*item).data;
         let mut bd = null_mut();
 
         if s.is_null() || *s == b'\0' || (*data).dead != 0 {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
         if item.is_null() || window_customize_get_key(item, null_mut(), &raw mut bd) == 0 {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
 
         // Assigning drops the old note CString — no manual free.
@@ -1648,7 +1648,7 @@ pub unsafe fn window_customize_set_note_callback(
         mode_tree_draw(&mut *(*data).data);
         (*(*data).wp).flags |= window_pane_flags::PANE_REDRAW;
 
-        0
+        prompt_result::PROMPT_CLOSE
     }
 }
 
@@ -1686,16 +1686,16 @@ pub unsafe fn window_customize_set_key(
             });
 
             (*data).references += 1;
-            status_prompt_set(
+            mode_tree_set_prompt(
+                (*data).data,
                 c,
-                null_mut(),
                 prompt,
                 value,
-                window_customize_set_command_callback,
-                window_customize_free_item_callback,
-                Box::into_raw(new_item),
-                prompt_flags::PROMPT_NOFORMAT,
                 prompt_type::PROMPT_TYPE_COMMAND,
+                prompt_flags::PROMPT_NOFORMAT,
+                window_customize_set_command_callback,
+                Some(window_customize_free_item_callback),
+                Box::into_raw(new_item),
             );
             free_(prompt);
             free_(value);
@@ -1713,20 +1713,20 @@ pub unsafe fn window_customize_set_key(
             });
 
             (*data).references += 1;
-            status_prompt_set(
+            mode_tree_set_prompt(
+                (*data).data,
                 c,
-                null_mut(),
                 prompt,
                 if (*bd).note.is_none() {
                     c!("")
                 } else {
                     (*bd).note_ptr()
                 },
-                window_customize_set_note_callback,
-                window_customize_free_item_callback,
-                Box::leak(new_item),
-                prompt_flags::PROMPT_NOFORMAT,
                 prompt_type::PROMPT_TYPE_COMMAND,
+                prompt_flags::PROMPT_NOFORMAT,
+                window_customize_set_note_callback,
+                Some(window_customize_free_item_callback),
+                Box::leak(new_item),
             );
             free_(prompt);
         }
@@ -1820,16 +1820,16 @@ pub unsafe fn window_customize_change_current_callback(
     _c: *mut client,
     modedata: NonNull<window_customize_modedata>,
     s: *const u8,
-    _done: i32,
-) -> i32 {
+    _key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let data: *mut window_customize_modedata = modedata.as_ptr();
 
         if s.is_null() || *s == b'\0' || (*data).dead != 0 {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
         if !(*s).eq_ignore_ascii_case(&b'y') || *s.add(1) != b'\0' {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
 
         let item: *mut window_customize_itemdata =
@@ -1857,7 +1857,7 @@ pub unsafe fn window_customize_change_current_callback(
         mode_tree_draw(&mut *(*data).data);
         (*(*data).wp).flags |= window_pane_flags::PANE_REDRAW;
 
-        0
+        prompt_result::PROMPT_CLOSE
     }
 }
 
@@ -1866,16 +1866,16 @@ pub unsafe fn window_customize_change_tagged_callback(
     c: *mut client,
     modedata: NonNull<window_customize_modedata>,
     s: *const u8,
-    _done: i32,
-) -> i32 {
+    _key: prompt_key_result,
+) -> prompt_result {
     unsafe {
         let data: *mut window_customize_modedata = modedata.as_ptr();
 
         if s.is_null() || *s == b'\0' || (*data).dead != 0 {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
         if !(*s).eq_ignore_ascii_case(&b'y') || *s.add(1) != b'\0' {
-            return 0;
+            return prompt_result::PROMPT_CLOSE;
         }
 
         mode_tree_each_tagged(
@@ -1889,7 +1889,7 @@ pub unsafe fn window_customize_change_tagged_callback(
         mode_tree_draw(&mut *(*data).data);
         (*(*data).wp).flags |= window_pane_flags::PANE_REDRAW;
 
-        0
+        prompt_result::PROMPT_CLOSE
     }
 }
 
@@ -1956,16 +1956,16 @@ pub unsafe fn window_customize_key(
                     prompt = format_nul!("Reset {} to default? ", _s((*item).name));
                     (*data).references += 1;
                     (*data).change = window_customize_change::WINDOW_CUSTOMIZE_RESET;
-                    status_prompt_set(
+                    mode_tree_set_prompt(
+                        (*data).data,
                         c,
-                        null_mut(),
                         prompt,
                         c!(""),
-                        window_customize_change_current_callback,
-                        window_customize_free_callback,
-                        data,
-                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
                         prompt_type::PROMPT_TYPE_COMMAND,
+                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                        window_customize_change_current_callback,
+                        Some(window_customize_free_callback),
+                        data,
                     );
                     free_(prompt);
                 }
@@ -1976,16 +1976,16 @@ pub unsafe fn window_customize_key(
                     prompt = format_nul!("Reset {} tagged to default? ", tagged);
                     (*data).references += 1;
                     (*data).change = window_customize_change::WINDOW_CUSTOMIZE_RESET;
-                    status_prompt_set(
+                    mode_tree_set_prompt(
+                        (*data).data,
                         c,
-                        null_mut(),
                         prompt,
                         c!(""),
-                        window_customize_change_tagged_callback,
-                        window_customize_free_callback,
-                        data,
-                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
                         prompt_type::PROMPT_TYPE_COMMAND,
+                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                        window_customize_change_tagged_callback,
+                        Some(window_customize_free_callback),
+                        data,
                     );
                     free_(prompt);
                 }
@@ -2000,16 +2000,16 @@ pub unsafe fn window_customize_key(
                     };
                     (*data).references += 1;
                     (*data).change = window_customize_change::WINDOW_CUSTOMIZE_UNSET;
-                    status_prompt_set(
+                    mode_tree_set_prompt(
+                        (*data).data,
                         c,
-                        null_mut(),
                         prompt,
                         c!(""),
-                        window_customize_change_current_callback,
-                        window_customize_free_callback,
-                        data,
-                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
                         prompt_type::PROMPT_TYPE_COMMAND,
+                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                        window_customize_change_current_callback,
+                        Some(window_customize_free_callback),
+                        data,
                     );
                     free_(prompt);
                 }
@@ -2020,16 +2020,16 @@ pub unsafe fn window_customize_key(
                     prompt = format_nul!("Unset {} tagged? ", tagged);
                     (*data).references += 1;
                     (*data).change = window_customize_change::WINDOW_CUSTOMIZE_UNSET;
-                    status_prompt_set(
+                    mode_tree_set_prompt(
+                        (*data).data,
                         c,
-                        null_mut(),
                         prompt,
                         c!(""),
-                        window_customize_change_tagged_callback,
-                        window_customize_free_callback,
-                        data,
-                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
                         prompt_type::PROMPT_TYPE_COMMAND,
+                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                        window_customize_change_tagged_callback,
+                        Some(window_customize_free_callback),
+                        data,
                     );
                     free_(prompt);
                 }

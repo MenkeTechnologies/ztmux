@@ -1602,6 +1602,11 @@ pub unsafe fn window_pane_set_mode(
             tailq_insert_head(&raw mut (*wp).modes, wme);
             (*wme).screen = ((*(*wme).mode).init)(NonNull::new_unchecked(wme), fs, args);
         }
+        (*wme).kill = if args.is_null() {
+            0
+        } else {
+            i32::from(args_has(args, 'k'))
+        };
 
         (*wp).screen = (*wme).screen;
         (*wp).flags |= window_pane_flags::PANE_REDRAW
@@ -1625,6 +1630,7 @@ pub unsafe fn window_pane_reset_mode(wp: *mut window_pane) {
         }
 
         let wme = tailq_first(&raw mut (*wp).modes);
+        let kill = (*wme).kill;
         tailq_remove::<_, ()>(&raw mut (*wp).modes, wme);
         ((*(*wme).mode).free)(NonNull::new(wme).unwrap());
         free(wme as _);
@@ -1645,6 +1651,10 @@ pub unsafe fn window_pane_reset_mode(wp: *mut window_pane) {
         server_redraw_window_borders((*wp).window);
         server_status_window((*wp).window);
         notify_pane(c"pane-mode-changed", wp);
+
+        if kill != 0 {
+            server_kill_pane(wp);
+        }
     }
 }
 

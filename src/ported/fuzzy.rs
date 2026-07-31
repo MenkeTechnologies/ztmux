@@ -35,12 +35,6 @@
 //! highlight them; `None` is returned if there is no match. A cheap fzf-style
 //! score (matches at the start, after word boundaries and in contiguous runs
 //! score higher) is also produced so callers can rank best-match-first.
-// Dead until window-switch.c is ported: fuzzy matching exists for switch mode
-// and has no other caller in tmux either. Remove when that mode lands.
-#![cfg_attr(
-    not(test),
-    expect(dead_code, reason = "consumer is window-switch, ported next")
-)]
 
 use crate::bitstr::BitStr;
 use crate::*;

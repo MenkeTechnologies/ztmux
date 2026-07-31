@@ -164,6 +164,8 @@ cfg_pub_mods! {
     mod server_fn;
     #[path = "ported/prompt.rs"]
     mod prompt_;
+    #[path = "ported/prompt_history.rs"]
+    mod prompt_history;
     #[path = "ported/session.rs"]
     mod session_;
     #[path = "ported/sort.rs"]
@@ -208,6 +210,8 @@ cfg_pub_mods! {
     mod window_copy;
     #[path = "ported/window_customize.rs"]
     mod window_customize;
+    #[path = "ported/window_switch.rs"]
+    mod window_switch;
     #[path = "ported/window_tree.rs"]
     mod window_tree;
     #[path = "ported/window_visible.rs"]
@@ -291,6 +295,8 @@ use crate::{
     paste::*,
     popup::*,
     proc::*,
+    prompt_::*,
+    prompt_history::*,
     regsub::regsub,
     resize::*,
     screen_::*,
@@ -322,6 +328,7 @@ use crate::{
     window_clock::{WINDOW_CLOCK_MODE, WINDOW_CLOCK_TABLE},
     window_copy::{window_copy_add, *},
     window_customize::WINDOW_CUSTOMIZE_MODE,
+    window_switch::WINDOW_SWITCH_MODE,
     window_tree::WINDOW_TREE_MODE,
     window_visible::*,
     xmalloc::*,
@@ -1692,6 +1699,11 @@ struct window_mode_entry {
 
     screen: *mut screen,
     prefix: u32,
+    /// C `vendor/tmux/tmux.h:1194`: `int kill` — set from `-k` on the command that
+    /// entered the mode (`window.c:1380`); `window_pane_reset_mode` kills the
+    /// pane when the mode exits. The default `Tab`/`BTab` bindings rely on it
+    /// to dispose of the scratch pane they open `switch-mode` in.
+    kill: c_int,
 
     // #[entry]
     entry: tailq_entry<window_mode_entry>,
@@ -2718,6 +2730,10 @@ struct status_line {
     active: *mut screen,
     references: c_int,
 
+    /// C `vendor/tmux/tmux.h:2014`: column the prompt's cursor ended up at,
+    /// written by `prompt_draw` and read back by `status_prompt_cursor`.
+    prompt_cx: c_uint,
+
     style: grid_cell,
     entries: [status_line_entry; STATUS_LINES_LIMIT],
 }
@@ -2733,6 +2749,29 @@ enum prompt_type {
     PROMPT_TYPE_COMMAND = 0,
     PROMPT_TYPE_SEARCH,
     PROMPT_TYPE_INVALID = 0xff,
+}
+
+/// Prompt result. C `vendor/tmux/tmux.h:2069`: what an input callback says the
+/// prompt should do next.
+#[repr(u32)]
+#[derive(Copy, Clone, Default, Eq, PartialEq)]
+enum prompt_result {
+    #[default]
+    PROMPT_CONTINUE,
+    PROMPT_CLOSE,
+}
+
+/// Prompt key result. C `vendor/tmux/tmux.h:2075`: what the prompt did with a
+/// key, which is also what the input callback is told about the key that fired
+/// it.
+#[repr(u32)]
+#[derive(Copy, Clone, Default, Eq, PartialEq, Debug)]
+enum prompt_key_result {
+    #[default]
+    PROMPT_KEY_NOT_HANDLED,
+    PROMPT_KEY_HANDLED,
+    PROMPT_KEY_CLOSE,
+    PROMPT_KEY_MOVE,
 }
 
 // File in client.
@@ -2812,7 +2851,16 @@ struct visible_ranges {
     size: u32,
 }
 
-type prompt_input_cb = Option<unsafe fn(*mut client, NonNull<c_void>, *const u8, i32) -> i32>;
+/// C `vendor/tmux/tmux.h:2083`: `typedef enum prompt_result (*prompt_input_cb)(void *, const char *, enum prompt_key_result)`
+type prompt_input_cb =
+    Option<unsafe fn(NonNull<c_void>, *const u8, prompt_key_result) -> prompt_result>;
+/// C `vendor/tmux/tmux.h:2085`: `typedef enum prompt_result (*status_prompt_input_cb)(struct client *, void *, const char *, enum prompt_key_result)`
+type status_prompt_input_cb =
+    Option<unsafe fn(*mut client, NonNull<c_void>, *const u8, prompt_key_result) -> prompt_result>;
+/// C `vendor/tmux/tmux.h:2087`: `typedef enum prompt_result (*mode_tree_prompt_input_cb)(struct client *, void *, const char *, enum prompt_key_result)`
+type mode_tree_prompt_input_cb =
+    Option<unsafe fn(*mut client, NonNull<c_void>, *const u8, prompt_key_result) -> prompt_result>;
+/// C `vendor/tmux/tmux.h:2089`: `typedef void (*prompt_free_cb)(void *)`
 type prompt_free_cb = Option<unsafe fn(NonNull<c_void>)>;
 
 type overlay_check_cb =
@@ -2885,13 +2933,66 @@ const CLIENT_NOSIZEFLAGS: client_flag = client_flag::DEAD
 bitflags::bitflags! {
     #[repr(transparent)]
     #[derive(Copy, Clone, Default, Eq, PartialEq)]
+    /// C `vendor/tmux/tmux.h:2092`.
     struct prompt_flags: u32 {
         const PROMPT_SINGLE = 0x1;
         const PROMPT_NUMERIC = 0x2;
         const PROMPT_INCREMENTAL = 0x4;
         const PROMPT_NOFORMAT = 0x8;
         const PROMPT_KEY = 0x10;
+        const PROMPT_ACCEPT = 0x20;
+        const PROMPT_QUOTENEXT = 0x40;
+        const PROMPT_BSPACE_EXIT = 0x80;
+        const PROMPT_NOFREEZE = 0x100;
+        const PROMPT_COMMANDMODE = 0x200;
+        const PROMPT_ISPANE = 0x400;
+        const PROMPT_ISMODE = 0x800;
+        const PROMPT_EDITARROWS = 0x1000;
     }
+}
+
+/// Prompt create data. C `vendor/tmux/tmux.h:2107`: `struct prompt_create_data`.
+///
+/// The argument block `prompt_create` reads: everything the caller resolves up
+/// front (styles, cursors, key mode, word separators) so a later `set-option`
+/// cannot change a prompt that is already open.
+#[repr(C)]
+struct prompt_create_data {
+    fs: *mut cmd_find_state,
+    prompt: *const u8,
+    input: *const u8,
+    type_: prompt_type,
+    flags: prompt_flags,
+
+    style: grid_cell,
+    command_style: grid_cell,
+    cstyle: screen_cursor_style,
+    command_cstyle: screen_cursor_style,
+    ccolour: c_int,
+    command_ccolour: c_int,
+    cmode: mode_flag,
+    command_cmode: mode_flag,
+    message_format: *const u8,
+    keys: c_int,
+    word_separators: *const u8,
+
+    inputcb: prompt_input_cb,
+    freecb: prompt_free_cb,
+    data: *mut c_void,
+}
+
+/// Prompt draw data. C `vendor/tmux/tmux.h:2132`: `struct prompt_draw_data`.
+///
+/// Where the host wants the prompt drawn (a row and an x range inside some
+/// screen) and where it wants the resulting cursor column written back.
+#[repr(C)]
+struct prompt_draw_data {
+    ctx: *mut screen_write_ctx,
+    cursor_x: *mut c_uint,
+
+    area_x: c_uint,
+    area_width: c_uint,
+    prompt_line: c_uint,
 }
 
 impl_tailq_entry!(client, entry, tailq_entry<client>);
@@ -2969,30 +3070,14 @@ struct client {
     message_string: Option<std::ffi::CString>,
     message_timer: event,
 
-    prompt_string: Option<std::ffi::CString>,
-    prompt_buffer: *mut utf8_data,
-    prompt_last: Option<std::ffi::CString>,
-    prompt_index: usize,
-    prompt_inputcb: prompt_input_cb,
-    prompt_freecb: prompt_free_cb,
-    prompt_data: *mut c_void,
-    prompt_hindex: [c_uint; 4],
-    prompt_mode: prompt_mode,
-    prompt_saved: *mut utf8_data,
-
-    prompt_flags: prompt_flags,
-    prompt_type: prompt_type,
-    prompt_cursor: c_int,
-    /// C `vendor/tmux/prompt.c:45`: the cursor the terminal shows while the
-    /// prompt is open, and the separate one for vi command mode. Resolved once
-    /// per prompt from the `prompt-cursor-*` options by
-    /// [`crate::prompt_::prompt_set_options`].
-    prompt_cstyle: screen_cursor_style,
-    prompt_command_cstyle: screen_cursor_style,
-    prompt_cmode: mode_flag,
-    prompt_command_cmode: mode_flag,
-    prompt_ccolour: c_int,
-    prompt_command_ccolour: c_int,
+    /// C `vendor/tmux/tmux.h:1353`: `struct prompt *prompt`.
+    ///
+    /// next-3.7 split the prompt out of the client into its own object
+    /// (`prompt.c`), so the client keeps a single pointer instead of the
+    /// nineteen `prompt_*` fields the pre-split design spread across it. NULL
+    /// when no prompt is open; owned by the client and freed in
+    /// `status_prompt_clear`.
+    prompt: *mut prompt,
 
     session: *mut session,
     last_session: *mut session,
@@ -3238,13 +3323,6 @@ enum exit_type {
     CLIENT_EXIT_RETURN,
     CLIENT_EXIT_SHUTDOWN,
     CLIENT_EXIT_DETACH,
-}
-
-#[repr(i32)]
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum prompt_mode {
-    PROMPT_ENTRY,
-    PROMPT_COMMAND,
 }
 
 bitflags::bitflags! {

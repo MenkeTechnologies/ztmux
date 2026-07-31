@@ -6,8 +6,11 @@
 //! ported code to C-name fidelity.
 
 /// The ztmux extension subcommands (`ztmux <name>`), the single source of truth
-/// for both the CLI dispatch in `tmux.rs` and the command-prompt completion in
-/// `status_prompt_complete_list`. Keep sorted for readability.
+/// for both the CLI dispatch in `tmux.rs` and the floating command-prompt
+/// palette's candidate list in `ratatui_ui::prompt_candidate_list`. (The ported
+/// prompt completes only what `prompt.c` completes — commands and
+/// `command-alias` entries — so this list is extension chrome, not a port.)
+/// Keep sorted for readability.
 pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "active",
     "age",

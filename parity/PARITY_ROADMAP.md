@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1183/1183 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 cases.
+**1188/1188 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 cases.
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
 (full-size split with a pre-existing split) crashed the server on a u32 underflow
@@ -212,9 +212,9 @@ That is exactly the shape of these two defaults — `tree-mode-selection-style` 
 `#{?…pane_active…}` — and of any user style written as a format. Fixed at
 `options.rs:1239`.
 
-`switch-mode-match-style` is in the table with its C default, but nothing reads
-it: `window-switch.c` is unported and stays a known gap alongside the
-`switch-mode` command.
+`switch-mode-match-style` was in the table with its C default and nothing reading
+it; Round-12 ported `window-switch.c`, whose `window_switch_draw_screen`
+(`window-switch.c:289`) is that reader, so the option is live.
 
 Case 1485 covers the option surface (defaults, the `,` separator under `-a`,
 style validation, `#{E:}` resolution). Cases 1486 and 1487 cover the preview as
@@ -227,13 +227,76 @@ leading SGR run of the selected line for the selection style.
 
 Not ported, and still absent: `mode_tree_draw_help` and the `?` overlay,
 `window_tree_draw_info` and the `preview_is_info` toggle, `window_tree_help`,
-`window_tree_sort`/`window_tree_swap` (next-3.7 replaced mode-tree's static sort
-list with `sortcb`/`swapcb`/`helpcb`), and every `mode_tree_prompt_*` function —
-those need next-3.7's `struct prompt` object, which this port does not have (it
-still carries the pre-split `status_prompt_*` fields on `struct client`). The
+and `window_tree_sort`/`window_tree_swap` (next-3.7 replaced mode-tree's static
+sort list with `sortcb`/`swapcb`/`helpcb`). The
 `#[#{E:tree-mode-border-style},acs]x` info/help format strings in `window-tree.c`,
 `window-client.c`, `window-buffer.c` and `window-customize.c` live inside exactly
-those unported functions, so none of them are in the tree yet.
+those unported functions, so none of them are in the tree yet. The
+`mode_tree_prompt_*` functions were in that list too until Round-12 built the
+`struct prompt` object they need.
+
+Round-12 port — `prompt.c` as an object, then `switch-mode`:
+
+The last `parity/known_gaps/` case was `switch-mode`, and it could not be closed
+on its own. `window-switch.c` drives the prompt as an **object** — `prompt_create`,
+`prompt_update`, `prompt_incremental_start`, `prompt_draw`, `prompt_key`,
+`prompt_mouse`, `prompt_free` — while this port still carried the pre-split
+design: nineteen `prompt_*` fields on `struct client` and twenty-four
+`status_prompt_*` functions in `status.rs` taking a `*mut client`. So the round is
+two ports.
+
+`prompt.c` became `src/ported/prompt.rs`. `struct prompt` owns the string, the
+buffer and cursor index, a `cmd_find_state`, the callbacks, the styles and cursor
+styles/colours, the key mode, the word separators, the per-type history index,
+the `C-w` copy buffer and the completion list; `struct client` keeps one
+`prompt: *mut prompt` and `struct status_line` gains `prompt_cx` (`tmux.h:2014`).
+All 13 `PROMPT_*` flags are present (this port had 5) — `PROMPT_COMMANDMODE`
+replaces the separate `enum prompt_mode`, and `PROMPT_QUOTENEXT` (`C-v`),
+`PROMPT_BSPACE_EXIT`, `PROMPT_NOFREEZE`, `PROMPT_ACCEPT`, `PROMPT_ISPANE`,
+`PROMPT_ISMODE` and `PROMPT_EDITARROWS` are new behaviour. `prompt_draw` takes a
+`prompt_draw_data` (a write context, a row, an x range and a cursor-column
+out-parameter), which is what lets the status line, a mode tree and switch mode
+run the same editor; it expands `message-format` rather than the raw prompt
+string, so `#{message}`, `#{prompt_input}`, `#{prompt_flags}`, `#{prompt_type}`
+and `#{command_prompt}` all reach a prompt now. Completion is upstream's —
+commands only, at offset zero, drawn as an inline underlined list — replacing the
+session/window menu this port had. `prompt-history.c` came with it as
+`src/ported/prompt_history.rs`, including the three accessors
+(`prompt_history_size`/`_get`/`_clear`) `clear-prompt-history` now goes through.
+`status.c` keeps the thin wrappers upstream keeps, plus `status_message_area`
+(`status.c:413`). `mode_tree_set_prompt` and friends (`mode-tree.c:1068`–`1172`)
+landed too, so a mode tree owns its prompt and draws it on its own row, and
+`window-tree`/`window-customize` moved off `status_prompt_set` onto it.
+
+`window-switch.c` then became `src/ported/window_switch.rs`, with
+`cmd_switch_mode_entry` (`cmd-choose-tree.c:87`) registered in `cmd.rs` and the
+`Tab`/`BTab` prefix bindings from `key-bindings.c:405`. Case 1488 covers the
+command surface (flag set, usage, entering and leaving the mode, the bindings,
+the option); case 1489 covers the picker as drawn — list, selection, incremental
+prompt row and `switch-mode-match-style` on the fuzzy-matched columns; case 1490
+covers `-k`, which the bindings rely on to dispose of the scratch pane and which
+needed `window_mode_entry.kill` (`window.c:1380`) and the `server_kill_pane` at
+the end of `window_pane_reset_mode` (`window.c:1428`). 1489 and 1490 are captured
+through a nested client the way 1484/1486 do.
+
+The round also closed a hole in the suite itself. Nothing drove `prompt_key`,
+because `send-keys` writes into a pane and never reaches a client-level prompt —
+and that is how a real defect survived this round's first green run: `prompt_key`
+left `result` at whatever `prompt_check_move` returned, so every edit reported
+`PROMPT_KEY_NOT_HANDLED` and the key was queued to the command queue as well.
+Keys sent to the *outer* pane of the nested-client harness are the inner client's
+terminal input, which does reach it, so cases 1491 (typing, backspace,
+Escape-cancel) and 1492 (history recall and the `PROMPT_SINGLE` confirm prompt)
+now drive the prompt the way a keyboard does and compare what it handed to the
+command it was collecting for.
+
+`src/extensions/ratatui_ui.rs` is the one piece with no upstream counterpart: it
+floats the prompt as an overlay box instead of drawing it on the status row, so
+`status_prompt_redraw` returns early and the terminal cursor stays hidden while
+the overlay paints its own. It now reads the prompt object's buffer and index and
+calls `prompt_replace_complete`; its richer candidate list (extension
+subcommands, option names, layout names) moved into the extension itself, leaving
+the ported prompt completing exactly what `prompt.c` completes.
 
 Round-7 fix:
 
@@ -402,8 +465,10 @@ so a regression in ported behavior cannot land.
 
 `parity/known_gaps/` is the inverse of `parity/cases/`: next-3.7 features ztmux
 does **not** implement yet, each pinned by a case that is expected to *diverge*
-from the reference. One case remains — the `switch-mode` command, tied to the
-unported `cmd-switch-mode` / `window-switch.c`. Run it with the inverted runner:
+from the reference. **It is now empty.** The last case, the `switch-mode`
+command, closed with the Round-12 `prompt.c` / `window-switch.c` port and is
+covered by `parity/cases/1488_switch_mode.sh` and
+`parity/cases/1489_switch_mode_draw.sh`.
 
 ```sh
 bash parity/run_known_gaps.sh   # "GAP" = still unported (expected); "CLOSED" = ported, promote it
@@ -411,9 +476,11 @@ bash parity/run_known_gaps.sh   # "GAP" = still unported (expected); "CLOSED" = 
 
 The runner is an advisory tripwire — it exits non-zero only when a gap closes
 (the feature got ported and its case should move to `parity/cases/`), so it never
-reddens CI merely because the gaps still exist. See
+reddens CI merely because the gaps still exist. With the directory empty it
+exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
+left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1183/1183 ported surface; they measure
+proof. These gaps do not count against the 1188/1188 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite

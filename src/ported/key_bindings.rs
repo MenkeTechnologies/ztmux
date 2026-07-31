@@ -404,7 +404,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
 /// C `vendor/tmux/key-bindings.c:349`: `void key_bindings_init(void)`
 pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
-    static DEFAULTS: [&str; 271] = [
+    static DEFAULTS: [&str; 273] = [
         // Prefix keys.
         "bind -N 'Send the prefix key' C-b { send-prefix }",
         "bind -N 'Rotate through the panes' C-o { rotate-window }",
@@ -458,6 +458,8 @@ pub unsafe fn key_bindings_init() {
         "bind -N 'Redraw the current client' r { refresh-client }",
         "bind -N 'Choose a session from a list' s { choose-tree -Zs }",
         "bind -N 'Show a clock' t { clock-mode }",
+        "bind -N 'Switch to a window' Tab { new-pane -E -x75% -y30% -X0 -Y0; move-pane -P bottom-centre; switch-mode -wk }",
+        "bind -N 'Switch to a session' BTab { new-pane -E -x75% -y30% -X0 -Y0; move-pane -P bottom-centre; switch-mode -sk }",
         "bind -N 'Choose a window from a list' w { choose-tree -Zw }",
         "bind -N 'Kill the active pane' x { confirm-before -p\"kill-pane #P? (y/n)\" kill-pane }",
         "bind -N 'Zoom the active pane' z { resize-pane -Z }",

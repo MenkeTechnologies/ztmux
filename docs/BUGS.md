@@ -18,6 +18,102 @@ Fixes to the ztmux port, most recent first.
 - **Found by:** the same style-directive check that turned up `width=`/`pad=`
   below.
 
+## 2026-07-31 (port round: `prompt.c` as an object, then `switch-mode`)
+
+The last entry in `parity/known_gaps/` was the `switch-mode` command. It could
+not be ported on its own: `window-switch.c` drives the prompt as an **object**
+(`prompt_create` / `prompt_update` / `prompt_incremental_start` / `prompt_draw` /
+`prompt_key` / `prompt_mouse` / `prompt_free`), and ztmux still carried the
+pre-split design — nineteen `prompt_*` fields on `struct client` and twenty-four
+`status_prompt_*` functions in `status.rs` taking a `*mut client`. So the round
+is two ports: the prompt object first, then the mode that needs it.
+
+- **`prompt.c` ported as `src/ported/prompt.rs`** — `struct prompt` owns the
+  string, buffer, cursor index, `cmd_find_state`, callbacks, styles, cursor
+  styles/colours, key mode, word separators, per-type history index, the `C-w`
+  copy buffer and the completion list. `struct client` keeps a single
+  `prompt: *mut prompt` in place of the nineteen fields, and `struct status_line`
+  gains `prompt_cx` (`tmux.h:2014`) for the column `prompt_draw` writes back.
+  The 13 `PROMPT_*` flags are all present now (ztmux had 5); `PROMPT_COMMANDMODE`
+  replaces the separate `enum prompt_mode`, and `PROMPT_QUOTENEXT` (`C-v`),
+  `PROMPT_BSPACE_EXIT`, `PROMPT_NOFREEZE`, `PROMPT_ACCEPT`, `PROMPT_ISMODE` and
+  `PROMPT_EDITARROWS` are new behaviour rather than just new names.
+- **The prompt draws itself into any screen.** `prompt_draw` takes a
+  `prompt_draw_data` — a `screen_write_ctx`, a row, an x range and a
+  cursor-column out-parameter — so the status line, a mode tree and switch mode
+  all run the same editor. It expands `message-format` (with `#{message}`,
+  `#{prompt_input}`, `#{prompt_flags}`, `#{prompt_type}` and `#{command_prompt}`
+  set) instead of drawing the raw prompt string, which is why the `message-style`
+  / `message-command-style` split and the `prompt-cursor-*` options now reach the
+  prompt the way they do upstream. The cursor is the terminal's, positioned from
+  `status_prompt_cursor`, not a reverse-video cell.
+- **`prompt-history.c` ported as `src/ported/prompt_history.rs`** — the history
+  lists moved out of `status.rs` under their real names (`prompt_load_history`,
+  `prompt_save_history`, `prompt_up_history`, `prompt_down_history`,
+  `prompt_add_history`) and gained the three accessors upstream added
+  (`prompt_history_size`, `prompt_history_get`, `prompt_history_clear`).
+  `clear-prompt-history` went through the accessor, which also fixed a leak: the
+  old code freed the array but not the strings in it.
+- **Completion is upstream's.** `prompt_complete_commands` /
+  `prompt_complete_prefix` / `prompt_store_complete` / `prompt_draw_complete` /
+  `prompt_mouse_complete` / `prompt_clear_complete` replace the session/window
+  menu path — see the entry above.
+- **`status.c` keeps the thin wrappers next-3.7 keeps** — `status_prompt_set`
+  (which now builds a `status_prompt_data` bridge so the client-level callbacks
+  still get their client), `_clear`, `_update`, `_redraw`, `_key`, `_cursor`,
+  `_screen_line`, `_accept`, plus `status_message_area` (`status.c:413`) for the
+  x/width the `message-style` width/align directives ask for.
+- **`mode_tree_set_prompt` and friends** (`mode-tree.c:1068`–`1172`) — a mode
+  tree now owns its prompt instead of borrowing the client's status prompt, and
+  draws it on its own top or bottom row per `status-position`. `window-tree` and
+  `window-customize` moved off `status_prompt_set` onto it, as upstream has them.
+- **Callback ABI is upstream's.** `prompt_input_cb` returns
+  `enum prompt_result` and is told `enum prompt_key_result` about the key that
+  fired it, so a callback can distinguish an edit from a close from a cursor
+  move. That is what lets `command-prompt -i` stay open across edits and
+  `window_switch_prompt_callback` ignore anything but `PROMPT_KEY_HANDLED`.
+- **`window-switch.c` ported as `src/ported/window_switch.rs`**, with
+  `cmd_switch_mode_entry` (`cmd-choose-tree.c:87`, flags `F:kst:wZ`) registered in
+  `cmd.rs` and the `Tab` / `BTab` prefix bindings from `key-bindings.c:405`.
+  Those bindings open the picker in a scratch floating pane and pass `-k`, which
+  needed `window_mode_entry.kill` (`window.c:1380`) and the `server_kill_pane`
+  at the end of `window_pane_reset_mode` (`window.c:1428`) — neither existed
+  here, so without them the scratch pane outlived the picker.
+  `switch-mode-match-style` had been in the option table since the theme round
+  with nothing reading it; `window-switch.c:289` is its reader, so it now takes
+  effect on the columns `fuzzy_match` matched.
+- **Pinned by:** `parity/cases/1488_switch_mode.sh` (the command surface: flag
+  set, usage, entering and leaving the mode, the two bindings, the option),
+  `parity/cases/1489_switch_mode_draw.sh` (the picker as drawn — list, selection,
+  incremental prompt row, and the match style) and
+  `parity/cases/1490_switch_mode_kill.sh` (`-k` disposing of the pane), the last
+  two captured through a nested client the way 1484/1486 do.
+  `parity/known_gaps/cmd_switch_mode.sh` is deleted; `parity/known_gaps/` now
+  holds no cases.
+- **The prompt's key path had no coverage at all**, which is how a real defect
+  survived the first green run of this round: `prompt_key` left `result` at
+  whatever `prompt_check_move` returned, so every edit reported
+  `PROMPT_KEY_NOT_HANDLED` instead of `PROMPT_KEY_HANDLED` and the key was also
+  queued to the command queue. The C resets it (`prompt.c:1151`). `send-keys`
+  writes into a *pane* and never reaches a client-level prompt, so no case could
+  drive it; the nested client can, because keys sent to the outer pane are the
+  inner client's terminal input. `parity/cases/1491_prompt_keys.sh` (typing,
+  backspace, Escape-cancel) and `parity/cases/1492_prompt_history_and_single.sh`
+  (history recall, the de-duplicated history list, and the `PROMPT_SINGLE`
+  confirm prompt on both a confirming and a non-confirming key) now cover it.
+  They compare what the prompt handed to the command it was collecting for, not
+  how it was drawn — ztmux floats the prompt as an overlay instead of taking the
+  status row, which is an intended extension.
+
+### `list-keys <key>` pads the flag column differently (open, unrelated)
+
+- **Symptom:** `list-keys -T prefix c` prints `bind-key -T prefix c new-window`
+  under ztmux and `bind-key  -T prefix c new-window` (two spaces) under next-3.7.
+  Reproduces for every key, with or without the `switch-mode` bindings.
+- **Scope:** a `cmd-list-keys.c` column-width matter, not a prompt one. Recorded
+  here because `parity/cases/1488` had to take the two `switch-mode` bindings out
+  of the full table rather than ask for them by key.
+
 ## 2026-07-31
 
 ### a style written as a format was cached unexpanded, so it never resolved
@@ -88,12 +184,15 @@ Fixes to the ztmux port, most recent first.
   lining the prompt types up for the `struct prompt` port. No case covered the
   prompt types at all, which is why the suite was green over it.
 - **Pinned by:** `parity/cases/1481_prompt_types.sh`.
-- **Still divergent, separately:** `prompt_complete` (`prompt.c:1538`) now
-  completes **commands only** and only at offset zero, showing matches as an
-  inline underlined list rather than a menu. ztmux still completes sessions and
-  windows behind `-t`/`-s` and shows a menu. That is a different divergence from
-  this one and needs the `struct prompt` completion fields
-  (`complete_list`/`complete_size`/`complete_display`) to close.
+- **Was still divergent, separately, now closed:** `prompt_complete`
+  (`prompt.c:1538`) completes **commands only** and only at offset zero, showing
+  matches as an inline underlined list rather than a menu. ztmux completed
+  sessions and windows behind `-t`/`-s` and popped a menu. Closed by the
+  `struct prompt` port in the round below, which brought the completion fields
+  (`complete_list`/`complete_size`/`complete_display`) with it and deleted the
+  menu path (`status_prompt_complete_list_menu`,
+  `status_prompt_complete_window_menu`, `status_prompt_complete_session`,
+  `status_prompt_menu_callback`).
 
 ## 2026-07-30
 

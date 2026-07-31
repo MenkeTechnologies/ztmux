@@ -48,56 +48,38 @@ unsafe fn cmd_show_prompt_history_exec(self_: *mut cmd, item: *mut cmdq_item) ->
 
         if std::ptr::eq(cmd_get_entry(self_), &CMD_CLEAR_PROMPT_HISTORY_ENTRY) {
             if typestr.is_null() {
-                for tidx in 0..PROMPT_NTYPES {
-                    free_(STATUS_PROMPT_HLIST[tidx as usize]);
-                    STATUS_PROMPT_HLIST[tidx as usize] = null_mut();
-                    STATUS_PROMPT_HSIZE[tidx as usize] = 0;
+                for t in 0..PROMPT_NTYPES {
+                    prompt_history_clear(t);
                 }
             } else {
-                type_ = status_prompt_type(typestr);
+                type_ = prompt_type(typestr);
                 if type_ == prompt_type::PROMPT_TYPE_INVALID {
                     cmdq_error!(item, "invalid type: {}", _s(typestr));
                     return cmd_retval::CMD_RETURN_ERROR;
                 }
-                free_(STATUS_PROMPT_HLIST[type_ as usize]);
-                STATUS_PROMPT_HLIST[type_ as usize] = null_mut();
-                STATUS_PROMPT_HSIZE[type_ as usize] = 0;
+                prompt_history_clear(type_ as u32);
             }
 
             return cmd_retval::CMD_RETURN_NORMAL;
         }
 
         if typestr.is_null() {
-            for tidx in 0..PROMPT_NTYPES {
-                cmdq_print!(item, "History for {}:\n", status_prompt_type_string(tidx),);
-                for hidx in 0u32..STATUS_PROMPT_HSIZE[tidx as usize] {
-                    cmdq_print!(
-                        item,
-                        "{}: {}",
-                        hidx + 1,
-                        _s(*STATUS_PROMPT_HLIST[tidx as usize].add(hidx as usize)),
-                    );
+            for t in 0..PROMPT_NTYPES {
+                cmdq_print!(item, "History for {}:\n", prompt_type_string(t));
+                for h in 0u32..prompt_history_size(t) {
+                    cmdq_print!(item, "{}: {}", h + 1, _s(prompt_history_get(t, h)));
                 }
                 cmdq_print!(item, "");
             }
         } else {
-            type_ = status_prompt_type(typestr);
+            type_ = prompt_type(typestr);
             if type_ == prompt_type::PROMPT_TYPE_INVALID {
                 cmdq_error!(item, "invalid type: {}", _s(typestr));
                 return cmd_retval::CMD_RETURN_ERROR;
             }
-            cmdq_print!(
-                item,
-                "History for {}:\n",
-                status_prompt_type_string(type_ as u32),
-            );
-            for hidx in 0u32..STATUS_PROMPT_HSIZE[type_ as usize] {
-                cmdq_print!(
-                    item,
-                    "{}: {}",
-                    hidx + 1,
-                    _s(*STATUS_PROMPT_HLIST[type_ as usize].add(hidx as usize)),
-                );
+            cmdq_print!(item, "History for {}:\n", prompt_type_string(type_ as u32));
+            for h in 0u32..prompt_history_size(type_ as u32) {
+                cmdq_print!(item, "{}: {}", h + 1, _s(prompt_history_get(type_ as u32, h)));
             }
             cmdq_print!(item, "");
         }

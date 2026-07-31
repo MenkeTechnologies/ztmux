@@ -70,6 +70,21 @@ pub static CMD_CUSTOMIZE_MODE_ENTRY: cmd_entry = cmd_entry {
     exec: cmd_choose_tree_exec,
 };
 
+/// C `vendor/tmux/cmd-choose-tree.c:87`: `const struct cmd_entry cmd_switch_mode_entry`
+pub static CMD_SWITCH_MODE_ENTRY: cmd_entry = cmd_entry {
+    name: "switch-mode",
+    alias: None,
+
+    args: args_parse::new("F:kst:wZ", 0, 1, Some(cmd_choose_tree_args_parse)),
+    usage: "[-kswZ] [-F format] [-t target-pane] [command]",
+
+    target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
+    source: cmd_entry_flag::zeroed(),
+
+    flags: cmd_flag::empty(),
+    exec: cmd_choose_tree_exec,
+};
+
 /// C `vendor/tmux/cmd-choose-tree.c:101`: `static enum args_parse_type cmd_choose_tree_args_parse(__unused struct args *args, __unused u_int idx, __unused char **cause)`
 fn cmd_choose_tree_args_parse(
     _args: *mut args,
@@ -98,6 +113,8 @@ unsafe fn cmd_choose_tree_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
             &raw const WINDOW_CLIENT_MODE
         } else if std::ptr::eq(cmd_get_entry(self_), &CMD_CUSTOMIZE_MODE_ENTRY) {
             &raw const WINDOW_CUSTOMIZE_MODE
+        } else if std::ptr::eq(cmd_get_entry(self_), &CMD_SWITCH_MODE_ENTRY) {
+            &raw const WINDOW_SWITCH_MODE
         } else {
             &raw const WINDOW_TREE_MODE
         };

@@ -1206,6 +1206,18 @@ _ztmux-switch-client() {
     '-t+[specify target window]:window:__ztmux-windows'
 }
 
+_ztmux-switch-mode() {
+  [[ -n ${tmux_describe} ]] && print "put a pane into switch (session/window picker) mode" && return
+  _arguments -s \
+    '-F+[specify format for each list item]:format:__ztmux-formats' \
+    '-k[kill the pane when the mode exits]' \
+    '-s[choose among sessions]' \
+    '-t+[specify target pane]:pane:__ztmux-panes' \
+    '-w[choose among windows]' \
+    '-Z[zoom the pane]' \
+    '*:::template:= _ztmux'
+}
+
 _ztmux-unbind-key() {
   [[ -n ${tmux_describe} ]] && print "unbind a key" && return
   local curcontext="$curcontext" state line keytable

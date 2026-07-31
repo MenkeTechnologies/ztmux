@@ -45,8 +45,6 @@ client_cstr_ptrs! {
     exit_session => exit_session_ptr,
     exit_message => exit_message_ptr,
     message_string => message_string_ptr,
-    prompt_string => prompt_string_ptr,
-    prompt_last => prompt_last_ptr,
 }
 
 /// Compare client windows.
@@ -536,9 +534,8 @@ pub unsafe fn server_client_lost(c: *mut client) {
             evtimer_del(&raw mut (*c).message_timer);
         }
 
-        free_((*c).prompt_saved);
-        (*c).prompt_string = None;
-        free_((*c).prompt_buffer);
+        prompt_free((*c).prompt);
+        (*c).prompt = null_mut();
 
         format_lost_client(c);
         environ_free((*c).environ);
@@ -2439,8 +2436,13 @@ pub unsafe fn server_client_handle_key(c: *mut client, event: *mut key_event) ->
                 }
             }
             server_client_clear_overlay(c);
-            if (*c).prompt_string.is_some() && status_prompt_key(c, (*event).key) == 0 {
-                return 0;
+            if !(*c).prompt.is_null() {
+                match status_prompt_key(c, (*event).key, &raw mut (*event).m) {
+                    prompt_key_result::PROMPT_KEY_HANDLED
+                    | prompt_key_result::PROMPT_KEY_CLOSE => return 0,
+                    prompt_key_result::PROMPT_KEY_NOT_HANDLED
+                    | prompt_key_result::PROMPT_KEY_MOVE => (),
+                }
             }
         }
 
@@ -2738,7 +2740,6 @@ pub unsafe fn server_client_reset_state(c: *mut client) {
         let mut mode = mode_flag::empty();
         let mut cursor;
 
-        let mut n: i32;
 
         let mut cx = 0;
         let mut cy = 0;
@@ -2763,8 +2764,10 @@ pub unsafe fn server_client_reset_state(c: *mut client) {
             if let Some(overlay_mode) = (*c).overlay_mode {
                 s = overlay_mode(c, (*c).overlay_data, &raw mut cx, &raw mut cy);
             }
-        } else {
+        } else if !wp.is_null() && (*c).prompt.is_null() {
             s = (*wp).screen;
+        } else {
+            s = (*c).status.active;
         }
         if !s.is_null() {
             mode = (*s).mode;
@@ -2778,20 +2781,17 @@ pub unsafe fn server_client_reset_state(c: *mut client) {
         tty_margin_off(tty);
 
         // Move cursor to pane cursor and offset.
-        if (*c).prompt_string.is_some() {
-            n = options_get_number_((*(*c).session).options, "status-position") as i32;
-            if n == 0 {
-                cy = 0;
+        let prompt = !(*c).prompt.is_null();
+        if prompt {
+            if crate::extensions::ratatui_ui::enabled() {
+                // ztmux: the prompt is a floating overlay that paints its own
+                // block cursor, so `sl->prompt_cx` is never written and the
+                // terminal cursor stays hidden instead of parked on the status
+                // row.
+                mode &= !mode_flag::MODE_CURSOR;
             } else {
-                n = status_line_size(c) as i32;
-                if n == 0 {
-                    cy = (*tty).sy - 1;
-                } else {
-                    cy = (*tty).sy - n as u32;
-                }
+                status_prompt_cursor(c, &raw mut cx, &raw mut cy);
             }
-            cx = (*c).prompt_cursor as u32;
-            mode &= !mode_flag::MODE_CURSOR;
         } else if (*c).overlay_draw.is_none() {
             cursor = 0;
             tty_window_offset(tty, &raw mut ox, &raw mut oy, &raw mut sx, &raw mut sy);
@@ -2863,7 +2863,7 @@ pub unsafe fn server_client_reset_state(c: *mut client) {
         }
 
         // Clear bracketed paste mode if at the prompt.
-        if (*c).overlay_draw.is_none() && (*c).prompt_string.is_some() {
+        if (*c).overlay_draw.is_none() && prompt {
             mode &= !mode_flag::MODE_BRACKETPASTE;
         }
 

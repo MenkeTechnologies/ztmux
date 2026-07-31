@@ -24,7 +24,6 @@ bitflags::bitflags! {
     }
 }
 pub const MENU_NOMOUSE: menu_flags = menu_flags::MENU_NOMOUSE;
-pub const MENU_TAB: menu_flags = menu_flags::MENU_TAB;
 pub const MENU_STAYOPEN: menu_flags = menu_flags::MENU_STAYOPEN;
 
 #[repr(C)]

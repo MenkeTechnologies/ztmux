@@ -779,16 +779,19 @@ struct PromptLayout {
 
 unsafe fn prompt_layout(c: *mut client) -> Option<PromptLayout> {
     unsafe {
-        (*c).prompt_string.as_ref()?;
+        let pr = (*c).prompt;
+        if pr.is_null() {
+            return None;
+        }
         let sx = (*c).tty.sx as u16;
         let sy = (*c).tty.sy as u16;
         if sx < 12 || sy < 6 {
             return None;
         }
 
-        let prompt = strip_markup(crate::cstr_to_str((*c).prompt_string_ptr()));
-        let input = prompt_graphemes((*c).prompt_buffer);
-        let cursor_i = (*c).prompt_index;
+        let prompt = strip_markup(crate::cstr_to_str((*pr).string_ptr()));
+        let input = prompt_graphemes((*pr).buffer);
+        let cursor_i = (*pr).index;
         let input_w: u16 = input.iter().map(|(_, w)| *w).sum();
         let plabel = format!("{prompt} ");
         let plabel_w = plabel.chars().count() as u16;
@@ -867,7 +870,7 @@ unsafe fn prompt_overlay_key(
             });
             // A button press (not release/drag/wheel) outside the box = click-away.
             if !inside && !MOUSE_RELEASE((*m).b) && !MOUSE_WHEEL((*m).b) && !MOUSE_DRAG((*m).b) {
-                status_prompt_key(c, b'\x1b' as key_code); // Escape -> cancel
+                status_prompt_key(c, b'\x1b' as key_code, null_mut()); // Escape -> cancel
             }
             return 0;
         }
@@ -899,8 +902,13 @@ unsafe fn prompt_overlay_key(
         if key == 0x09 {
             if n > 0 {
                 let idx = PROMPT_SEL.load(Relaxed).max(0) as usize;
-                if let Some(cand) = cands.get(idx) {
-                    crate::status::status_prompt_replace_complete(c, Some(cand));
+                if let Some(cand) = cands.get(idx)
+                    && let Ok(ccand) = std::ffi::CString::new(cand.as_str())
+                {
+                    crate::prompt_::prompt_replace_complete(
+                        (*c).prompt,
+                        ccand.as_ptr().cast::<u8>(),
+                    );
                 }
             }
             PROMPT_SEL.store(-1, Relaxed);
@@ -912,7 +920,7 @@ unsafe fn prompt_overlay_key(
         // Escape to cancel, history) goes to the normal prompt handler; the
         // candidate list is about to change, so drop the highlight.
         PROMPT_SEL.store(-1, Relaxed);
-        status_prompt_key(c, raw);
+        status_prompt_key(c, raw, null_mut());
         redraw(c);
         0
     }
@@ -921,8 +929,12 @@ unsafe fn prompt_overlay_key(
 /// Completion candidates for the word currently under the cursor.
 unsafe fn prompt_completions(c: *mut client) -> Vec<String> {
     unsafe {
-        let input = prompt_graphemes((*c).prompt_buffer);
-        let cursor_i = (*c).prompt_index;
+        let pr = (*c).prompt;
+        if pr.is_null() {
+            return Vec::new();
+        }
+        let input = prompt_graphemes((*pr).buffer);
+        let cursor_i = (*pr).index;
         let before: String = input[..cursor_i.min(input.len())]
             .iter()
             .map(|(t, _)| t.as_str())
@@ -932,11 +944,65 @@ unsafe fn prompt_completions(c: *mut client) -> Vec<String> {
         if word.is_empty() {
             return Vec::new();
         }
-        let Ok(cword) = std::ffi::CString::new(word) else {
-            return Vec::new();
-        };
-        crate::status::status_prompt_complete_list(cword.as_ptr().cast(), at_start as i32)
+        prompt_candidate_list(word, at_start)
     }
+}
+
+/// Candidate list for the floating palette.
+///
+/// Upstream's `prompt_complete_commands` only ever offers command names and
+/// `command-alias` entries, because upstream completes inline on the status row
+/// where a long list has nowhere to go. The floating palette has room, so it
+/// also offers ztmux's own extension subcommands and — once past the first word
+/// — option names and layout names. This is extension chrome, not a port: the
+/// ported prompt still completes exactly what `prompt.c` completes.
+fn prompt_candidate_list(word: &str, at_start: bool) -> Vec<String> {
+    const LAYOUTS: [&str; 7] = [
+        "even-horizontal",
+        "even-vertical",
+        "main-horizontal",
+        "main-horizontal-mirrored",
+        "main-vertical",
+        "main-vertical-mirrored",
+        "tiled",
+    ];
+
+    let mut list: Vec<String> = Vec::new();
+    let add = |s: &str, list: &mut Vec<String>| {
+        if !list.iter().any(|item| item == s) {
+            list.push(s.to_string());
+        }
+    };
+
+    for cmdent in crate::CMD_TABLE {
+        if cmdent.name.starts_with(word) {
+            add(cmdent.name, &mut list);
+        }
+        if let Some(alias) = cmdent.alias
+            && alias.starts_with(word)
+        {
+            add(alias, &mut list);
+        }
+    }
+    for &name in crate::extensions::EXTENSION_COMMANDS {
+        if name.starts_with(word) {
+            add(name, &mut list);
+        }
+    }
+    if at_start {
+        return list;
+    }
+    for oe in &crate::OPTIONS_TABLE {
+        if oe.name.starts_with(word) {
+            add(oe.name, &mut list);
+        }
+    }
+    for layout in LAYOUTS {
+        if layout.starts_with(word) {
+            add(layout, &mut list);
+        }
+    }
+    list
 }
 
 /// Draw the floating command-prompt overlay onto the tty.

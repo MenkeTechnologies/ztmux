@@ -311,7 +311,7 @@ pub unsafe fn server_start(
         log_debug!("server event loop exited cleanly (SERVER_EXIT={})", server_exit);
 
         job_kill_all();
-        status_prompt_save_history();
+        prompt_save_history();
 
         libc::exit(0)
     }
