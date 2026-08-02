@@ -192,9 +192,10 @@ pub unsafe fn image_scroll_up(s: *mut screen, lines: u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
     use super::*;
     use crate::options_::{options_create, options_default};
-    use std::sync::Mutex;
 
     // image_store()/image_free() mutate the process-global ALL_IMAGES list and
     // ALL_IMAGES_COUNT counter (image.c:24-25). screen_init() -> screen_reinit()

@@ -911,10 +911,11 @@ fn centered_rect(pct_x: u16, pct_y: u16, area: Rect) -> Rect {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tmux_query::{Session, Window};
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+
+    use super::super::tmux_query::{Session, Window};
+    use super::*;
 
     fn sample() -> App {
         let snap = Snapshot {

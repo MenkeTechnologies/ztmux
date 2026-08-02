@@ -717,8 +717,9 @@ fn restore_signal_handler(sig: c_int) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::cell::RefCell;
+
+    use super::*;
 
     thread_local! {
         /// What the callbacks in these tests recorded, in order.

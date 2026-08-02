@@ -66,7 +66,7 @@ fn wait_impl(watches: &mut [Watch], timeout: Option<Duration>) -> io::Result<()>
         None => -1,
         Some(d) => c_int::try_from(d.as_millis().min(c_int::MAX as u128))
             .unwrap_or(c_int::MAX)
-            .max(if d.is_zero() { 0 } else { 1 }),
+            .max(c_int::from(!d.is_zero())),
     };
 
     let n = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::nfds_t, ms) };

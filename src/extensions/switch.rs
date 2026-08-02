@@ -313,10 +313,11 @@ fn ui(f: &mut Frame, app: &mut Picker) {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tmux_query::{Pane, Session, Window};
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+
+    use super::super::tmux_query::{Pane, Session, Window};
+    use super::*;
 
     fn snap() -> Snapshot {
         Snapshot {

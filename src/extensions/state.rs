@@ -149,8 +149,9 @@ fn render_json(rows: &[Row]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::HashMap;
+
+    use super::*;
 
     #[test]
     fn healthy_states_classify_none() {

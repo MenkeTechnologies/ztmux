@@ -127,9 +127,10 @@ fn render_json(rows: &[PsRow]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::super::tmux_query::Pane;
     use super::*;
-    use std::collections::HashMap;
 
     fn snap() -> Snapshot {
         Snapshot {

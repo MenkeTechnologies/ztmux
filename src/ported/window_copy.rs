@@ -5826,19 +5826,13 @@ pub unsafe fn window_copy_write_line(
             let mode = window_copy_line_number_mode(wme);
             let line_number = if mode == window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_DEFAULT {
                 // The old scroll-offset numbering: distance from the top line.
-                if py < (*data).oy {
-                    (*data).oy - py
-                } else {
-                    py - (*data).oy
-                }
+                (*data).oy.abs_diff(py)
             } else if mode == window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_ABSOLUTE
                 || (mode == window_copy_line_numbers::WINDOW_COPY_LINE_NUMBERS_HYBRID && current)
             {
                 absolute
-            } else if py > (*data).cy {
-                py - (*data).cy
             } else {
-                (*data).cy - py
+                py.abs_diff((*data).cy)
             };
             screen_write_cursormove(ctx, 0, py as i32, 0);
             // C: `screen_write_nputs(ctx, width, gc, "%*u ", width - 1, n)` —
@@ -7858,7 +7852,7 @@ mod tests {
     // scrollback crosses each power of ten.
     #[test]
     fn line_number_width_has_a_three_digit_floor_and_grows_with_scrollback() {
-        let _g = LN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _g = LN_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             // 24 visible + 0 scrollback + 1 = 25 -> 2 digits, floored to 3, +1.
             let f = fixture(80, 24, 0);
@@ -7890,7 +7884,7 @@ mod tests {
     // from a mouse event) never gets a gutter even when the option asks for one.
     #[test]
     fn line_numbers_disabled_on_the_entry_beats_the_option() {
-        let _g = LN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _g = LN_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             let f = fixture(80, 24, 100);
             set_mode(&f, "absolute");
@@ -7908,7 +7902,7 @@ mod tests {
     // what decides whether #{copy_position} counts lines or scroll offset.
     #[test]
     fn only_line_counting_modes_are_absolute() {
-        let _g = LN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _g = LN_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             let f = fixture(80, 24, 100);
             for (mode, want) in [
@@ -7935,7 +7929,7 @@ mod tests {
     // which is where the `$` end-of-line marker is drawn.
     #[test]
     fn cursor_offset_round_trips_and_clamps_past_the_content() {
-        let _g = LN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _g = LN_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             let f = fixture(80, 24, 100);
             set_mode(&f, "absolute");
@@ -7974,7 +7968,7 @@ mod tests {
     // the content width underflows and every cursor mapping is nonsense.
     #[test]
     fn a_pane_narrower_than_the_gutter_keeps_one_content_column() {
-        let _g = LN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _g = LN_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             let f = fixture(3, 24, 100);
             set_mode(&f, "absolute");

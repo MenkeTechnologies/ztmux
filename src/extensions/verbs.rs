@@ -21,9 +21,8 @@
 use std::borrow::Cow;
 use std::io::IsTerminal;
 
-use crate::cmd_::CMD_TABLE;
-
 use super::completion_spec::VERB_DESCRIPTIONS;
+use crate::cmd_::CMD_TABLE;
 
 /// What a verb is — the listing's grouping, and its `kind` in JSON.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -177,7 +176,11 @@ pub(crate) fn print_verbs(filter: Option<&str>) {
             paint(&format!("{label} ({})", group.len()), code, color)
         );
         for v in group {
-            println!("  {:<width$}  {}", v.name, paint(&v.description, "2", color));
+            println!(
+                "  {:<width$}  {}",
+                v.name,
+                paint(&v.description, "2", color)
+            );
         }
         println!();
     }
@@ -266,11 +269,22 @@ mod tests {
         // kinds do not clash.
         for name in ["verbs", "banner"] {
             let entry = verbs.iter().find(|v| v.name == name).expect(name);
-            assert!(entry.kind == Kind::Extension, "{name} is listed as a builtin");
+            assert!(
+                entry.kind == Kind::Extension,
+                "{name} is listed as a builtin"
+            );
         }
         // A console-only builtin still shows up, shell builtins included.
-        assert!(verbs.iter().any(|v| v.name == "help" && v.kind == Kind::Builtin));
-        assert!(verbs.iter().any(|v| v.name == "cd" && v.kind == Kind::Builtin));
+        assert!(
+            verbs
+                .iter()
+                .any(|v| v.name == "help" && v.kind == Kind::Builtin)
+        );
+        assert!(
+            verbs
+                .iter()
+                .any(|v| v.name == "cd" && v.kind == Kind::Builtin)
+        );
     }
 
     #[test]
@@ -293,7 +307,10 @@ mod tests {
         let killp = verbs.iter().find(|v| v.name == "killp").expect("killp");
         assert_eq!(killp.description, "alias for kill-pane");
         assert!(killp.kind == Kind::Alias);
-        let kill_pane = verbs.iter().find(|v| v.name == "kill-pane").expect("kill-pane");
+        let kill_pane = verbs
+            .iter()
+            .find(|v| v.name == "kill-pane")
+            .expect("kill-pane");
         assert_eq!(kill_pane.description, "destroy a given pane");
     }
 
@@ -342,7 +359,10 @@ mod tests {
         // `-o json` is the output format, not a filter — but a bare `json` is.
         assert_eq!(filter_arg(&argv(&["verbs", "-o", "json"])), None);
         assert_eq!(filter_arg(&argv(&["verbs", "json"])), Some("json"));
-        assert_eq!(filter_arg(&argv(&["verbs", "--json", "pane"])), Some("pane"));
+        assert_eq!(
+            filter_arg(&argv(&["verbs", "--json", "pane"])),
+            Some("pane")
+        );
         // Words before the verb (socket flags) are never the filter.
         assert_eq!(filter_arg(&argv(&["-S", "/tmp/s", "verbs"])), None);
     }

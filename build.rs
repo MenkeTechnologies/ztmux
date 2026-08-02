@@ -119,7 +119,9 @@ mod completions {
         while let Some(open) = rest.find(['\'', '"']) {
             let quote = rest.as_bytes()[open] as char;
             let after = &rest[open + 1..];
-            let Some(close) = after.find(quote) else { break };
+            let Some(close) = after.find(quote) else {
+                break;
+            };
             out.push(after[..close].to_string());
             rest = &after[close + 1..];
         }

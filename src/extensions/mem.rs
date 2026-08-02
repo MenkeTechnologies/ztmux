@@ -136,8 +136,9 @@ fn render_json(rows: &[Row]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::HashMap;
+
+    use super::*;
 
     fn pane(id: &str, idx: i64, pid: i64) -> Pane {
         Pane {

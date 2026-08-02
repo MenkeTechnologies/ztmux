@@ -206,8 +206,9 @@ fn render_json(rows: &[Row]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::HashSet;
+
+    use super::*;
 
     /// Build an existence predicate over a fixed set of paths.
     fn fake_fs(present: &[&str]) -> impl Fn(&Path) -> bool {

@@ -43,19 +43,67 @@ pub(crate) type Builtin = fn(&[String]) -> Result<(), String>;
 /// being one the console cannot actually run.
 pub(crate) const BUILTINS: &[(&str, &str, Builtin)] = &[
     ("cat", "print files to stdout (console builtin)", cat),
-    ("cd", "change the console's working directory (console builtin)", cd),
-    ("cp", "copy files, or directories with -r (console builtin)", cp),
-    ("dir", "list a directory, -a all -l long -t by time -r reversed (console builtin)", dir),
-    ("echo", "print the arguments, -n without a newline (console builtin)", echo),
-    ("export", "set an environment variable for later lines (console builtin)", export),
-    ("ln", "create a hard link, or a symlink with -s (console builtin)", ln),
-    ("mkdir", "create directories, -p with parents (console builtin)", mkdir),
+    (
+        "cd",
+        "change the console's working directory (console builtin)",
+        cd,
+    ),
+    (
+        "cp",
+        "copy files, or directories with -r (console builtin)",
+        cp,
+    ),
+    (
+        "dir",
+        "list a directory, -a all -l long -t by time -r reversed (console builtin)",
+        dir,
+    ),
+    (
+        "echo",
+        "print the arguments, -n without a newline (console builtin)",
+        echo,
+    ),
+    (
+        "export",
+        "set an environment variable for later lines (console builtin)",
+        export,
+    ),
+    (
+        "ln",
+        "create a hard link, or a symlink with -s (console builtin)",
+        ln,
+    ),
+    (
+        "mkdir",
+        "create directories, -p with parents (console builtin)",
+        mkdir,
+    ),
     ("mv", "move or rename files (console builtin)", mv),
-    ("printenv", "print the environment, or one variable (console builtin)", printenv),
-    ("pwd", "print the console's working directory (console builtin)", pwd),
-    ("rm", "remove files, -r directories -f ignore missing (console builtin)", rm),
-    ("touch", "create files, or bump their mtime (console builtin)", touch),
-    ("unset", "remove environment variables (console builtin)", unset),
+    (
+        "printenv",
+        "print the environment, or one variable (console builtin)",
+        printenv,
+    ),
+    (
+        "pwd",
+        "print the console's working directory (console builtin)",
+        pwd,
+    ),
+    (
+        "rm",
+        "remove files, -r directories -f ignore missing (console builtin)",
+        rm,
+    ),
+    (
+        "touch",
+        "create files, or bump their mtime (console builtin)",
+        touch,
+    ),
+    (
+        "unset",
+        "remove environment variables (console builtin)",
+        unset,
+    ),
 ];
 
 /// The function that runs `verb`, if it is a shell builtin — i.e. runs in the
@@ -70,7 +118,9 @@ pub(crate) fn lookup(verb: &str) -> Option<Builtin> {
 /// The listable half of [`BUILTINS`]: name and description, for the `verbs`
 /// listing and the console's `help`.
 pub(crate) fn described() -> impl Iterator<Item = (&'static str, &'static str)> {
-    BUILTINS.iter().map(|&(name, description, _)| (name, description))
+    BUILTINS
+        .iter()
+        .map(|&(name, description, _)| (name, description))
 }
 
 /// The flags `verb` accepts, for the console's Tab completion of a `-` word.
@@ -117,7 +167,11 @@ pub(crate) fn path_arguments(verb: &str) -> Option<Paths> {
 fn cd(args: &[String]) -> Result<(), String> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let oldpwd = std::env::var_os("OLDPWD").map(PathBuf::from);
-    let target = cd_target(args.first().map(String::as_str), home.as_deref(), oldpwd.as_deref())?;
+    let target = cd_target(
+        args.first().map(String::as_str),
+        home.as_deref(),
+        oldpwd.as_deref(),
+    )?;
 
     let previous = std::env::current_dir().ok();
     std::env::set_current_dir(&target).map_err(|e| format!("{}: {e}", target.display()))?;
@@ -138,9 +192,15 @@ fn cd(args: &[String]) -> Result<(), String> {
 
 /// Where `cd` goes, given its argument and the two variables it reads. Split
 /// out from [`cd`] so the resolution is testable without moving the process.
-fn cd_target(arg: Option<&str>, home: Option<&Path>, oldpwd: Option<&Path>) -> Result<PathBuf, String> {
+fn cd_target(
+    arg: Option<&str>,
+    home: Option<&Path>,
+    oldpwd: Option<&Path>,
+) -> Result<PathBuf, String> {
     match arg {
-        None | Some("~") => home.map(Path::to_path_buf).ok_or_else(|| "HOME not set".to_string()),
+        None | Some("~") => home
+            .map(Path::to_path_buf)
+            .ok_or_else(|| "HOME not set".to_string()),
         Some("-") => oldpwd
             .map(Path::to_path_buf)
             .ok_or_else(|| "OLDPWD not set".to_string()),
@@ -150,7 +210,10 @@ fn cd_target(arg: Option<&str>, home: Option<&Path>, oldpwd: Option<&Path>) -> R
 
 /// Expand a leading `~` (`~` or `~/rest`) to `$HOME`; other paths pass through.
 fn expand_tilde(dir: &str, home: Option<&Path>) -> Result<PathBuf, String> {
-    let home = || home.map(Path::to_path_buf).ok_or_else(|| "HOME not set".to_string());
+    let home = || {
+        home.map(Path::to_path_buf)
+            .ok_or_else(|| "HOME not set".to_string())
+    };
     if dir == "~" {
         return home();
     }
@@ -232,7 +295,9 @@ fn echo(args: &[String]) -> Result<(), String> {
         println!("{line}");
     } else {
         print!("{line}");
-        std::io::stdout().flush().map_err(|e| format!("write: {e}"))?;
+        std::io::stdout()
+            .flush()
+            .map_err(|e| format!("write: {e}"))?;
     }
     Ok(())
 }
@@ -463,7 +528,9 @@ impl DirOpts {
             long: flags.contains('l'),
             reverse: flags.contains('r'),
             by_mtime: flags.contains('t'),
-            path: operands.first().map_or_else(|| PathBuf::from("."), PathBuf::from),
+            path: operands
+                .first()
+                .map_or_else(|| PathBuf::from("."), PathBuf::from),
         }
     }
 }
@@ -554,10 +621,15 @@ fn dir_rows(opts: &DirOpts) -> Result<Vec<Row>, String> {
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs() as i64);
-    let mut rows: Vec<Row> = names.iter().map(|name| Row::build(&base, name, now)).collect();
+    let mut rows: Vec<Row> = names
+        .iter()
+        .map(|name| Row::build(&base, name, now))
+        .collect();
     rows.sort_by(|a, b| {
         if opts.by_mtime {
-            b.mtime.cmp(&a.mtime).then_with(|| a.sort_key.cmp(&b.sort_key))
+            b.mtime
+                .cmp(&a.mtime)
+                .then_with(|| a.sort_key.cmp(&b.sort_key))
         } else {
             a.sort_key.cmp(&b.sort_key)
         }
@@ -658,7 +730,8 @@ mod tests {
 
     impl TempDir {
         fn new(test: &str) -> TempDir {
-            let path = std::env::temp_dir().join(format!("ztmux-shell-{}-{test}", std::process::id()));
+            let path =
+                std::env::temp_dir().join(format!("ztmux-shell-{}-{test}", std::process::id()));
             let _ = std::fs::remove_dir_all(&path);
             std::fs::create_dir_all(&path).expect("create temp dir");
             TempDir(path)
@@ -685,10 +758,16 @@ mod tests {
         let names: Vec<&str> = described().map(|(name, _)| name).collect();
         let mut sorted = names.clone();
         sorted.sort_unstable();
-        assert_eq!(names, sorted, "BUILTINS must stay sorted for lookup's binary search");
+        assert_eq!(
+            names, sorted,
+            "BUILTINS must stay sorted for lookup's binary search"
+        );
 
         for name in &names {
-            assert!(lookup(name).is_some(), "{name} is listed but lookup misses it");
+            assert!(
+                lookup(name).is_some(),
+                "{name} is listed but lookup misses it"
+            );
         }
         // A verb the console must spawn instead of running in-process.
         assert!(lookup("kill-pane").is_none());
@@ -705,12 +784,21 @@ mod tests {
             home.join("src/app")
         );
         assert_eq!(cd_target(Some("-"), Some(home), Some(old)).unwrap(), old);
-        assert_eq!(cd_target(Some("/etc"), Some(home), None).unwrap(), Path::new("/etc"));
+        assert_eq!(
+            cd_target(Some("/etc"), Some(home), None).unwrap(),
+            Path::new("/etc")
+        );
         // A `~` inside the path is not a home reference, only a leading one.
-        assert_eq!(cd_target(Some("a/~/b"), Some(home), None).unwrap(), Path::new("a/~/b"));
+        assert_eq!(
+            cd_target(Some("a/~/b"), Some(home), None).unwrap(),
+            Path::new("a/~/b")
+        );
         // The two variables the resolution needs report their own absence.
         assert_eq!(cd_target(None, None, None).unwrap_err(), "HOME not set");
-        assert_eq!(cd_target(Some("-"), Some(home), None).unwrap_err(), "OLDPWD not set");
+        assert_eq!(
+            cd_target(Some("-"), Some(home), None).unwrap_err(),
+            "OLDPWD not set"
+        );
     }
 
     #[test]
@@ -744,13 +832,20 @@ mod tests {
         touch(&args(&[&file])).expect("touch");
         std::fs::write(&file, b"payload").expect("write");
         touch(&args(&[&file])).expect("touch again");
-        assert_eq!(std::fs::read(&file).expect("read"), b"payload", "touch truncated the file");
+        assert_eq!(
+            std::fs::read(&file).expect("read"),
+            b"payload",
+            "touch truncated the file"
+        );
 
         // cp -r copies the tree; without -r a directory is refused.
         let copy = tmp.arg("copy");
         assert!(cp(&args(&[&tmp.arg("tree"), &copy])).is_err());
         cp(&args(&["-r", &tmp.arg("tree"), &copy])).expect("cp -r");
-        assert_eq!(std::fs::read(tmp.arg("copy/nested/f")).expect("read"), b"payload");
+        assert_eq!(
+            std::fs::read(tmp.arg("copy/nested/f")).expect("read"),
+            b"payload"
+        );
 
         // mv renames; the source is gone afterwards.
         let moved = tmp.arg("moved");
@@ -761,7 +856,11 @@ mod tests {
         // ln -s links; rm removes the link, not its target.
         let link = tmp.arg("link");
         ln(&args(&["-s", &file, &link])).expect("ln -s");
-        assert!(std::fs::symlink_metadata(&link).expect("lstat").is_symlink());
+        assert!(
+            std::fs::symlink_metadata(&link)
+                .expect("lstat")
+                .is_symlink()
+        );
         rm(&args(&[&link])).expect("rm link");
         assert!(Path::new(&file).exists(), "rm followed the symlink");
 
@@ -859,7 +958,11 @@ mod tests {
         assert!(flags("pwd").is_empty());
         for (name, _) in described() {
             for flag in flags(name) {
-                assert_eq!(split_flags(&args(&[flag])).0.len(), 1, "{name}: {flag} is not a flag");
+                assert_eq!(
+                    split_flags(&args(&[flag])).0.len(),
+                    1,
+                    "{name}: {flag} is not a flag"
+                );
             }
         }
     }

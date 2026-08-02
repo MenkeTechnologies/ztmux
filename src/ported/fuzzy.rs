@@ -690,6 +690,24 @@ mod tests {
         fuzzy_match(pattern.as_bytes(), text.as_bytes(), 40).map(|(_, s)| s)
     }
 
+    // fuzzy_decode_one() decodes through mbtowc()/wcwidth(), which are
+    // locale-sensitive: under the C locale glibc rejects every multibyte
+    // sequence, the decode falls back to raw bytes, and fuzzy_scan() then drops
+    // them as non-printable. The binary sets a UTF-8 LC_CTYPE in main(), but
+    // unit tests run without that, so establish it once (idempotent,
+    // process-global).
+    fn ensure_utf8_locale() {
+        use std::sync::Once;
+        static ONCE: Once = Once::new();
+        ONCE.call_once(|| unsafe {
+            if crate::libc::setlocale(::libc::LC_CTYPE, crate::c!("en_US.UTF-8")).is_null()
+                && crate::libc::setlocale(::libc::LC_CTYPE, crate::c!("C.UTF-8")).is_null()
+            {
+                crate::libc::setlocale(::libc::LC_CTYPE, crate::c!(""));
+            }
+        });
+    }
+
     #[test]
     fn subsequence_marks_the_tightest_span_not_the_first_one() {
         // The match is compacted backwards after the first subsequence is
@@ -785,6 +803,7 @@ mod tests {
         // (How many columns it then highlights follows its display width,
         // which comes from the locale the server sets at startup, so it is not
         // asserted here.)
+        ensure_utf8_locale();
         assert!(marks("é", "café", 10).is_some());
         assert!(marks("é", "cafe", 10).is_none());
         assert!(marks("横", "a横b", 10).is_some());

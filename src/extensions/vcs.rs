@@ -194,8 +194,9 @@ fn render_json(rows: &[Row]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::HashSet;
+
+    use super::*;
 
     fn fake_fs(present: &[&str]) -> impl Fn(&Path) -> bool {
         let set: HashSet<String> = present

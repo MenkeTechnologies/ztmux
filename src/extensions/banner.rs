@@ -10,11 +10,10 @@
 //! instead, so the banner is also the shortest "is anything up on this socket"
 //! check there is.
 
-use crate::cmd_::CMD_TABLE;
-use crate::tmux::getversion;
-
 use super::tmux_query::{Snapshot, poll};
 use super::verbs::{colored, paint, strip_ansi};
+use crate::cmd_::CMD_TABLE;
+use crate::tmux::getversion;
 
 pub(crate) fn run(socket: &str) -> i32 {
     print_banner(socket);
@@ -125,7 +124,8 @@ mod tests {
         assert!(server_line("/tmp/sock", &snap, false).contains("no server running"));
         let mut live = Snapshot::default();
         assert!(server_line("", &live, false).contains("0 sessions"));
-        live.sessions.push(super::super::tmux_query::Session::default());
+        live.sessions
+            .push(super::super::tmux_query::Session::default());
         assert!(server_line("", &live, false).contains("1 session  "));
     }
 }

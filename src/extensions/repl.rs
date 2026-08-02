@@ -46,18 +46,18 @@ use std::borrow::Cow;
 use std::io::{BufRead, IsTerminal, Write};
 
 use reedline::{
-    ColumnarMenu, Completer, EditMode, Emacs, FileBackedHistory, KeyCode, KeyModifiers, Keybindings,
-    MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch, PromptHistorySearchStatus,
-    PromptViMode, Reedline, ReedlineEvent, ReedlineMenu, Signal, Span, Suggestion, Vi,
-    default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
+    ColumnarMenu, Completer, EditMode, Emacs, FileBackedHistory, KeyCode, KeyModifiers,
+    Keybindings, MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch,
+    PromptHistorySearchStatus, PromptViMode, Reedline, ReedlineEvent, ReedlineMenu, Signal, Span,
+    Suggestion, Vi, default_emacs_keybindings, default_vi_insert_keybindings,
+    default_vi_normal_keybindings,
 };
-
-use crate::cmd_::cmd_find;
 
 use super::completion_spec::EXTENSION_SPEC;
 use super::shell::{self, Paths};
 use super::tmux_query::{query_lines, ztmux_cmd};
 use super::verbs::{Verb, all_verbs, colored, paint, print_verbs};
+use crate::cmd_::cmd_find;
 
 /// The console's own commands, which never reach the server. `verbs` and
 /// `banner` are real subcommands too (`ztmux verbs`, `ztmux banner`); in here
@@ -66,9 +66,15 @@ pub(crate) const BUILTINS: &[(&str, &str)] = &[
     ("banner", "redraw the opening banner (console builtin)"),
     ("clear", "clear the screen (console builtin)"),
     ("exit", "leave the console (console builtin)"),
-    ("help", "show the console keys and builtins (console builtin)"),
+    (
+        "help",
+        "show the console keys and builtins (console builtin)",
+    ),
     ("quit", "leave the console (console builtin)"),
-    ("verbs", "list every verb, optionally filtered (console builtin)"),
+    (
+        "verbs",
+        "list every verb, optionally filtered (console builtin)",
+    ),
 ];
 
 pub(crate) fn run(socket: &str) -> i32 {
@@ -96,7 +102,13 @@ fn extension_spec(verb: &str) -> Option<Vocabulary> {
     EXTENSION_SPEC
         .binary_search_by(|(v, _, _, _)| (*v).cmp(verb))
         .ok()
-        .map(|i| (EXTENSION_SPEC[i].1, EXTENSION_SPEC[i].2, EXTENSION_SPEC[i].3))
+        .map(|i| {
+            (
+                EXTENSION_SPEC[i].1,
+                EXTENSION_SPEC[i].2,
+                EXTENSION_SPEC[i].3,
+            )
+        })
 }
 
 /// Every flag `verb` accepts. Shell builtins hand back their own flag list,
@@ -105,7 +117,10 @@ fn extension_spec(verb: &str) -> Option<Vocabulary> {
 /// to the harvested zsh completion. Unknown verbs offer nothing.
 fn options(verb: &str) -> Vec<String> {
     if shell::lookup(verb).is_some() {
-        return shell::flags(verb).iter().map(|o| (*o).to_string()).collect();
+        return shell::flags(verb)
+            .iter()
+            .map(|o| (*o).to_string())
+            .collect();
     }
     if let Some((opts, _, _)) = extension_spec(verb) {
         return opts.iter().map(|o| (*o).to_string()).collect();
@@ -130,7 +145,9 @@ fn option_values(verb: &str, option: &str) -> Vec<String> {
         return values
             .iter()
             .find(|(name, _)| *name == option)
-            .map_or_else(Vec::new, |(_, v)| v.iter().map(|s| (*s).to_string()).collect());
+            .map_or_else(Vec::new, |(_, v)| {
+                v.iter().map(|s| (*s).to_string()).collect()
+            });
     }
     let Ok(entry) = cmd_find(verb) else {
         return Vec::new();
@@ -309,7 +326,10 @@ fn print_help(mode: Option<KeyMode>) {
     // coloured string would leave the second column ragged.
     let key = |s: &str| paint(&format!("{s:<8}"), "33", color);
 
-    println!("{}", paint("Every line runs as `ztmux <line>`.", "1", color));
+    println!(
+        "{}",
+        paint("Every line runs as `ztmux <line>`.", "1", color)
+    );
     println!();
     for &(name, description) in BUILTINS {
         println!("  {} {description}", key(name));
@@ -317,7 +337,11 @@ fn print_help(mode: Option<KeyMode>) {
     println!();
     println!(
         "{}",
-        paint("These run in the console itself, so the directory and environment they set are inherited by every later line:", "2", color)
+        paint(
+            "These run in the console itself, so the directory and environment they set are inherited by every later line:",
+            "2",
+            color
+        )
     );
     for (name, description) in shell::described() {
         println!("  {} {description}", key(name));
@@ -329,7 +353,10 @@ fn print_help(mode: Option<KeyMode>) {
     println!("  {} search history", key("Ctrl-R"));
     if let Some(mode) = mode {
         if mode.keys == ReplKeys::Vi {
-            println!("  {} leave insert mode (the prompt becomes `:`)", key("Esc"));
+            println!(
+                "  {} leave insert mode (the prompt becomes `:`)",
+                key("Esc")
+            );
         }
         println!();
         for line in key_mode_lines(mode) {
@@ -520,8 +547,16 @@ fn install_menu_bindings(keybindings: &mut Keybindings) {
             ReedlineEvent::MenuNext,
         ]),
     );
-    keybindings.add_binding(KeyModifiers::SHIFT, KeyCode::BackTab, ReedlineEvent::MenuPrevious);
-    keybindings.add_binding(KeyModifiers::NONE, KeyCode::BackTab, ReedlineEvent::MenuPrevious);
+    keybindings.add_binding(
+        KeyModifiers::SHIFT,
+        KeyCode::BackTab,
+        ReedlineEvent::MenuPrevious,
+    );
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::BackTab,
+        ReedlineEvent::MenuPrevious,
+    );
 }
 
 /// Vi keys when `$VISUAL`/`$EDITOR` names a vi editor — the same test tmux
@@ -575,7 +610,11 @@ fn repl_keys(socket: &str) -> KeyMode {
             .into_iter()
             .next()
     };
-    if let Some(keys) = std::env::var(REPL_KEYS_ENV).ok().as_deref().and_then(parse_keys) {
+    if let Some(keys) = std::env::var(REPL_KEYS_ENV)
+        .ok()
+        .as_deref()
+        .and_then(parse_keys)
+    {
         return KeyMode {
             keys,
             source: REPL_KEYS_ENV,
@@ -589,7 +628,11 @@ fn repl_keys(socket: &str) -> KeyMode {
         }
     }
     KeyMode {
-        keys: if vi_mode() { ReplKeys::Vi } else { ReplKeys::Emacs },
+        keys: if vi_mode() {
+            ReplKeys::Vi
+        } else {
+            ReplKeys::Emacs
+        },
         source: "$VISUAL/$EDITOR",
     }
 }
@@ -597,9 +640,7 @@ fn repl_keys(socket: &str) -> KeyMode {
 fn run_interactive(socket: &str) -> i32 {
     show_banner(socket);
 
-    let completer = Box::new(ReplCompleter {
-        verbs: all_verbs(),
-    });
+    let completer = Box::new(ReplCompleter { verbs: all_verbs() });
     let menu = ColumnarMenu::default()
         .with_name("completion_menu")
         .with_columns(4)
@@ -692,9 +733,7 @@ mod tests {
     use crate::cmd_::CMD_TABLE;
 
     fn values(line: &str) -> Vec<String> {
-        let mut completer = ReplCompleter {
-            verbs: all_verbs(),
-        };
+        let mut completer = ReplCompleter { verbs: all_verbs() };
         completer
             .complete(line, line.len())
             .into_iter()
@@ -782,7 +821,10 @@ mod tests {
 
     #[test]
     fn lines_split_like_a_shell() {
-        assert_eq!(split_words("  new-window  -n build "), ["new-window", "-n", "build"]);
+        assert_eq!(
+            split_words("  new-window  -n build "),
+            ["new-window", "-n", "build"]
+        );
         assert_eq!(
             split_words("run-shell 'echo hello world'"),
             ["run-shell", "echo hello world"]
@@ -832,7 +874,11 @@ mod tests {
             source: "$VISUAL/$EDITOR",
         });
         assert_eq!(emacs[0], "emacs keys, from $VISUAL/$EDITOR");
-        assert!(emacs[1].contains("@ztmux-repl-edit-mode vi"), "{}", emacs[1]);
+        assert!(
+            emacs[1].contains("@ztmux-repl-edit-mode vi"),
+            "{}",
+            emacs[1]
+        );
     }
 
     #[test]
@@ -843,8 +889,17 @@ mod tests {
         // alias for list-sessions.
         for (name, _) in shell::described() {
             for entry in CMD_TABLE {
-                assert_ne!(name, entry.name, "{name} shadows the command {}", entry.name);
-                assert_ne!(Some(name), entry.alias, "{name} shadows an alias of {}", entry.name);
+                assert_ne!(
+                    name, entry.name,
+                    "{name} shadows the command {}",
+                    entry.name
+                );
+                assert_ne!(
+                    Some(name),
+                    entry.alias,
+                    "{name} shadows an alias of {}",
+                    entry.name
+                );
             }
             assert!(
                 !super::super::EXTENSION_COMMANDS.contains(&name),
@@ -871,7 +926,10 @@ mod tests {
         // `cd` is directories-only; `cat` takes any entry, so at the same
         // prefix it can only offer more, never less.
         let any = values("cat /");
-        assert!(any.len() >= root.len(), "cat / offered fewer entries than cd /: {any:?}");
+        assert!(
+            any.len() >= root.len(),
+            "cat / offered fewer entries than cd /: {any:?}"
+        );
         // A prefix narrows to what starts with it, and a builtin that takes no
         // paths completes nothing.
         assert!(values("cd /de").iter().all(|v| v.starts_with("/de")));
