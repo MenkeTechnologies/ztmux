@@ -112,9 +112,7 @@ fn extension_spec(verb: &str) -> Option<Vocabulary> {
 }
 
 /// Every flag `verb` accepts. Shell builtins hand back their own flag list,
-/// ported commands their `args_parse` template (`"af:t:"` → `-a -f -t`), which
-/// is the exact string the parser validates against; extension verbs fall back
-/// to the harvested zsh completion. Unknown verbs offer nothing.
+/// everything else goes through [`command_flags`]. Unknown verbs offer nothing.
 fn options(verb: &str) -> Vec<String> {
     if shell::lookup(verb).is_some() {
         return shell::flags(verb)
@@ -122,6 +120,15 @@ fn options(verb: &str) -> Vec<String> {
             .map(|o| (*o).to_string())
             .collect();
     }
+    command_flags(verb)
+}
+
+/// Every flag a command verb accepts: ported commands hand back their
+/// `args_parse` template (`"af:t:"` → `-a -f -t`), which is the exact string
+/// the parser validates against; extension verbs fall back to the harvested zsh
+/// completion. Unknown verbs offer nothing. Shared with the command box's Tab
+/// palette ([`super::ratatui_ui`]) so both offer the same flags.
+pub(crate) fn command_flags(verb: &str) -> Vec<String> {
     if let Some((opts, _, _)) = extension_spec(verb) {
         return opts.iter().map(|o| (*o).to_string()).collect();
     }

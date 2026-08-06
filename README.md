@@ -247,7 +247,9 @@ They fall into a few families:
   inline wizard: `ztmux triggers wizard` (or `ztmux triggers add <name> <pane> <match> <action>`).
 - **Ratatui UI** (on by default) — original interactive surfaces rendered with
   ratatui rather than tmux's server draw: a which-key **hint bar** on the prefix, a floating
-  **command palette** with inline Tab/arrow completion, ratatui **clock** and **display-panes**,
+  **command palette** with inline Tab/arrow completion (command names and aliases, extension
+  verbs, a command's own flags after `-`, and its option or layout vocabulary), ratatui **clock**
+  and **display-panes**,
   **edit-scrollback-in-`$EDITOR`** (`prefix e`), and **multi-pane selective sync** — mark panes
   (`prefix C-s`), sync the set (`prefix M`). Sync state is shown on the pane **border** — synced
   (red), selected (orange), trigger-armed (cyan) — which output can never overwrite.

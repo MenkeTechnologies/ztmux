@@ -939,12 +939,28 @@ unsafe fn prompt_completions(c: *mut client) -> Vec<String> {
             .iter()
             .map(|(t, _)| t.as_str())
             .collect();
-        let at_start = !before.trim_end().contains(char::is_whitespace);
+        // The cursor is still on the first word only while nothing before it is
+        // whitespace - a trailing space has already moved on to the next word
+        // (`setw ` completes window options, not command names).
+        let at_start = !before.contains(char::is_whitespace);
         let word = before.rsplit(char::is_whitespace).next().unwrap_or("");
-        if word.is_empty() {
+        // An empty prompt has nothing to narrow the whole command table with;
+        // an empty word after a command does (that command's vocabulary), so
+        // only the first word insists on something typed.
+        if word.is_empty() && at_start {
             return Vec::new();
         }
-        prompt_candidate_list(word, at_start)
+        // The verb whose flags apply is the first word of the command being
+        // typed - the last `;`-separated one, so a chain completes the flags of
+        // the command under the cursor rather than the first of the sequence.
+        let command = before
+            .rsplit(';')
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .next()
+            .unwrap_or("");
+        prompt_candidate_list(word, at_start, command)
     }
 }
 
@@ -954,9 +970,10 @@ unsafe fn prompt_completions(c: *mut client) -> Vec<String> {
 /// `command-alias` entries, because upstream completes inline on the status row
 /// where a long list has nowhere to go. The floating palette has room, so it
 /// also offers ztmux's own extension subcommands and — once past the first word
-/// — option names and layout names. This is extension chrome, not a port: the
-/// ported prompt still completes exactly what `prompt.c` completes.
-fn prompt_candidate_list(word: &str, at_start: bool) -> Vec<String> {
+/// — `command`'s flags, option names and layout names. This is extension chrome,
+/// not a port: the ported prompt still completes exactly what `prompt.c`
+/// completes.
+fn prompt_candidate_list(word: &str, at_start: bool, command: &str) -> Vec<String> {
     const LAYOUTS: [&str; 7] = [
         "even-horizontal",
         "even-vertical",
@@ -973,6 +990,37 @@ fn prompt_candidate_list(word: &str, at_start: bool) -> Vec<String> {
             list.push(s.to_string());
         }
     };
+
+    // A `-` word is a flag of the command being typed, and nothing else can
+    // match there, so the flag list is the whole answer.
+    if !at_start && word.starts_with('-') {
+        let mut flags: Vec<String> = super::repl::command_flags(command)
+            .into_iter()
+            .filter(|flag| flag.starts_with(word))
+            .collect();
+        flags.sort();
+        flags.dedup();
+        return flags;
+    }
+
+    let canonical = crate::cmd_::cmd_find(command).map_or(command, |entry| entry.name);
+    let scope = option_scope(canonical);
+
+    // Tab on a fresh word (nothing typed yet) offers the vocabulary of that
+    // position rather than every name in the tables: the command's own options
+    // where it takes one, layouts for select-layout, its flags otherwise.
+    if word.is_empty() {
+        if let Some(scope) = scope {
+            return scoped_options(scope, word);
+        }
+        if canonical == "select-layout" {
+            return LAYOUTS.iter().map(|l| (*l).to_string()).collect();
+        }
+        let mut flags = super::repl::command_flags(command);
+        flags.sort();
+        flags.dedup();
+        return flags;
+    }
 
     for cmdent in crate::CMD_TABLE {
         if cmdent.name.starts_with(word) {
@@ -992,10 +1040,10 @@ fn prompt_candidate_list(word: &str, at_start: bool) -> Vec<String> {
     if at_start {
         return list;
     }
-    for oe in &crate::OPTIONS_TABLE {
-        if oe.name.starts_with(word) {
-            add(oe.name, &mut list);
-        }
+    // An option command narrows to its own scope (`setw` never offers server
+    // options); anything else may name any option, as `bind-key` does.
+    for name in scoped_options(scope.unwrap_or(ANY_SCOPE), word) {
+        add(&name, &mut list);
     }
     for layout in LAYOUTS {
         if layout.starts_with(word) {
@@ -1003,6 +1051,34 @@ fn prompt_candidate_list(word: &str, at_start: bool) -> Vec<String> {
         }
     }
     list
+}
+
+/// Every option scope, for the commands (and positions) that may name any
+/// option.
+const ANY_SCOPE: i32 = crate::OPTIONS_TABLE_SERVER
+    | crate::OPTIONS_TABLE_SESSION
+    | crate::OPTIONS_TABLE_WINDOW
+    | crate::OPTIONS_TABLE_PANE;
+
+/// The option scope `command` (a canonical command name) names options in, as
+/// an `OPTIONS_TABLE_*` mask; `None` for commands that take no option name.
+fn option_scope(command: &str) -> Option<i32> {
+    match command {
+        "set-window-option" | "show-window-options" => {
+            Some(crate::OPTIONS_TABLE_WINDOW | crate::OPTIONS_TABLE_PANE)
+        }
+        "set-option" | "show-options" => Some(ANY_SCOPE),
+        _ => None,
+    }
+}
+
+/// Option names in `scope` starting with `word`, in table order.
+fn scoped_options(scope: i32, word: &str) -> Vec<String> {
+    crate::OPTIONS_TABLE
+        .iter()
+        .filter(|oe| oe.scope & scope != 0 && oe.name.starts_with(word))
+        .map(|oe| oe.name.to_string())
+        .collect()
 }
 
 /// Draw the floating command-prompt overlay onto the tty.
@@ -1839,6 +1915,59 @@ mod tests {
         assert!(both.contains(grid_attr::GRID_ATTR_BRIGHT));
         assert!(both.contains(grid_attr::GRID_ATTR_UNDERSCORE));
         assert!(map_modifier(Modifier::empty()).is_empty());
+    }
+
+    // `:resize-pane -<Tab>` must offer that command's flags - the whole point of
+    // a `-` word, and what the palette used to answer with nothing.
+    #[test]
+    fn dash_word_completes_the_commands_flags() {
+        let flags = prompt_candidate_list("-", false, "resize-pane");
+        // From the "D::L::MR::Tt:U::x:y:Z" args template, sorted and unique.
+        assert_eq!(
+            flags,
+            ["-D", "-L", "-M", "-R", "-T", "-U", "-Z", "-t", "-x", "-y"]
+        );
+        // A partially typed flag narrows to it, and an unknown one to nothing.
+        assert_eq!(prompt_candidate_list("-Z", false, "resize-pane"), ["-Z"]);
+        assert!(prompt_candidate_list("-q", false, "resize-pane").is_empty());
+        // The alias resolves to the same entry as the full name.
+        assert_eq!(
+            prompt_candidate_list("-", false, "resizep"),
+            prompt_candidate_list("-", false, "resize-pane")
+        );
+    }
+
+    // `:setw <Tab>` (nothing typed after the command) must offer the window
+    // options it sets, not the empty list and not server options.
+    #[test]
+    fn empty_word_after_a_command_offers_its_vocabulary() {
+        let opts = prompt_candidate_list("", false, "setw");
+        assert!(opts.iter().any(|o| o == "main-pane-width"), "got {opts:?}");
+        assert!(
+            !opts.iter().any(|o| o == "buffer-limit"), // server scope
+            "server option leaked into setw: {opts:?}"
+        );
+        // `select-layout` names layouts there; anything else falls back to its
+        // own flags.
+        assert_eq!(
+            prompt_candidate_list("", false, "select-layout")[0],
+            "even-horizontal"
+        );
+        assert_eq!(
+            prompt_candidate_list("", false, "kill-pane"), // "af:t:" template
+            ["-a", "-f", "-t"]
+        );
+        // The empty prompt itself still has nothing to narrow with.
+        assert!(prompt_candidate_list("", true, "").is_empty());
+    }
+
+    // `set-option` reaches every scope; `setw` must not offer names it rejects.
+    #[test]
+    fn option_names_narrow_to_the_commands_scope() {
+        let setw = prompt_candidate_list("buffer-", false, "set-window-option");
+        assert!(!setw.iter().any(|o| o == "buffer-limit"), "got {setw:?}");
+        let set = prompt_candidate_list("buffer-", false, "set-option");
+        assert!(set.iter().any(|o| o == "buffer-limit"), "got {set:?}");
     }
 
     #[test]
