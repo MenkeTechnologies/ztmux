@@ -596,13 +596,28 @@ single-case parity verifier (`parity/verify_one.sh`).
   "server exited unexpectedly"; ztmux and tmux could not run side by side.
 - **Root cause:** ztmux resolved its default socket from `$TMUX`, so when launched
   inside a tmux pane it connected to tmux's server and spoke protocol 8 at it.
-- **Fix:** ztmux ignores `$TMUX` for socket resolution entirely. Unless `-S`/`-L`
-  is given it always resolves its own socket through `make_label` (`default`
-  under the `ztmux-<uid>` directory), so nesting inside a real tmux pane can
-  never put it on tmux's socket (`src/ported/tmux.rs:605`). It still *exports*
-  `$TMUX` to its panes, pointing at its own socket, because the ecosystem
-  (powerline, tpm, prompts) detects a multiplexer by that variable being set; it
-  deliberately introduces no `$ZTMUX` variable (`src/ported/environ.rs:301`).
+- **Fix:** ztmux adopts a socket from `$TMUX` only when the path lives in its own
+  `ztmux-<uid>` directory (tmux's is `tmux-<uid>`), and otherwise resolves
+  through `make_label` (`default` under `ztmux-<uid>`), so nesting inside a real
+  tmux pane can never put it on tmux's socket — `socket_from_environment`,
+  `src/ported/tmux.rs`. Regression test: `ztmux_socket_adopts_only_its_own`. It
+  still *exports* `$TMUX` to its panes, pointing at its own socket, because the
+  ecosystem (powerline, tpm, prompts) detects a multiplexer by that variable
+  being set; it deliberately introduces no `$ZTMUX` variable
+  (`src/ported/environ.rs:301`).
+
+### 2b. A nested command ran against the wrong server
+
+- **Symptom:** inside a `-L pldbg` server, `ztmux -L pldbg run-shell "ztmux
+  set-environment -g PROBE_VAR probe"` set the variable on the *default* socket;
+  `ztmux -L pldbg show-environment -g PROBE_VAR` answered "unknown variable".
+- **Root cause:** the fix for bug 2 above ignored `$TMUX` outright, so a command
+  inheriting a pane's `$TMUX` fell through to the default socket instead of the
+  server it was run from. Harmless on the default socket, wrong everywhere else.
+- **Fix:** `$TMUX` is now adopted when it names a socket in ztmux's own
+  `ztmux-<uid>` directory, which keeps a foreign tmux socket out (see above). A
+  socket named with `-S` sits wherever the user put it and cannot be recognised
+  this way, so a nested command there still needs its own `-S`.
 
 ### 3. Version string broke config version-gates
 
