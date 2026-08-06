@@ -219,6 +219,7 @@ pub(crate) mod ports;
 pub(crate) mod procstat;
 pub(crate) mod proctree;
 pub(crate) mod project;
+pub(crate) mod prompt_complete;
 pub(crate) mod prune;
 pub(crate) mod ps;
 pub(crate) mod pstree;

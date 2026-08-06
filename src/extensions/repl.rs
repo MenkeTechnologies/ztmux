@@ -91,14 +91,15 @@ pub(crate) fn run(socket: &str) -> i32 {
 /// What an extension verb completes: `(options, option values, positional
 /// vocabulary)` — a [`super::completion_spec::ExtensionSpec`] without the verb
 /// it is keyed by.
-type Vocabulary = (
+pub(crate) type Vocabulary = (
     &'static [&'static str],
     &'static [(&'static str, &'static [&'static str])],
     &'static [&'static str],
 );
 
 /// The harvested vocabulary for an extension verb; `None` for anything else.
-fn extension_spec(verb: &str) -> Option<Vocabulary> {
+/// Shared with the command box's Tab palette ([`super::prompt_complete`]).
+pub(crate) fn extension_spec(verb: &str) -> Option<Vocabulary> {
     EXTENSION_SPEC
         .binary_search_by(|(v, _, _, _)| (*v).cmp(verb))
         .ok()
@@ -147,7 +148,7 @@ pub(crate) fn command_flags(verb: &str) -> Vec<String> {
 /// The fixed value vocabulary of `verb`'s `option`, if it has one: harvested
 /// from the zsh completion for extensions, and read off the usage string for
 /// ported commands (`"[-o json|jsonl|csv]"` → json/jsonl/csv).
-fn option_values(verb: &str, option: &str) -> Vec<String> {
+pub(crate) fn option_values(verb: &str, option: &str) -> Vec<String> {
     if let Some((_, values, _)) = extension_spec(verb) {
         return values
             .iter()
@@ -438,12 +439,31 @@ fn plain_suggestions(candidates: Vec<String>, prefix: &str, span: Span) -> Vec<S
     suggestions(owned.iter().map(|c| (c.as_str(), None)), prefix, span)
 }
 
-/// Complete a shell builtin's path argument against the filesystem: the
-/// entries of the directory the typed word names, directories only for `cd`.
-/// The suggestion keeps whatever the word already said (`~/`, `../src/`) and
-/// replaces only its last component, and a directory completes without a
-/// trailing space so the next component can be typed straight on.
+/// Complete a shell builtin's path argument against the filesystem, as
+/// [`path_candidates`] does; a directory completes without a trailing space so
+/// the next component can be typed straight on.
 fn path_suggestions(prefix: &str, span: Span, paths: Paths) -> Vec<Suggestion> {
+    path_candidates(prefix, paths)
+        .into_iter()
+        .map(|value| Suggestion {
+            append_whitespace: !value.ends_with('/'),
+            value,
+            description: None,
+            style: None,
+            extra: None,
+            span,
+            display_override: None,
+            match_indices: None,
+        })
+        .collect()
+}
+
+/// Filesystem completions for the word `prefix`: the entries of the directory
+/// it names, directories only where the slot wants one. Each candidate keeps
+/// whatever the word already said (`~/`, `../src/`) and replaces only its last
+/// component, and directories end in `/`. Shared with the command box's Tab
+/// palette ([`super::prompt_complete`]) so both complete paths alike.
+pub(crate) fn path_candidates(prefix: &str, paths: Paths) -> Vec<String> {
     // The word splits at its last `/`: everything up to and including it names
     // the directory to read, the rest is the prefix to match entries against.
     let (typed_dir, base) = match prefix.rfind('/') {
@@ -468,7 +488,7 @@ fn path_suggestions(prefix: &str, span: Span, paths: Paths) -> Vec<Suggestion> {
     let Ok(entries) = std::fs::read_dir(&dir) else {
         return Vec::new();
     };
-    let mut out: Vec<Suggestion> = Vec::new();
+    let mut out: Vec<String> = Vec::new();
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
         if !name.starts_with(base) {
@@ -485,18 +505,9 @@ fn path_suggestions(prefix: &str, span: Span, paths: Paths) -> Vec<Suggestion> {
             continue;
         }
         let slash = if is_dir { "/" } else { "" };
-        out.push(Suggestion {
-            value: format!("{typed_dir}{name}{slash}"),
-            description: None,
-            style: None,
-            extra: None,
-            span,
-            append_whitespace: !is_dir,
-            display_override: None,
-            match_indices: None,
-        });
+        out.push(format!("{typed_dir}{name}{slash}"));
     }
-    out.sort_by(|a, b| a.value.cmp(&b.value));
+    out.sort();
     out
 }
 
