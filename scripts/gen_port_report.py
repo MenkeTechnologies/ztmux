@@ -620,6 +620,30 @@ def expected_for(c_path: str) -> list[str]:
 GENERIC_NAME_THRESHOLD = 4
 
 def main() -> int:
+    # Both source roots must exist and must actually match files. Without this,
+    # a moved/renamed vendor/tmux or src/ported silently yields an empty index,
+    # every table renders zero rows, and the script still exits 0 — a report
+    # that measures nothing while looking freshly generated.
+    if not TMUX_SRC.is_dir():
+        print(f"ERROR: tmux C source not found at {TMUX_SRC}", file=sys.stderr)
+        print("The upstream tree is committed in-repo; restore it before generating.", file=sys.stderr)
+        return 1
+    c_paths = c_source_paths()
+    if not c_paths:
+        print(f"ERROR: no *.c files under {TMUX_SRC} or {TMUX_SRC / 'compat'}", file=sys.stderr)
+        return 1
+    missing_rs = [d for d in RS_DIRS if not d.is_dir()]
+    if missing_rs:
+        print("ERROR: ported Rust source not found at "
+              + ", ".join(str(d) for d in missing_rs), file=sys.stderr)
+        return 1
+    rs_paths = [f for d in RS_DIRS for f in d.rglob("*.rs")]
+    if not rs_paths:
+        print("ERROR: no *.rs files under "
+              + ", ".join(str(d) for d in RS_DIRS), file=sys.stderr)
+        return 1
+    print(f"sources: {len(c_paths)} C files, {len(rs_paths)} Rust files", file=sys.stderr)
+
     build_rs_file_index()
     print(f"  {len(RS_FILE_INDEX)} indexed Rust file stems", file=sys.stderr)
     print("indexing C sources...", file=sys.stderr)
@@ -1636,7 +1660,8 @@ function ros(key){{
 """
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(html_doc)
-    print(f"wrote {OUT} ({len(html_doc):,} bytes)", file=sys.stderr)
+    print(f"wrote {OUT} ({len(html_doc):,} bytes) "
+          f"from {len(c_paths)} C files and {len(rs_paths)} Rust files", file=sys.stderr)
     # NOTE: ztmux's port_report.html is standalone — we do NOT patch
     # docs/report.html (that coupling was zsh-specific).
     return 0
