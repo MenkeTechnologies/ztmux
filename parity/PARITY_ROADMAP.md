@@ -65,8 +65,27 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1193/1193 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 cases.
+**1194/1194 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 cases.
+
+Case **1498** is structural rather than another probe: it diffs the *whole*
+default binding table against next-3.7's, which nothing had done before. The
+anti-drift gate (`tests/ported_fn_names_match_c.rs`) compares function *names*,
+and a default binding is *data*, so the ~283 binding strings had never been
+compared to `key-bindings.c` — five had drifted (a wrong command on
+`MouseDown1Status`, a missing `#{alternate_on}` on `WheelUpPane`, a spurious `-O`
+on five menus, a hand-written session menu, and 16 bindings missing the `--`
+before their argument). It compares what `list-keys` prints rather than the
+source text, so it is a diff of what each binary actually *parsed*: cosmetic
+transcription differences that parse to the same command list are canonicalised
+away by the round trip. 243 of the 283 bindings are compared; the 40 excluded are
+listed by key in the case with the reason for each, and the list shrinks as the
+features behind them land. The output is sorted, because `list-keys` walks each
+table in key-code order and ztmux's flat `keyc` enum orders differently from the
+C's type-shifted one — so the case compares the set of bindings and their
+commands, not their order, until that encoding migrates. Both halves were
+mutation-tested: reintroducing the `MouseDown1Status` command and dropping one
+`--` each turn the case red.
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
 (full-size split with a pre-existing split) crashed the server on a u32 underflow
@@ -480,7 +499,7 @@ reddens CI merely because the gaps still exist. With the directory empty it
 exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
 left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1193/1193 ported surface; they measure
+proof. These gaps do not count against the 1194/1194 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite
