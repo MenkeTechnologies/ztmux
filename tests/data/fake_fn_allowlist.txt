@@ -211,7 +211,6 @@ screen_size_y
 screen_write_strlen_
 screen_write_text_
 screen_write_vnputs_
-server_acl_get_uid
 server_acl_user_allow
 server_acl_user_allow_write
 server_acl_user_deny

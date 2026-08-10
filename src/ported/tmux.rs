@@ -272,40 +272,6 @@ unsafe fn make_label(mut label: *const u8, cause: *mut *mut u8) -> *const u8 {
     }
 }
 
-/// The socket `$TMUX` names, when it is one of ztmux's own; NULL otherwise.
-///
-/// ztmux extension, standing in for the plain `$TMUX` adoption upstream does in
-/// `tmux.c:540`. A command run inside a pane inherits `$TMUX`, and without it a
-/// nested `ztmux set-environment ...` on a `-L pldbg` server would resolve to
-/// the *default* socket and quietly act on the wrong server. Adopting the path
-/// wholesale is what ztmux must not do: nested inside a real tmux pane, `$TMUX`
-/// points at tmux's socket, and ztmux would speak its protocol at a tmux
-/// server. The two are told apart by the directory the socket lives in —
-/// ztmux's is `ztmux-<uid>`, tmux's is `tmux-<uid>` — so a ztmux socket is
-/// adopted and a foreign one ignored.
-///
-/// A socket named with `-S` sits wherever the user put it, so it cannot be
-/// recognised this way and is not adopted; a nested command there still needs
-/// its own `-S`.
-unsafe fn socket_from_environment() -> *const u8 {
-    let Ok(value) = std::env::var("TMUX") else {
-        return null();
-    };
-    let uid = unsafe { getuid() };
-    let Some(socket) = ztmux_socket(&value, uid) else {
-        return null();
-    };
-    CString::new(socket).map_or(null(), |path| path.into_raw().cast())
-}
-
-/// The socket path out of a `$TMUX` value (`<path>,<pid>,<session>`), if it
-/// lives in ztmux's own `ztmux-<uid>` socket directory.
-fn ztmux_socket(value: &str, uid: u32) -> Option<&str> {
-    let socket = value.split(',').next().filter(|s| !s.is_empty())?;
-    let parent = std::path::Path::new(socket).parent()?.file_name()?;
-    (parent == std::ffi::OsStr::new(&format!("ztmux-{uid}"))).then_some(socket)
-}
-
 /// C `vendor/tmux/tmux.c:239`: `char *shell_argv0(const char *shell, int is_login)`
 pub unsafe fn shell_argv0(shell: *const u8, is_login: c_int) -> *mut u8 {
     unsafe {
@@ -638,13 +604,13 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
 
         // Socket resolution. If -S or -L was given it is used; otherwise the
         // socket comes from $TMUX when that names one of ztmux's own (see
-        // `socket_from_environment`), and from make_label ("default" under the
+        // `extensions::socket`), and from make_label ("default" under the
         // ztmux-<uid> directory) when it does not. Upstream (`tmux.c:540`)
         // adopts $TMUX outright; ztmux cannot, because nested inside a real
         // tmux pane $TMUX points at tmux's server and ztmux must never speak
         // its protocol at a tmux socket.
         if path.is_null() && label.is_null() {
-            path = socket_from_environment();
+            path = crate::extensions::socket::socket_from_environment();
         }
         if path.is_null() {
             path = make_label(label.cast(), &raw mut cause);
@@ -804,32 +770,6 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Regression: a command run inside a `-L pldbg` pane inherits that server's
-    // $TMUX, and must resolve back to it rather than to the default socket -
-    // but a foreign tmux's $TMUX (`tmux-<uid>`) must still be ignored, or ztmux
-    // speaks protocol at a tmux server (bug 2).
-    #[test]
-    fn ztmux_socket_adopts_only_its_own() {
-        assert_eq!(
-            ztmux_socket("/private/tmp/ztmux-501/pldbg,28344,0", 501),
-            Some("/private/tmp/ztmux-501/pldbg")
-        );
-        assert_eq!(
-            ztmux_socket("/private/tmp/ztmux-501/default,1,0", 501),
-            Some("/private/tmp/ztmux-501/default")
-        );
-        // Real tmux's socket directory, which ztmux must never speak to.
-        assert_eq!(ztmux_socket("/private/tmp/tmux-501/default,1,0", 501), None);
-        // Another user's ztmux directory is not ours either.
-        assert_eq!(ztmux_socket("/private/tmp/ztmux-0/default,1,0", 501), None);
-        // A socket loose in a directory of its own name proves nothing.
-        assert_eq!(ztmux_socket("/tmp/mysock,1,0", 501), None);
-        // Malformed or empty values resolve to nothing rather than to "".
-        assert_eq!(ztmux_socket("", 501), None);
-        assert_eq!(ztmux_socket(",1,0", 501), None);
-        assert_eq!(ztmux_socket("ztmux-501,1,0", 501), None);
-    }
 
     // Regression (bug 3): `ztmux -V` once reported the crate's placeholder
     // "0.1.0", so version-gated user config (e.g. `tmux -V | awk '{print

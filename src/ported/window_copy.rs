@@ -4534,7 +4534,10 @@ pub unsafe fn window_copy_command(
                 clear = window_copy_cmd_table_i.clear;
                 action = (window_copy_cmd_table_i.f)(&raw mut cs);
                 args_free(cs.wargs);
-                cs.wargs = null_mut();
+                #[expect(unused_assignments)]
+                {
+                    cs.wargs = null_mut();
+                }
                 break;
             }
         }

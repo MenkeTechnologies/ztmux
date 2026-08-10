@@ -126,7 +126,7 @@ struct window_tree_modedata {
     /// not show that pane back to itself.
     hide_preview_this_pane: bool,
     /// C `vendor/tmux/window-tree.c:118`: extra prompt flags, set to
-    /// PROMPT_ACCEPT by -y so the mode's prompts take the default answer.
+    /// `PROMPT_ACCEPT` by -y so the mode's prompts take the default answer.
     prompt_flags: prompt_flags,
 
     item_list: *mut *mut window_tree_itemdata,

@@ -237,6 +237,7 @@ pub(crate) mod shell;
 pub(crate) mod shells;
 pub(crate) mod size;
 pub(crate) mod snapshot;
+pub(crate) mod socket;
 pub(crate) mod solo;
 pub(crate) mod ssh;
 pub(crate) mod stack;

@@ -249,10 +249,6 @@ pub unsafe fn server_acl_join(c: *mut client) -> c_int {
     }
 }
 
-pub unsafe fn server_acl_get_uid(user: *mut server_acl_user) -> uid_t {
-    unsafe { (*user).uid }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,7 +330,7 @@ mod tests {
             server_acl_user_allow(uid, server_acl_user_flags::empty());
             let user = server_acl_user_find(uid, server_acl_user_flags::empty());
             assert!(!user.is_null());
-            assert_eq!(server_acl_get_uid(user), uid);
+            assert_eq!((*user).uid, uid);
             // xcalloc zeroes flags -> not read-only (write access).
             assert!(
                 !(*user)
@@ -481,7 +477,10 @@ mod tests {
             // Neighbours survive the removal.
             assert!(!server_acl_user_find(900_010, server_acl_user_flags::empty()).is_null());
             assert!(!server_acl_user_find(900_012, server_acl_user_flags::empty()).is_null());
-            assert_eq!(server_acl_get_uid(server_acl_user_find(900_010, server_acl_user_flags::empty())), 900_010);
+            assert_eq!(
+                (*server_acl_user_find(900_010, server_acl_user_flags::empty())).uid,
+                900_010
+            );
         }
     }
 

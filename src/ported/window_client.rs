@@ -218,7 +218,7 @@ pub unsafe fn window_client_build(
 
 /// C `vendor/tmux/window-client.c:54`: `static const char *window_client_info_lines[]`
 ///
-/// The WINDOW_CLIENT_FEATURE macro is expanded here, since Rust has no
+/// The `WINDOW_CLIENT_FEATURE` macro is expanded here, since Rust has no
 /// token-pasting equivalent; each entry is the string the C preprocessor
 /// produces.
 static WINDOW_CLIENT_INFO_LINES: [&str; 23] = [

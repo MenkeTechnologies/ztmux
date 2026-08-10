@@ -95,7 +95,7 @@ pub struct window_customize_modedata {
     /// C freed it by hand. Read via `format_ptr`.
     format: CString,
     /// C `vendor/tmux/window-customize.c:104`: extra prompt flags, set to
-    /// PROMPT_ACCEPT by -y so the mode's confirmations take the default answer.
+    /// `PROMPT_ACCEPT` by -y so the mode's confirmations take the default answer.
     prompt_flags: prompt_flags,
     hide_global: bool,
 
