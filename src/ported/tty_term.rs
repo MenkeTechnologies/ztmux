@@ -670,6 +670,22 @@ pub unsafe fn tty_term_create(
                 a = options_array_next(a);
             }
 
+            // Check for COLORTERM (tty-term.c:608-617). This is the only route
+            // to the RGB feature for terminals whose terminfo carries neither
+            // `Tc` nor `RGB` -- xterm-256color among them -- so without it a
+            // truecolor terminal was reported as 16-colour and #{client_colours}
+            // answered 16 where the reference answers 16777216.
+            let envent = environ_find((*(*tty).client).environ, c!("COLORTERM"));
+            if !envent.is_null() && (*envent).value.is_some() {
+                let value: *const u8 = (*envent).value_ptr();
+                log_debug!("{} COLORTERM={}", _s((*(*tty).client).name), _s(value));
+                if strcasecmp(value, c!("truecolor")) == 0 || strcasecmp(value, c!("24bit")) == 0 {
+                    tty_add_features(feat, "RGB", c!(","));
+                } else if !strstr(value, c!("256")).is_null() {
+                    tty_add_features(feat, "256", c!(","));
+                }
+            }
+
             // Apply overrides so any capabilities used for features are changed.
             tty_term_apply_overrides(term);
 
