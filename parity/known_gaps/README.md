@@ -25,7 +25,19 @@ ported surface `parity/cases/` measures — they are unbuilt surface.
 
 ## The cases
 
-**There are none left.** Every case that lived here has graduated into
+`cmd_prompt_in_pane.sh` — `command-prompt -P`, the in-pane prompt next-3.7 moved
+off the status line. 32 of the default copy-mode bindings carry the flag; ztmux's
+`struct window_pane` has no prompt fields, so there is nothing for `PROMPT_ISPANE`
+to set and the default table was written without it. Visible through `list-keys`
+without a client, because the flag is part of the binding string.
+
+`mouse_scrollbar_locations.sh` — the scrollbar and control mouse locations. The C
+names 19 locations per mouse family (`tmux.h:178-197`); ztmux's `keyc` table is
+the older six, with no code for `SCROLLBAR_UP` / `_SLIDER` / `_DOWN` or
+`CONTROL0`-`9`. Five default root bindings have no key to attach to, and
+`copy-mode -S` is unreachable because the slider drag is its only default caller.
+
+Everything else that lived here has graduated into
 `parity/cases/`: `pane_zoomed_flag`, `session_*_flag`, the terminal-feature
 flags, `codepoint-widths` / `variation-selector-always-wide`,
 `default-client-command`, `get-clipboard`, the `theme` / `dark-theme-*` /
@@ -37,9 +49,8 @@ repeat modifier), `copy-mode-line-numbers` and its styles, the
 floating-pane format vars, `pane-scrollbars*`, the `tree-mode-*` preview/style
 options, and — last — `cmd_switch_mode`.
 
-The directory is kept, not deleted: it is where the next proven-unported
-behaviour goes. Add a case here the moment a next-3.7 feature is shown to be
-missing, so the gap is measured rather than remembered.
+Add a case here the moment a next-3.7 feature is shown to be missing, so the gap
+is measured rather than remembered.
 
 With no cases present `run_known_gaps.sh` reports `no cases in
 parity/known_gaps/*.sh` and exits 2 (it also trips `set -u` on the empty glob
@@ -75,10 +86,9 @@ covers the five options themselves, `1486` the choose-tree session preview as
 drawn and `1487` the selection style and the per-pane preview, both captured
 through the same nested client.
 
-The one command still unported is `scroll-to-mouse`, and it has no case here: it
-drags the scrollbar slider, which needs `tty.mouse_scrolling_flag` /
-`tty.mouse_slider_mpos` and the `KEYC_MOUSE_LOCATION_SCROLLBAR_*` key codes that
-ztmux's six-location `keyc` mouse table cannot name. Driving it against the
-reference is not possible anyway — with no mouse event to read, the vendored tmux
-takes its own server down, so a case would measure that crash rather than the gap.
-It is recorded in `docs/BUGS.md` instead.
+The one command still unported is `scroll-to-mouse`. `mouse_scrollbar_locations.sh`
+covers the reason — the `KEYC_MOUSE_LOCATION_SCROLLBAR_*` key codes ztmux's
+six-location `keyc` table cannot name — but not the command itself: driving it
+needs a slider drag, and with no mouse event to read the vendored tmux takes its
+own server down, so such a case would measure that crash rather than the gap. The
+command is recorded in `docs/BUGS.md` instead.

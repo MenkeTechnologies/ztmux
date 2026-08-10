@@ -64,7 +64,7 @@ Fixes to the ztmux port, most recent first.
   `options-table.c:557`. So the port ships 20 default option values that expand
   a format variable its own table cannot resolve.
 - **Why the suite does not have the case:** none of the five is named by any of
-  the 1188 cases. Three are client-scoped and the harness attaches no client;
+  the 1193 cases. Three are client-scoped and the harness attaches no client;
   one is a pid; `buffer_full` has no excuse at all.
 
 ### `#{history_bytes}` and `#{history_all_bytes}` use the wrong `sizeof`

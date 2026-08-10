@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1188/1188 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 cases.
+**1193/1193 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 cases.
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
 (full-size split with a pre-existing split) crashed the server on a u32 underflow
@@ -480,7 +480,7 @@ reddens CI merely because the gaps still exist. With the directory empty it
 exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
 left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1188/1188 ported surface; they measure
+proof. These gaps do not count against the 1193/1193 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite
