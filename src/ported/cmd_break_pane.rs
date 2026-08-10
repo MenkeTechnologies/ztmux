@@ -18,8 +18,8 @@ pub static CMD_BREAK_PANE_ENTRY: cmd_entry = cmd_entry {
     name: "break-pane",
     alias: Some("breakp"),
 
-    args: args_parse::new("abdPF:n:s:t:", 0, 0, None),
-    usage: "[-abdP] [-F format] [-n window-name] [-s src-pane] [-t dst-window]",
+    args: args_parse::new("abdPF:n:s:t:Wx:X:y:Y:", 0, 0, None),
+    usage: "[-abdPW] [-F format] [-n window-name] [-s src-pane] [-t dst-window] [-x position] [-X position] [-y position] [-Y position]",
 
     source: cmd_entry_flag::new(b's', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
     target: cmd_entry_flag::new(
@@ -33,6 +33,69 @@ pub static CMD_BREAK_PANE_ENTRY: cmd_entry = cmd_entry {
 };
 
 /// C `vendor/tmux/cmd-break-pane.c:92`: `static enum cmd_retval cmd_break_pane_exec(struct cmd *self, struct cmdq_item *item)`
+/// Float a pane in place instead of breaking it into a new window.
+/// C `vendor/tmux/cmd-break-pane.c:50`: `static enum cmd_retval cmd_break_pane_float(struct cmdq_item *item, struct args *args, struct window *w, struct window_pane *wp)`
+unsafe fn cmd_break_pane_float(
+    item: *mut cmdq_item,
+    args: *mut args,
+    w: *mut window,
+    wp: *mut window_pane,
+) -> cmd_retval {
+    unsafe {
+        let lc = (*wp).layout_cell;
+        let mut sx = (*lc).saved_sx;
+        let mut sy = (*lc).saved_sy;
+        let mut ox = (*lc).saved_xoff;
+        let mut oy = (*lc).saved_yoff;
+        let mut cause: *mut u8 = null_mut();
+        let lines = window_get_pane_lines(w);
+
+        if window_pane_is_floating(wp) != 0 {
+            cmdq_error!(item, "pane is already floating");
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
+        if (*w).flags.intersects(window_flag::ZOOMED) {
+            cmdq_error!(item, "can't float a pane while window is zoomed");
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
+
+        if layout_floating_args_parse(
+            item,
+            args,
+            lines,
+            w,
+            &raw mut sx,
+            &raw mut sy,
+            &raw mut ox,
+            &raw mut oy,
+            &raw mut cause,
+        ) != 0
+        {
+            cmdq_error!(item, "failed to float pane: {}", _s(cause));
+            free_(cause);
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
+        layout_remove_tile(w, lc);
+        layout_set_size(lc, sx, sy, ox as u32, oy as u32);
+
+        (*lc).flags |= LAYOUT_CELL_FLOATING;
+        // Floating panes are drawn front to back off z_index, so a newly
+        // floated one goes to the head (cmd-break-pane.c:78).
+        tailq_remove::<_, discr_zentry>(&raw mut (*w).z_index, wp);
+        tailq_insert_head::<_, discr_zentry>(&raw mut (*w).z_index, wp);
+
+        if !args_has(args, 'd') {
+            window_set_active_pane(w, wp, 1);
+        }
+        layout_fix_offsets(w);
+        layout_fix_panes(w, null_mut());
+        notify_window(c"window-layout-changed", w);
+        server_redraw_window(w);
+
+        cmd_retval::CMD_RETURN_NORMAL
+    }
+}
+
 pub unsafe fn cmd_break_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
     unsafe {
         let args = cmd_get_args(self_);
@@ -51,6 +114,11 @@ pub unsafe fn cmd_break_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
         let cp: *mut u8;
         let mut idx = (*target).idx;
         let mut template: *const u8;
+
+        // cmd-break-pane.c:108
+        if args_has(args, 'W') {
+            return cmd_break_pane_float(item, args, w, wp);
+        }
 
         let before = args_has(args, 'b');
         if args_has(args, 'a') || before {

@@ -26,6 +26,11 @@ pub unsafe fn layout_create_cell(lcparent: *mut layout_cell) -> *mut layout_cell
             sy: u32::MAX,
             xoff: i32::MAX,
             yoff: i32::MAX,
+            // layout.c:78-82
+            saved_sx: u32::MAX,
+            saved_sy: u32::MAX,
+            saved_xoff: i32::MAX,
+            saved_yoff: i32::MAX,
             wp: null_mut(),
             cells: tailq_head {
                 tqh_first: null_mut(),

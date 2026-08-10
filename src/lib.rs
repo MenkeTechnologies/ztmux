@@ -2129,6 +2129,13 @@ struct layout_cell {
     xoff: i32,
     yoff: i32,
 
+    /// C `vendor/tmux/tmux.h:1521`-`1525`: the tiled geometry a cell had before
+    /// it was floated, so `break-pane -W` has a size and offset to start from.
+    saved_sx: u32,
+    saved_sy: u32,
+    saved_xoff: i32,
+    saved_yoff: i32,
+
     wp: *mut window_pane,
     cells: layout_cells,
 
