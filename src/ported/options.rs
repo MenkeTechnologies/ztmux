@@ -1464,6 +1464,18 @@ pub unsafe fn options_push_changes(name: &str) {
     unsafe {
         log_debug!("{}: {}", _s(__func__), name);
 
+        // options.c:1217-1226: the theme option and either palette half force
+        // every client to re-resolve its theme colours and redraw.
+        if name == "theme" || name.starts_with("dark-theme-") || name.starts_with("light-theme-") {
+            for loop_ in tailq_foreach::<_, ()>(&raw mut CLIENTS).map(NonNull::as_ptr) {
+                server_client_update_theme_colours(loop_);
+                if (*loop_).tty.flags.intersects(tty_flags::TTY_OPENED) {
+                    tty_invalidate(&raw mut (*loop_).tty);
+                }
+                server_redraw_client(loop_);
+            }
+        }
+
         if name == "automatic-rename" {
             for w in rb_foreach(&raw mut WINDOWS).map(NonNull::as_ptr) {
                 if (*w).active.is_null() {

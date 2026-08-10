@@ -403,6 +403,8 @@ pub unsafe fn server_client_open(c: *mut client, cause: *mut *mut u8) -> i32 {
             return -1;
         }
 
+        // server-client.c:369
+        server_client_update_theme_colours(c);
         0
     }
 }
@@ -2155,6 +2157,19 @@ pub unsafe fn server_client_key_callback(item: *mut cmdq_item, data: *mut c_void
                 }
                 wl = (*s).curw;
 
+                // Handle theme reporting before anything else so it works even
+                // with a popup open (server-client.c:1603-1614). The terminal
+                // sends these in reply to the DSR 996 query; tty_keys turns the
+                // escape sequence into one of the two synthetic key codes.
+                if key == keyc::KEYC_REPORT_LIGHT_THEME as u64 {
+                    server_client_report_theme(c, client_theme::THEME_LIGHT);
+                    break 'out;
+                }
+                if key == keyc::KEYC_REPORT_DARK_THEME as u64 {
+                    server_client_report_theme(c, client_theme::THEME_DARK);
+                    break 'out;
+                }
+
                 // Update the activity timer.
                 if libc::gettimeofday(&raw mut (*c).activity_time, null_mut()) != 0 {
                     fatal("gettimeofday failed");
@@ -2406,6 +2421,74 @@ pub unsafe fn server_client_key_callback(item: *mut cmdq_item, data: *mut c_void
 
 /// Handle a key event.
 /// C `vendor/tmux/server-client.c:1693`: `int server_client_handle_key(struct client *c, struct key_event *event)`
+/// Update client theme colours from server options.
+/// C `vendor/tmux/server-client.c:1173`: `void server_client_update_theme_colours(struct client *c)`
+pub unsafe fn server_client_update_theme_colours(c: *mut client) {
+    unsafe {
+        if c.is_null() {
+            return;
+        }
+
+        let option = options_get_number_(GLOBAL_OPTIONS, "theme");
+        if option == 1 {
+            for i in 0..COLOUR_THEME_COUNT {
+                (*c).theme_colours[i] = colour_theme_terminal_colour(i as u32);
+            }
+            return;
+        }
+
+        let ft = format_create(c, null_mut(), FORMAT_NONE, format_flags::FORMAT_NOJOBS);
+        format_defaults(ft, c, None, None, None);
+
+        let mut theme = (*c).theme;
+        if option == 2 {
+            theme = client_theme::THEME_LIGHT;
+        } else if option == 3 {
+            theme = client_theme::THEME_DARK;
+        }
+        for i in 0..COLOUR_THEME_COUNT {
+            (*c).theme_colours[i] = 8;
+            let Some(name) = colour_theme_option(i as u32, theme) else {
+                continue;
+            };
+            let value = options_get_string_(GLOBAL_OPTIONS, name);
+            let expanded = format_expand(ft, value);
+            let colour = colour_fromstring(&std::ffi::CStr::from_ptr(expanded.cast()).to_string_lossy());
+            free_(expanded);
+            if colour == -1 || colour & COLOUR_FLAG_THEME != 0 {
+                continue;
+            }
+            (*c).theme_colours[i] = colour;
+        }
+
+        format_free(ft);
+    }
+}
+
+/// C `vendor/tmux/server-client.c:3083`: `static void server_client_report_theme(struct client *c, enum client_theme theme)`
+unsafe fn server_client_report_theme(c: *mut client, theme: client_theme) {
+    unsafe {
+        let old = (*c).theme;
+
+        if theme == client_theme::THEME_LIGHT {
+            (*c).theme = client_theme::THEME_LIGHT;
+            notify_client(c"client-light-theme", c);
+        } else {
+            (*c).theme = client_theme::THEME_DARK;
+            notify_client(c"client-dark-theme", c);
+        }
+
+        // Only redraw when it actually changed (server-client.c:3099).
+        if (*c).theme != old {
+            server_client_update_theme_colours(c);
+            if (*c).tty.flags.intersects(tty_flags::TTY_OPENED) {
+                tty_invalidate(&raw mut (*c).tty);
+            }
+            server_redraw_client(c);
+        }
+    }
+}
+
 pub unsafe fn server_client_handle_key(c: *mut client, event: *mut key_event) -> i32 {
     unsafe {
         let s = (*c).session;

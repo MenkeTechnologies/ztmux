@@ -446,6 +446,15 @@ pub unsafe fn key_string_lookup_key(mut key: key_code, with_flags: i32) -> *cons
                     s = c!("PasteEnd");
                     break 'append;
                 }
+                // key-string.c:385-392
+                if key == keyc::KEYC_REPORT_DARK_THEME as u64 {
+                    s = c!("ReportDarkTheme");
+                    break 'append;
+                }
+                if key == keyc::KEYC_REPORT_LIGHT_THEME as u64 {
+                    s = c!("ReportLightTheme");
+                    break 'append;
+                }
                 if key == keyc::KEYC_MOUSE as u64 {
                     s = c!("Mouse");
                     break 'append;

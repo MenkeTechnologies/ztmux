@@ -541,6 +541,14 @@ pub(crate) enum keyc {
     KEYC_KP_ZERO,
     KEYC_KP_PERIOD,
 
+    // Theme reporting (tmux.h:399-401). The C places these between the keypad
+    // keys and the mouse keys; this enum keeps the pre-next-3.7 ordering with
+    // the mouse keys near the front, so they go at the end instead. The values
+    // are internal to the port -- nothing puts a keyc discriminant on the wire
+    // -- so only the name/code mapping has to agree with itself.
+    KEYC_REPORT_DARK_THEME,
+    KEYC_REPORT_LIGHT_THEME,
+
     // End of special keys.
     KEYC_BASE_END,
 }
@@ -690,13 +698,38 @@ mod tests {
         assert_eq!(v(keyc::KEYC_F2), v(keyc::KEYC_F1) + 1);
     }
 
-    // KEYC_BASE_END is the sentinel terminating the special-key enum; the
-    // numeric keypad period is the final real key just before it (tmux.h).
+    // KEYC_BASE_END is the sentinel terminating the special-key enum, so it
+    // must sit above every real key in it. It used to be asserted as
+    // KP_PERIOD + 1, but that only held while the keypad keys happened to be
+    // declared last; the C does not have that property either (tmux.h:394-405
+    // puts the theme keys and the whole mouse block after KP_PERIOD). The
+    // invariant that actually matters is the one checked here: the sentinel is
+    // one past the last declared key and above every family's terminal member.
     #[test]
     fn base_end_is_the_final_sentinel() {
-        assert_eq!(v(keyc::KEYC_BASE_END), v(keyc::KEYC_KP_PERIOD) + 1);
+        assert_eq!(v(keyc::KEYC_BASE_END), v(keyc::KEYC_REPORT_LIGHT_THEME) + 1);
+        assert!(v(keyc::KEYC_BASE_END) > v(keyc::KEYC_KP_PERIOD));
         assert!(v(keyc::KEYC_BASE_END) > v(keyc::KEYC_TRIPLECLICK11_BORDER));
+        assert!(v(keyc::KEYC_BASE_END) > v(keyc::KEYC_F12));
         assert!(v(keyc::KEYC_BASE_END) > KEYC_BASE);
+    }
+
+    // The two theme-reporting keys are real members of the special-key range,
+    // so KEYC_IS_MOUSE must not claim them and they must fall inside the
+    // KEYC_BASE..KEYC_BASE_END window the ignore-guard in input_key tests.
+    #[test]
+    fn theme_report_keys_are_special_but_not_mouse() {
+        for k in [
+            v(keyc::KEYC_REPORT_DARK_THEME),
+            v(keyc::KEYC_REPORT_LIGHT_THEME),
+        ] {
+            assert!(k >= KEYC_BASE && k < v(keyc::KEYC_BASE_END));
+            assert!(!KEYC_IS_MOUSE(k));
+        }
+        assert_eq!(
+            v(keyc::KEYC_REPORT_LIGHT_THEME),
+            v(keyc::KEYC_REPORT_DARK_THEME) + 1
+        );
     }
 
     // The six-location block ordering (PANE, STATUS, STATUS_LEFT, STATUS_RIGHT,

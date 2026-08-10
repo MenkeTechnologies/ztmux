@@ -400,6 +400,13 @@ pub unsafe fn tty_start_tty(tty: *mut tty) {
             tty_putcode(tty, tty_code_code::TTYC_ENBP);
         }
 
+        if (*(*tty).term).flags.intersects(term_flags::TERM_VT100LIKE) {
+            // Subscribe to theme changes and request the theme now (tty.c:377).
+            // The reply comes back as \033[?997;1n or ;2n, which tty_keys turns
+            // into KEYC_REPORT_DARK_THEME / KEYC_REPORT_LIGHT_THEME.
+            tty_puts(tty, c!("\x1b[?2031h\x1b[?996n"));
+        }
+
         evtimer_set(
             &raw mut (*tty).start_timer,
             tty_start_timer_callback,
