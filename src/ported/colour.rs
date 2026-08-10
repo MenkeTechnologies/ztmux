@@ -50,6 +50,56 @@ pub fn colour_theme_terminal_colour(n: u32) -> i32 {
     COLOUR_THEME_TABLE[n as usize].3
 }
 
+/// Get theme colour option name.
+/// C `vendor/tmux/colour.c:90`: `const char *colour_theme_option(u_int n, enum client_theme theme)`
+pub fn colour_theme_option(n: u32, theme: client_theme) -> Option<&'static str> {
+    let row = COLOUR_THEME_TABLE.get(n as usize)?;
+    Some(if theme == client_theme::THEME_LIGHT {
+        row.2
+    } else {
+        row.1
+    })
+}
+
+/// Convert background colour to theme.
+/// C `vendor/tmux/colour.c:347`: `enum client_theme colour_totheme(int c)`
+pub fn colour_totheme(c: i32) -> client_theme {
+    if c == -1 {
+        return client_theme::THEME_UNKNOWN;
+    }
+
+    if c & COLOUR_FLAG_RGB != 0 {
+        let r = (c >> 16) & 0xff;
+        let g = (c >> 8) & 0xff;
+        let b = c & 0xff;
+        // The C sums the three channels and splits at 382, which is halfway
+        // through 3*255 (colour.c:359-362).
+        return if r + g + b > 382 {
+            client_theme::THEME_LIGHT
+        } else {
+            client_theme::THEME_DARK
+        };
+    }
+
+    if c & COLOUR_FLAG_256 != 0 {
+        return colour_totheme(colour_256_to_rgb(c));
+    }
+
+    match c {
+        0 | 90 => client_theme::THEME_DARK,
+        7 | 97 => client_theme::THEME_LIGHT,
+        _ => {
+            if (0..=7).contains(&c) {
+                colour_totheme(colour_256_to_rgb(c))
+            } else if (90..=97).contains(&c) {
+                colour_totheme(colour_256_to_rgb(8 + c - 90))
+            } else {
+                client_theme::THEME_UNKNOWN
+            }
+        }
+    }
+}
+
 /// C `vendor/tmux/colour.c:109`: `static int colour_dist_sq(int R, int G, int B, int r, int g, int b)`
 fn colour_dist_sq(r1: i32, g1: i32, b1: i32, r2: i32, g2: i32, b2: i32) -> i32 {
     (r1 - r2) * (r1 - r2) + (g1 - g2) * (g1 - g2) + (b1 - b2) * (b1 - b2)

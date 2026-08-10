@@ -859,6 +859,16 @@ const MOUSE_PARAM_POS_OFF: u32 = 0x21;
 const CMD_LIST_PRINT_ESCAPED: c_int = 0x1;
 const CMD_LIST_PRINT_NO_GROUPS: c_int = 0x2;
 
+/// C `vendor/tmux/tmux.h:1243`: `enum client_theme`
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
+#[repr(C)]
+enum client_theme {
+    #[default]
+    THEME_UNKNOWN,
+    THEME_LIGHT,
+    THEME_DARK,
+}
+
 // Colour flags.
 const COLOUR_FLAG_256: i32 = 0x01000000;
 const COLOUR_FLAG_RGB: i32 = 0x02000000;
@@ -3105,6 +3115,10 @@ struct client {
 
     references: c_int,
 
+    /// What the terminal's background says it is (`tmux.h:2205`), learned from
+    /// the OSC 11 reply. Drives `#{client_theme}`, the client-light-theme /
+    /// client-dark-theme hooks, and which half of the palette options is read.
+    theme: client_theme,
     theme_colours: [c_int; COLOUR_THEME_COUNT],
 
     pan_window: *mut c_void,

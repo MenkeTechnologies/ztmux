@@ -1729,6 +1729,33 @@ pub unsafe fn format_cb_client_cell_width(ft: *mut format_tree) -> format_table_
     }
 }
 
+/// Callback for `client_colours`.
+/// C `vendor/tmux/format.c:1484`: `static void *format_cb_client_colours(struct format_tree *ft)`
+pub unsafe fn format_cb_client_colours(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if (*ft).c.is_null() || !(*(*ft).c).tty.flags.intersects(tty_flags::TTY_STARTED) {
+            return format_table_type::None;
+        }
+        let term = (*(*ft).c).tty.term;
+
+        let colours: u32 = if (*term).flags.intersects(term_flags::TERM_RGBCOLOURS) {
+            16777216
+        } else if (*term).flags.intersects(term_flags::TERM_256COLOURS) {
+            256
+        } else {
+            let n = tty_term_number(term, tty_code_code::TTYC_COLORS);
+            if n < 8 {
+                2
+            } else if n < 16 {
+                8
+            } else {
+                16
+            }
+        };
+        format!("{colours}").into()
+    }
+}
+
 /// C `vendor/tmux/format.c:1511`: `static void *format_cb_client_control_mode(struct format_tree *ft)`
 pub unsafe fn format_cb_client_control_mode(ft: *mut format_tree) -> format_table_type {
     unsafe {
@@ -1958,6 +1985,21 @@ pub unsafe fn format_cb_client_written(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `config_files`.
+/// Callback for `client_theme`.
+/// C `vendor/tmux/format.c:1726`: `static void *format_cb_client_theme(struct format_tree *ft)`
+pub unsafe fn format_cb_client_theme(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if !(*ft).c.is_null() {
+            return match (*(*ft).c).theme {
+                client_theme::THEME_DARK => "dark".to_string().into(),
+                client_theme::THEME_LIGHT => "light".to_string().into(),
+                client_theme::THEME_UNKNOWN => format_table_type::None,
+            };
+        }
+        format_table_type::None
+    }
+}
+
 /// C `vendor/tmux/format.c:1743`: `static void *format_cb_config_files(__unused struct format_tree *ft)`
 pub unsafe fn format_cb_config_files(_ft: *mut format_tree) -> format_table_type {
     let mut s = String::new();
@@ -3531,6 +3573,7 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("client_activity", format_cb_client_activity),
     format_table_entry::new("client_cell_height", format_cb_client_cell_height),
     format_table_entry::new("client_cell_width", format_cb_client_cell_width),
+    format_table_entry::new("client_colours", format_cb_client_colours),
     format_table_entry::new("client_control_mode", format_cb_client_control_mode),
     format_table_entry::new("client_created", format_cb_client_created),
     format_table_entry::new("client_discarded", format_cb_client_discarded),
@@ -3547,6 +3590,7 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("client_termfeatures", format_cb_client_termfeatures),
     format_table_entry::new("client_termname", format_cb_client_termname),
     format_table_entry::new("client_termtype", format_cb_client_termtype),
+    format_table_entry::new("client_theme", format_cb_client_theme),
     format_table_entry::new("client_tty", format_cb_client_tty),
     format_table_entry::new("client_uid", format_cb_client_uid),
     format_table_entry::new("client_user", format_cb_client_user),
