@@ -82,6 +82,7 @@ pub unsafe fn tty_init(tty: *mut tty, c: *mut client) -> i32 {
         (*tty).fg = -1;
         (*tty).bg = -1;
         (*tty).mouse_last_pane = -1;
+        (*tty).mouse_slider_mpos = -1;
 
         if libc::tcgetattr((*c).fd, &raw mut (*tty).tio) != 0 {
             return -1;

@@ -2417,6 +2417,10 @@ struct tty {
     mouse_last_y: u32,
     mouse_last_b: u32,
     mouse_drag_flag: i32,
+    /// C `vendor/tmux/tmux.h:1769`: where within the scrollbar slider a drag
+    /// was grabbed, or -1 when no slider drag is in progress. Read by
+    /// `scroll-to-mouse` and `copy-mode -S`.
+    mouse_slider_mpos: i32,
     /// C `vendor/tmux/tmux.h:1770`: `int mouse_last_pane`.
     ///
     /// Pane id the current drag was started on, or -1. Latching it keeps a

@@ -1308,6 +1308,7 @@ pub unsafe fn server_client_check_mouse(c: *mut client, event: *mut key_event) -
                     _ => key = keyc::KEYC_MOUSE as u64,
                 }
                 (*c).tty.mouse_drag_flag = 0;
+                (*c).tty.mouse_slider_mpos = -1;
                 break 'out;
             }
 

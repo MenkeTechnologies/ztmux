@@ -740,6 +740,131 @@ pub unsafe fn window_copy_vadd(wp: *mut window_pane, parse: i32, args: std::fmt:
 }
 
 /// C `vendor/tmux/window-copy.c:870`: `void window_copy_pageup(struct window_pane *wp, int half_page)`
+/// C `vendor/tmux/window-copy.c:754`: `void window_copy_scroll(struct window_pane *wp, int sl_mpos, u_int my, u_int tty_oy, int scroll_exit)`
+pub unsafe fn window_copy_scroll(
+    wp: *mut window_pane,
+    sl_mpos: i32,
+    my: u32,
+    tty_oy: u32,
+    scroll_exit: i32,
+) {
+    unsafe {
+        let wme = tailq_first(&raw mut (*wp).modes);
+        if !wme.is_null() {
+            window_set_active_pane((*wp).window, wp, 0);
+            window_copy_scroll1(wme, wp, sl_mpos, my, tty_oy, scroll_exit);
+        }
+    }
+}
+
+/// C `vendor/tmux/window-copy.c:766`: `static void window_copy_scroll1(struct window_mode_entry *wme, struct window_pane *wp, int sl_mpos, u_int my, u_int tty_oy, int scroll_exit)`
+unsafe fn window_copy_scroll1(
+    wme: *mut window_mode_entry,
+    wp: *mut window_pane,
+    sl_mpos: i32,
+    my: u32,
+    tty_oy: u32,
+    scroll_exit: i32,
+) {
+    unsafe {
+        let data: *mut window_copy_mode_data = (*wme).data.cast();
+        let slider_height = (*wp).sb_slider_h;
+        let sb_height = (*wp).sy;
+        // The C holds these as u_int (window-copy.c:773); this port's yoff is
+        // signed so a floating pane can sit off an edge, so it is taken as
+        // unsigned here to keep the C's arithmetic.
+        let sb_top = (*wp).yoff as u32;
+        let sy = screen_size_y((*data).backing);
+
+        // sl_mpos is where in the slider the drag started, `my` is a raw tty y
+        // coordinate and sb_top is a window one, so `my` is converted by adding
+        // the window pan offset. sl_mpos already carries the status-line
+        // adjustment from server_client_check_mouse (window-copy.c:778-787).
+        let my_w = my + tty_oy;
+        let new_slider_y: i32 = if my_w <= sb_top + sl_mpos as u32 {
+            // Slider banged into the top.
+            (sb_top - (*wp).yoff as u32) as i32
+        } else if my_w - sl_mpos as u32 > sb_top + sb_height - slider_height {
+            // Slider banged into the bottom.
+            (sb_top - (*wp).yoff as u32 + (sb_height - slider_height)) as i32
+        } else {
+            (my_w - (*wp).yoff as u32 - sl_mpos as u32) as i32
+        };
+
+        let mut offset: u32 = 0;
+        let mut size: u32 = 0;
+        if tailq_first(&raw mut (*wp).modes).is_null()
+            || window_copy_get_current_offset(wp, &raw mut offset, &raw mut size) == 0
+        {
+            return;
+        }
+
+        // The inverse of the formula redraw_draw_pane_scrollbar uses.
+        let new_offset =
+            (new_slider_y as f32 * ((size + sb_height) as f32 / sb_height as f32)) as u32;
+        let delta = offset as i32 - new_offset as i32;
+
+        // Move the view around relative to the cursor, keeping the selection.
+        let oy = screen_hsize((*data).backing) + (*data).cy - (*data).oy;
+        let ox = window_copy_find_length(wme, oy);
+
+        if (*data).cx != ox {
+            (*data).lastcx = (*data).cx;
+            (*data).lastsx = ox;
+        }
+        (*data).cx = (*data).lastcx;
+
+        if delta >= 0 {
+            let n = delta as u32;
+            if (*data).oy + n > screen_hsize((*data).backing) {
+                (*data).oy = screen_hsize((*data).backing);
+                if (*data).cy < n {
+                    (*data).cy = 0;
+                } else {
+                    (*data).cy -= n;
+                }
+            } else {
+                (*data).oy += n;
+            }
+        } else {
+            let n = (-delta) as u32;
+            if (*data).oy < n {
+                (*data).oy = 0;
+                if (*data).cy + (n - (*data).oy) >= sy {
+                    (*data).cy = sy - 1;
+                } else {
+                    (*data).cy += n - (*data).oy;
+                }
+            } else {
+                (*data).oy -= n;
+            }
+        }
+
+        // Dragging the tail as well as the scrollbar looks wrong.
+        (*data).cursordrag = cursordrag::CURSORDRAG_NONE;
+
+        if (*data).screen.sel.is_null() || !(*data).rectflag {
+            let py = screen_hsize((*data).backing) + (*data).cy - (*data).oy;
+            let px = window_copy_find_length(wme, py);
+            if ((*data).cx >= (*data).lastsx && (*data).cx != px) || (*data).cx > px {
+                window_copy_cursor_end_of_line(wme);
+            }
+        }
+
+        if scroll_exit != 0 && (*data).oy == 0 {
+            window_pane_reset_mode(wp);
+            return;
+        }
+
+        if !(*data).searchmark.is_null() && (*data).timeout == 0 {
+            window_copy_search_marks(wme, null_mut(), (*data).searchregex, 1);
+        }
+        window_copy_update_selection(wme, 1, 0);
+        window_pane_scrollbar_show(wp, 1);
+        window_copy_redraw_screen(wme);
+    }
+}
+
 pub unsafe fn window_copy_pageup(wp: *mut window_pane, half_page: i32) {
     unsafe {
         window_copy_pageup1(tailq_first(&raw mut (*wp).modes), half_page);
@@ -1689,6 +1814,34 @@ pub unsafe fn window_copy_cmd_scroll_middle(
 }
 
 // Scroll line containing the cursor to the top.
+
+/// Scroll the pane to the mouse in the scrollbar.
+/// C `vendor/tmux/window-copy.c:1678`: `static enum window_copy_cmd_action window_copy_cmd_scroll_to_mouse(struct window_copy_cmd_state *cs)`
+pub unsafe fn window_copy_cmd_scroll_to_mouse(
+    cs: *mut window_copy_cmd_state,
+) -> window_copy_cmd_action {
+    unsafe {
+        let wme = (*cs).wme;
+        let wp = (*wme).wp;
+        let c = (*cs).c;
+        let m = (*cs).m;
+        let scroll_exit = i32::from(args_has((*cs).wargs, 'e'));
+
+        let mut tty_ox: u32 = 0;
+        let mut tty_oy: u32 = 0;
+        let mut tty_sx: u32 = 0;
+        let mut tty_sy: u32 = 0;
+        tty_window_offset(
+            &raw mut (*c).tty,
+            &raw mut tty_ox,
+            &raw mut tty_oy,
+            &raw mut tty_sx,
+            &raw mut tty_sy,
+        );
+        window_copy_scroll(wp, (*c).tty.mouse_slider_mpos, (*m).y, tty_oy, scroll_exit);
+        window_copy_cmd_action::WINDOW_COPY_CMD_NOTHING
+    }
+}
 
 /// C `vendor/tmux/window-copy.c:1695`: `static enum window_copy_cmd_action window_copy_cmd_scroll_top(struct window_copy_cmd_state *cs)`
 pub unsafe fn window_copy_cmd_scroll_top(cs: *mut window_copy_cmd_state) -> window_copy_cmd_action {
@@ -3453,7 +3606,7 @@ struct window_copy_cmd_table_entry {
 /// C `vendor/tmux/window-copy.c:3113`: `#define WINDOW_COPY_CMD_FLAG_READONLY 0x1`
 const WINDOW_COPY_CMD_FLAG_READONLY: i32 = 0x1;
 
-static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 94] = [
+static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 95] = [
     window_copy_cmd_table_entry {
         command: "append-selection",
         minargs: 0,
@@ -4137,6 +4290,15 @@ static WINDOW_COPY_CMD_TABLE: [window_copy_cmd_table_entry; 94] = [
         flags: WINDOW_COPY_CMD_FLAG_READONLY,
         clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_ALWAYS,
         f: window_copy_cmd_scroll_middle,
+    },
+    window_copy_cmd_table_entry {
+        command: "scroll-to-mouse",
+        minargs: 0,
+        maxargs: 0,
+        args: args_parse::new("e", 0, 0, None),
+        flags: WINDOW_COPY_CMD_FLAG_READONLY,
+        clear: window_copy_cmd_clear::WINDOW_COPY_CMD_CLEAR_EMACS_ONLY,
+        f: window_copy_cmd_scroll_to_mouse,
     },
     window_copy_cmd_table_entry {
         command: "scroll-top",
