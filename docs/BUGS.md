@@ -4,6 +4,196 @@ Fixes to the ztmux port, most recent first.
 
 ## Open
 
+### Two client theme hooks are absent from the options table
+
+- **Symptom:** `set-hook -g client-light-theme ...` fails with `invalid option`;
+  next-3.7 accepts it. The same for `client-dark-theme`.
+- **Root cause:** `vendor/tmux/options-table.c:1929`–`1930` declares both; the
+  port's `OPTIONS_TABLE` has neither. Unlike the five pane hooks fixed on
+  2026-08-09 these are not typos — there is no notify side either
+  (`vendor/tmux/server-client.c:3089`/`:3092` call `notify_client` for them and
+  the port has no counterpart), so this is an unported feature rather than a
+  transcription slip.
+- **Measurement:** `show-hooks -g` + `-gw` + `-gp` counts 68 names on the
+  reference and 66 on the port; after the pane hook fix these two are the whole
+  remaining difference.
+
+### 27 upstream command flags have no counterpart in the port
+
+- **Symptom:** eleven of the 92 commands reject flags the reference accepts —
+  e.g. `break-pane -x` gives `command break-pane: unknown flag -x` where
+  next-3.7 accepts it.
+- **Measurement:** comparing the `getopt`-shaped argument template of every
+  `cmd_entry` (the first member of `.args` in C, the first argument to
+  `args_parse::new` in Rust) gives 564 flag slots across the 92 upstream
+  commands, of which **27 are absent from the port**, 5 are port-only (the `o:`
+  structured-output extension on the five `list-*` commands), and 1 differs in
+  arity.
+- **The eleven:** `break-pane` (`-W -x -X -y -Y`), `choose-buffer` (`-k -y`),
+  `choose-client` (`-h -i -k -y`), `choose-tree` (`-h -k -y`),
+  `command-prompt` (`-C -e -l -P`), `copy-mode` (`-S`), `customize-mode`
+  (`-k -y`), `list-keys` (`-F -O -r`), `run-shell` (`-E -s`), `server-access`
+  (`-g`). `refresh-client` declares `l::` where the C declares `l` — an
+  optional-argument form for a flag the C reads with `args_has`
+  (`cmd-refresh-client.c:263`), which is the one entry most likely to be a
+  transcription artefact.
+- **Largest block:** `break-pane`'s five are next-3.7's floating-pane geometry,
+  dispatched in C to `cmd_break_pane_float` (`cmd-break-pane.c:50`), which the
+  port does not have — one feature, not five flags.
+- **Why nothing caught it:** no parity case passes any of the 27. Every one of
+  the 564 slots is a mechanically derivable case, so the templates are a
+  generator for the suite.
+
+### Five rows are missing from the format table
+
+- **Symptom:** `#{buffer_full}` expands to the empty string where next-3.7
+  returns the buffer. Four commands reproduce it: `set-buffer hello` then
+  `display-message -p '#{buffer_full}'` prints `hello` on the reference and
+  nothing on the port.
+- **Measurement:** `format_table[]` (`vendor/tmux/format.c:3203`) holds 195
+  rows; `FORMAT_TABLE` (`src/ported/format.rs:3466`) holds 190. The five names
+  the port does not have are `buffer_full`, `client_colours`, `client_theme`,
+  `pane_pipe_pid` and `session_active`; every name the port does have is in the
+  C's table, so these are absences rather than renames.
+- **Why it is hard to see:** an unknown format variable expands to the empty
+  string, exactly as a known variable with an empty value does, so expanding the
+  name under both binaries proves nothing until the value is made non-empty.
+- **Note:** `client_colours` is *referenced* by the port — 20 `dark-theme-*` /
+  `light-theme-*` defaults in `src/ported/options_table.rs` (e.g. line 534)
+  carry `#{?#{e|>=:#{client_colours},256},gray5,black}`, faithfully copied from
+  `options-table.c:557`. So the port ships 20 default option values that expand
+  a format variable its own table cannot resolve.
+- **Why the suite does not have the case:** none of the five is named by any of
+  the 1188 cases. Three are client-scoped and the harness attaches no client;
+  one is a pid; `buffer_full` has no excuse at all.
+
+### `#{history_bytes}` and `#{history_all_bytes}` use the wrong `sizeof`
+
+- **Symptom:** on an idle 80x24 pane with three lines of output,
+  `#{history_bytes}` is 1498 on the reference and 4964 on the port;
+  `#{history_all_bytes}` is `24,960,80,400,6,138` against
+  `24,960,80,3520,11,484`. Filling 20,000 lines gives 8,800,040 against
+  71,200,040 — the port over-reports by about 8x.
+- **Root cause:** the C multiplies the cell count by `sizeof *gl->celldata`
+  (`struct grid_cell_entry`, `__packed`, 5 bytes) and the extended count by
+  `sizeof *gl->extddata` (`struct grid_extd_entry`, `__packed`, 23 bytes) —
+  `format.c:952`–`953` and `format.c:983`–`984`. The port multiplies both by
+  `std::mem::size_of::<grid_cell>()` (44 bytes) in all four places:
+  `src/ported/format.rs:1185`, `1186`, `1220`, `1222`. `grid_cell` is the
+  *unpacked* cell struct with its `utf8_data`, not the storage entry.
+- **Fix:** `size_of::<grid_cell_entry>()` and `size_of::<grid_extd_entry>()`.
+  Note that the port's own entries are `#[repr(C)]` where the C's are
+  `__packed`, so the corrected numbers will still be larger than the
+  reference's — that difference is real memory, and RSS after 20,000 lines
+  bears it out (10,432 KiB grown on the reference against 14,320 KiB on the
+  port).
+- **Why nothing caught it:** no parity case reads either variable; both are
+  memory-shaped numbers, which the determinism rules discourage.
+
+### Six read-only client gates are missing (seven sites)
+
+- **Measurement:** `CLIENT_READONLY` appears at 24 sites in 9 files of the
+  vendored C; `client_flag::READONLY` appears at 17 sites in 6 files of
+  `src/ported`. The port also calls `proc_get_peer_uid` at 5 of the C's 7 call
+  sites.
+- **Absent gates:** `cmd-attach-session.c:111`–`117` and
+  `cmd-switch-client.c:83`–`88` (a read-only client from a foreign uid may not
+  clear its own read-only flag with `-r`; the port's `cmd_switch_client.rs:55`
+  toggles unconditionally), `cmd-detach-client.c:73`–`78` (`detach-client -s` /
+  `-a` / another client), `cmd-send-keys.c:178`–`181` (`send-keys` without
+  `-X`), `window-copy.c:3723`–`3729` (any copy-mode command without
+  `WINDOW_COPY_CMD_FLAG_READONLY`), `server-client.c:1573` (the bracketed-paste
+  key path) and `server-client.c:2618` (the command-prompt result).
+- **Why it matters:** these are the ACL surface of Chapter 38, and two of them
+  are the uid checks that keep `server-access`-granted foreign clients from
+  promoting themselves.
+
+### The copy-mode command table has no argument templates and no read-only flag
+
+- **Measurement:** `window_copy_cmd_table[]` (`vendor/tmux/window-copy.c:3118`)
+  carries `.args` (an `args_parse` template) and `.flags` on every entry; 17 of
+  the 95 entries have a non-empty template (`CP` on the fourteen copy/copy-pipe
+  commands, `o` on `next-prompt`/`previous-prompt`, `e` on `scroll-to-mouse`)
+  and 49 carry
+  `WINDOW_COPY_CMD_FLAG_READONLY`. `WINDOW_COPY_CMD_TABLE`
+  (`src/ported/window_copy.rs:3425`) has neither field — only `minargs` and
+  `maxargs` — and `cs.wargs` does not exist, so `args_has(cs->wargs, 'P')` and
+  friends have no counterpart.
+- **Symptom:** `send-keys -X copy-line -P` suppresses the paste buffer on the
+  reference (`list-buffers` returns nothing) and creates one on the port.
+- **Related:** an unknown copy-mode command is silently ignored by the port —
+  `send-keys -X scroll-to-mouse` returns nothing, while the reference *has* the
+  command and takes the server down running it (`server exited unexpectedly`),
+  which is why no parity case can drive it.
+
+### The deferred request/reply mechanism is not ported
+
+- **Measurement:** `input_csi_table[]` (`vendor/tmux/input.c:304`) has 43 rows;
+  `INPUT_CSI_TABLE` (`src/ported/input.rs:257`) has 40. The three absent are
+  `CSI ? Ps n` (`INPUT_CSI_DSR_PRIVATE`), `CSI Ps $ p` (`INPUT_CSI_QUERY`) and
+  `CSI ? Ps $ p` (`INPUT_CSI_QUERY_PRIVATE`). Eighteen `input_*` functions have
+  no counterpart under `src/`, and they are one cluster: `input_make_request`,
+  `input_add_request`, `input_free_request`, `input_cancel_requests`,
+  `input_request_reply`, `input_request_clipboard_reply`,
+  `input_request_palette_reply`, `input_request_timer_callback`,
+  `input_start_request_timer`, `input_send_reply`, `input_handle_decrqss`,
+  `input_osc_52_parse`, `input_osc_52_reply`, `input_report_current_theme`,
+  `input_start_ground_timer`, `input_ground_timer_callback`, `input_stop_utf8`
+  and the C's four-argument `input_reply`.
+- **Symptom (queried from inside a pane, reply read back off the tty):**
+  `CSI ? 1004 $ p` returns `ESC [ ? 1004 ; 2 $ y` on the reference and nothing
+  on the port; `DCS $ q m ST` returns `ESC P 0 $ r ESC \` on the reference and
+  nothing on the port. `CSI 6 n` agrees (`ESC [ 1 ; 1 R`).
+- **Semantics, not just rows:** the C's `input_reply(ictx, add, fmt, ...)`
+  (`input.c:1153`) queues a reply behind any outstanding request when `add` is
+  set, so replies stay ordered against clipboard and palette round-trips. The
+  port's `input_reply_` (`src/ported/input.rs:1274`) writes straight to the
+  bufferevent.
+
+### A control-mode client never receives `%output`
+
+- **Symptom:** attach a control client, then split a window whose command
+  prints. The reference emits `%output %1 splitout`; the port emits the
+  `%layout-change` line and nothing else. Reproduced with a four-line script on
+  isolated sockets; `%begin`/`%end`/`%error`, `%session-changed`,
+  `%window-add`, `%layout-change`, `%subscription-changed` and `%exit` all
+  agree.
+- **Localisation so far:** the call site (`src/ported/window.rs:1484`–`1488`
+  against `vendor/tmux/window.c:1275`–`1278`), `control_write_output`
+  (`control.rs:495` against `control.c:474`) and `control_add_pane`
+  (`control.rs:253` against `control.c:247`) are all faithful, and the control
+  client's `#{client_flags}` reads `attached,focused,control-mode` on both. The
+  responsible line was not isolated; it is somewhere in the
+  pending-block/flush chain or in the offset accounting behind
+  `window_pane_get_new_data`.
+- **Also worth fixing while there:** `control_append_data`
+  (`src/ported/control.rs:707`) emits each byte with `*new_data.add(i) as char`,
+  which re-encodes any byte over 0x7f as multi-byte UTF-8 where the C
+  (`control.c:646`) copies the raw bytes.
+
+### `-o json` and `-o tsv` are unusable under a non-UTF-8 locale
+
+- **Symptom:** `LC_ALL=C ztmux list-windows -o json` emits `[_{"session":...`
+  — the newline between array elements is an underscore, and the document is
+  not parseable. All four formats collapse to a single line: json 4 lines to 1,
+  jsonl 2 to 1, csv 3 to 1, tsv 3 to 1 with 38 underscores where the tabs were.
+- **Root cause:** `Rows::render` (`src/extensions/structured.rs:117`) builds the
+  whole document as one string and hands it to a single `cmdq_print`, whose own
+  comment at line 116 says so. `server_client_print`
+  (`vendor/tmux/server-client.c:3040`, ported faithfully) runs `utf8_sanitize`
+  over a message when the client lacks `CLIENT_UTF8`, and `utf8_sanitize`
+  (`utf8.c:784`, `src/ported/utf8.rs:770`) replaces every byte outside
+  `0x20..0x7e` with `_`. tmux's own multi-line listings survive because they
+  call `cmdq_print` once per line.
+- **Blast radius:** running each of the 113 extension verbs against a fresh
+  two-window server gives 95 producing output under the inherited UTF-8 locale
+  and 31 under `LC_ALL=C` — 64 verbs flip from working to `parse [...]:
+  expected value at line 1 column 2`. `parity/run_parity.sh:55` exports
+  `LC_ALL=C LANG=C`, so the suite runs in exactly that locale, and no parity
+  case can cover `-o` because it has no upstream counterpart.
+- **Fix:** emit one `cmdq_print` per rendered line, as the ported `list-*`
+  commands already do.
+
 ### `link=` in a style is still rejected
 
 - **Symptom:** `set-option -g status-style 'bg=red,link=3'` fails with
@@ -17,6 +207,39 @@ Fixes to the ztmux port, most recent first.
   `style_copy`/`style_set`, which are whole-struct copies.
 - **Found by:** the same style-directive check that turned up `width=`/`pad=`
   below.
+
+## 2026-08-09
+
+### Five pane hooks were misspelled in the options table (dead in both directions)
+
+- **Symptom:** `set-hook -g pane-focus-in ...` failed with `invalid option:
+  pane-focus-in` where next-3.7 accepts it. The same for `pane-focus-out`,
+  `pane-mode-changed`, `pane-set-clipboard` and `pane-title-changed`. None of
+  the five could fire either.
+- **Root cause:** five of the seven `options_table_pane_hook!` rows in
+  `src/ported/options_table.rs` dropped a `c`, against
+  `vendor/tmux/options-table.c:1932`–`1938` — `pane-fous-in`, `pane-fous-out`,
+  `pane-mode-hanged`, `pane-set-lipboard`, `pane-title-hanged`.
+- **Dead inbound:** `options_match` (`options.c:678`) returned `None` for the
+  real name, so `cmd_set_option.rs:124` answered with `invalid option: ...`.
+- **Dead outbound:** the notify side was already correct — `window.rs:577`/`:584`
+  fire `pane-focus-out`/`pane-focus-in`, `window_copy.rs:6432`/`:6525` fire
+  `pane-set-clipboard`, `cmd_select_pane.rs:213` and three sites in `input.rs`
+  fire `pane-title-changed`, `window.rs:1618`/`:1653` fire
+  `pane-mode-changed` — so `notify_insert_hook`'s `options_get(oo, name)` looked
+  up a name the table did not hold. Correcting the table connected thirteen call
+  sites that were already in place.
+- **Why nothing caught it:** the anti-drift gate compares function names, not
+  string literals in macro arguments; the parity suite compares output, and a
+  hook that never fires emits none; the row count is identical on both sides
+  because a misspelled row is still a row. Only a name-level comparison finds it.
+- **Pinned by** three tests in `options_table.rs`, each reading its expectations
+  out of the vendored C or out of `src/ported` rather than a hand-typed list:
+  every pane hook row is compared by name and in order against
+  `OPTIONS_TABLE_PANE_HOOK` in `options-table.c`; every `notify_pane` name in
+  `src/ported` must resolve to a registered pane hook; and each name must resolve
+  through `options_match`, the same call `cmd_set_option` makes. Reverting only
+  the five literals fails all three.
 
 ## 2026-07-31 (port round: `prompt.c` as an object, then `switch-mode`)
 
