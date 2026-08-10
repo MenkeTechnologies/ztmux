@@ -2087,11 +2087,11 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
     options_table_hook!("command-error", ""),
     options_table_pane_hook!("pane-died", ""),
     options_table_pane_hook!("pane-exited", ""),
-    options_table_pane_hook!("pane-fous-in", ""),
-    options_table_pane_hook!("pane-fous-out", ""),
-    options_table_pane_hook!("pane-mode-hanged", ""),
-    options_table_pane_hook!("pane-set-lipboard", ""),
-    options_table_pane_hook!("pane-title-hanged", ""),
+    options_table_pane_hook!("pane-focus-in", ""),
+    options_table_pane_hook!("pane-focus-out", ""),
+    options_table_pane_hook!("pane-mode-changed", ""),
+    options_table_pane_hook!("pane-set-clipboard", ""),
+    options_table_pane_hook!("pane-title-changed", ""),
     options_table_hook!("session-closed", ""),
     options_table_hook!("session-created", ""),
     options_table_hook!("session-renamed", ""),
@@ -2376,6 +2376,122 @@ mod tests {
                     oe.name
                 );
             }
+        }
+    }
+
+    /// Read a file from the repository root (`CARGO_MANIFEST_DIR`).
+    fn read_repo_file(rel: &str) -> String {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(rel);
+        std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()))
+    }
+
+    /// Every string literal opened by `needle` in `src`, in source order.
+    /// `needle` must end in the opening quote (`OPTIONS_TABLE_PANE_HOOK("`), so
+    /// the literal starts immediately after it and the capture runs to the next
+    /// quote. Requiring the quote is what skips the C `#define` of the macro and
+    /// the `notify_pane(const char *name, …)` doc comment, both of which contain
+    /// the bare call text but no name literal. Used to lift names straight out of
+    /// the vendored C table and out of the `notify_pane` call sites, so the
+    /// expectations in these tests are never hand-typed.
+    fn literals_after(src: &str, needle: &str) -> Vec<String> {
+        assert!(needle.ends_with('"'), "needle must end at the opening quote");
+        let mut out = Vec::new();
+        let mut rest = src;
+        while let Some(at) = rest.find(needle) {
+            let after = &rest[at + needle.len()..];
+            let Some(close) = after.find('"') else { break };
+            out.push(after[..close].to_string());
+            rest = &after[close + 1..];
+        }
+        out
+    }
+
+    /// The pane hooks the port declares: `options_table_pane_hook!` is the only
+    /// macro that produces `IS_HOOK` with scope `WINDOW|PANE`, so this reads the
+    /// built table rather than the source text.
+    fn rust_pane_hooks() -> Vec<&'static str> {
+        OPTIONS_TABLE
+            .iter()
+            .filter(|oe| {
+                oe.flags & OPTIONS_TABLE_IS_HOOK != 0
+                    && oe.scope == (OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE)
+            })
+            .map(|oe| oe.name)
+            .collect()
+    }
+
+    // Anti-typo gate for the pane hooks. Five of the seven rows shipped with a
+    // dropped `c` (`pane-fous-in`, `pane-fous-out`, `pane-mode-hanged`,
+    // `pane-set-lipboard`, `pane-title-hanged`), which killed them in both
+    // directions: `set-hook -g pane-focus-in` could not resolve, and the
+    // matching `notify_pane` call sites looked up a name the table did not hold
+    // so the hooks could never fire. Names are read out of
+    // vendor/tmux/options-table.c at test time — the C source is the spec — so a
+    // sixth typo, a dropped row or a stale extra row all fail here.
+    #[test]
+    fn test_pane_hook_rows_match_vendored_c_table() {
+        let c_src = read_repo_file("vendor/tmux/options-table.c");
+        let c_hooks = literals_after(&c_src, "OPTIONS_TABLE_PANE_HOOK(\"");
+        assert!(
+            !c_hooks.is_empty(),
+            "no OPTIONS_TABLE_PANE_HOOK rows found in vendor/tmux/options-table.c \
+             — the extractor is broken, not the table"
+        );
+        assert_eq!(
+            rust_pane_hooks(),
+            c_hooks,
+            "options_table_pane_hook! rows drifted from vendor/tmux/options-table.c"
+        );
+    }
+
+    // The other half of the same bug. Every hook name passed to `notify_pane`
+    // must exist in OPTIONS_TABLE as a pane hook, otherwise `notify_insert_hook`
+    // looks up a name that is not there and the notification is silently
+    // dropped. Call sites are scanned out of src/ported so a new `notify_pane`
+    // with a misspelt or unregistered name fails immediately.
+    #[test]
+    fn test_notify_pane_names_are_registered_pane_hooks() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/ported");
+        let hooks = rust_pane_hooks();
+        let mut checked = 0;
+        for entry in std::fs::read_dir(&dir).expect("cannot read src/ported").flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("rs") {
+                continue;
+            }
+            let src = std::fs::read_to_string(&path).expect("cannot read source file");
+            for name in literals_after(&src, "notify_pane(c\"") {
+                checked += 1;
+                assert!(
+                    hooks.contains(&name.as_str()),
+                    "{}: notify_pane(\"{name}\") has no pane hook in OPTIONS_TABLE",
+                    path.display()
+                );
+            }
+        }
+        assert!(checked > 0, "found no notify_pane call sites to check");
+    }
+
+    // End-to-end on the resolution path `set-hook`/`set-option` actually use:
+    // cmd_set_option.rs:117 calls options_match and reports "invalid option: …"
+    // when it returns None. Each vendored pane hook must resolve to itself,
+    // unambiguously — this is what `set-hook -g pane-focus-in …` does.
+    #[test]
+    fn test_pane_hooks_resolve_through_options_match() {
+        let c_src = read_repo_file("vendor/tmux/options-table.c");
+        for name in literals_after(&c_src, "OPTIONS_TABLE_PANE_HOOK(\"") {
+            let mut idx: i32 = -1;
+            let mut ambiguous: i32 = 0;
+            let matched = unsafe {
+                crate::options_::options_match(&name, &raw mut idx, &raw mut ambiguous)
+            };
+            assert_eq!(ambiguous, 0, "{name} resolves ambiguously");
+            assert_eq!(
+                matched.as_deref(),
+                Some(name.as_str()),
+                "set-hook -g {name} would fail with \"invalid option: {name}\""
+            );
         }
     }
 }
