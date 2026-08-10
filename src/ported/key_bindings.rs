@@ -415,7 +415,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
 /// C `vendor/tmux/key-bindings.c:349`: `void key_bindings_init(void)`
 pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
-    static DEFAULTS: [&str; 273] = [
+    static DEFAULTS: [&str; 279] = [
         // Prefix keys.
         "bind -N 'Send the prefix key' C-b { send-prefix }",
         "bind -N 'Rotate through the panes' C-o { rotate-window }",
@@ -512,6 +512,7 @@ pub unsafe fn key_bindings_init() {
         concat!( "bind > { display-menu -xP -yP -T '#[align=centre]#{pane_index} ", "(#{pane_id})' ", DEFAULT_PANE_MENU!(), " }"),
         // Mouse button 1 down on pane.
         "bind -n MouseDown1Pane { select-pane -t=; send -M }",
+        "bind -n C-MouseDown1Pane { swap-pane -s@ }",
         /* Mouse button 1 drag on pane. */
         "bind -n MouseDrag1Pane { if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -M } }",
         "bind -n M-MouseDrag1Pane { move-pane -M }",
@@ -535,6 +536,7 @@ pub unsafe fn key_bindings_init() {
         concat!("bind -n MouseDown3Border { display-menu -O -t= -xM -yM -T '#[align=centre]#{pane_index} (#{pane_id})' ", DEFAULT_PANE_MENU!(), " }"),
         /* Mouse button 1 down on status line. */
         "bind -n MouseDown1Status { select-window -t= }",
+        "bind -n C-MouseDown1Status { swap-window -t@ }",
         /* Mouse wheel down on status line. */
         "bind -n WheelDownStatus { next-window }",
         /* Mouse wheel up on status line. */
@@ -623,6 +625,9 @@ pub unsafe fn key_bindings_init() {
         "bind -Tcopy-mode M-Down { send -X halfpage-down }",
         "bind -Tcopy-mode C-Up { send -X scroll-up }",
         "bind -Tcopy-mode C-Down { send -X scroll-down }",
+        "bind -Tcopy-mode C-[ { send -X cancel }",
+        "bind -Tcopy-mode M-C-Up { send -X previous-prompt }",
+        "bind -Tcopy-mode M-C-Down { send -X next-prompt }",
         /* Copy mode (vi) keys. */
         "bind -Tcopy-mode-vi '#' { send -FX search-backward '#{copy_cursor_word}' }",
         "bind -Tcopy-mode-vi * { send -FX search-forward '#{copy_cursor_word}' }",
@@ -638,6 +643,7 @@ pub unsafe fn key_bindings_init() {
         "bind -Tcopy-mode-vi C-v { send -X rectangle-toggle }",
         "bind -Tcopy-mode-vi C-y { send -X scroll-up }",
         "bind -Tcopy-mode-vi Escape { send -X clear-selection }",
+        "bind -Tcopy-mode-vi C-[ { send -X clear-selection }",
         "bind -Tcopy-mode-vi Space { send -X begin-selection }",
         "bind -Tcopy-mode-vi '$' { send -X end-of-line }",
         "bind -Tcopy-mode-vi , { send -X jump-reverse }",
