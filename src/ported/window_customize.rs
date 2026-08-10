@@ -94,6 +94,9 @@ pub struct window_customize_modedata {
     /// Owned format string. Dropped with the struct in `window_customize_destroy`, where
     /// C freed it by hand. Read via `format_ptr`.
     format: CString,
+    /// C `vendor/tmux/window-customize.c:104`: extra prompt flags, set to
+    /// PROMPT_ACCEPT by -y so the mode's confirmations take the default answer.
+    prompt_flags: prompt_flags,
     hide_global: bool,
 
     item_list: *mut *mut window_customize_itemdata,
@@ -1236,6 +1239,12 @@ pub unsafe fn window_customize_init(
             references: 1,
             data: null_mut(),
             format,
+            // window-customize.c:931
+            prompt_flags: if args_has(args, 'y') {
+                prompt_flags::PROMPT_ACCEPT
+            } else {
+                prompt_flags::empty()
+            },
             hide_global: false,
             item_list: null_mut(),
             item_size: 0,
@@ -1962,7 +1971,7 @@ pub unsafe fn window_customize_key(
                         prompt,
                         c!(""),
                         prompt_type::PROMPT_TYPE_COMMAND,
-                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT | (*data).prompt_flags,
                         window_customize_change_current_callback,
                         Some(window_customize_free_callback),
                         data,
@@ -1982,7 +1991,7 @@ pub unsafe fn window_customize_key(
                         prompt,
                         c!(""),
                         prompt_type::PROMPT_TYPE_COMMAND,
-                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT | (*data).prompt_flags,
                         window_customize_change_tagged_callback,
                         Some(window_customize_free_callback),
                         data,
@@ -2006,7 +2015,7 @@ pub unsafe fn window_customize_key(
                         prompt,
                         c!(""),
                         prompt_type::PROMPT_TYPE_COMMAND,
-                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT | (*data).prompt_flags,
                         window_customize_change_current_callback,
                         Some(window_customize_free_callback),
                         data,
@@ -2026,7 +2035,7 @@ pub unsafe fn window_customize_key(
                         prompt,
                         c!(""),
                         prompt_type::PROMPT_TYPE_COMMAND,
-                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                        prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT | (*data).prompt_flags,
                         window_customize_change_tagged_callback,
                         Some(window_customize_free_callback),
                         data,

@@ -121,6 +121,9 @@ struct window_tree_modedata {
     key_format: CString,
     command: CString,
     squash_groups: bool,
+    /// C `vendor/tmux/window-tree.c:118`: extra prompt flags, set to
+    /// PROMPT_ACCEPT by -y so the mode's prompts take the default answer.
+    prompt_flags: prompt_flags,
 
     item_list: *mut *mut window_tree_itemdata,
     item_size: u32,
@@ -1157,6 +1160,11 @@ unsafe fn window_tree_init(
             key_format: arg_str('K').unwrap_or_else(|| WINDOW_TREE_DEFAULT_KEY_FORMAT.to_owned()),
             command,
             squash_groups: !args_has(args, 'G'),
+            prompt_flags: if args_has(args, 'y') {
+                prompt_flags::PROMPT_ACCEPT
+            } else {
+                prompt_flags::empty()
+            },
             item_list: null_mut(),
             item_size: 0,
             entered: null(),
@@ -1659,7 +1667,7 @@ unsafe fn window_tree_key(
                             prompt,
                             c!(""),
                             prompt_type::PROMPT_TYPE_COMMAND,
-                            prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                            prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT | (*data).prompt_flags,
                             window_tree_kill_current_callback,
                             Some(window_tree_command_free),
                             data,
@@ -1681,7 +1689,7 @@ unsafe fn window_tree_key(
                             prompt,
                             c!(""),
                             prompt_type::PROMPT_TYPE_COMMAND,
-                            prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT,
+                            prompt_flags::PROMPT_SINGLE | prompt_flags::PROMPT_NOFORMAT | (*data).prompt_flags,
                             window_tree_kill_tagged_callback,
                             Some(window_tree_command_free),
                             data,
