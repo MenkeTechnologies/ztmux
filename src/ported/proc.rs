@@ -57,6 +57,9 @@ pub struct tmuxpeer {
     pub ibuf: imsgbuf,
     pub event: event,
     pub uid: uid_t,
+    /// C `vendor/tmux/proc.c:317`: the peer's group id, from the same
+    /// `getpeereid` call as `uid`. Group ACLs match on it.
+    pub gid: gid_t,
 
     pub flags: i32,
 
@@ -392,7 +395,6 @@ pub unsafe fn proc_add_peer(
     arg: *mut c_void,
 ) -> *mut tmuxpeer {
     unsafe {
-        let mut gid: gid_t = 0;
         let peer = xcalloc1::<tmuxpeer>() as *mut tmuxpeer;
         (*peer).parent = tp;
 
@@ -411,8 +413,9 @@ pub unsafe fn proc_add_peer(
             peer.cast(), // TODO could be ub if this and function below both write
         );
 
-        if getpeereid(fd, &raw mut (*peer).uid, &raw mut gid) != 0 {
+        if getpeereid(fd, &raw mut (*peer).uid, &raw mut (*peer).gid) != 0 {
             (*peer).uid = -1i32 as uid_t;
+            (*peer).gid = -1i32 as gid_t;
         }
 
         log_debug!("add peer {:p}: {} ({:p})", peer, fd, arg);
@@ -497,4 +500,9 @@ pub unsafe fn proc_fork_and_daemon(fd: *mut i32) -> pid_t {
 /// C `vendor/tmux/proc.c:385`: `uid_t proc_get_peer_uid(struct tmuxpeer *peer)`
 pub unsafe fn proc_get_peer_uid(peer: *const tmuxpeer) -> uid_t {
     unsafe { (*peer).uid }
+}
+
+/// C `vendor/tmux/proc.c:391`: `gid_t proc_get_peer_gid(struct tmuxpeer *peer)`
+pub unsafe fn proc_get_peer_gid(peer: *const tmuxpeer) -> gid_t {
+    unsafe { (*peer).gid }
 }
