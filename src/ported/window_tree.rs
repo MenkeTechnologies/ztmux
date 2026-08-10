@@ -121,6 +121,10 @@ struct window_tree_modedata {
     key_format: CString,
     command: CString,
     squash_groups: bool,
+    /// C `vendor/tmux/window-tree.c:116`: -h. When set, the mode's own pane is
+    /// left out of the tree and its preview, so a chooser opened in a pane does
+    /// not show that pane back to itself.
+    hide_preview_this_pane: bool,
     /// C `vendor/tmux/window-tree.c:118`: extra prompt flags, set to
     /// PROMPT_ACCEPT by -y so the mode's prompts take the default answer.
     prompt_flags: prompt_flags,
@@ -359,6 +363,9 @@ unsafe fn window_tree_build_window(
             for wp in
                 tailq_foreach::<_, discr_entry>(&raw mut (*(*wl).window).panes).map(NonNull::as_ptr)
             {
+                if (*data.as_ptr()).hide_preview_this_pane && wp == (*data.as_ptr()).wp {
+                    continue;
+                }
                 if !window_tree_filter_pane(s, wl, wp, cstr_to_str_(filter)) {
                     continue;
                 }
@@ -839,7 +846,10 @@ unsafe fn window_tree_draw_window(
         // int left, right;
         // char *label;
 
-        let total = window_count_panes(w, 1);
+        let mut total = window_count_panes(w, 1);
+        if (*data).hide_preview_this_pane && (*(*data).wp).window == w {
+            total -= 1;
+        }
 
         let visible = if sx / total < 24 {
             if sx / 24 != 0 { sx / 24 } else { 1 }
@@ -849,6 +859,9 @@ unsafe fn window_tree_draw_window(
 
         let mut current: u32 = 0;
         for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
+            if (*data).hide_preview_this_pane && wp == (*data).wp {
+                continue;
+            }
             if wp == (*w).active {
                 break;
             }
@@ -924,6 +937,9 @@ unsafe fn window_tree_draw_window(
         let mut i = 0;
         let mut loop_ = 0;
         for wp in tailq_foreach::<_, discr_entry>(&raw mut (*w).panes).map(NonNull::as_ptr) {
+            if (*data).hide_preview_this_pane && wp == (*data).wp {
+                continue;
+            }
             if loop_ == end {
                 break;
             }
@@ -1003,6 +1019,7 @@ unsafe fn window_tree_draw(
     sy: u32,
 ) {
     unsafe {
+        let data: *mut window_tree_modedata = modedata.cast();
         let item: Option<NonNull<window_tree_itemdata>> = itemdata.map(NonNull::cast);
         let mut sp: Option<NonNull<session>> = None;
         let mut wlp: Option<NonNull<winlink>> = None;
@@ -1027,7 +1044,9 @@ unsafe fn window_tree_draw(
                 sy,
             ),
             window_tree_type::WINDOW_TREE_PANE => {
-                screen_write_preview(ctx, &raw mut (*wp.as_ptr()).base, sx, sy);
+                if !(*data).hide_preview_this_pane || wp.as_ptr() != (*data).wp {
+                    screen_write_preview(ctx, &raw mut (*wp.as_ptr()).base, sx, sy);
+                }
             }
         }
     }
@@ -1160,6 +1179,7 @@ unsafe fn window_tree_init(
             key_format: arg_str('K').unwrap_or_else(|| WINDOW_TREE_DEFAULT_KEY_FORMAT.to_owned()),
             command,
             squash_groups: !args_has(args, 'G'),
+            hide_preview_this_pane: args_has(args, 'h'),
             prompt_flags: if args_has(args, 'y') {
                 prompt_flags::PROMPT_ACCEPT
             } else {

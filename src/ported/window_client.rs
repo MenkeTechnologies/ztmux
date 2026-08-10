@@ -72,6 +72,10 @@ pub struct window_client_modedata {
     command: CString,
 
     item_list: Vec<*mut window_client_itemdata>,
+
+    /// C `vendor/tmux/window-client.c:177`: -h. Keeps the chooser's own pane out
+    /// of the preview, falling back to the window's last pane.
+    hide_preview_this_pane: bool,
 }
 
 impl window_client_modedata {
@@ -211,13 +215,14 @@ pub unsafe fn window_client_build(
 
 /// C `vendor/tmux/window-client.c:293`: `static void window_client_draw(void *modedata, void *itemdata, struct screen_write_ctx *ctx, u_int sx, u_int sy)`
 pub unsafe fn window_client_draw(
-    _modedata: *mut c_void,
+    modedata: *mut c_void,
     itemdata: Option<NonNull<c_void>>,
     ctx: *mut screen_write_ctx,
     sx: u32,
     sy: u32,
 ) {
     unsafe {
+        let data: *mut window_client_modedata = modedata.cast();
         let item: Option<NonNull<window_client_itemdata>> = itemdata.map(NonNull::cast);
         let c = (*item.unwrap().as_ptr()).c;
         let s = (*ctx).s;
@@ -228,7 +233,16 @@ pub unsafe fn window_client_draw(
         if (*c).session.is_null() || (*c).flags.intersects(CLIENT_UNATTACHEDFLAGS) {
             return;
         }
-        let wp = (*(*(*(*c).session).curw).window).active;
+        let w = (*(*(*c).session).curw).window;
+        let mut wp = (*w).active;
+        // window-client.c:314: showing the chooser its own pane is useless, so
+        // -h falls back to the last pane, or nothing.
+        if (*data).hide_preview_this_pane && wp == (*data).wp {
+            wp = tailq_first(&raw mut (*w).last_panes);
+        }
+        if wp.is_null() {
+            return;
+        }
 
         let mut lines = status_line_size(c);
         if lines >= sy {
@@ -327,6 +341,8 @@ pub unsafe fn window_client_init(
                 .unwrap_or_else(|| cstring_truncating(WINDOW_CLIENT_DEFAULT_KEY_FORMAT.to_owned())),
             command,
             item_list: Vec::new(),
+            // window-client.c:429
+            hide_preview_this_pane: args_has(args, 'h'),
         }));
         (*wme.as_ptr()).data = data.cast();
 

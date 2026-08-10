@@ -18,7 +18,7 @@ pub static CMD_CHOOSE_TREE_ENTRY: cmd_entry = cmd_entry {
     name: "choose-tree",
     alias: None,
 
-    args: args_parse::new("F:f:GK:kNO:rst:wyZ", 0, 1, Some(cmd_choose_tree_args_parse)),
+    args: args_parse::new("F:f:GhK:kNO:rst:wyZ", 0, 1, Some(cmd_choose_tree_args_parse)),
     usage: "[-GNrswZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]",
 
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
@@ -32,7 +32,7 @@ pub static CMD_CHOOSE_CLIENT_ENTRY: cmd_entry = cmd_entry {
     name: "choose-client",
     alias: None,
 
-    args: args_parse::new("F:f:K:kNO:rt:yZ", 0, 1, Some(cmd_choose_tree_args_parse)),
+    args: args_parse::new("F:f:hK:kNO:rt:yZ", 0, 1, Some(cmd_choose_tree_args_parse)),
     usage: "[-NrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]",
 
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
