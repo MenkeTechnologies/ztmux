@@ -20,8 +20,8 @@ pub static CMD_RUN_SHELL_ENTRY: cmd_entry = cmd_entry {
     name: "run-shell",
     alias: Some("run"),
 
-    args: args_parse::new("bd:Ct:c:", 0, 2, Some(cmd_run_shell_args_parse)),
-    usage: "[-bC] [-c start-directory] [-d delay] [-t target-pane] [shell-command]",
+    args: args_parse::new("bd:Ct:Es:c:", 0, -1, Some(cmd_run_shell_args_parse)),
+    usage: "[-bCE] [-c start-directory] [-d delay] [-t target-pane] [shell-command [argument ...]]",
 
     target: cmd_entry_flag::new(
         b't',
@@ -131,7 +131,17 @@ pub unsafe fn cmd_run_shell_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
         if !args_has(args, 'C') {
             let cmd = args_string(args, 0);
             if !cmd.is_null() {
-                (*cdata).cmd = format_single_from_target(item, cmd);
+                // Arguments after the command are exposed to the command
+                // string as #{1}, #{2}, ... before it is expanded
+                // (cmd-run-shell.c:139-142). Without this loop every such
+                // reference expanded to nothing, because an unknown format
+                // name is empty rather than an error.
+                let ft = format_create_from_target(item);
+                for i in 1..args_count(args) {
+                    format_add_(ft, &i.to_string(), format_args!("{}", _s(args_string(args, i))));
+                }
+                (*cdata).cmd = format_expand(ft, cmd);
+                format_free(ft);
             }
         } else {
             (*cdata).state = args_make_commands_prepare(self_, item, 0, null_mut(), wait, true);
@@ -157,6 +167,10 @@ pub unsafe fn cmd_run_shell_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
             (*cdata).cwd = xstrdup(args_get_(args, 'c')).as_ptr();
         } else {
             (*cdata).cwd = xstrdup(server_client_get_cwd(c, s)).as_ptr();
+        }
+
+        if args_has(args, 'E') {
+            (*cdata).flags |= job_flag::JOB_SHOWSTDERR;
         }
 
         (*cdata).s = s;

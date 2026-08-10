@@ -293,26 +293,6 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         ..options_table_entry::const_default()
     },
     options_table_entry {
-        name: "codepoint-widths",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_SERVER,
-        flags: OPTIONS_TABLE_IS_ARRAY,
-        default_str: Some(""),
-        separator: c!(","),
-        text: c!("Array of override widths for Unicode codepoints."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "variation-selector-always-wide",
-        type_: options_table_type::OPTIONS_TABLE_FLAG,
-        scope: OPTIONS_TABLE_SERVER,
-        default_num: 1,
-        text: c!(
-            "If the Unicode VS16 codepoint should always be treated as a wide character."
-        ),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
         name: "command-alias",
         type_: options_table_type::OPTIONS_TABLE_STRING,
         scope: OPTIONS_TABLE_SERVER,
@@ -324,6 +304,16 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         text: c!(
             "Array of command aliases. Each entry is an alias and a command separated by '='."
         ),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "codepoint-widths",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_ARRAY,
+        default_str: Some(""),
+        separator: c!(","),
+        text: c!("Array of override widths for Unicode codepoints."),
         ..options_table_entry::const_default()
     },
     options_table_entry {
@@ -350,6 +340,14 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         choices: &OPTIONS_TABLE_CURSOR_STYLE_LIST,
         default_num: 0,
         text: c!("Style of the cursor."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "default-client-command",
+        type_: options_table_type::OPTIONS_TABLE_COMMAND,
+        scope: OPTIONS_TABLE_SERVER,
+        default_str: Some("new-session"),
+        text: c!("Default command to run when tmux is run without a command."),
         ..options_table_entry::const_default()
     },
     options_table_entry {
@@ -419,6 +417,17 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         scope: OPTIONS_TABLE_SERVER,
         default_num: 0,
         text: c!("Whether to send focus events to applications."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "get-clipboard",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_SERVER,
+        choices: &OPTIONS_TABLE_GET_CLIPBOARD_LIST,
+        default_num: 1,
+        text: c!(
+            "When an application requests the clipboard, whether to ignore the request ('off'); respond with the newest buffer ('buffer'); request the clipboard from the most recently used terminal ('request'); or to request the clipboard, create a buffer, and send it to the application ('both')."
+        ),
         ..options_table_entry::const_default()
     },
     options_table_entry {
@@ -513,6 +522,39 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         maximum: i32::MAX as u32,
         default_num: 100,
         text: c!("Maximum number of commands to keep in history."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "set-clipboard",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_SERVER,
+        choices: &OPTIONS_TABLE_SET_CLIPBOARD_LIST,
+        default_num: 1,
+        text: c!(
+            "Whether to attempt to set the system clipboard ('on' or 'external') and whether to allow applications to create paste buffers with an escape sequence ('on' only)."
+        ),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "terminal-overrides",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_ARRAY,
+        default_str: Some("linux*:AX@"),
+        separator: c!(","),
+        text: c!("List of terminal capabilities overrides."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "terminal-features",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SERVER,
+        flags: OPTIONS_TABLE_IS_ARRAY,
+        default_str: Some(
+            "xterm*:clipboard:ccolour:cstyle:focus:title,screen*:title,rxvt*:ignorefkeys",
+        ),
+        separator: c!(","),
+        text: c!("List of terminal features, used if they cannot be automatically detected."),
         ..options_table_entry::const_default()
     },
     options_table_entry {
@@ -707,50 +749,6 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         ..options_table_entry::const_default()
     },
     options_table_entry {
-        name: "get-clipboard",
-        type_: options_table_type::OPTIONS_TABLE_CHOICE,
-        scope: OPTIONS_TABLE_SERVER,
-        choices: &OPTIONS_TABLE_GET_CLIPBOARD_LIST,
-        default_num: 1,
-        text: c!(
-            "When an application requests the clipboard, whether to ignore the request ('off'); respond with the newest buffer ('buffer'); request the clipboard from the most recently used terminal ('request'); or to request the clipboard, create a buffer, and send it to the application ('both')."
-        ),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "set-clipboard",
-        type_: options_table_type::OPTIONS_TABLE_CHOICE,
-        scope: OPTIONS_TABLE_SERVER,
-        choices: &OPTIONS_TABLE_SET_CLIPBOARD_LIST,
-        default_num: 1,
-        text: c!(
-            "Whether to attempt to set the system clipboard ('on' or 'external') and whether to allow applications to create paste buffers with an escape sequence ('on' only)."
-        ),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "terminal-overrides",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_SERVER,
-        flags: OPTIONS_TABLE_IS_ARRAY,
-        default_str: Some("linux*:AX@"),
-        separator: c!(","),
-        text: c!("List of terminal capabilities overrides."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "terminal-features",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_SERVER,
-        flags: OPTIONS_TABLE_IS_ARRAY,
-        default_str: Some(
-            "xterm*:clipboard:ccolour:cstyle:focus:title,screen*:title,rxvt*:ignorefkeys",
-        ),
-        separator: c!(","),
-        text: c!("List of terminal features, used if they cannot be automatically detected."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
         name: "user-keys",
         type_: options_table_type::OPTIONS_TABLE_STRING,
         scope: OPTIONS_TABLE_SERVER,
@@ -763,6 +761,16 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         ..options_table_entry::const_default()
     },
     // Session options.
+    options_table_entry {
+        name: "variation-selector-always-wide",
+        type_: options_table_type::OPTIONS_TABLE_FLAG,
+        scope: OPTIONS_TABLE_SERVER,
+        default_num: 1,
+        text: c!(
+            "If the Unicode VS16 codepoint should always be treated as a wide character."
+        ),
+        ..options_table_entry::const_default()
+    },
     options_table_entry {
         name: "activity-action",
         type_: options_table_type::OPTIONS_TABLE_CHOICE,
@@ -808,14 +816,6 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         scope: OPTIONS_TABLE_SESSION,
         default_str: Some(""),
         text: c!("Default command to run in new panes. If empty, a shell is started."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "default-client-command",
-        type_: options_table_type::OPTIONS_TABLE_COMMAND,
-        scope: OPTIONS_TABLE_SERVER,
-        default_str: Some("new-session"),
-        text: c!("Default command to run when tmux is run without a command."),
         ..options_table_entry::const_default()
     },
     options_table_entry {
@@ -1231,6 +1231,87 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         ..options_table_entry::const_default()
     },
     options_table_entry {
+        name: "pane-status-current-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("underscore"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of the current pane in the status line."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "pane-status-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("default"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of panes in the status line, except the current pane."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "prompt-cursor-colour",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SESSION,
+        default_str: Some(""),
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        text: c!("Colour of the cursor when in the command prompt."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "prompt-command-cursor-colour",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_SESSION,
+        default_str: Some(""),
+        flags: OPTIONS_TABLE_IS_COLOUR,
+        text: c!(
+            "Colour of the cursor in the command prompt when in command mode, if 'status-keys' is set to 'vi'."
+        ),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "prompt-cursor-style",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_SESSION,
+        choices: &OPTIONS_TABLE_CURSOR_STYLE_LIST,
+        default_num: 0,
+        text: c!("Style of the cursor when in the command prompt."),
+        ..options_table_entry::const_default()
+    },
+    // Window options
+    options_table_entry {
+        name: "prompt-command-cursor-style",
+        type_: options_table_type::OPTIONS_TABLE_CHOICE,
+        scope: OPTIONS_TABLE_SESSION,
+        choices: &OPTIONS_TABLE_CURSOR_STYLE_LIST,
+        default_num: 0,
+        text: c!(
+            "Style of the cursor in the command prompt when in command mode, if 'status-keys' is set to 'vi'."
+        ),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "session-status-current-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("underscore"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of the current session in the status line."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "session-status-style",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("default"),
+        flags: OPTIONS_TABLE_IS_STYLE,
+        separator: c!(","),
+        text: c!("Style of sessions in the status line, except the current session."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
         name: "update-environment",
         type_: options_table_type::OPTIONS_TABLE_STRING,
         scope: OPTIONS_TABLE_SESSION,
@@ -1286,7 +1367,6 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         text: c!("Characters considered to separate words."),
         ..options_table_entry::const_default()
     },
-    // Window options
     options_table_entry {
         name: "aggressive-resize",
         type_: options_table_type::OPTIONS_TABLE_FLAG,
@@ -1617,62 +1697,6 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         ..options_table_entry::const_default()
     },
     options_table_entry {
-        name: "pane-status-style",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_WINDOW,
-        default_str: Some("default"),
-        flags: OPTIONS_TABLE_IS_STYLE,
-        separator: c!(","),
-        text: c!("Style of panes in the status line, except the current pane."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "pane-status-current-style",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_WINDOW,
-        default_str: Some("underscore"),
-        flags: OPTIONS_TABLE_IS_STYLE,
-        separator: c!(","),
-        text: c!("Style of the current pane in the status line."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "session-status-style",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_WINDOW,
-        default_str: Some("default"),
-        flags: OPTIONS_TABLE_IS_STYLE,
-        separator: c!(","),
-        text: c!("Style of sessions in the status line, except the current session."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "session-status-current-style",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_WINDOW,
-        default_str: Some("underscore"),
-        flags: OPTIONS_TABLE_IS_STYLE,
-        separator: c!(","),
-        text: c!("Style of the current session in the status line."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "window-pane-status-format",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_WINDOW,
-        default_str: Some("#P:[#T]#{?pane_flags,#{pane_flags}, }"),
-        text: c!("Format of window panes in the status line, except the current pane."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "window-pane-current-status-format",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_WINDOW,
-        default_str: Some("#P:[#T]#{?pane_flags,#{pane_flags}, }"),
-        text: c!("Format of the current window pane in the status line."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
         name: "pane-border-style",
         type_: options_table_type::OPTIONS_TABLE_STRING,
         scope: OPTIONS_TABLE_WINDOW,
@@ -1689,46 +1713,6 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         default_str: Some(""),
         flags: OPTIONS_TABLE_IS_ARRAY,
         text: c!("The default colour palette for colours zero to 255."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "prompt-cursor-colour",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_SESSION,
-        default_str: Some(""),
-        flags: OPTIONS_TABLE_IS_COLOUR,
-        text: c!("Colour of the cursor when in the command prompt."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "prompt-command-cursor-colour",
-        type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_SESSION,
-        default_str: Some(""),
-        flags: OPTIONS_TABLE_IS_COLOUR,
-        text: c!(
-            "Colour of the cursor in the command prompt when in command mode, if 'status-keys' is set to 'vi'."
-        ),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "prompt-cursor-style",
-        type_: options_table_type::OPTIONS_TABLE_CHOICE,
-        scope: OPTIONS_TABLE_SESSION,
-        choices: &OPTIONS_TABLE_CURSOR_STYLE_LIST,
-        default_num: 0,
-        text: c!("Style of the cursor when in the command prompt."),
-        ..options_table_entry::const_default()
-    },
-    options_table_entry {
-        name: "prompt-command-cursor-style",
-        type_: options_table_type::OPTIONS_TABLE_CHOICE,
-        scope: OPTIONS_TABLE_SESSION,
-        choices: &OPTIONS_TABLE_CURSOR_STYLE_LIST,
-        default_num: 0,
-        text: c!(
-            "Style of the cursor in the command prompt when in command mode, if 'status-keys' is set to 'vi'."
-        ),
         ..options_table_entry::const_default()
     },
     options_table_entry {
@@ -1920,6 +1904,22 @@ pub static OPTIONS_TABLE: [options_table_entry; 246] = [
         flags: OPTIONS_TABLE_IS_STYLE,
         separator: c!(","),
         text: c!("Default style of the active pane."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "window-pane-current-status-format",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("#P:[#T]#{?pane_flags,#{pane_flags}, }"),
+        text: c!("Format of the current window pane in the status line."),
+        ..options_table_entry::const_default()
+    },
+    options_table_entry {
+        name: "window-pane-status-format",
+        type_: options_table_type::OPTIONS_TABLE_STRING,
+        scope: OPTIONS_TABLE_WINDOW,
+        default_str: Some("#P:[#T]#{?pane_flags,#{pane_flags}, }"),
+        text: c!("Format of window panes in the status line, except the current pane."),
         ..options_table_entry::const_default()
     },
     options_table_entry {

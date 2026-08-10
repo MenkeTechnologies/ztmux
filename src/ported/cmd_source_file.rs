@@ -97,7 +97,7 @@ unsafe fn cmd_source_file_done(
         }
 
         if error != 0 {
-            cmdq_error!(item, "{}: {}", _s(path), strerror(error));
+            cmdq_error!(item, "{}: {}", strerror(error), _s(path));
         } else if bsize != 0 {
             if load_cfg_from_buffer(
                 std::slice::from_raw_parts(bdata, bsize),
@@ -227,7 +227,7 @@ unsafe fn cmd_source_file_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
                     } else {
                         strerror(EINVAL)
                     };
-                    cmdq_error!(item, "{}: {}", _s(path), error);
+                    cmdq_error!(item, "{}: {}", error, _s(path));
                     retval = cmd_retval::CMD_RETURN_ERROR;
                 }
                 globfree(g.as_mut_ptr());

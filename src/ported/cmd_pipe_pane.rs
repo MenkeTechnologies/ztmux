@@ -109,7 +109,12 @@ pub unsafe fn cmd_pipe_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
         // Fork the child.
         sigfillset(&raw mut set);
         sigprocmask(SIG_BLOCK, &raw const set, &raw mut oldset);
-        match libc::fork() {
+        // The C assigns straight into the pane: `switch ((wp->pipe_pid = fork()))`
+        // (cmd-pipe-pane.c:126), so the pid is recorded in the parent before
+        // anything else looks at it.
+        let forked = libc::fork();
+        (*wp).pipe_pid = forked;
+        match forked {
             -1 => {
                 sigprocmask(SIG_SETMASK, &raw const oldset, null_mut());
                 cmdq_error!(item, "fork error: {}", strerror(errno!()));

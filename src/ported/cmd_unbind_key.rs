@@ -72,7 +72,7 @@ unsafe fn cmd_unbind_key_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retv
         let key = key_string_lookup_string(keystr);
         if key == KEYC_NONE || key == KEYC_UNKNOWN {
             if !quiet {
-                cmdq_error!(item, "unknown key unbind: {}", _s(keystr));
+                cmdq_error!(item, "unknown key: {}", _s(keystr));
             }
             return cmd_retval::CMD_RETURN_ERROR;
         }

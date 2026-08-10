@@ -205,21 +205,34 @@ pub unsafe fn job_run(
                         if dup2(out[1], STDOUT_FILENO) == -1 {
                             fatal("dup2 failed");
                         }
-                        if out[1] != STDIN_FILENO && out[1] != STDOUT_FILENO {
+                        // `do_close` in the C (job.c:159-177): out[1] is only
+                        // closed if none of the three redirections landed on
+                        // it, and JOB_SHOWSTDERR adds stderr to that set.
+                        let mut do_close =
+                            out[1] != STDIN_FILENO && out[1] != STDOUT_FILENO;
+
+                        if flags.intersects(job_flag::JOB_SHOWSTDERR) {
+                            if dup2(out[1], STDERR_FILENO) == -1 {
+                                fatal("dup2 failed");
+                            }
+                            do_close = do_close && out[1] != STDERR_FILENO;
+                        } else {
+                            nullfd = open(_PATH_DEVNULL, O_RDWR, 0);
+                            if nullfd == -1 {
+                                fatal("open failed");
+                            }
+                            if dup2(nullfd, STDERR_FILENO) == -1 {
+                                fatal("dup2 failed");
+                            }
+                            if nullfd != STDERR_FILENO {
+                                close(nullfd);
+                            }
+                        }
+
+                        if do_close {
                             close(out[1]);
                         }
                         close(out[0]);
-
-                        nullfd = open(_PATH_DEVNULL, O_RDWR, 0);
-                        if nullfd == -1 {
-                            fatal("open failed");
-                        }
-                        if dup2(nullfd, STDERR_FILENO) == -1 {
-                            fatal("dup2 failed");
-                        }
-                        if nullfd != STDERR_FILENO {
-                            close(nullfd);
-                        }
                     }
                     closefrom(STDERR_FILENO + 1);
 

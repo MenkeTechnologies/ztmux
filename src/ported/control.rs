@@ -700,12 +700,24 @@ pub unsafe fn control_append_data(
         if new_size < size {
             fatalx_!("not enough data: {} < {}", new_size, size);
         }
-        for i in 0..size {
+        // Escape the control bytes and `\`, and copy every run of printable
+        // bytes between them wholesale, as the C does. Emitting the printable
+        // case one byte at a time through a formatter would widen each `u8` to
+        // a `char` and re-encode everything above 0x7f as two bytes of UTF-8,
+        // corrupting any pane output that is not ASCII.
+        let mut i = 0usize;
+        while i < size {
             if *new_data.add(i) < b' ' || *new_data.add(i) == b'\\' {
                 evbuffer_add_printf!(message, "\\{:03o}", *new_data.add(i) as i32);
             } else {
-                evbuffer_add_printf!(message, "{}", *new_data.add(i) as char);
+                let start = i;
+                while i + 1 < size && *new_data.add(i + 1) >= b' ' && *new_data.add(i + 1) != b'\\'
+                {
+                    i += 1;
+                }
+                evbuffer_add(message, new_data.add(start).cast(), i - start + 1);
             }
+            i += 1;
         }
         window_pane_update_used_data(wp, &raw mut (*cp).offset, size);
         message

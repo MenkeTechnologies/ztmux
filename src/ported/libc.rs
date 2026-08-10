@@ -299,6 +299,12 @@ pub unsafe fn strncasecmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
     unsafe { ::libc::strncasecmp(s1.cast(), s2.cast(), n) }
 }
 
+/// C `strcasecmp(3)`, both operands NUL-terminated. `strcasecmp_` above takes a
+/// `&'static str` on the right and cannot compare two C strings.
+pub unsafe fn strcasecmp(s1: *const u8, s2: *const u8) -> i32 {
+    unsafe { ::libc::strcasecmp(s1.cast(), s2.cast()) }
+}
+
 pub unsafe fn strcasecmp_(left: *const u8, right: &'static str) -> std::cmp::Ordering {
     unsafe {
         for (i, r_ch) in right.bytes().enumerate() {

@@ -106,10 +106,16 @@ unsafe fn grid_need_extended_cell(gce: *const grid_cell_entry, gc: *const grid_c
         if (*gc).attr.bits() > 0xff {
             return true;
         }
-        if (*gc).data.size != 1 || (*gc).data.width != 1 {
+        // `>` rather than `!=`, as the C has it (grid.c:146). The padding cell
+        // that follows every double-width character carries size and width 0
+        // (`grid_padding_cell`, grid.c:50), so `!= 1` spilled every one of them
+        // into the extended array for nothing.
+        if (*gc).data.size > 1 || (*gc).data.width > 1 {
             return true;
         }
-        if ((*gc).fg & COLOUR_FLAG_RGB != 0) || ((*gc).bg & COLOUR_FLAG_RGB != 0) {
+        if ((*gc).fg & (COLOUR_FLAG_RGB | COLOUR_FLAG_THEME) != 0)
+            || ((*gc).bg & (COLOUR_FLAG_RGB | COLOUR_FLAG_THEME) != 0)
+        {
             return true;
         }
         if (*gc).us != 8 {
@@ -2130,8 +2136,21 @@ mod tests {
         }
     }
 
-    // grid_set_padding stores GRID_PADDING_CELL (grid.c:687), a zero-width
-    // extended cell carrying the PADDING flag.
+    // grid_set_padding stores grid_padding_cell (grid.c:687), whose PADDING
+    // flag survives the round trip.
+    //
+    // Its width does not, and that is the C's behaviour rather than a defect.
+    // grid_padding_cell is `{ { '!' }, 0, 0, 0 }` — size and width both 0 — so
+    // grid_need_extended_cell's `gc->data.size > 1 || gc->data.width > 1`
+    // (grid.c:146) is false and grid_set_cell stores it packed (grid.c:682).
+    // The packed read path ends in `utf8_set(&gc->data, gce->data.data)`
+    // (grid.c:647), and utf8_set writes have/size/width all 1 (utf8.c:533).
+    // So a padding cell reads back one cell wide on both binaries.
+    //
+    // This assertion used to expect width 0, which only held while this port
+    // spelled that predicate `!= 1` and so spilled every padding cell into the
+    // extended array. The reference disagrees: two CJK characters produce two
+    // extended cells there, not four.
     #[test]
     fn test_grid_set_padding_flags() {
         let gd = grid_create(20, 2, 0);
@@ -2140,7 +2159,29 @@ mod tests {
             let mut out = zeroed::<grid_cell>();
             grid_get_cell(gd, 3, 0, &mut out);
             assert!(out.flags.intersects(grid_flag::PADDING));
-            assert_eq!(out.data.width, 0);
+            assert_eq!(out.data.width, 1);
+            grid_destroy(gd);
+        }
+    }
+
+    // The storage decision behind the assertion above: a padding cell is not an
+    // extended cell, so writing one leaves extdsize at zero. A wide character
+    // is, so writing one bumps it. This is the property that made the port
+    // report double the reference's extended-cell count.
+    #[test]
+    fn test_padding_cell_is_not_extended() {
+        let gd = grid_create(20, 2, 0);
+        unsafe {
+            grid_set_padding(gd, 3, 0);
+            assert_eq!((*grid_get_line(gd, 0)).extdsize, 0);
+
+            let mut wide = zeroed::<grid_cell>();
+            memcpy__(&raw mut wide, &raw const GRID_DEFAULT_CELL);
+            wide.data.size = 3;
+            wide.data.width = 2;
+            grid_set_cell(gd, 5, 0, &wide);
+            assert_eq!((*grid_get_line(gd, 0)).extdsize, 1);
+
             grid_destroy(gd);
         }
     }

@@ -52,7 +52,7 @@ macro_rules! DEFAULT_PANE_MENU {
             " '#{?#{m/r:(copy|view)-mode,#{pane_mode}},Go To Top,}' '<' {send -X history-top}",
             " '#{?#{m/r:(copy|view)-mode,#{pane_mode}},Go To Bottom,}' '>' {send -X history-bottom}",
             " ''",
-            " '#{?mouse_word,Search For #[underscore]#{=/9/...:mouse_word},}' 'C-r' {if -F '#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}' 'copy-mode -t='; send -Xt= search-backward \"#{q:mouse_word}\"}",
+            " '#{?mouse_word,Search For #[underscore]#{=/9/...:mouse_word},}' 'C-r' {if -F '#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}' 'copy-mode -t='; send -Xt= search-backward -- \"#{q:mouse_word}\"}",
             " '#{?mouse_word,Type #[underscore]#{=/9/...:mouse_word},}' 'C-y' {copy-mode -q; send-keys -l -- \"#{q:mouse_word}\"}",
             " '#{?mouse_word,Copy #[underscore]#{=/9/...:mouse_word},}' 'c' {copy-mode -q; set-buffer -- \"#{q:mouse_word}\"}",
             " '#{?mouse_line,Copy Line,}' 'l' {copy-mode -q; set-buffer -- \"#{q:mouse_line}\"}",
@@ -227,6 +227,11 @@ pub unsafe fn key_bindings_next(_table: *mut key_table, bd: *mut key_binding) ->
 }
 
 /// C `vendor/tmux/key-bindings.c:190`: `void key_bindings_add(const char *name, key_code key, const char *note, int repeat, struct cmd_list *cmdlist)`
+/// C `vendor/tmux/key-bindings.c:727`: `int key_bindings_has_repeat(struct key_binding **l, u_int n)`
+pub unsafe fn key_bindings_has_repeat(l: &[*mut key_binding]) -> bool {
+    unsafe { l.iter().any(|&bd| (*bd).flags & KEY_BINDING_REPEAT != 0) }
+}
+
 pub unsafe fn key_bindings_add(
     name: *const u8,
     key: key_code,
@@ -265,6 +270,11 @@ pub unsafe fn key_bindings_add(
             } else {
                 Some(std::ffi::CStr::from_ptr(note.cast()).to_owned())
             },
+            // C key-bindings.c:218: `bd->tablename = table->name`, borrowed
+            // rather than copied. The table owns its name and outlives every
+            // binding inside it, so the pointer stays valid for the binding's
+            // whole life.
+            tablename: (*table).name.as_ptr().cast(),
             flags: 0,
             entry: zeroed(),
         }));
@@ -389,6 +399,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
                     key: (*bd).key,
                     cmdlist: (*bd).cmdlist,
                     note: (*bd).note.clone(),
+                    tablename: (*bd).tablename,
                     flags: (*bd).flags,
                     entry: zeroed(),
                 }));
@@ -749,12 +760,18 @@ pub unsafe fn key_bindings_init() {
         "bind -N 'ztmux: edit this pane scrollback in $EDITOR' e { capture-pane -S - -b ztmux-scrollback ; save-buffer -b ztmux-scrollback /tmp/ztmux-scrollback.txt ; delete-buffer -b ztmux-scrollback ; display-popup -E -w 90% -h 90% 'exec ${EDITOR:-${VISUAL:-vi}} /tmp/ztmux-scrollback.txt' }",
         // Multi-pane sync selection. Kept OFF the native `m`/`M` marked-pane
         // bindings (those stay tmux's select-pane -m/-M for swap): our select
-        // lives on `C-s`, and `M` syncs the whole selection.
+        // lives on `C-s`, and `y` syncs the whole selection.
         //   prefix C-s -> select/deselect THIS pane (selections persist)
-        //   prefix M   -> sync all selected panes (then the selection clears)
-        // The pane border menu also exposes select / sync / clear.
+        //   prefix y   -> sync all selected panes (then the selection clears)
+        // The pane border menu also exposes select / sync / clear, and uses the
+        // same `y` for sync (see the menu string above), so the key is the same
+        // whether you reach the action from the menu or from the prefix table.
+        // `y` is unbound in every default table upstream, so taking it shadows
+        // nothing; `M` was used here until it was found to be shadowing tmux's
+        // own 'Clear the marked pane' binding at :444, which is exactly what the
+        // first line of this comment says not to do.
         "bind -N 'ztmux: select/deselect this pane for sync' C-s { set -pF @ztmux_sel '#{?@ztmux_sel,,1}' ; display-message 'pane #{pane_index} #{?@ztmux_sel,\u{2713} selected for sync,deselected}' }",
-        "bind -N 'ztmux: sync all selected panes' M { run-shell 'ztmux -S \"${TMUX%%,*}\" pick sync' ; display-message 'synced all selected panes' }",
+        "bind -N 'ztmux: sync all selected panes' y { run-shell 'ztmux -S \"${TMUX%%,*}\" pick sync' ; display-message 'synced all selected panes' }",
         // Inline trigger wizard: chain four command-prompts (name, pane glob,
         // match regex, action) straight into `triggers add` - no JSON editing.
         "bind -N 'ztmux: add a content-trigger (inline wizard)' R { command-prompt -p 'trigger name:,pane glob (*):,match regex:,action:' { run-shell \"ztmux -S '#{socket_path}' triggers add '%1' '%2' '%3' '%4'\" } }",

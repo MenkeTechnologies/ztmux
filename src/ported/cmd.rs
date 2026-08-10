@@ -830,11 +830,13 @@ pub unsafe fn cmd_list_copy(
 }
 
 /// C `vendor/tmux/cmd.c:685`: `char *cmd_list_print(const struct cmd_list *cmdlist, int flags)`
-pub fn cmd_list_print(cmdlist: &cmd_list, escaped: c_int) -> *mut u8 {
+pub fn cmd_list_print(cmdlist: &cmd_list, flags: c_int) -> *mut u8 {
     unsafe {
         let mut len = 1;
         let mut buf: *mut u8 = xcalloc(1, len).cast().as_ptr();
 
+        let escaped = flags & CMD_LIST_PRINT_ESCAPED;
+        let no_groups = flags & CMD_LIST_PRINT_NO_GROUPS;
         let single_separator = if escaped != 0 { c!(" \\; ") } else { c!(" ; ") };
         let double_separator = if escaped != 0 {
             c!(" \\;\\; ")
@@ -852,7 +854,7 @@ pub fn cmd_list_print(cmdlist: &cmd_list, escaped: c_int) -> *mut u8 {
 
             let next = tailq_next::<_, _, qentry>(cmd);
             if !next.is_null() {
-                let separator = if (*cmd).group != (*next).group {
+                let separator = if no_groups == 0 && (*cmd).group != (*next).group {
                     double_separator
                 } else {
                     single_separator

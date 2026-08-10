@@ -451,6 +451,69 @@ pub unsafe fn sort_get_winlinks_session(s: *mut session, sc: sort_criteria) -> V
     }
 }
 
+/// C `vendor/tmux/sort.c:299`: `static int sort_key_binding_cmp(const void *a0, const void *b0)`
+///
+/// The two `strcasecmp(...) == 0` lines are the C's, not a transcription slip:
+/// upstream compares the table names for *equality* and yields 0 or 1 rather
+/// than an ordering. Reproduced as written — Chapter 37's rule is that a
+/// behavioural quirk in the reference is inherited, not corrected.
+unsafe fn sort_key_binding_cmp(a: *mut key_binding, b: *mut key_binding, sc: sort_criteria) -> i32 {
+    unsafe {
+        let names_equal =
+            || i32::from(strcasecmp((*a).tablename, (*b).tablename) == 0);
+        let mut result = match sc.order {
+            sort_order::SORT_INDEX => (*a).key.wrapping_sub((*b).key) as i32,
+            sort_order::SORT_MODIFIER => (((*a).key & KEYC_MASK_MODIFIERS)
+                .wrapping_sub((*b).key & KEYC_MASK_MODIFIERS))
+                as i32,
+            sort_order::SORT_NAME => names_equal(),
+            _ => 0,
+        };
+        if result == 0 {
+            result = names_equal();
+        }
+        if sc.reversed {
+            result = -result;
+        }
+        result
+    }
+}
+
+/// C `vendor/tmux/sort.c:622`: `struct key_binding **sort_get_key_bindings(u_int *n, struct sort_criteria *sort_crit)`
+pub unsafe fn sort_get_key_bindings(sc: sort_criteria) -> Vec<*mut key_binding> {
+    unsafe {
+        let mut l: Vec<*mut key_binding> = Vec::new();
+        let mut table = key_bindings_first_table();
+        while !table.is_null() {
+            let mut bd = key_bindings_first(table);
+            while !bd.is_null() {
+                l.push(bd);
+                bd = key_bindings_next(table, bd);
+            }
+            table = key_bindings_next_table(table);
+        }
+        sort_qsort(&mut l, sort_key_binding_cmp, sc);
+        l
+    }
+}
+
+/// C `vendor/tmux/sort.c:651`: `struct key_binding **sort_get_key_bindings_table(struct key_table *table, u_int *n, struct sort_criteria *sort_crit)`
+pub unsafe fn sort_get_key_bindings_table(
+    table: *mut key_table,
+    sc: sort_criteria,
+) -> Vec<*mut key_binding> {
+    unsafe {
+        let mut l: Vec<*mut key_binding> = Vec::new();
+        let mut bd = key_bindings_first(table);
+        while !bd.is_null() {
+            l.push(bd);
+            bd = key_bindings_next(table, bd);
+        }
+        sort_qsort(&mut l, sort_key_binding_cmp, sc);
+        l
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

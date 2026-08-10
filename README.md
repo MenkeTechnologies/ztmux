@@ -256,7 +256,7 @@ They fall into a few families:
   `on`/`off` or choice values, layouts, and filesystem paths. Also ratatui **clock**
   and **display-panes**,
   **edit-scrollback-in-`$EDITOR`** (`prefix e`), and **multi-pane selective sync** — mark panes
-  (`prefix C-s`), sync the set (`prefix M`). Sync state is shown on the pane **border** — synced
+  (`prefix C-s`), sync the set (`prefix y`). Sync state is shown on the pane **border** — synced
   (red), selected (orange), trigger-armed (cyan) — which output can never overwrite.
   Opt into zellij-style **pane frames** with `@ztmux-zellij-mode on` (off by default): every pane
   is *inset* by a one-cell ring (like zellij, so a program can never draw on the frame) and gets a

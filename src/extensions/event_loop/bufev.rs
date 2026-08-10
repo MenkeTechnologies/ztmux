@@ -125,9 +125,18 @@ pub unsafe fn bufferevent_enable(bev: *mut bufferevent, events: i16) -> c_int {
         if events & EV_READ != 0 {
             event_add(&raw mut (*bev).ev_read, std::ptr::null());
         }
-        // Writing is only watched while there is something to write; otherwise
-        // the descriptor would report ready on every turn and spin the loop.
-        if events & EV_WRITE != 0 && evbuffer_get_length((*bev).output) > 0 {
+        // libevent arms the write event whenever EV_WRITE is enabled, whether
+        // or not anything is queued yet, because a caller may enable it purely
+        // to be *told* when the descriptor is writable and fill the buffer from
+        // the callback. Control mode does exactly that: control_write_output
+        // queues into the per-pane block lists and then enables EV_WRITE, and
+        // control_write_callback is what moves those blocks into `output`.
+        // Making the arm conditional on `output` being non-empty deadlocked
+        // that path -- the callback that would have filled the buffer only runs
+        // once the buffer is already full -- so no %output ever reached a
+        // control client. write_ready drops the watch again as soon as the
+        // queue drains, which is what keeps the loop from spinning.
+        if events & EV_WRITE != 0 {
             event_add(&raw mut (*bev).ev_write, std::ptr::null());
         }
         0
@@ -295,6 +304,13 @@ unsafe extern "C-unwind" fn write_ready(_fd: c_int, _events: c_short, arg: *mut 
             && let Some(cb) = (*bev).writecb
         {
             cb(bev, (*bev).cbarg);
+        }
+
+        // The callback is allowed to queue more -- control_write_callback fills
+        // `output` from its pending blocks right here -- so re-arm if it did,
+        // since the watch was dropped above while the queue looked empty.
+        if (*bev).enabled & EV_WRITE != 0 && evbuffer_get_length((*bev).output) > 0 {
+            event_add(&raw mut (*bev).ev_write, std::ptr::null());
         }
     }
 }

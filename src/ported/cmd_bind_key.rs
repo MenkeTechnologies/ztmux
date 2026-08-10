@@ -42,7 +42,7 @@ unsafe fn cmd_bind_key_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval
 
         let key: key_code = key_string_lookup_string(args_string(args, 0));
         if key == KEYC_NONE || key == KEYC_UNKNOWN {
-            cmdq_error!(item, "unknown key bind: {}", _s(args_string(args, 0)));
+            cmdq_error!(item, "unknown key: {}", _s(args_string(args, 0)));
             return cmd_retval::CMD_RETURN_ERROR;
         }
 

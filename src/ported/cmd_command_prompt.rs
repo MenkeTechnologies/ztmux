@@ -17,8 +17,8 @@ pub static CMD_COMMAND_PROMPT_ENTRY: cmd_entry = cmd_entry {
     name: "command-prompt",
     alias: None,
 
-    args: args_parse::new("1bFkiI:Np:t:T:", 0, 1, Some(cmd_command_prompt_args_parse)),
-    usage: "[-1bFkiN] [-I inputs] [-p prompts] [-t target-pane] [-T type] [template]",
+    args: args_parse::new("1CbeFiklI:Np:t:T:", 0, 1, Some(cmd_command_prompt_args_parse)),
+    usage: "[-1Cbeikl] [-I inputs] [-p prompts] [-t target-client] [-T prompt-type] [template]",
 
     flags: cmd_flag::CMD_CLIENT_TFLAG,
     exec: cmd_command_prompt_exec,
@@ -108,6 +108,16 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
         } else {
             next_input = null_mut();
         }
+        if args_has(args, 'l') {
+            // -l takes the whole string as a single prompt rather than
+            // splitting it on commas (cmd-command-prompt.c:129-134). The C
+            // hands `prompts`/`inputs` straight to the one slot and does not
+            // free them below, so neither does this.
+            cdata.prompts = xreallocarray_::<cmd_command_prompt_prompt>(cdata.prompts, 1).as_ptr();
+            (*cdata.prompts).prompt = prompts;
+            (*cdata.prompts).input = inputs;
+            cdata.count = 1;
+        } else {
         while {
             prompt = strsep(&raw mut next_prompt as _, c!(","));
             !prompt.is_null()
@@ -139,6 +149,7 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
         }
         free_(inputs);
         free_(prompts);
+        }
 
         let type_ = args_get(args, b'T');
         if !type_.is_null() {
@@ -160,6 +171,11 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
             cdata.flags |= prompt_flags::PROMPT_INCREMENTAL;
         } else if args_has(args, 'k') {
             cdata.flags |= prompt_flags::PROMPT_KEY;
+        } else if args_has(args, 'e') {
+            cdata.flags |= prompt_flags::PROMPT_BSPACE_EXIT;
+        }
+        if args_has(args, 'C') {
+            cdata.flags |= prompt_flags::PROMPT_NOFREEZE;
         }
 
         let flags = cdata.flags;

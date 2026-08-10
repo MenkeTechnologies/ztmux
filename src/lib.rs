@@ -855,9 +855,14 @@ const MOUSE_PARAM_UTF8_MAX: u32 = 0x7ff;
 const MOUSE_PARAM_BTN_OFF: u32 = 0x20;
 const MOUSE_PARAM_POS_OFF: u32 = 0x21;
 
+// cmd_list_print flags (vendor/tmux/tmux.h:2996-2997).
+const CMD_LIST_PRINT_ESCAPED: c_int = 0x1;
+const CMD_LIST_PRINT_NO_GROUPS: c_int = 0x2;
+
 // Colour flags.
 const COLOUR_FLAG_256: i32 = 0x01000000;
 const COLOUR_FLAG_RGB: i32 = 0x02000000;
+const COLOUR_FLAG_THEME: i32 = 0x04000000;
 // vendor/tmux/tmux.h:752 `#define COLOUR_THEME_COUNT 10` — number of theme
 // colour slots (the `enum` of COLOUR_THEME_* slots is not yet ported; only the
 // count is needed here, for the client's `theme_colours` array).
@@ -1008,7 +1013,12 @@ impl grid_cell {
 }
 
 /// Grid extended cell entry.
-#[repr(C)]
+///
+/// `__packed` in the C (tmux.h:857), so 23 bytes rather than the 24 natural
+/// alignment would give. The grid stores these by the million, and
+/// `#{history_all_bytes}` reports `extdsize * sizeof *gl->extddata`, so the
+/// packing is both the real memory cost and an observable number.
+#[repr(C, packed)]
 struct grid_extd_entry {
     data: utf8_char,
     attr: u16,
@@ -1019,8 +1029,12 @@ struct grid_extd_entry {
     link: u32,
 }
 
+// Four `u_char`s in the C, with no alignment attribute of its own — it takes
+// the union's 4-byte alignment from the `u_int` arm beside it, which is why
+// forcing align(4) here is both unnecessary and enough to block packing the
+// enclosing entry.
 #[derive(Copy, Clone)]
-#[repr(C, align(4))]
+#[repr(C)]
 struct grid_cell_entry_data {
     attr: u8,
     fg: u8,
@@ -1034,7 +1048,11 @@ union grid_cell_entry_union {
     data: grid_cell_entry_data,
 }
 
-#[repr(C)]
+/// Grid cell entry.
+///
+/// `__packed` in the C (tmux.h:871): a 4-byte union plus a 1-byte flags word
+/// is 5 bytes, not the 8 that aligning the union to 4 would give.
+#[repr(C, packed)]
 struct grid_cell_entry {
     union_: grid_cell_entry_union,
     flags: grid_flag,
@@ -1834,6 +1852,9 @@ struct window_pane {
     cached_active_gc: grid_cell,
     palette: colour_palette,
 
+    /// pid of the `pipe-pane` child (`tmux.h:1339`), reported by
+    /// `#{pane_pipe_pid}`. Meaningful only while `pipe_fd != -1`.
+    pipe_pid: pid_t,
     pipe_fd: i32,
     pipe_event: *mut bufferevent,
     pipe_offset: window_pane_offset,
@@ -3128,6 +3149,11 @@ struct key_binding {
     cmdlist: *mut cmd_list,
     /// Owned note text, `None` when unset; drops with the boxed binding.
     note: Option<std::ffi::CString>,
+    /// The name of the table this binding lives in (`tmux.h:2332`). The C
+    /// borrows `table->name`, which outlives every binding in it; `list-keys`
+    /// reads it for `#{key_table}` and the table-column width, and
+    /// `sort_key_binding_cmp` sorts on it.
+    tablename: *const u8,
 
     flags: i32,
 
@@ -3333,6 +3359,9 @@ bitflags::bitflags! {
         const JOB_KEEPWRITE = 2;
         const JOB_PTY = 4;
         const JOB_DEFAULTSHELL = 8;
+        // vendor/tmux/tmux.h:2728. Set by `run-shell -E`; makes the child's
+        // stderr go to the job socket with its stdout instead of /dev/null.
+        const JOB_SHOWSTDERR = 0x10;
     }
 }
 

@@ -251,6 +251,7 @@ status_prompt_translate_key
 status_prompt_type
 status_prompt_type_string
 status_prompt_up_history
+strcasecmp
 strcasecmp_
 strcaseeq_
 strchr

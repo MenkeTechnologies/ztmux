@@ -95,6 +95,8 @@ bitflags::bitflags! {
         const FORMAT_LENGTH = 0x800;
         const FORMAT_WIDTH = 0x1000;
         const FORMAT_QUOTE_STYLE = 0x2000;
+        /// vendor/tmux/format.c:119. `#{q|a:...}` -> args_escape.
+        const FORMAT_QUOTE_ARGUMENTS = 0x400000;
         const FORMAT_WINDOW_NAME = 0x4000;
         const FORMAT_SESSION_NAME = 0x8000;
         const FORMAT_CHARACTER = 0x10000;
@@ -685,6 +687,20 @@ pub unsafe fn format_cb_session_alerts(ft: *mut format_tree) -> format_table_typ
 }
 
 /// Callback for `session_activity_flag`.
+/// Callback for `session_active`.
+/// C `vendor/tmux/format.c:2515`: `static void *format_cb_session_active(struct format_tree *ft)`
+pub unsafe fn format_cb_session_active(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if (*ft).s.is_null() || (*ft).c.is_null() {
+            return format_table_type::None;
+        }
+        if std::ptr::eq((*(*ft).c).session, (*ft).s) {
+            return "1".to_string().into();
+        }
+        "0".to_string().into()
+    }
+}
+
 /// C `vendor/tmux/format.c:2526`: `static void *format_cb_session_activity_flag(struct format_tree *ft)`
 pub unsafe fn format_cb_session_activity_flag(ft: *mut format_tree) -> format_table_type {
     unsafe {
@@ -1182,8 +1198,12 @@ pub unsafe fn format_cb_history_bytes(ft: *mut format_tree) -> format_table_type
 
         for i in 0..((*gd).hsize + (*gd).sy) {
             let gl = grid_get_line(gd, i);
-            size += (*gl).cellsize as usize * std::mem::size_of::<grid_cell>();
-            size += (*gl).extdsize as usize * std::mem::size_of::<grid_cell>();
+            // The C multiplies by `sizeof *gl->celldata` and `sizeof
+            // *gl->extddata` (format.c:952-953) -- the packed entry types the
+            // grid actually stores, not the unpacked `grid_cell` with its
+            // 24-byte utf8_data inside it.
+            size += (*gl).cellsize as usize * std::mem::size_of::<grid_cell_entry>();
+            size += (*gl).extdsize as usize * std::mem::size_of::<grid_extd_entry>();
         }
         size += ((*gd).hsize + (*gd).sy) as usize * std::mem::size_of::<grid_line>();
 
@@ -1217,9 +1237,9 @@ pub unsafe fn format_cb_history_all_bytes(ft: *mut format_tree) -> format_table_
             lines,
             lines as usize * std::mem::size_of::<grid_line>(),
             cells,
-            cells as usize * std::mem::size_of::<grid_cell>(),
+            cells as usize * std::mem::size_of::<grid_cell_entry>(),
             extended_cells,
-            extended_cells as usize * std::mem::size_of::<grid_cell>(),
+            extended_cells as usize * std::mem::size_of::<grid_extd_entry>(),
         )
         .into()
     }
@@ -1660,6 +1680,23 @@ pub unsafe fn format_cb_buffer_sample(ft: *mut format_tree) -> format_table_type
     }
 }
 
+/// Callback for `buffer_full`.
+/// C `vendor/tmux/format.c:1438`: `static void *format_cb_buffer_full(struct format_tree *ft)`
+pub unsafe fn format_cb_buffer_full(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if !(*ft).pb.is_null() {
+            let mut size = 0usize;
+            let data = paste_buffer_data((*ft).pb, &mut size);
+            if !data.is_null() {
+                return String::from_utf8_lossy(std::slice::from_raw_parts(data, size))
+                    .into_owned()
+                    .into();
+            }
+        }
+        format_table_type::None
+    }
+}
+
 /// C `vendor/tmux/format.c:1453`: `static void *format_cb_buffer_size(struct format_tree *ft)`
 pub unsafe fn format_cb_buffer_size(ft: *mut format_tree) -> format_table_type {
     unsafe {
@@ -1929,6 +1966,11 @@ pub unsafe fn format_cb_config_files(_ft: *mut format_tree) -> format_table_type
         s.push_str(file.to_str().expect("cfg_files invalid utf8"));
         s.push(',');
     }
+
+    // The C appends "%s," per file and then overwrites the last comma with a
+    // NUL (`s[slen - 1] = '\0'`, format.c:1757), so the result is comma-
+    // separated rather than comma-terminated. An empty list stays empty.
+    s.pop();
 
     s.into()
 }
@@ -2596,6 +2638,17 @@ pub unsafe fn format_cb_pane_pid(ft: *mut format_tree) -> format_table_type {
 }
 
 /// Callback for `pane_pb_progress`.
+/// Callback for `pane_pipe_pid`.
+/// C `vendor/tmux/format.c:2328`: `static void *format_cb_pane_pipe_pid(struct format_tree *ft)`
+pub unsafe fn format_cb_pane_pipe_pid(ft: *mut format_tree) -> format_table_type {
+    unsafe {
+        if !(*ft).wp.is_null() && (*(*ft).wp).pipe_fd != -1 {
+            return format!("{}", (*(*ft).wp).pipe_pid).into();
+        }
+        format_table_type::None
+    }
+}
+
 /// C `vendor/tmux/format.c:2339`: `static void *format_cb_pane_pb_progress(struct format_tree *ft)`
 pub unsafe fn format_cb_pane_pb_progress(ft: *mut format_tree) -> format_table_type {
     unsafe {
@@ -3470,6 +3523,7 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("alternate_saved_y", format_cb_alternate_saved_y),
     format_table_entry::new("bracket_paste_flag", format_cb_bracket_paste_flag),
     format_table_entry::new("buffer_created", format_cb_buffer_created),
+    format_table_entry::new("buffer_full", format_cb_buffer_full),
     format_table_entry::new("buffer_mode_format", format_cb_buffer_mode_format),
     format_table_entry::new("buffer_name", format_cb_buffer_name),
     format_table_entry::new("buffer_sample", format_cb_buffer_sample),
@@ -3567,6 +3621,7 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("pane_pb_state", format_cb_pane_pb_state),
     format_table_entry::new("pane_pid", format_cb_pane_pid),
     format_table_entry::new("pane_pipe", format_cb_pane_pipe),
+    format_table_entry::new("pane_pipe_pid", format_cb_pane_pipe_pid),
     format_table_entry::new("pane_right", format_cb_pane_right),
     format_table_entry::new("pane_search_string", format_cb_pane_search_string),
     format_table_entry::new("pane_start_command", format_cb_start_command),
@@ -3586,6 +3641,7 @@ static FORMAT_TABLE: &[format_table_entry] = &[
     format_table_entry::new("scroll_region_lower", format_cb_scroll_region_lower),
     format_table_entry::new("scroll_region_upper", format_cb_scroll_region_upper),
     format_table_entry::new("server_sessions", format_cb_server_sessions),
+    format_table_entry::new("session_active", format_cb_session_active),
     format_table_entry::new("session_activity", format_cb_session_activity),
     format_table_entry::new("session_activity_flag", format_cb_session_activity_flag),
     format_table_entry::new("session_alert", format_cb_session_alert),
@@ -4129,6 +4185,11 @@ fn format_find(
         if modifiers.intersects(format_modifiers::FORMAT_QUOTE_STYLE) {
             saved = found;
             found = format_quote_style(saved);
+            free_(saved);
+        }
+        if modifiers.intersects(format_modifiers::FORMAT_QUOTE_ARGUMENTS) {
+            saved = found;
+            found = args_escape(saved);
             free_(saved);
         }
         found
@@ -5214,6 +5275,8 @@ pub unsafe fn format_replace(
                                     || !strchr(*(*fm).argv, b'h' as i32).is_null()
                                 {
                                     modifiers |= format_modifiers::FORMAT_QUOTE_STYLE;
+                                } else if !strchr(*(*fm).argv, b'a' as i32).is_null() {
+                                    modifiers |= format_modifiers::FORMAT_QUOTE_ARGUMENTS;
                                 }
                             }
                             b'E' => modifiers |= format_modifiers::FORMAT_EXPAND,
