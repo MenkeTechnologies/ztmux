@@ -76,6 +76,9 @@ pub struct window_client_modedata {
     /// C `vendor/tmux/window-client.c:177`: -h. Keeps the chooser's own pane out
     /// of the preview, falling back to the window's last pane.
     hide_preview_this_pane: bool,
+    /// C `vendor/tmux/window-client.c:178`: -i. Shows the client info block in
+    /// place of the pane preview; toggled at runtime with `i`.
+    preview_is_info: bool,
 }
 
 impl window_client_modedata {
@@ -213,6 +216,87 @@ pub unsafe fn window_client_build(
     }
 }
 
+/// C `vendor/tmux/window-client.c:54`: `static const char *window_client_info_lines[]`
+///
+/// The WINDOW_CLIENT_FEATURE macro is expanded here, since Rust has no
+/// token-pasting equivalent; each entry is the string the C preprocessor
+/// produces.
+static WINDOW_CLIENT_INFO_LINES: [&str; 23] = [
+    "#[fg=themelightgrey]Client Name   #[#{E:tree-mode-border-style},acs]x#[default] #{client_name} #[fg=themelightgrey]#[fg=themelightgrey](PID #{client_pid})#[default]",
+    "#[fg=themelightgrey]Session       #[#{E:tree-mode-border-style},acs]x#[default] #{session_name}",
+    "#[fg=themelightgrey]Attach Time   #[#{E:tree-mode-border-style},acs]x#[default] #{t:client_created} #[fg=themelightgrey](#{t/r:client_created})#[default]",
+    "#[fg=themelightgrey]Activity Time #[#{E:tree-mode-border-style},acs]x#[default] #{t:client_activity} #[fg=themelightgrey](#{t/r:client_activity})#[default]",
+    "#[fg=themelightgrey]Terminal Type #[#{E:tree-mode-border-style},acs]x#[default] #{?client_termtype,#{client_termtype},Unknown}",
+    "#[fg=themelightgrey]TERM          #[#{E:tree-mode-border-style},acs]x#[default] #{client_termname}",
+    "#[fg=themelightgrey]Size          #[#{E:tree-mode-border-style},acs]x#[default] #{client_width}x#{client_height} #[fg=themelightgrey](cell #{client_cell_width}x#{client_cell_height})#[default]",
+    "#[fg=themelightgrey]Bytes Written #[#{E:tree-mode-border-style},acs]x#[default] #{client_written} #[fg=themelightgrey](#{client_discarded} discarded)#[default]",
+    "#[fg=themelightgrey]Features      #[#{E:tree-mode-border-style},acs]x#[default] #{?#{I/f:256},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:256}}#[default] #{?#{I/f:RGB},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:RGB}}#[default] #{?#{I/f:bpaste},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:bpaste}}#[default] #{?#{I/f:ccolour},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:ccolour}}#[default]",
+    "              #[#{E:tree-mode-border-style},acs]x#[default] #{?#{I/f:clipboard},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:clipboard}}#[default] #{?#{I/f:cstyle},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:cstyle}}#[default] #{?#{I/f:extkeys},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:extkeys}}#[default] #{?#{I/f:focus},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:focus}}#[default]",
+    "              #[#{E:tree-mode-border-style},acs]x#[default] #{?#{I/f:hyperlinks},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:hyperlinks}}#[default] #{?#{I/f:ignorefkeys},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:ignorefkeys}}#[default] #{?#{I/f:margins},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:margins}}#[default] #{?#{I/f:mouse},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:mouse}}#[default]",
+    "              #[#{E:tree-mode-border-style},acs]x#[default] #{?#{I/f:osc7},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:osc7}}#[default] #{?#{I/f:overline},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:overline}}#[default] #{?#{I/f:progressbar},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:progressbar}}#[default] #{?#{I/f:rectfill},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:rectfill}}#[default]",
+    "              #[#{E:tree-mode-border-style},acs]x#[default] #{?#{I/f:sixel},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:sixel}}#[default] #{?#{I/f:strikethrough},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:strikethrough}}#[default] #{?#{I/f:sync},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:sync}}#[default] #{?#{I/f:title},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:title}}#[default]",
+    "              #[#{E:tree-mode-border-style},acs]x#[default] #{?#{I/f:usstyle},#[fg=themegreen],#[fg=themelightgrey]}#{p/15:#{l:usstyle}}#[default]",
+    "#[#{E:tree-mode-border-style},acs]qqqqqqqqqqqqqqn#{R:q,#{window_width}}#[default]",
+    "#[fg=themelightgrey]prefix        #[#{E:tree-mode-border-style},acs]x#[default] #{prefix}",
+    "#[fg=themelightgrey]mouse         #[#{E:tree-mode-border-style},acs]x#[default] #{?mouse,#{?#{I/c:kmous},,#[fg=themered]}on,#[fg=themelightgrey]off} #{?#{I/c:kmous},,#[align=right]unavailable: [kmous] missing}",
+    "#[fg=themelightgrey]set-clipboard #[#{E:tree-mode-border-style},acs]x#[default] #{?#{!=:#{set-clipboard},off},#{?#{I/f:clipboard},,#[fg=themered]}#{set-clipboard},#[fg=themelightgrey]off} #{?#{I/f:clipboard},,#[align=right]unavailable: [Ms] missing}",
+    "#[fg=themelightgrey]get-clipboard #[#{E:tree-mode-border-style},acs]x#[default] #{?#{!=:#{get-clipboard},off},#{?#{I/f:clipboard},,#[fg=themered]}#{get-clipboard},#[fg=themelightgrey]off} #{?#{I/f:clipboard},,#[align=right]unavailable: [Ms] missing}",
+    "#[fg=themelightgrey]focus-events  #[#{E:tree-mode-border-style},acs]x#[default] #{?focus-events,#{?#{I/f:focus},,#[fg=themered]}on,#[fg=themelightgrey]off} #{?#{I/f:focus},,#[align=right]unavailable: [Enfcs] or [Dcfcs] missing}",
+    "#[fg=themelightgrey]extended-keys #[#{E:tree-mode-border-style},acs]x#[default] #{?#{!=:#{extended-keys},off},#{?#{I/f:extkeys},,#[fg=themered]}#{extended-keys},#[fg=themelightgrey]off} #{?#{I/f:extkeys},,#[align=right]unavailable: [Eneks] or [Dseks] missing}",
+    "#[fg=themelightgrey]set-titles    #[#{E:tree-mode-border-style},acs]x#[default] #{?set-titles,on,#[fg=themelightgrey]off}",
+    "#[fg=themelightgrey]escape-time   #[#{E:tree-mode-border-style},acs]x#[default] #{escape-time} ms",
+];
+
+/// C `vendor/tmux/window-client.c:259`: `static void window_client_draw_info(__unused void *modedata, void *itemdata, struct screen_write_ctx *ctx, u_int sx, u_int sy)`
+unsafe fn window_client_draw_info(
+    _modedata: *mut c_void,
+    itemdata: Option<NonNull<c_void>>,
+    ctx: *mut screen_write_ctx,
+    sx: u32,
+    sy: u32,
+) {
+    unsafe {
+        let item: *mut window_client_itemdata = itemdata.unwrap().cast().as_ptr();
+        let c = (*item).c;
+        let s = (*ctx).s;
+        let w = (*(*(*c).session).curw).window;
+        let cx = (*s).cx;
+        let cy = (*s).cy;
+
+        let ft = format_create_defaults(null_mut(), c, null_mut(), null_mut(), null_mut());
+
+        screen_write_cursormove(ctx, cx as i32, cy as i32, 0);
+        let mut i: u32 = 0;
+        while (i as usize) < WINDOW_CLIENT_INFO_LINES.len() {
+            if i == sy {
+                break;
+            }
+            let line = std::ffi::CString::new(WINDOW_CLIENT_INFO_LINES[i as usize]).unwrap();
+            let expanded = format_expand(ft, line.as_ptr().cast());
+            screen_write_cursormove(ctx, cx as i32, (cy + i) as i32, 0);
+            format_draw(
+                ctx,
+                &raw const GRID_DEFAULT_CELL,
+                sx,
+                &_s(expanded).to_string(),
+                null_mut(),
+                0,
+            );
+            free_(expanded);
+            i += 1;
+        }
+        if sx > 14 && i < sy {
+            let mut gc: grid_cell = zeroed();
+            memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
+            style_apply(&raw mut gc, (*w).options, c!("tree-mode-border-style"), null_mut());
+            screen_write_cursormove(ctx, (cx + 14) as i32, (cy + i) as i32, 0);
+            screen_write_vline(ctx, sy - i, 0, 0, &raw const gc);
+        }
+
+        format_free(ft);
+    }
+}
+
 /// C `vendor/tmux/window-client.c:293`: `static void window_client_draw(void *modedata, void *itemdata, struct screen_write_ctx *ctx, u_int sx, u_int sy)`
 pub unsafe fn window_client_draw(
     modedata: *mut c_void,
@@ -231,6 +315,10 @@ pub unsafe fn window_client_draw(
         let cy = (*s).cy;
 
         if (*c).session.is_null() || (*c).flags.intersects(CLIENT_UNATTACHEDFLAGS) {
+            return;
+        }
+        if (*data).preview_is_info {
+            window_client_draw_info(modedata, itemdata, ctx, sx, sy);
             return;
         }
         let w = (*(*(*c).session).curw).window;
@@ -343,6 +431,8 @@ pub unsafe fn window_client_init(
             item_list: Vec::new(),
             // window-client.c:429
             hide_preview_this_pane: args_has(args, 'h'),
+            // window-client.c:430
+            preview_is_info: args_has(args, 'i'),
         }));
         (*wme.as_ptr()).data = data.cast();
 
@@ -460,6 +550,15 @@ pub unsafe fn window_client_key(
             b'd' | b'x' | b'z' => {
                 let item: NonNull<window_client_itemdata> = mode_tree_get_current(mtd).cast();
                 window_client_do_detach(NonNull::new(data.cast()).unwrap(), item.cast(), c, key);
+                mode_tree_build(mtd);
+            }
+            b'i' => {
+                (*data).preview_is_info = !(*data).preview_is_info;
+                if (*data).preview_is_info {
+                    mode_tree_view_name(mtd, "info");
+                } else {
+                    mode_tree_view_name(mtd, "preview");
+                }
                 mode_tree_build(mtd);
             }
             b'D' | b'X' | b'Z' => {

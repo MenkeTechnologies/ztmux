@@ -57,6 +57,10 @@ pub struct mode_tree_data {
     sort_list: &'static [&'static str],
     sort_crit: mode_tree_sort_criteria,
 
+    /// C `vendor/tmux/mode-tree.c:71`: the name of the view the mode is showing,
+    /// appended to the box title. `None` when the mode has not named one.
+    view_name: Option<&'static str>,
+
     buildcb: mode_tree_build_cb,
     drawcb: mode_tree_draw_cb,
     searchcb: mode_tree_search_cb,
@@ -364,6 +368,13 @@ pub unsafe fn mode_tree_collapse_current(mtd: *mut mode_tree_data) {
     }
 }
 
+/// C `vendor/tmux/mode-tree.c:777`: `void mode_tree_view_name(struct mode_tree_data *mtd, const char *name)`
+pub unsafe fn mode_tree_view_name(mtd: *mut mode_tree_data, name: &'static str) {
+    unsafe {
+        (*mtd).view_name = Some(name);
+    }
+}
+
 /// C `vendor/tmux/mode-tree.c:470`: `static int mode_tree_get_tag(struct mode_tree_data *mtd, uint64_t tag, u_int *found)`
 pub unsafe fn mode_tree_get_tag(mtd: &mode_tree_data, tag: u64) -> Option<usize> {
     unsafe {
@@ -475,6 +486,7 @@ pub unsafe fn mode_tree_start(
 ) -> *mut mode_tree_data {
     unsafe {
         let mut mtd = Box::new(mode_tree_data {
+            view_name: None,
             references: 1,
             wp,
             modedata,
@@ -920,8 +932,10 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
             );
 
             let text = if !mtd.sort_list.is_empty() {
+                // mode-tree.c:992-997: the view name, when one is set, follows
+                // the sort in the box title.
                 format_nul!(
-                    " {} (sort: {}{})",
+                    " {} (sort: {}{}){}{}{}",
                     _s((*mti).name),
                     mtd.sort_list[mtd.sort_crit.field as usize],
                     if mtd.sort_crit.reversed {
@@ -929,6 +943,9 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
                     } else {
                         ""
                     },
+                    if mtd.view_name.is_none() { "" } else { " (view: " },
+                    mtd.view_name.unwrap_or(""),
+                    if mtd.view_name.is_none() { "" } else { ")" },
                 )
             } else {
                 format_nul!(" {}", _s((*mti).name))
