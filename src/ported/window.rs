@@ -1760,6 +1760,103 @@ pub unsafe fn window_pane_visible(wp: *const window_pane) -> bool {
 }
 
 /// C `vendor/tmux/window.c:1698`: `int window_pane_exited(struct window_pane *wp)`
+/// If any control mode client exists that has provided a bg colour, return it.
+/// C `vendor/tmux/window.c:2329`: `int window_pane_get_bg_control_client(struct window_pane *wp)`
+pub unsafe fn window_pane_get_bg_control_client(wp: *mut window_pane) -> i32 {
+    unsafe {
+        if (*wp).control_bg == -1 {
+            return -1;
+        }
+        for c in tailq_foreach::<_, ()>(&raw mut CLIENTS).map(NonNull::as_ptr) {
+            if (*c).flags.intersects(client_flag::CONTROL) {
+                return (*wp).control_bg;
+            }
+        }
+        -1
+    }
+}
+
+/// Get a client with a background for the pane.
+/// C `vendor/tmux/window.c:2307`: `int window_get_bg_client(struct window_pane *wp)`
+pub unsafe fn window_get_bg_client(wp: *mut window_pane) -> i32 {
+    unsafe {
+        let w = (*wp).window;
+        for loop_ in tailq_foreach::<_, ()>(&raw mut CLIENTS).map(NonNull::as_ptr) {
+            if (*loop_).flags.intersects(CLIENT_UNATTACHEDFLAGS) {
+                continue;
+            }
+            if (*loop_).session.is_null() || !session_has((*loop_).session, w) {
+                continue;
+            }
+            if (*loop_).tty.bg == -1 {
+                continue;
+            }
+            return (*loop_).tty.bg;
+        }
+        -1
+    }
+}
+
+/// Get the pane's background colour.
+/// C `vendor/tmux/window.c:2289`: `int window_pane_get_bg(struct window_pane *wp)`
+pub unsafe fn window_pane_get_bg(wp: *mut window_pane) -> i32 {
+    unsafe {
+        let mut c = window_pane_get_bg_control_client(wp);
+        if c == -1 {
+            let mut defaults: grid_cell = zeroed();
+            tty_default_colours(&raw mut defaults, wp);
+            c = if COLOUR_DEFAULT(defaults.bg) {
+                window_get_bg_client(wp)
+            } else {
+                defaults.bg
+            };
+        }
+        c
+    }
+}
+
+/// Work out the theme for a pane: its own background if it has one, otherwise
+/// whatever the attached clients agree on.
+/// C `vendor/tmux/window.c:2385`: `enum client_theme window_pane_get_theme(struct window_pane *wp)`
+pub unsafe fn window_pane_get_theme(wp: *mut window_pane) -> client_theme {
+    unsafe {
+        if wp.is_null() {
+            return client_theme::THEME_UNKNOWN;
+        }
+        let w = (*wp).window;
+
+        let theme = colour_totheme(window_pane_get_bg(wp));
+        if theme != client_theme::THEME_UNKNOWN {
+            return theme;
+        }
+
+        // Only decide from the clients when they do not disagree (window.c:2422).
+        let mut found_light = false;
+        let mut found_dark = false;
+        for loop_ in tailq_foreach::<_, ()>(&raw mut CLIENTS).map(NonNull::as_ptr) {
+            if (*loop_).flags.intersects(CLIENT_UNATTACHEDFLAGS) {
+                continue;
+            }
+            if (*loop_).session.is_null() || !session_has((*loop_).session, w) {
+                continue;
+            }
+            match (*loop_).theme {
+                client_theme::THEME_LIGHT => found_light = true,
+                client_theme::THEME_DARK => found_dark = true,
+                client_theme::THEME_UNKNOWN => {}
+            }
+        }
+
+        if found_dark && !found_light {
+            return client_theme::THEME_DARK;
+        }
+        if found_light && !found_dark {
+            return client_theme::THEME_LIGHT;
+        }
+        client_theme::THEME_UNKNOWN
+    }
+}
+
 pub unsafe fn window_pane_exited(wp: *mut window_pane) -> bool {
     unsafe { (*wp).fd == -1 || (*wp).flags.intersects(window_pane_flags::PANE_EXITED) }
 }

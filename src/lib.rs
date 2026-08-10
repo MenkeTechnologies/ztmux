@@ -1777,7 +1777,12 @@ bitflags::bitflags! {
         const PANE_STATUSDRAWN = 0x400;
         const PANE_EMPTY = 0x800;
         const PANE_STYLECHANGED = 0x1000;
-        const PANE_UNSEENCHANGES = 0x2000;
+        /// C `vendor/tmux/tmux.h:1293`. Set when the pane's theme changed and a
+        /// theme update is owed to the program inside it.
+        const PANE_THEMECHANGED = 0x2000;
+        /// C `vendor/tmux/tmux.h:1294`. This sat at 0x2000 -- the bit the C
+        /// gives PANE_THEMECHANGED -- because the port never had that flag.
+        const PANE_UNSEENCHANGES = 0x4000;
         /// C `vendor/tmux/tmux.h:1295`: the pane's scrollbar needs redrawing on
         /// its own. A reserved scrollbar sits outside the pane's own area, so it
         /// can be repainted without repainting the pane; an overlay one cannot,
@@ -1862,6 +1867,9 @@ struct window_pane {
     cached_active_gc: grid_cell,
     palette: colour_palette,
 
+    /// The theme this pane last told its program about (`tmux.h:1335`), so a
+    /// DSR 996 query can be answered and repeat updates suppressed.
+    last_theme: client_theme,
     /// pid of the `pipe-pane` child (`tmux.h:1339`), reported by
     /// `#{pane_pipe_pid}`. Meaningful only while `pipe_fd != -1`.
     pipe_pid: pid_t,

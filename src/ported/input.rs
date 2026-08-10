@@ -228,6 +228,7 @@ enum input_csi_type {
     INPUT_CSI_DECSTBM,
     INPUT_CSI_DL,
     INPUT_CSI_DSR,
+    INPUT_CSI_DSR_PRIVATE,
     INPUT_CSI_ECH,
     INPUT_CSI_ED,
     INPUT_CSI_EL,
@@ -238,6 +239,8 @@ enum input_csi_type {
     INPUT_CSI_MODSET,
     INPUT_CSI_RCP,
     INPUT_CSI_REP,
+    INPUT_CSI_QUERY,
+    INPUT_CSI_QUERY_PRIVATE,
     INPUT_CSI_RM,
     INPUT_CSI_RM_PRIVATE,
     INPUT_CSI_SCP,
@@ -254,7 +257,7 @@ enum input_csi_type {
 }
 
 /// control (csi) command table.
-static INPUT_CSI_TABLE: [input_table_entry; 40] = [
+static INPUT_CSI_TABLE: [input_table_entry; 43] = [
     input_table_entry::new_csi('@', c"", input_csi_type::INPUT_CSI_ICH),
     input_table_entry::new_csi('A', c"", input_csi_type::INPUT_CSI_CUU),
     input_table_entry::new_csi('B', c"", input_csi_type::INPUT_CSI_CUD),
@@ -289,6 +292,9 @@ static INPUT_CSI_TABLE: [input_table_entry; 40] = [
     input_table_entry::new_csi('m', c">", input_csi_type::INPUT_CSI_MODSET),
     input_table_entry::new_csi('n', c"", input_csi_type::INPUT_CSI_DSR),
     input_table_entry::new_csi('n', c">", input_csi_type::INPUT_CSI_MODOFF),
+    input_table_entry::new_csi('n', c"?", input_csi_type::INPUT_CSI_DSR_PRIVATE),
+    input_table_entry::new_csi('p', c"$", input_csi_type::INPUT_CSI_QUERY),
+    input_table_entry::new_csi('p', c"?$", input_csi_type::INPUT_CSI_QUERY_PRIVATE),
     input_table_entry::new_csi('q', c" ", input_csi_type::INPUT_CSI_DECSCUSR),
     input_table_entry::new_csi('q', c">", input_csi_type::INPUT_CSI_XDA),
     input_table_entry::new_csi('r', c"", input_csi_type::INPUT_CSI_DECSTBM),
@@ -1284,6 +1290,34 @@ unsafe fn input_reply_(ictx: *mut input_ctx, args: std::fmt::Arguments) {
     }
 }
 
+/// Report the pane's current theme to the program inside it.
+/// C `vendor/tmux/input.c:3575`: `static void input_report_current_theme(struct input_ctx *ictx)`
+unsafe fn input_report_current_theme(ictx: *mut input_ctx) {
+    unsafe {
+        let wp = (*ictx).wp;
+        if wp.is_null() {
+            return;
+        }
+
+        (*wp).last_theme = window_pane_get_theme(wp);
+        (*wp).flags &= !window_pane_flags::PANE_THEMECHANGED;
+
+        match (*wp).last_theme {
+            client_theme::THEME_DARK => {
+                log_debug!("input_report_current_theme: %{} dark theme", (*wp).id);
+                input_reply!(ictx, "\x1b[?997;1n");
+            }
+            client_theme::THEME_LIGHT => {
+                log_debug!("input_report_current_theme: %{} light theme", (*wp).id);
+                input_reply!(ictx, "\x1b[?997;2n");
+            }
+            client_theme::THEME_UNKNOWN => {
+                log_debug!("input_report_current_theme: %{} unknown theme", (*wp).id);
+            }
+        }
+    }
+}
+
 /// Clear saved state.
 /// C `vendor/tmux/input.c:1174`: `static void input_clear(struct input_ctx *ictx)`
 unsafe fn input_clear(ictx: *mut input_ctx) {
@@ -1744,6 +1778,62 @@ unsafe fn input_csi_dispatch(ictx: *mut input_ctx) -> i32 {
                 let n = input_get(ictx, 0, 1, 1);
                 if n != -1 {
                     screen_write_deleteline(sctx, n as u32, bg);
+                }
+            }
+            // input.c:1606-1612. Only 996 is defined: report the pane's theme.
+            Ok(input_csi_type::INPUT_CSI_DSR_PRIVATE) => {
+                if input_get(ictx, 0, 0, 0) == 996 {
+                    input_report_current_theme(ictx);
+                }
+            }
+            // DECRQM (input.c:1613-1624).
+            Ok(input_csi_type::INPUT_CSI_QUERY) => {
+                let m = input_get(ictx, 0, 0, 0);
+                // 1 means set, 2 means reset; 0 means the mode is not known.
+                let n = match m {
+                    4 => {
+                        if (*s).mode.intersects(mode_flag::MODE_INSERT) {
+                            1
+                        } else {
+                            2
+                        }
+                    }
+                    _ => 0,
+                };
+                if m > 0 {
+                    input_reply!(ictx, "\x1b[{};{}$y", m, n);
+                }
+            }
+            // DECRQM, private modes (input.c:1626-1697).
+            Ok(input_csi_type::INPUT_CSI_QUERY_PRIVATE) => {
+                let m = input_get(ictx, 0, 0, 0);
+                let md = |f: mode_flag| if (*s).mode.intersects(f) { 1 } else { 2 };
+                let n = match m {
+                    1 => md(mode_flag::MODE_KCURSOR),
+                    3 => 4, // DECCOLM: always reset
+                    6 => md(mode_flag::MODE_ORIGIN),
+                    7 => md(mode_flag::MODE_WRAP),
+                    25 => md(mode_flag::MODE_CURSOR),
+                    47 | 1047 | 1049 => {
+                        if !(*s).saved_grid.is_null() {
+                            1
+                        } else {
+                            2
+                        }
+                    }
+                    1000 => md(mode_flag::MODE_MOUSE_STANDARD),
+                    1002 => md(mode_flag::MODE_MOUSE_BUTTON),
+                    1003 => md(mode_flag::MODE_MOUSE_ALL),
+                    1004 => md(mode_flag::MODE_FOCUSON),
+                    1005 => md(mode_flag::MODE_MOUSE_UTF8),
+                    1006 => md(mode_flag::MODE_MOUSE_SGR),
+                    2004 => md(mode_flag::MODE_BRACKETPASTE),
+                    2026 => md(mode_flag::MODE_SYNC),
+                    2031 => md(mode_flag::MODE_THEME_UPDATES),
+                    _ => 0,
+                };
+                if m > 0 {
+                    input_reply!(ictx, "\x1b[?{};{}$y", m, n);
                 }
             }
             Ok(input_csi_type::INPUT_CSI_DSR) => match input_get(ictx, 0, 0, 0) {
