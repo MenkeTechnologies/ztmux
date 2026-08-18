@@ -2655,7 +2655,7 @@ _ztmux-resurrect() {
   [[ -n ${tmux_describe} ]] && print "save/restore all sessions across restarts (ztmux extension)" && return
   _arguments -s \
     ':subcommand:(save restore list)' \
-    '--run[re-run each pane's saved command]'
+    '--run[re-run the saved command of each pane]'
 }
 
 _ztmux-stack() {

@@ -587,7 +587,7 @@ EXTENSIONS = [
     ),
     (
         "resurrect",
-        [":subcommand:(save restore list)", "--run[re-run each pane's saved command]"],
+        [":subcommand:(save restore list)", "--run[re-run the saved command of each pane]"],
         "save/restore all sessions across restarts (ztmux extension)",
     ),
     (
@@ -629,13 +629,26 @@ def ext_function(name: str, specs: list[str], desc: str) -> str:
     otherwise run _arguments for the verb's own flags."""
     lines = [
         f"_ztmux-{name}() {{",
-        f'  [[ -n ${{tmux_describe}} ]] && print "{desc}" && return',
+        f'  [[ -n ${{tmux_describe}} ]] && print "{zdquote(desc)}" && return',
     ]
     if specs:
-        spec_str = " \\\n    ".join(f"'{s}'" for s in specs)
+        spec_str = " \\\n    ".join(f"'{zquote(s)}'" for s in specs)
         lines.append(f"  _arguments -s \\\n    {spec_str}")
     lines.append("}")
     return "\n".join(lines)
+
+
+def zquote(spec: str) -> str:
+    """Escape a spec for the single quotes it is emitted inside: an apostrophe
+    closes the quote and leaves the whole file unparseable, which kills zsh
+    completion for *every* verb, not just this one (a "pane's saved command"
+    description did exactly that).  The zsh idiom closes, escapes, reopens."""
+    return spec.replace("'", "'\\''")
+
+
+def zdquote(desc: str) -> str:
+    """Escape a description for the double quotes `print` emits it inside."""
+    return desc.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def main() -> int:
