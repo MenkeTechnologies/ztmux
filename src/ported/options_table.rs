@@ -1638,7 +1638,7 @@ pub static OPTIONS_TABLE: [options_table_entry; 248] = [
     options_table_entry {
         name: "pane-active-border-style",
         type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_WINDOW,
+        scope: OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE,
         default_str: Some("fg=#{?pane_marked,thememagenta,#{?synchronize-panes,themered,#{?pane_in_mode,themeyellow,themegreen}}}"),
         flags: OPTIONS_TABLE_IS_STYLE,
         separator: c!(","),
@@ -1679,7 +1679,7 @@ pub static OPTIONS_TABLE: [options_table_entry; 248] = [
     options_table_entry {
         name: "pane-border-lines",
         type_: options_table_type::OPTIONS_TABLE_CHOICE,
-        scope: OPTIONS_TABLE_WINDOW,
+        scope: OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE,
         choices: &OPTIONS_TABLE_PANE_BORDER_LINES_LIST,
         default_num: pane_lines::PANE_LINES_SINGLE as i64,
         text: c!(
@@ -1699,7 +1699,7 @@ pub static OPTIONS_TABLE: [options_table_entry; 248] = [
     options_table_entry {
         name: "pane-border-style",
         type_: options_table_type::OPTIONS_TABLE_STRING,
-        scope: OPTIONS_TABLE_WINDOW,
+        scope: OPTIONS_TABLE_WINDOW | OPTIONS_TABLE_PANE,
         default_str: Some("fg=themelightgrey"),
         flags: OPTIONS_TABLE_IS_STYLE,
         separator: c!(","),

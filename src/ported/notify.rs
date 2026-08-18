@@ -248,7 +248,19 @@ pub unsafe fn notify_add(
             format_add!((*ne).formats, "hook_window_name", "{}", _s((*w).name_ptr()));
         }
         if !wp.is_null() {
-            format_add!((*ne).formats, "hook_pane", "%%{}", (*wp).id);
+            // C notify.c:212 formats with printf, where `%%` is ONE literal `%`;
+            // this is a Rust format string, where `%%` is two. The pane id has to
+            // read `%3`, the same spelling every target parser expects.
+            format_add!((*ne).formats, "hook_pane", "%{}", (*wp).id);
+            // C notify.c:213-215: a pane notification also carries its WINDOW.
+            // Omitting these left #{hook_window} empty for every pane-scoped hook.
+            format_add!((*ne).formats, "hook_window", "@{}", (*(*wp).window).id);
+            format_add!(
+                (*ne).formats,
+                "hook_window_name",
+                "{}",
+                _s((*(*wp).window).name_ptr())
+            );
         }
         format_log_debug((*ne).formats, __func__);
 
