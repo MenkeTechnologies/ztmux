@@ -66,8 +66,11 @@ pub unsafe fn cmd_attach_session(
             return cmd_retval::CMD_RETURN_ERROR;
         }
 
+        // C `tflag[strcspn(tflag, ":.")] != '\0'`: strcspn stops at the first ':'
+        // or '.', so the test is "the target CONTAINS one of them" -- a window or
+        // pane target rather than a plain session name.
         let (type_, flags) =
-            if tflag.is_some_and(|tflag| !tflag.trim_start_matches([':', '.']).is_empty()) {
+            if tflag.is_some_and(|tflag| tflag.contains([':', '.'])) {
                 (cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty())
             } else {
                 (

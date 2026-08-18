@@ -877,6 +877,7 @@ pub unsafe fn tty_force_cursor_colour(tty: *mut tty, mut c: i32) {
         let mut s: [u8; 13] = [0; 13];
 
         if c != -1 {
+            c = tty_map_theme_colour(tty, c);
             c = colour_force_rgb(c);
         }
         if c == (*tty).ccolour {
@@ -3396,6 +3397,31 @@ pub unsafe fn tty_colours(tty: *mut tty, gc: *const grid_cell) {
     }
 }
 
+/// Resolve a theme colour (themegreen, themeblack, …) to the real colour this
+/// client's theme maps it to. Everything else passes through untouched.
+/// C `vendor/tmux/tty.c:2800`: `static int tty_map_theme_colour(struct tty *tty, int colour)`
+unsafe fn tty_map_theme_colour(tty: *const tty, colour: i32) -> i32 {
+    unsafe {
+        if colour & COLOUR_FLAG_THEME == 0 {
+            return colour;
+        }
+
+        let n = (colour & 0xff) as usize;
+        if n >= COLOUR_THEME_COUNT {
+            return 8;
+        }
+        if tty.is_null() || (*tty).client.is_null() {
+            return 8;
+        }
+
+        let m = (*(*tty).client).theme_colours[n];
+        if m == -1 || m & COLOUR_FLAG_THEME != 0 {
+            return 8;
+        }
+        m
+    }
+}
+
 /// C `vendor/tmux/tty.c:2822`: `static void tty_check_fg(struct tty *tty, struct colour_palette *palette, struct grid_cell *gc)`
 pub unsafe fn tty_check_fg(tty: *const tty, palette: *const colour_palette, gc: *mut grid_cell) {
     unsafe {
@@ -3417,6 +3443,7 @@ pub unsafe fn tty_check_fg(tty: *const tty, palette: *const colour_palette, gc: 
                 (*gc).fg = c;
             }
         }
+        (*gc).fg = tty_map_theme_colour(tty, (*gc).fg);
 
         // Is this a 24-bit colour?
         if (*gc).fg & COLOUR_FLAG_RGB != 0 {
@@ -3470,6 +3497,7 @@ pub unsafe fn tty_check_bg(tty: *const tty, palette: *const colour_palette, gc: 
                 (*gc).bg = c;
             }
         }
+        (*gc).bg = tty_map_theme_colour(tty, (*gc).bg);
 
         // Is this a 24-bit colour?
         if (*gc).bg & COLOUR_FLAG_RGB != 0 {
@@ -3524,6 +3552,7 @@ pub unsafe fn tty_check_us(tty: *const tty, palette: *const colour_palette, gc: 
                 (*gc).us = c;
             }
         }
+        (*gc).us = tty_map_theme_colour(tty, (*gc).us);
 
         // Convert underscore colour if only RGB can be supported.
         if !tty_term_has((*tty).term, tty_code_code::TTYC_SETULC1) {

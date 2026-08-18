@@ -265,7 +265,7 @@ unsafe fn grid_clear_cell(gd: *mut grid, px: c_uint, py: c_uint, bg: c_uint) {
         let gce = (*gl).celldata.add(px as usize);
         std::ptr::copy_nonoverlapping(&raw const GRID_CLEARED_ENTRY, gce, 1);
         if bg != 8 {
-            if (bg & COLOUR_FLAG_RGB as u32) != 0 {
+            if (bg & (COLOUR_FLAG_RGB | COLOUR_FLAG_THEME) as u32) != 0 {
                 grid_get_extended_cell(gl, gce, (*gce).flags);
                 let gee = grid_extended_cell(gl, gce, &raw const GRID_CLEARED_CELL);
                 (*gee).bg = bg as i32;
@@ -906,7 +906,15 @@ unsafe fn grid_string_cells_fg(gc: *const grid_cell, values: *mut c_int) -> usiz
     unsafe {
         let mut n: usize = 0;
 
-        if (*gc).fg & COLOUR_FLAG_256 != 0 {
+        if (*gc).fg & COLOUR_FLAG_THEME != 0 {
+            let c = colour_theme_terminal_colour(((*gc).fg & 0xff) as u32);
+            if c == 8 {
+                *values.add(n) = 39;
+            } else {
+                *values.add(n) = c + 30;
+            }
+            n += 1;
+        } else if (*gc).fg & COLOUR_FLAG_256 != 0 {
             *values.add(n) = 38;
             n += 1;
             *values.add(n) = 5;
@@ -952,7 +960,15 @@ unsafe fn grid_string_cells_bg(gc: *const grid_cell, values: *mut c_int) -> usiz
     unsafe {
         let mut n: usize = 0;
 
-        if (*gc).bg & COLOUR_FLAG_256 != 0 {
+        if (*gc).bg & COLOUR_FLAG_THEME != 0 {
+            let c = colour_theme_terminal_colour(((*gc).bg & 0xff) as u32);
+            if c == 8 {
+                *values.add(n) = 49;
+            } else {
+                *values.add(n) = c + 40;
+            }
+            n += 1;
+        } else if (*gc).bg & COLOUR_FLAG_256 != 0 {
             *values.add(n) = 48;
             n += 1;
             *values.add(n) = 5;
@@ -997,7 +1013,20 @@ unsafe fn grid_string_cells_bg(gc: *const grid_cell, values: *mut c_int) -> usiz
 unsafe fn grid_string_cells_us(gc: *const grid_cell, values: *mut c_int) -> usize {
     unsafe {
         let mut n: usize = 0;
-        if (*gc).us & COLOUR_FLAG_256 != 0 {
+        if (*gc).us & COLOUR_FLAG_THEME != 0 {
+            let c = colour_theme_terminal_colour(((*gc).us & 0xff) as u32);
+            if c == 8 {
+                *values.add(n) = 59;
+                n += 1;
+            } else {
+                *values.add(n) = 58;
+                n += 1;
+                *values.add(n) = 5;
+                n += 1;
+                *values.add(n) = c;
+                n += 1;
+            }
+        } else if (*gc).us & COLOUR_FLAG_256 != 0 {
             *values.add(n) = 58;
             n += 1;
             *values.add(n) = 5;

@@ -64,8 +64,10 @@ Fixes to the ztmux port, most recent first.
   `options-table.c:557`. So the port ships 20 default option values that expand
   a format variable its own table cannot resolve.
 - **Why the suite does not have the case:** none of the five is named by any of
-  the 1194 cases. Three are client-scoped and the harness attaches no client;
-  one is a pid; `buffer_full` has no excuse at all.
+  the 1201 cases. Three are client-scoped, and until case 1504 the harness had no
+  way to attach a client; that case now nests a second server inside a pane and
+  attaches to it, so the client-scoped three are reachable and no longer blocked
+  on the harness. One is a pid; `buffer_full` has no excuse at all.
 
 ### `#{history_bytes}` and `#{history_all_bytes}` use the wrong `sizeof`
 
@@ -207,6 +209,78 @@ Fixes to the ztmux port, most recent first.
   `style_copy`/`style_set`, which are whole-struct copies.
 - **Found by:** the same style-directive check that turned up `width=`/`pad=`
   below.
+
+## 2026-08-18 (Hashrocket dotmatrix acceptance round)
+
+Found by loading [hashrocket/dotmatrix](https://github.com/hashrocket/dotmatrix)'s
+`.tmux.conf` into both binaries and diffing the resulting state, then driving the
+config through a real client (a second server nested in a pane of the first).
+Every option and every binding the config sets was already identical, and the
+whole default binding table diverged only at the entries already listed in case
+1498's exclusions. The two bugs below were in the layers under the config: the
+first in what a client draws, the second surfaced while building the nested
+client — ztmux accepted `attach -t <window-name>` where tmux refuses it.
+
+### Theme colours never reached the terminal, so the default status bar was unstyled
+
+- **Symptom:** the whole status line painted with the terminal's default
+  colours instead of next-3.7's green. Loading dotmatrix's
+  `status-left '#[fg=colour235,bg=colour76,bold] #S '`, the reference paints the
+  `#S` segment AND carries the status style into the window list; the port
+  painted the `#S` segment and then reset:
+
+  ```
+  tmux   ^[[1m^[[38;5;235m^[[48;5;76m hr ^[[0;4m^[[38;2;13;13;13m^[[48;2;154;205;50m0:one*…
+  ztmux  ^[[1m^[[38;5;235m^[[48;5;76m hr ^[[0;4m0:one*…
+  ```
+
+- **Root cause:** next-3.7's `status-style` defaults to
+  `bg=themegreen,fg=themeblack`, theme colours that carry `COLOUR_FLAG_THEME` and
+  resolve to a real colour only at render time. `colour_fromstring`,
+  `colour_tostring` and `server_client_update_theme_colours` were all ported —
+  which is why `show-options -g status-style` was already byte-identical — but
+  `tty_map_theme_colour` (`vendor/tmux/tty.c:2800`), the function that turns the
+  flag into the client's resolved colour, had no counterpart. A flagged colour
+  therefore reached `tty_colours_fg`/`_bg` still carrying `0x04000000`, matched
+  neither the RGB nor the 256 branch, and was written as default.
+- **Fix:** ported `tty_map_theme_colour` and called it where the C does — in
+  `tty_check_fg` (`tty.c:2843`), `tty_check_bg` (`:2904`), `tty_check_us`
+  (`:2955`) and `tty_force_cursor_colour` (`:757`). Two grid-side sites were
+  missing the same flag: `grid_string_cells_fg`/`_bg`/`_us` (`grid.c:866`/`:922`/
+  `:978`), which is what `capture-pane -e` serialises, and `grid_clear_cell`
+  (`grid.c:281`), where a theme background needs the extended cell an 8-bit
+  `data.bg` cannot hold.
+- **Why nothing caught it:** every existing case asks the server what it
+  *stored*. A theme colour stores and prints back perfectly; only a client
+  drawing to a terminal shows that it never resolves, and the parity harness has
+  no terminal. Case **1504** builds one — a second server inside a pane of the
+  first, with a client attached to it — so `capture-pane -e` on the outer server
+  re-serialises the attributes the inner client actually emitted. Mutation-tested:
+  reverting the fix turns it red.
+
+### `attach-session` resolved a window name as if it were a session
+
+- **Symptom:** with a session `hr` whose windows are `code` and `docs`,
+  `attach -t code` is `can't find session: code` on the reference and was
+  accepted by the port (failing later, only because the test ran without a
+  terminal). Shell aliases of the `tmux attach -t <name>` shape would attach to
+  something other than what they named.
+- **Root cause:** `cmd-attach-session.c:80` picks the target *type* with
+  `tflag[strcspn(tflag, ":.")] != '\0'` — strcspn stops at the first `:` or `.`,
+  so the test is "the target CONTAINS one of them", i.e. a window/pane target.
+  The port had `!tflag.trim_start_matches([':', '.']).is_empty()`, which strips
+  *leading* separators and asks whether anything remains — true for every
+  ordinary name. So `code` was resolved as `CMD_FIND_PANE`, which matches window
+  names, and `:`/`.` alone took the session branch the C sends to the pane one.
+  The flag argument went with it: plain session targets lost
+  `CMD_FIND_PREFER_UNATTACHED`.
+- **Fix:** `tflag.contains([':', '.'])`, the C's test. The sibling site
+  (`cmd-switch-client.c:69`, `":.%"`) was already faithful — it kept the raw
+  `strcspn` — so this was the one place the pointer-to-`Option<&str>` change lost
+  the meaning.
+- **Pinned by:** case **1505**, which runs eleven target shapes through
+  `attach-session` and reads the error as the marker for accepted vs rejected.
+  Mutation-tested.
 
 ## 2026-08-09
 

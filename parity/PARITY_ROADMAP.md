@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1194/1194 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 cases.
+**1201/1201 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 cases.
 
 Case **1498** is structural rather than another probe: it diffs the *whole*
 default binding table against next-3.7's, which nothing had done before. The
@@ -86,6 +86,35 @@ C's type-shifted one — so the case compares the set of bindings and their
 commands, not their order, until that encoding migrates. Both halves were
 mutation-tested: reintroducing the `MouseDown1Status` command and dropping one
 `--` each turn the case red.
+Cases **1499–1505** are an acceptance round rather than a probe block: they take
+[hashrocket/dotmatrix](https://github.com/hashrocket/dotmatrix)'s `.tmux.conf` —
+a config a whole shop runs — and ask whether ztmux loads and executes it the way
+tmux does. The config is written out and read with `source-file` rather than
+replayed as `$TM set …` lines, so the config LEXER runs (`\;` chains, `-q`
+mid-arguments, comments, quoting) and not just the command parser. 1499 covers its
+options (a window option set globally, `set -sa` appending to a server option that
+already holds a default, `-sg` on a server option, `-q`), 1500 its bindings read
+back one key at a time, 1501 the four copy-mode commands it binds driven end to
+end, 1502 `send-keys -R` against a pane left in five sticky terminal states, 1503
+the conditional `if-shell` include it ends with. Every option and every binding the
+config sets was already identical; the round's two bugs were underneath it, and
+both are pinned here:
+
+- **1504** builds a terminal the harness does not have — a second server inside a
+  pane of the first, with a client attached to it — so `capture-pane -e` on the
+  outer server re-serialises what the inner client actually drew. That is what
+  caught `tty_map_theme_colour` being unported: next-3.7's default `status-style`
+  is `bg=themegreen,fg=themeblack`, and a theme colour stores and prints back
+  perfectly while never resolving at render time, so the whole status bar drew
+  unstyled while every `show-options` case stayed green.
+- **1505** runs eleven target shapes through `attach-session`. The C picks the
+  target type with `tflag[strcspn(tflag, ":.")] != '\0'` — "contains `:` or `.`";
+  the port asked whether anything remained after stripping *leading* separators,
+  which is true for every ordinary name, so a window name resolved as a pane
+  target and `attach -t <window>` was accepted where tmux refuses.
+
+Both were mutation-tested: reverting either fix turns its case red.
+
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
 (full-size split with a pre-existing split) crashed the server on a u32 underflow
@@ -499,7 +528,7 @@ reddens CI merely because the gaps still exist. With the directory empty it
 exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
 left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1194/1194 ported surface; they measure
+proof. These gaps do not count against the 1201/1201 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite
