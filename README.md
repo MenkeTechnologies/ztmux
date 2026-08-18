@@ -10,7 +10,7 @@
 [![CI](https://github.com/MenkeTechnologies/ztmux/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/ztmux/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://menketechnologies.github.io/ztmux/)
 [![Port Report](https://img.shields.io/badge/port-report-8a2be2.svg)](https://menketechnologies.github.io/ztmux/port_report.html)
-[![Parity vs tmux](https://img.shields.io/badge/parity%20vs%20tmux-1205%2F1205%20(100%25)-brightgreen.svg)](parity/PARITY_ROADMAP.md)
+[![Parity vs tmux](https://img.shields.io/badge/parity%20vs%20tmux-1244%2F1244%20(100%25)-brightgreen.svg)](parity/PARITY_ROADMAP.md)
 [![Status](https://img.shields.io/badge/status-100%25%20functional-brightgreen.svg)](docs/BUGS.md)
 [![Reference](https://img.shields.io/badge/reference-tmux%203.x-00ffcc.svg)](https://github.com/tmux/tmux)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -22,7 +22,7 @@
 >
 > *"Not a wrapper. Not control mode. The multiplexer itself."*
 >
-> *"Ported against the C, verified against the C — byte for byte, 1205/1205 parity cases passing."*
+> *"Ported against the C, verified against the C — byte for byte, 1244/1244 parity cases passing."*
 
 ## `[FROM SOURCE, NOT FROM SCRATCH]`
 
@@ -65,7 +65,7 @@ opens its own socket namespace (`ztmux-<uid>`) so it never collides with a runni
 
 **Status: 100% functional.** The port builds, runs, and self-hosts — `ztmux new-session`,
 splits, detach/reattach, the command language, formats, and layouts all work — and the
-parity suite is green at **1205/1205 (100%)** against the vendored tmux. Every divergence the
+parity suite is green at **1244/1244 (100%)** against the vendored tmux. Every divergence the
 suite has ever caught has been root-caused and fixed; surface that is still unported, or
 that no case can reach yet, is tracked openly in [`docs/BUGS.md`](docs/BUGS.md) and
 [`parity/known_gaps/`](parity/known_gaps/) rather than being counted as passing.
@@ -174,12 +174,15 @@ It earns its keep: it root-caused a `#{l:…}` server crash to a dropped pointer
 `format_unescape`, fixed even-horizontal layout rounding and `#{pane_current_command}` on
 macOS, regex backreferences, `#{!:}`, named buffers, loop variables, and the last layout
 divergences — each pinned to a single case and then ported correctly. It now stands at
-**1205/1205 cases passing (100%), byte-for-byte vs the vendored tmux, with zero failing
+**1244/1244 cases passing (100%), byte-for-byte vs the vendored tmux, with zero failing
 cases.** That is a statement about what the suite measures, not a claim that nothing
 differs: `parity/known_gaps/` holds behaviour that is deliberately still unported, and
-`docs/BUGS.md` keeps an open list. Eleven of the cases compare what an ATTACHED CLIENT
+`docs/BUGS.md` keeps an open list. 37 of the cases compare what an ATTACHED CLIENT
 draws, by nesting a second server inside a pane of the first — the only way this suite can
-see rendering at all, and where several of the divergences it has caught were hiding. See
+see rendering at all. That technique is where most of the recent divergences were hiding:
+copy-mode line numbers going stale on a cursor move, `display-menu -b` being parsed and
+discarded, VS16 emoji measuring one column narrow, and OSC 8 hyperlinks being absent from
+every build. See
 [`parity/PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md) and the bug log
 [`docs/BUGS.md`](docs/BUGS.md).
 

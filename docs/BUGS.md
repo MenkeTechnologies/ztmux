@@ -4,49 +4,31 @@ Fixes to the ztmux port, most recent first.
 
 ## Open
 
-### One upstream command flag has no counterpart in the port (was filed as 27)
+Re-measured 2026-08-18 against the current build. Two entries that stood here
+earlier the same day are gone because the defects are fixed, not because the
+entries were tidied away: the `choose-tree` `i` info view (ported, pinned by case
+1510) and `link=` in a style (ported, pinned by cases 1554/1555). One entry
+shrank to a smaller, sharper claim after live probing, and one new one was added.
 
-- **Symptom:** `copy-mode -S` gives `command copy-mode: unknown flag -S`; the
-  reference accepts it silently.
-- **Re-measured 2026-08-18, method reproducible.** For every `cmd_entry` in both
-  trees, extract the getopt-shaped template (the first member of `.args` in C,
-  the first argument to `args_parse::new` in Rust), parse it into
-  `{flag -> arity}` (0 none, `:` 1, `::` 2) and diff. Both sides yield 92
-  entries, matching `cmd_table[]` (`cmd.c`) and `CMD_TABLE`
-  (`src/ported/cmd.rs:236`) exactly.
-- **Result:** C flag slots **564**, port **568**. Absent from the port: **1** —
-  `copy-mode -S`. Port-only: **5** — the `-o` structured-output extension on
-  `list-buffers`/`-clients`/`-panes`/`-sessions`/`-windows`. Arity differences:
-  **1** — `refresh-client -l`. Only seven commands differ textually at all.
-- **The headline 27 was wrong**, not merely stale: it named `command-prompt`
-  `-C`/`-e`/`-l` as absent when all three already parsed. Verified live today:
-  of the 27 flags that entry listed, 26 are present.
-- **`copy-mode -S` is deliberately still absent.** Its only upstream caller is
-  `MouseDrag1ScrollbarSlider` (`key-bindings.c:504`), a key the flat `keyc`
-  encoding cannot generate, so adding the flag alone would be dead code. It
-  belongs with the scrollbar work in
-  `parity/known_gaps/mouse_scrollbar_locations.sh`.
-- **`refresh-client -l` is a real divergence and worse than an arity slip.** The
-  port declares `l::` where the C declares `l`, so `refresh-client -lZ` swallows
-  `Z` as the flag's value and reports `no current client`, where the reference
-  says `unknown flag -Z` (both observed). Underneath, `cmd_refresh_client.rs:203`
-  still implements pre-next-3.7 `-l [target-pane]` semantics with
-  `clipboard_panes` and a `CLIPBOARDBUFFER` client flag; next-3.7
-  (`cmd-refresh-client.c:263`) is just `tty_clipboard_query(&tc->tty)`, and
-  `CLIENT_CLIPBOARDBUFFER` does not exist anywhere in `vendor/tmux`.
+### One upstream command flag has an arity the port gets wrong
 
-### `choose-tree` has no `i` info view
-
-- **Symptom:** `i` in `choose-tree` toggles a per-item info panel in the
-  reference; in the port it does nothing.
-- **Scope:** `window_tree_draw_info` (`window-tree.c:805`) is unported, along
-  with the three `window_tree_*_info_lines` tables it reads, the
-  `preview_is_info` field (`window-tree.c:117`), the draw dispatch (`:893`) and
-  the `i` key case (`:1481`). `choose-client` has the equivalent and works.
-- **Not the box title.** The `(view: preview)` segment that segment used to be
-  missing from was a separate one-line omission
-  (`mode_tree_view_name`, `window-tree.c:1141`), fixed 2026-08-18 and pinned by
-  case 1508; this entry is the feature behind the `i` key only.
+- **Symptom:** `refresh-client -lZ` gives `no current client` under ztmux and
+  `command refresh-client: unknown flag -Z` upstream (both observed today).
+- **Root cause:** the port declares `l::` where the C declares `l`
+  (`cmd-refresh-client.c:39`), so `-l` swallows the next character as its value.
+  Underneath, `cmd_refresh_client.rs:203` still implements the pre-next-3.7
+  `-l [target-pane]` semantics with `clipboard_panes` and a `CLIPBOARDBUFFER`
+  client flag; next-3.7 (`cmd-refresh-client.c:263`) is just
+  `tty_clipboard_query(&tc->tty)`, and `CLIENT_CLIPBOARDBUFFER` exists nowhere in
+  `vendor/tmux`.
+- **Why it is not a one-line fix:** dropping the argument makes the port's own
+  OSC 52 delivery path (`tty_keys.rs:1814-1828`) unreachable, because nothing
+  else registers a pane. Upstream delivers that reply through
+  `input_request_clipboard_reply`, which is part of the unported request/reply
+  mechanism below. The two have to land together or `refresh-client -l` becomes a
+  query whose answer goes nowhere.
+- **`copy-mode -S` is no longer absent.** It was the one genuinely missing flag;
+  it landed with the scrollbar mouse locations and is accepted now (rc 0 on both).
 
 ### Four read-only client gates remain (of seven sites)
 
@@ -65,29 +47,51 @@ Fixes to the ztmux port, most recent first.
   unobservable on a single-uid machine and need a second real account to
   exercise, which is why they are recorded rather than claimed either way.
 
-### The deferred request/reply mechanism is not ported
+### DECRQSS and the queued request/reply mechanism are not ported
 
-- **Measurement:** `input_csi_table[]` (`vendor/tmux/input.c:304`) has 43 rows;
-  `INPUT_CSI_TABLE` (`src/ported/input.rs:257`) has 40. The three absent are
-  `CSI ? Ps n` (`INPUT_CSI_DSR_PRIVATE`), `CSI Ps $ p` (`INPUT_CSI_QUERY`) and
-  `CSI ? Ps $ p` (`INPUT_CSI_QUERY_PRIVATE`). Eighteen `input_*` functions have
-  no counterpart under `src/`, and they are one cluster: `input_make_request`,
+- **Narrowed 2026-08-18.** This entry used to claim three missing
+  `input_csi_table[]` rows and a dead `CSI ? Ps n`. Both are wrong now: the table
+  has **43 rows on both sides**, `INPUT_CSI_DSR_PRIVATE`, `INPUT_CSI_QUERY` and
+  `INPUT_CSI_QUERY_PRIVATE` all exist, and `CSI ? 1004 $ p` answers
+  `ESC [ ? 1004 ; 2 $ y` on **both** binaries (probed from inside a pane, reply
+  read back off the pty).
+- **What is still missing, probed the same way:** `DCS $ q m ST` returns
+  `ESC P 0 $ r ESC \` on the reference and **nothing** on the port —
+  `input_handle_decrqss` has no counterpart.
+- **And the machinery behind it:** fifteen `input_*` functions have no
+  counterpart under `src/`, all one cluster — `input_make_request`,
   `input_add_request`, `input_free_request`, `input_cancel_requests`,
   `input_request_reply`, `input_request_clipboard_reply`,
   `input_request_palette_reply`, `input_request_timer_callback`,
   `input_start_request_timer`, `input_send_reply`, `input_handle_decrqss`,
-  `input_osc_52_parse`, `input_osc_52_reply`, `input_report_current_theme`,
-  `input_start_ground_timer`, `input_ground_timer_callback`, `input_stop_utf8`
-  and the C's four-argument `input_reply`.
-- **Symptom (queried from inside a pane, reply read back off the tty):**
-  `CSI ? 1004 $ p` returns `ESC [ ? 1004 ; 2 $ y` on the reference and nothing
-  on the port; `DCS $ q m ST` returns `ESC P 0 $ r ESC \` on the reference and
-  nothing on the port. `CSI 6 n` agrees (`ESC [ 1 ; 1 R`).
+  `input_osc_52_parse`, `input_osc_52_reply`, `input_start_ground_timer` and
+  `input_ground_timer_callback`.
 - **Semantics, not just rows:** the C's `input_reply(ictx, add, fmt, ...)`
   (`input.c:1153`) queues a reply behind any outstanding request when `add` is
   set, so replies stay ordered against clipboard and palette round-trips. The
   port's `input_reply_` (`src/ported/input.rs:1274`) writes straight to the
-  bufferevent.
+  bufferevent. This is the same cluster the `refresh-client -l` entry above is
+  blocked on.
+
+### `dim=` in a style is rejected
+
+- **Found 2026-08-18** by sweeping every style directive through both binaries.
+  It is the only one that still differs: `set-option -g status-style 'dim=30'`
+  fails with `invalid style:` under ztmux and is accepted upstream.
+- **Root cause:** `struct style` has no `dim` field, and the value is not just
+  stored — `tty_attributes` dims the resolved fg and bg through `colour_dim`
+  (`tty.c:2650-2658`), reading it from `tty_style_ctx.dim`.
+- **Scope, and why it is not parse-only:** this port has no `tty_style_ctx` at
+  all; `tty_attributes`, `tty_cell`, `tty_draw_line` and
+  `tty_default_attributes` take `defaults`/`palette`/`hyperlinks` as separate
+  parameters. Porting `dim=` means introducing the struct and threading it
+  through all of them plus `screen_write` and `screen_redraw`, and adding
+  `colour_dim`. Accepting the directive without that would store a value nothing
+  reads — a config that looks applied and renders undimmed — so it stays
+  rejected until the render lands.
+- Every other directive now agrees, including the three fixed today
+  (`set-default`, `link=`, `nolink`); the full accept/reject set is pinned by
+  case 1554.
 
 ### `-o json` and `-o tsv` are unusable under a non-UTF-8 locale
 
@@ -95,6 +99,7 @@ Fixes to the ztmux port, most recent first.
   — the newline between array elements is an underscore, and the document is
   not parseable. All four formats collapse to a single line: json 4 lines to 1,
   jsonl 2 to 1, csv 3 to 1, tsv 3 to 1 with 38 underscores where the tabs were.
+  Still reproduces today.
 - **Root cause:** `Rows::render` (`src/extensions/structured.rs:117`) builds the
   whole document as one string and hands it to a single `cmdq_print`, whose own
   comment at line 116 says so. `server_client_print`
@@ -110,7 +115,10 @@ Fixes to the ztmux port, most recent first.
   `LC_ALL=C LANG=C`, so the suite runs in exactly that locale, and no parity
   case can cover `-o` because it has no upstream counterpart.
 - **Fix:** emit one `cmdq_print` per rendered line, as the ported `list-*`
-  commands already do.
+  commands already do. Five call sites
+  (`cmd_list_buffers/clients/panes/sessions/windows.rs`) share one
+  `cmdq_print!(item, "{}", out.render())`, so the change belongs behind one
+  shared helper rather than five edits.
 
 ### `TTY_WAITBG`/`TTY_WAITFG` and `tty_repeat_requests`' `force` are unported
 
@@ -118,27 +126,141 @@ Fixes to the ztmux port, most recent first.
   (`tty.c:318`), recorded rather than absorbed into that change.
 - `tty_send_requests` sets `tty->flags |= (TTY_WAITBG|TTY_WAITFG)` after the OSC
   10/11 queries (`tty.c:409`) and the start-timer callback clears them
-  (`tty.c:322`). Neither flag exists in this tree — `grep TTY_WAITBG src/`
-  returns nothing — so both sites are absent along with every consumer.
+  (`tty.c:322`). Neither flag exists in this tree — the only mention is a comment
+  at `src/ported/tty.rs:445` recording the gap — so both sites are absent along
+  with every consumer.
 - `tty_repeat_requests` takes an `int force` parameter (`tty.c:414`); the port's
   takes none.
 - **Not known to be observable.** No probe has been constructed that
   distinguishes the two binaries on this, so it is filed as unported surface
   rather than as a reproduced defect.
 
-### `link=` in a style is still rejected
+## 2026-08-18 (client-render round: what only an attached client could see)
 
-- **Symptom:** `set-option -g status-style 'bg=red,link=3'` fails with
-  `invalid style:` under ztmux; next-3.7 accepts it and prints it back.
-- **Root cause:** `style_parse` (`style.c:276`) puts the URI into a global
-  hyperlink set and stores the small id in `sy->link`; `style_tostring`
-  (`style.c:416`) reads it back through `style_link`. ztmux's `struct style` has
-  no `link` field and no such set, so the directive has nowhere to go.
-- **Scope:** unlike `width=`/`pad=`, this one is not just a field — it needs the
-  `style_hyperlinks` store and `style_link`, and the id has to survive
-  `style_copy`/`style_set`, which are whole-struct copies.
-- **Found by:** the same style-directive check that turned up `width=`/`pad=`
-  below.
+Thirty-two parity cases were written over the surface a live session touches —
+splits and borders, copy mode, the status bar, attach/resize, mouse and
+scrollbars, menus and popups, wide characters, hooks. None of it had been
+reachable before, because those paths only run for an ATTACHED CLIENT and until
+this round no case could see one. Every client-level case written found something.
+
+### `variation-selector-always-wide` never fired, and the naive fix would have broken the other direction
+
+- **Symptom:** every VS16 emoji rendered ONE COLUMN NARROW, shifting the rest of
+  the line — so wrapping, cursor position and `capture-pane` all desynchronised
+  after one.
+- **Root cause:** `utf8_is_vs` compared against `EF BF 8F` where the C uses
+  `EF B8 8F` (`utf8-combined.c:73`). One byte. Real U+FE0F never matched.
+- **The second bug it was hiding:** `screen_write_combine` set `force_wide`
+  unconditionally where the C gates it on the option (`screen-write.c:2824`), so
+  fixing the constant alone would have made every VS16 emoji wide even with the
+  option off. Both fixed together; heart and warning now measure 2 with the
+  option on and 1 with it off, matching.
+- **Two unit tests were pinning the typo as correct**, one named
+  `is_vs_matches_port_constant`, with a comment explaining the divergence from
+  `vendor/tmux`. A test that encodes a bug as expected hides it from the process
+  meant to catch it. Renamed and inverted to assert the C.
+
+### `display-menu` drew a rule per empty argument, and `-b` was discarded
+
+- `menu_add_item` has two guards (`menu.c:77-78`); the port had only the first,
+  so consecutive separators were not collapsed and any menu with two blank
+  arguments showed a doubled line.
+- `-b` was parsed, validated, then thrown away: `lines` was immutable and never
+  took the resolved choice (`cmd-display-menu.c:359`), so `-b double` drew
+  single-line glyphs while the `menu-border-lines` OPTION path worked.
+
+### Copy-mode line numbers went stale on every vertical cursor move
+
+With line numbers active the C repaints the whole screen when the cursor changes
+row (`window-copy.c:5437-5443`), because the gutter depends on the row. The port
+did not, so the relative numbers kept counting from the old row and the yellow
+current-line style stayed on it.
+
+### `set -p` wrote the window option for the three pane-scoped border options
+
+`options-table.c` gives `pane-active-border-style`, `pane-border-lines` and
+`pane-border-style` the scope `OPTIONS_TABLE_WINDOW|OPTIONS_TABLE_PANE`; the
+port's table had plain `OPTIONS_TABLE_WINDOW` for exactly those three.
+`options_scope_from_name` only consults `-p` under the combined
+`case WINDOW|PANE:` label (`options.c:900`), so for those three it fell through
+to the window branch: the command succeeded and changed the border on every pane
+in the window instead of the one named. Nothing errored — that is what let it
+survive. The scope resolution itself was a faithful port; the whole defect was
+three characters of table drift, which is the argument for checking the table
+mechanically rather than by eye. All 180 entries now agree with the C on name,
+scope and type.
+
+### Two `#{hook_*}` formats were wrong, and neither could fail loudly
+
+- `#{hook_pane}` rendered `%%3` instead of `%3`. C `notify.c:212` formats with
+  printf, where `%%` is one literal percent; the port's `format_add!` takes a
+  RUST format string, where `%%` is two. Any hook passing `#{hook_pane}` to
+  another command handed it a target that cannot resolve.
+- `#{hook_window}` and `#{hook_window_name}` were EMPTY for every pane-scoped
+  hook. The C sets them twice — once from `w`, again from `wp->window` on the
+  pane branch (`notify.c:213-215`) — because a pane notification passes no
+  window. `pane-died`, `pane-exited`, `pane-mode-changed` and
+  `pane-title-changed` all reported a pane with no window it belonged to.
+
+### OSC 8 hyperlinks were off in every shipped build
+
+The `Hls` capability sat behind a cargo feature (`hyperlinks`) that is not in
+`default`, so `tty_feature_hyperlinks` had an empty capability list and
+hyperlinks were dropped entirely: a pane printing one came back as bare text and
+`#[link=...]` drew nothing. Upstream gates it on an ncurses-version `#if`
+(`tty-features.c:98`) asking whether the local ncurses can express an extended
+capability name — a question ztmux, which links no ncurses and emits the string
+from its own table, has nothing to answer.
+
+Four separate defects sat behind that gate, all of them invisible while it was
+closed:
+
+| Defect | C reference | Effect |
+| --- | --- | --- |
+| `link=` / `nolink` rejected by `style_parse` | `style.c:246`, `:276-284` | a style option is all-or-nothing, so the whole option was lost |
+| `set-default` missing from the enum, parse, tostring and format_draw | `style.c:112`, `format-draw.c:865-870` | rejected outright; it moves the BASE, so a later `pop-default` lands on the new cell |
+| `style_tostring`'s `pad=` block did not advance `off` | `style.c:411` | correct only while `pad=` was LAST; `pad=2,link=…` would have had the link overwrite it |
+| `grid_string_cells_code` took `has_link` by value | `grid.c:1166` | `capture-pane -e` emitted the opening OSC 8 and never closed it |
+
+The `has_link` one is why the nested-client cases could not see the bug from
+outside: the C threads `int *has_link` ACROSS cells, so the closing sequence is
+only written when a link was open on an earlier one. As a per-call local
+re-initialised to false, the `else if` could never fire — and the ztmux acting as
+the OUTER server was mis-serialising its own grid.
+
+### The terminal-feature table had drifted, including three whole terminals
+
+`tty_feature_progressbar` did not exist, so `Spb` was never applied and the OSC
+9;4 progress bar never emitted despite `screen_set_progress_bar` being ported.
+The `tmux` entry was missing `extkeys` and `progressbar`; iTerm2 and mintty were
+missing entries of their own; **foot, WezTerm and ghostty were absent outright**,
+so a user on any of those three got no feature detection at all. All 21 features
+and all 8 terminals now match `tty-features.c` entry for entry.
+
+Five unit tests were pinning the drifted values — one asserted the `tmux` row
+WITHOUT `extkeys` and `progressbar`. Corrected against strings derived
+mechanically from the C table and cross-checked against what the reference prints
+for `#{client_termfeatures}`.
+
+### A shared static made the unit suite flaky about once in ten runs
+
+`key_string_lookup_key` returns a pointer into a function-level buffer, faithful
+to the C's `static char out[64]`. The tmux server is single-threaded so that is
+fine in production — but under the parallel test runner it made every test that
+renders a key race every other caller in the binary, surfacing as `"\0C-?"` and
+`"\0-Space"`: a half-overwritten buffer. A mutex in the test helper could not fix
+it, because the racers were production call sites outside the helper. The buffer
+is thread-local now, which is indistinguishable for the running server and cannot
+be clobbered across threads. Eighteen consecutive clean full-suite runs since.
+
+### Three stale bug notes in `style.rs` described defects that were already fixed
+
+The test module's header listed two "latent bugs in this port" — a
+`style_tostring` truncation of any multi-field style, and a `range=user` render
+that segfaulted. Both had been fixed; the tests already asserted the correct
+behaviour while their names (`bug_tostring_multifield_truncated`,
+`bug_tostring_user_range_crashes`) and comments still claimed otherwise. Renamed
+and rewritten to record what the bugs were rather than assert they are current.
 
 ## 2026-08-18 (Open-section audit)
 

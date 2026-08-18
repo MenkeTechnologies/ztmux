@@ -1,9 +1,9 @@
 {
-  "total": 1205,
-  "passed": 1205,
+  "total": 1244,
+  "passed": 1244,
   "failed": 0,
   "percent": 100.00,
-  "ztmux_version": "3.7.38",
+  "ztmux_version": "3.7.39",
   "reference": "tmux next-3.7",
-  "generated_at": "2026-08-18T18:33:08Z"
+  "generated_at": "2026-08-18T23:31:13Z"
 }
