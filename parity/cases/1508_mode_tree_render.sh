@@ -62,6 +62,11 @@ $TM send-keys -t client w
 wait_mode tree-mode
 echo "choose-tree:"
 $TM capture-pane -p -e -t client | sed -n '1,6p' | cat -v | scrub
+# The mode-tree BOX, not just the rows: its title carries the sort field and the
+# view name (mode_tree_view_name, mode-tree.c:777). Capturing only the rows missed
+# a missing "(view: preview)" segment on every choose-tree.
+echo "choose-tree box:"
+$TM capture-pane -p -e -t client | grep -o 'sort: [^)]*)[^M]*' | head -1
 $TM send-keys -t client q
 wait_mode ''
 

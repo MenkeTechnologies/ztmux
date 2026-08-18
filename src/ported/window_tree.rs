@@ -1215,6 +1215,9 @@ unsafe fn window_tree_init(
             &raw mut s,
         );
         mode_tree_zoom((*data).data, args);
+        // C window-tree.c:1141. Without this the mode-tree box title omits the
+        // "(view: preview)" segment on every choose-tree.
+        mode_tree_view_name((*data).data, "preview");
 
         mode_tree_build((*data).data);
         mode_tree_draw(&mut *(*data).data);

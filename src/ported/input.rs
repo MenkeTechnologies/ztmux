@@ -1359,7 +1359,7 @@ unsafe fn input_print(ictx: *mut input_ctx) -> i32 {
     unsafe {
         let sctx = &raw mut (*ictx).ctx;
 
-        (*ictx).utf8started = 0; /* can't be valid UTF-8 */
+        input_stop_utf8(ictx); // can't be valid UTF-8
 
         let set = if (*ictx).cell.set == 0 {
             (*ictx).cell.g0set
@@ -1448,7 +1448,7 @@ unsafe fn input_c0_dispatch(ictx: *mut input_ctx) -> i32 {
         let wp = (*ictx).wp;
         let s = (*sctx).s;
 
-        (*ictx).utf8started = 0; /* can't be valid UTF-8 */
+        input_stop_utf8(ictx); // can't be valid UTF-8
 
         log_debug!("{}: '{}'", "input_c0_dispatch", (*ictx).ch as u8 as char);
 
@@ -2738,17 +2738,21 @@ unsafe fn input_top_bit_set(ictx: *mut input_ctx) -> i32 {
         (*ictx).flags &= !input_flags::INPUT_LAST;
 
         if (*ictx).utf8started == 0 {
-            if utf8_open(ud, (*ictx).ch as u8) != utf8_state::UTF8_MORE {
-                return 0;
-            }
+            // C input.c:2841-2846: utf8started is set BEFORE the open check, so a
+            // byte that fails to open still enters a replacement character. The
+            // ordering is load-bearing -- setting it only on success silently
+            // DROPS invalid bytes and shifts every column after them.
             (*ictx).utf8started = 1;
+            if utf8_open(ud, (*ictx).ch as u8) != utf8_state::UTF8_MORE {
+                input_stop_utf8(ictx);
+            }
             return 0;
         }
 
         match utf8_append(ud, (*ictx).ch as u8) {
             utf8_state::UTF8_MORE => return 0,
             utf8_state::UTF8_ERROR => {
-                (*ictx).utf8started = 0;
+                input_stop_utf8(ictx);
                 return 0;
             }
             utf8_state::UTF8_DONE => (),
@@ -2764,6 +2768,26 @@ unsafe fn input_top_bit_set(ictx: *mut input_ctx) -> i32 {
         (*ictx).flags |= input_flags::INPUT_LAST;
 
         0
+    }
+}
+
+/// Stop UTF-8 and enter an invalid character.
+/// C `vendor/tmux/input.c:783`: `static void input_stop_utf8(struct input_ctx *ictx)`
+///
+/// The replacement character is entered only if a UTF-8 sequence had actually
+/// been started, so a run of invalid bytes produces one U+FFFD per started
+/// sequence -- which is what keeps the column count in step with the reference.
+unsafe fn input_stop_utf8(ictx: *mut input_ctx) {
+    unsafe {
+        let sctx = &raw mut (*ictx).ctx;
+        // C: `static struct utf8_data rc = { "\357\277\275", 3, 3, 1 };` -- U+FFFD.
+        static RC: utf8_data = utf8_data::new([0o357, 0o277, 0o275, 0o000], 3, 3, 1);
+
+        if (*ictx).utf8started != 0 {
+            utf8_copy(&raw mut (*ictx).cell.cell.data, &raw const RC);
+            screen_write_collect_add(sctx, &raw mut (*ictx).cell.cell);
+        }
+        (*ictx).utf8started = 0;
     }
 }
 

@@ -453,6 +453,14 @@ pub unsafe fn window_client_init(
         );
         mode_tree_zoom((*data).data, args);
 
+        // C window-client.c:451-454: the initial view name, which the port had
+        // only in the `i` key handler.
+        if (*data).preview_is_info {
+            mode_tree_view_name((*data).data, "info");
+        } else {
+            mode_tree_view_name((*data).data, "preview");
+        }
+
         mode_tree_build((*data).data);
         mode_tree_draw(&mut *(*data).data);
 

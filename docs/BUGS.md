@@ -4,154 +4,66 @@ Fixes to the ztmux port, most recent first.
 
 ## Open
 
-### `mode_tree_draw` row composition predates next-3.7
+### One upstream command flag has no counterpart in the port (was filed as 27)
 
-- **Symptom:** rows in `choose-tree` / `choose-buffer` differ from the reference
-  beyond the tagged-row colour fixed on 2026-08-18: next-3.7 draws a
-  `MODE_TREE_PREFIX_FORMAT` prefix through `format_draw` (which is where the
-  green `+` for an expanded parent comes from) and a
-  `#[fg=themelightgrey]: #[default]` separator before `mti->text`; the port
-  composes one string from key/prefix/name/tag and draws it with
-  `screen_write_nputs`.
-- **Measurement:** with a client attached and a row tagged, the reference emits
-  the prefix and separator styling and the port does not. The tagged colour
-  itself now matches.
-- **Scope:** this is the row-drawing block of `mode_tree_draw`
-  (`mode-tree.c:873`–`:972`), not a single line; the alignment array,
-  `format_width` clipping and the prefix/text split all move together.
+- **Symptom:** `copy-mode -S` gives `command copy-mode: unknown flag -S`; the
+  reference accepts it silently.
+- **Re-measured 2026-08-18, method reproducible.** For every `cmd_entry` in both
+  trees, extract the getopt-shaped template (the first member of `.args` in C,
+  the first argument to `args_parse::new` in Rust), parse it into
+  `{flag -> arity}` (0 none, `:` 1, `::` 2) and diff. Both sides yield 92
+  entries, matching `cmd_table[]` (`cmd.c`) and `CMD_TABLE`
+  (`src/ported/cmd.rs:236`) exactly.
+- **Result:** C flag slots **564**, port **568**. Absent from the port: **1** —
+  `copy-mode -S`. Port-only: **5** — the `-o` structured-output extension on
+  `list-buffers`/`-clients`/`-panes`/`-sessions`/`-windows`. Arity differences:
+  **1** — `refresh-client -l`. Only seven commands differ textually at all.
+- **The headline 27 was wrong**, not merely stale: it named `command-prompt`
+  `-C`/`-e`/`-l` as absent when all three already parsed. Verified live today:
+  of the 27 flags that entry listed, 26 are present.
+- **`copy-mode -S` is deliberately still absent.** Its only upstream caller is
+  `MouseDrag1ScrollbarSlider` (`key-bindings.c:504`), a key the flat `keyc`
+  encoding cannot generate, so adding the flag alone would be dead code. It
+  belongs with the scrollbar work in
+  `parity/known_gaps/mouse_scrollbar_locations.sh`.
+- **`refresh-client -l` is a real divergence and worse than an arity slip.** The
+  port declares `l::` where the C declares `l`, so `refresh-client -lZ` swallows
+  `Z` as the flag's value and reports `no current client`, where the reference
+  says `unknown flag -Z` (both observed). Underneath, `cmd_refresh_client.rs:203`
+  still implements pre-next-3.7 `-l [target-pane]` semantics with
+  `clipboard_panes` and a `CLIPBOARDBUFFER` client flag; next-3.7
+  (`cmd-refresh-client.c:263`) is just `tty_clipboard_query(&tc->tty)`, and
+  `CLIENT_CLIPBOARDBUFFER` does not exist anywhere in `vendor/tmux`.
 
-### Two client theme hooks are absent from the options table
+### `choose-tree` has no `i` info view
 
-- **Symptom:** `set-hook -g client-light-theme ...` fails with `invalid option`;
-  next-3.7 accepts it. The same for `client-dark-theme`.
-- **Root cause:** `vendor/tmux/options-table.c:1929`–`1930` declares both; the
-  port's `OPTIONS_TABLE` has neither. Unlike the five pane hooks fixed on
-  2026-08-09 these are not typos — there is no notify side either
-  (`vendor/tmux/server-client.c:3089`/`:3092` call `notify_client` for them and
-  the port has no counterpart), so this is an unported feature rather than a
-  transcription slip.
-- **Measurement:** `show-hooks -g` + `-gw` + `-gp` counts 68 names on the
-  reference and 66 on the port; after the pane hook fix these two are the whole
-  remaining difference.
+- **Symptom:** `i` in `choose-tree` toggles a per-item info panel in the
+  reference; in the port it does nothing.
+- **Scope:** `window_tree_draw_info` (`window-tree.c:805`) is unported, along
+  with the three `window_tree_*_info_lines` tables it reads, the
+  `preview_is_info` field (`window-tree.c:117`), the draw dispatch (`:893`) and
+  the `i` key case (`:1481`). `choose-client` has the equivalent and works.
+- **Not the box title.** The `(view: preview)` segment that segment used to be
+  missing from was a separate one-line omission
+  (`mode_tree_view_name`, `window-tree.c:1141`), fixed 2026-08-18 and pinned by
+  case 1508; this entry is the feature behind the `i` key only.
 
-### 27 upstream command flags have no counterpart in the port
+### Four read-only client gates remain (of seven sites)
 
-- **Symptom:** eleven of the 92 commands reject flags the reference accepts —
-  e.g. `break-pane -x` gives `command break-pane: unknown flag -x` where
-  next-3.7 accepts it.
-- **Measurement:** comparing the `getopt`-shaped argument template of every
-  `cmd_entry` (the first member of `.args` in C, the first argument to
-  `args_parse::new` in Rust) gives 564 flag slots across the 92 upstream
-  commands, of which **27 are absent from the port**, 5 are port-only (the `o:`
-  structured-output extension on the five `list-*` commands), and 1 differs in
-  arity.
-- **The eleven:** `break-pane` (`-W -x -X -y -Y`), `choose-buffer` (`-k -y`),
-  `choose-client` (`-h -i -k -y`), `choose-tree` (`-h -k -y`),
-  `command-prompt` (`-C -e -l -P`), `copy-mode` (`-S`), `customize-mode`
-  (`-k -y`), `list-keys` (`-F -O -r`), `run-shell` (`-E -s`), `server-access`
-  (`-g`). `refresh-client` declares `l::` where the C declares `l` — an
-  optional-argument form for a flag the C reads with `args_has`
-  (`cmd-refresh-client.c:263`), which is the one entry most likely to be a
-  transcription artefact.
-- **Stale as of 2026-08-18, and the count needs re-measuring.**
-  `command-prompt` no longer belongs on this list: its template is now
-  `1CbeFiklI:NPp:t:T:`, character-for-character the C's, after `-P` was added
-  with the in-pane prompt. Spot-checking the other three it names — `-C`, `-e`,
-  `-l` — they parse too, so they were already present when this entry was
-  written. The headline **27** was produced by a full template comparison that
-  has not been re-run; it is left unchanged rather than decremented to a number
-  that has not been measured. Re-running that comparison is the fix, and it
-  should be done before this entry is quoted again.
-- **Largest block:** `break-pane`'s five are next-3.7's floating-pane geometry,
-  dispatched in C to `cmd_break_pane_float` (`cmd-break-pane.c:50`), which the
-  port does not have — one feature, not five flags.
-- **Why nothing caught it:** no parity case passes any of the 27. Every one of
-  the 564 slots is a mechanically derivable case, so the templates are a
-  generator for the suite.
-
-### Five rows are missing from the format table
-
-- **Symptom:** `#{buffer_full}` expands to the empty string where next-3.7
-  returns the buffer. Four commands reproduce it: `set-buffer hello` then
-  `display-message -p '#{buffer_full}'` prints `hello` on the reference and
-  nothing on the port.
-- **Measurement:** `format_table[]` (`vendor/tmux/format.c:3203`) holds 195
-  rows; `FORMAT_TABLE` (`src/ported/format.rs:3466`) holds 190. The five names
-  the port does not have are `buffer_full`, `client_colours`, `client_theme`,
-  `pane_pipe_pid` and `session_active`; every name the port does have is in the
-  C's table, so these are absences rather than renames.
-- **Why it is hard to see:** an unknown format variable expands to the empty
-  string, exactly as a known variable with an empty value does, so expanding the
-  name under both binaries proves nothing until the value is made non-empty.
-- **Note:** `client_colours` is *referenced* by the port — 20 `dark-theme-*` /
-  `light-theme-*` defaults in `src/ported/options_table.rs` (e.g. line 534)
-  carry `#{?#{e|>=:#{client_colours},256},gray5,black}`, faithfully copied from
-  `options-table.c:557`. So the port ships 20 default option values that expand
-  a format variable its own table cannot resolve.
-- **Why the suite does not have the case:** none of the five is named by any of
-  the 1201 cases. Three are client-scoped, and until case 1504 the harness had no
-  way to attach a client; that case now nests a second server inside a pane and
-  attaches to it, so the client-scoped three are reachable and no longer blocked
-  on the harness. One is a pid; `buffer_full` has no excuse at all.
-
-### `#{history_bytes}` and `#{history_all_bytes}` use the wrong `sizeof`
-
-- **Symptom:** on an idle 80x24 pane with three lines of output,
-  `#{history_bytes}` is 1498 on the reference and 4964 on the port;
-  `#{history_all_bytes}` is `24,960,80,400,6,138` against
-  `24,960,80,3520,11,484`. Filling 20,000 lines gives 8,800,040 against
-  71,200,040 — the port over-reports by about 8x.
-- **Root cause:** the C multiplies the cell count by `sizeof *gl->celldata`
-  (`struct grid_cell_entry`, `__packed`, 5 bytes) and the extended count by
-  `sizeof *gl->extddata` (`struct grid_extd_entry`, `__packed`, 23 bytes) —
-  `format.c:952`–`953` and `format.c:983`–`984`. The port multiplies both by
-  `std::mem::size_of::<grid_cell>()` (44 bytes) in all four places:
-  `src/ported/format.rs:1185`, `1186`, `1220`, `1222`. `grid_cell` is the
-  *unpacked* cell struct with its `utf8_data`, not the storage entry.
-- **Fix:** `size_of::<grid_cell_entry>()` and `size_of::<grid_extd_entry>()`.
-  Note that the port's own entries are `#[repr(C)]` where the C's are
-  `__packed`, so the corrected numbers will still be larger than the
-  reference's — that difference is real memory, and RSS after 20,000 lines
-  bears it out (10,432 KiB grown on the reference against 14,320 KiB on the
-  port).
-- **Why nothing caught it:** no parity case reads either variable; both are
-  memory-shaped numbers, which the determinism rules discourage.
-
-### Six read-only client gates are missing (seven sites)
-
-- **Measurement:** `CLIENT_READONLY` appears at 24 sites in 9 files of the
-  vendored C; `client_flag::READONLY` appears at 17 sites in 6 files of
-  `src/ported`. The port also calls `proc_get_peer_uid` at 5 of the C's 7 call
-  sites.
-- **Absent gates:** `cmd-attach-session.c:111`–`117` and
-  `cmd-switch-client.c:83`–`88` (a read-only client from a foreign uid may not
-  clear its own read-only flag with `-r`; the port's `cmd_switch_client.rs:55`
-  toggles unconditionally), `cmd-detach-client.c:73`–`78` (`detach-client -s` /
-  `-a` / another client), `cmd-send-keys.c:178`–`181` (`send-keys` without
-  `-X`), `window-copy.c:3723`–`3729` (any copy-mode command without
-  `WINDOW_COPY_CMD_FLAG_READONLY`), `server-client.c:1573` (the bracketed-paste
-  key path) and `server-client.c:2618` (the command-prompt result).
-- **Why it matters:** these are the ACL surface of Chapter 38, and two of them
-  are the uid checks that keep `server-access`-granted foreign clients from
-  promoting themselves.
-
-### The copy-mode command table has no argument templates and no read-only flag
-
-- **Measurement:** `window_copy_cmd_table[]` (`vendor/tmux/window-copy.c:3118`)
-  carries `.args` (an `args_parse` template) and `.flags` on every entry; 17 of
-  the 95 entries have a non-empty template (`CP` on the fourteen copy/copy-pipe
-  commands, `o` on `next-prompt`/`previous-prompt`, `e` on `scroll-to-mouse`)
-  and 49 carry
-  `WINDOW_COPY_CMD_FLAG_READONLY`. `WINDOW_COPY_CMD_TABLE`
-  (`src/ported/window_copy.rs:3425`) has neither field — only `minargs` and
-  `maxargs` — and `cs.wargs` does not exist, so `args_has(cs->wargs, 'P')` and
-  friends have no counterpart.
-- **Symptom:** `send-keys -X copy-line -P` suppresses the paste buffer on the
-  reference (`list-buffers` returns nothing) and creates one on the port.
-- **Related:** an unknown copy-mode command is silently ignored by the port —
-  `send-keys -X scroll-to-mouse` returns nothing, while the reference *has* the
-  command and takes the server down running it (`server exited unexpectedly`),
-  which is why no parity case can drive it.
+- **Re-measured 2026-08-18.** `CLIENT_READONLY` has 24 sites across 9 files in
+  the C; `client_flag::READONLY` has 19 across 8 in `src/ported`
+  (`cmd_detach_client.rs` is the file with none).
+- **Landed 2026-08-18:** `copy-mode` gained `CMD_READONLY`
+  (`cmd-copy-mode.c:39`) so a read-only client can enter copy mode at all, and
+  `send-keys` gained both the flag and the exec gate together
+  (`cmd-send-keys.c:42-43`, `:178-181`). Those had to be one change: the flag
+  without the gate would have turned `send-keys` into an unauthenticated
+  key-injection channel rather than closing one. Verified: a read-only client is
+  refused, nothing reaches the pane, and copy mode still opens.
+- **Still missing:** the `proc_get_peer_uid` gates on `attach-session:112` and
+  `switch-client`, plus the `cmd_detach_client.rs` sites. These are
+  unobservable on a single-uid machine and need a second real account to
+  exercise, which is why they are recorded rather than claimed either way.
 
 ### The deferred request/reply mechanism is not ported
 
@@ -177,27 +89,6 @@ Fixes to the ztmux port, most recent first.
   port's `input_reply_` (`src/ported/input.rs:1274`) writes straight to the
   bufferevent.
 
-### A control-mode client never receives `%output`
-
-- **Symptom:** attach a control client, then split a window whose command
-  prints. The reference emits `%output %1 splitout`; the port emits the
-  `%layout-change` line and nothing else. Reproduced with a four-line script on
-  isolated sockets; `%begin`/`%end`/`%error`, `%session-changed`,
-  `%window-add`, `%layout-change`, `%subscription-changed` and `%exit` all
-  agree.
-- **Localisation so far:** the call site (`src/ported/window.rs:1484`–`1488`
-  against `vendor/tmux/window.c:1275`–`1278`), `control_write_output`
-  (`control.rs:495` against `control.c:474`) and `control_add_pane`
-  (`control.rs:253` against `control.c:247`) are all faithful, and the control
-  client's `#{client_flags}` reads `attached,focused,control-mode` on both. The
-  responsible line was not isolated; it is somewhere in the
-  pending-block/flush chain or in the offset accounting behind
-  `window_pane_get_new_data`.
-- **Also worth fixing while there:** `control_append_data`
-  (`src/ported/control.rs:707`) emits each byte with `*new_data.add(i) as char`,
-  which re-encodes any byte over 0x7f as multi-byte UTF-8 where the C
-  (`control.c:646`) copies the raw bytes.
-
 ### `-o json` and `-o tsv` are unusable under a non-UTF-8 locale
 
 - **Symptom:** `LC_ALL=C ztmux list-windows -o json` emits `[_{"session":...`
@@ -221,6 +112,20 @@ Fixes to the ztmux port, most recent first.
 - **Fix:** emit one `cmdq_print` per rendered line, as the ported `list-*`
   commands already do.
 
+### `TTY_WAITBG`/`TTY_WAITFG` and `tty_repeat_requests`' `force` are unported
+
+- **Found 2026-08-18** while un-inverting the start-timer condition
+  (`tty.c:318`), recorded rather than absorbed into that change.
+- `tty_send_requests` sets `tty->flags |= (TTY_WAITBG|TTY_WAITFG)` after the OSC
+  10/11 queries (`tty.c:409`) and the start-timer callback clears them
+  (`tty.c:322`). Neither flag exists in this tree — `grep TTY_WAITBG src/`
+  returns nothing — so both sites are absent along with every consumer.
+- `tty_repeat_requests` takes an `int force` parameter (`tty.c:414`); the port's
+  takes none.
+- **Not known to be observable.** No probe has been constructed that
+  distinguishes the two binaries on this, so it is filed as unported surface
+  rather than as a reproduced defect.
+
 ### `link=` in a style is still rejected
 
 - **Symptom:** `set-option -g status-style 'bg=red,link=3'` fails with
@@ -234,6 +139,36 @@ Fixes to the ztmux port, most recent first.
   `style_copy`/`style_set`, which are whole-struct copies.
 - **Found by:** the same style-directive check that turned up `width=`/`pad=`
   below.
+
+## 2026-08-18 (Open-section audit)
+
+Six entries under `## Open` described defects that no longer reproduced. Each was
+re-tested against the current build before being moved here; none was deleted.
+The list had been mis-steering triage — an earlier round this same day ranked work
+partly off entries that were already closed.
+
+### Verified fixed, with the evidence used
+
+| Entry | Verdict | Evidence |
+| --- | --- | --- |
+| `mode_tree_draw` row composition | fixed 2026-08-18 | This session's port; four mode screens byte-identical, case 1508 |
+| Two client theme hooks absent | fixed `3839310b6f` | `{show-hooks -g; -gw; -gp} \| wc -l` = **68 on both**; `set-hook -g client-light-theme` accepted |
+| Five format table rows missing | fixed `212038da0a` | 195 names on both, `comm -23`/`comm -13` both empty; `set-buffer hello; display -p '#{buffer_full}'` -> `hello` on both |
+| `#{history_bytes}` wrong `sizeof` | fixed `212038da0a` | idle 80x24: **960 on both**; after 2000 lines: 280040 on both |
+| copy-mode table lacked arg templates | fixed `35a2816d69` + `73dc53ce53` | table now carries templates and the read-only flag |
+| control-mode client never got `%output` | fixed `212038da0a` | transcripts byte-identical (`event_loop/bufev.rs`) |
+
+The remaining pacing difference in control mode (the C throttles to roughly
+3.5 KB/s, the port does not) delivers a correct, in-order superset rather than a
+protocol break, and is deliberately not filed as a defect.
+
+### What replaced them
+
+`27 upstream command flags` was not stale but **wrong**, and is re-measured above:
+the true absent count is 1. The read-only entry was over-counted and is corrected
+to 4 of 7. Three genuinely-open items were added that nothing had recorded: the
+`choose-tree` `i` info view, the `refresh-client -l` arity and semantics, and the
+`TTY_WAITBG`/`TTY_WAITFG` drift.
 
 ## 2026-08-18 (in-pane prompt)
 
