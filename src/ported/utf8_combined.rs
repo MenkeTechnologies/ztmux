@@ -61,7 +61,10 @@ pub unsafe fn utf8_is_vs(ud: *const utf8_data) -> bool {
         }
         memcmp(
             &raw const (*ud).data as *const u8 as *const c_void,
-            b"\xef\xbf\x8f\x00" as *const u8 as *const c_void,
+            // C utf8-combined.c:73 compares against "\357\270\217" = EF B8 8F,
+            // i.e. U+FE0F VARIATION SELECTOR-16. This had 0xBF for 0xB8, so real
+            // U+FE0F never matched and variation-selector-always-wide never fired.
+            b"\xef\xb8\x8f\x00" as *const u8 as *const c_void,
             3,
         ) == 0
     }
@@ -176,25 +179,31 @@ mod tests {
         }
     }
 
-    // utf8_is_vs (utf8-combined.c:69): true iff size == 3 AND data equals the
-    // variation-selector constant. NOTE: the C source compares against "\357\270\217"
-    // = EF B8 8F (U+FE0F). This Rust port compares against EF BF 8F (0xBF, not 0xB8),
-    // a divergence from vendor/tmux. These tests pin the port's ACTUAL constant and
-    // also assert the true U+FE0F encoding is (currently, per the port) rejected.
+    // utf8_is_vs (utf8-combined.c:69): true iff size == 3 AND data equals
+    // "\357\270\217" = EF B8 8F, i.e. U+FE0F VARIATION SELECTOR-16.
+    //
+    // These two tests previously pinned a TYPO as correct: the port compared
+    // against EF BF 8F (0xBF for 0xB8), so real U+FE0F never matched, and the
+    // tests asserted exactly that -- one named `is_vs_matches_port_constant`
+    // and one asserting real U+FE0F is rejected. The consequence was that
+    // `variation-selector-always-wide` never fired and every VS16 emoji
+    // rendered one column narrow, shifting everything after it. Found on
+    // 2026-08-18 by parity case 1545. A test that encodes a bug as expected
+    // hides it from exactly the process meant to catch it.
     #[test]
-    fn is_vs_matches_port_constant() {
+    fn is_vs_matches_real_variation_selector_16() {
         unsafe {
-            let ud = utf8_data::new([0xef, 0xbf, 0x8f], 3, 3, 0);
+            // Real U+FE0F, which is what the C checks for.
+            let ud = utf8_data::new([0xef, 0xb8, 0x8f], 3, 3, 0);
             assert!(utf8_is_vs(&raw const ud));
         }
     }
 
     #[test]
-    fn is_vs_real_fe0f_reflects_port_constant() {
+    fn is_vs_rejects_the_old_mistyped_constant() {
         unsafe {
-            // Real U+FE0F is EF B8 8F (what the C source checks). The port's constant
-            // uses 0xBF instead of 0xB8, so this does not match here.
-            let ud = utf8_data::new([0xef, 0xb8, 0x8f], 3, 3, 0);
+            // EF BF 8F is U+FFCF, not a variation selector. It must NOT match.
+            let ud = utf8_data::new([0xef, 0xbf, 0x8f], 3, 3, 0);
             assert!(!utf8_is_vs(&raw const ud));
         }
     }

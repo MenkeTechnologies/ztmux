@@ -80,6 +80,19 @@ pub unsafe fn menu_add_item(
         if line && (*menu).items.is_empty() {
             return;
         }
+        // C menu.c:77-78: the SECOND guard, which collapses consecutive
+        // separators. Without it every empty menu argument drew its own rule,
+        // so a menu separated by more than one empty argument showed a doubled
+        // line. `menu_item::default()` leaves an empty name, which is how a
+        // separator is represented here.
+        if line
+            && (*menu)
+                .items
+                .last()
+                .is_some_and(|last| last.name.is_empty())
+        {
+            return;
+        }
 
         (*menu).items.push(menu_item::default());
 

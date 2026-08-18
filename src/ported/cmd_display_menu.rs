@@ -342,7 +342,7 @@ unsafe fn cmd_display_menu_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
         let style = args_get_(args, 's');
         let border_style = args_get_(args, 'S');
         let selected_style = args_get_(args, 'H');
-        let lines = box_lines::BOX_LINES_DEFAULT;
+        let mut lines = box_lines::BOX_LINES_DEFAULT;
 
         let mut cause = null_mut();
         let mut flags = menu_flags::empty();
@@ -429,9 +429,18 @@ unsafe fn cmd_display_menu_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
         let value = args_get_(args, 'b');
         if !value.is_null() {
             let oe = options_get(&mut *o, "menu-border-lines");
-            if let Err(cause) = options_find_choice(options_table_entry(oe), value) {
-                cmdq_error!(item, "menu-border-lines {}", cause.to_str().unwrap());
-                return cmd_retval::CMD_RETURN_ERROR;
+            // C cmd-display-menu.c:359: the resolved choice IS the line style.
+            // This used to validate the flag and then discard the result, so
+            // `display-menu -b double` still drew the single-line glyphs while
+            // the menu-border-lines OPTION path worked.
+            match options_find_choice(options_table_entry(oe), value) {
+                // box_lines is #[repr(i32)] with TryFromPrimitive; the choice
+                // index is its discriminant.
+                Ok(n) => lines = box_lines::try_from(n).unwrap_or(box_lines::BOX_LINES_DEFAULT),
+                Err(cause) => {
+                    cmdq_error!(item, "menu-border-lines {}", cause.to_str().unwrap());
+                    return cmd_retval::CMD_RETURN_ERROR;
+                }
             }
         }
 

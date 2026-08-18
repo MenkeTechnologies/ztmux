@@ -3071,7 +3071,12 @@ pub unsafe fn screen_write_combine(ctx: *mut screen_write_ctx, gc: *const grid_c
             zero_width = 1;
         } else if utf8_is_vs(ud) {
             zero_width = 1;
-            force_wide = 1;
+            // C screen-write.c:2824: only forced wide when the option says so.
+            // This used to force it unconditionally, which was masked by the
+            // constant above never matching.
+            if options_get_number_(GLOBAL_OPTIONS, "variation-selector-always-wide") != 0 {
+                force_wide = 1;
+            }
         } else if (*ud).width == 0 {
             zero_width = 1;
         }

@@ -6523,6 +6523,41 @@ pub unsafe fn window_copy_update_cursor(wme: *mut window_mode_entry, mut cx: u32
         let old_cy = (*data).cy;
         (*data).cx = cx;
         (*data).cy = cy;
+        // C window-copy.c:5437-5459: with line numbers on, the gutter depends on
+        // the cursor ROW, so a vertical move has to repaint the whole screen --
+        // otherwise the relative numbers keep counting from the old row and the
+        // current-line style stays on it. Missing this made the gutter go stale
+        // on every cursor-down.
+        if window_copy_line_numbers_active(wme) {
+            let width = window_copy_line_number_width(wme);
+
+            if !(*s).sel.is_null()
+                || (*data).lineflag != line_sel::LINE_SEL_NONE
+                || old_cy != (*data).cy
+            {
+                window_copy_redraw_screen(wme);
+                return;
+            }
+            let content_sx = if width >= screen_size_x(s) {
+                1
+            } else {
+                screen_size_x(s) - width
+            };
+            if old_cx >= content_sx || (*data).cx >= content_sx {
+                window_copy_redraw_screen(wme);
+                return;
+            }
+            screen_write_start_pane(&raw mut ctx, wp, null_mut());
+            screen_write_cursormove(
+                &raw mut ctx,
+                window_copy_cursor_offset(wme, (*data).cx, screen_size_x(s)) as i32,
+                (*data).cy as i32,
+                0,
+            );
+            screen_write_stop(&raw mut ctx);
+            return;
+        }
+
         if old_cx == screen_size_x(s) {
             window_copy_redraw_lines(wme, old_cy, 1);
         }
