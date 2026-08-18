@@ -18,8 +18,8 @@ pub static CMD_COPY_MODE_ENTRY: cmd_entry = cmd_entry {
     name: "copy-mode",
     alias: None,
 
-    args: args_parse::new("deHMs:t:uq", 0, 0, None),
-    usage: "[-deHMuq] [-s src-pane] [-t target-pane]",
+    args: args_parse::new("deHMqSs:t:u", 0, 0, None),
+    usage: "[-deHMqSu] [-s src-pane] [-t target-pane]",
 
     source: cmd_entry_flag::new(b's', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
@@ -104,6 +104,27 @@ unsafe fn cmd_copy_mode_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
         }
         if args_has(args, 'd') {
             window_copy_pagedown(wp, 0, args_has(args, 'e'));
+        }
+        // C cmd-copy-mode.c:103-109: -S scrolls to the mouse, using the slider
+        // offset latched when the drag started. Its only default caller is
+        // MouseDrag1ScrollbarSlider (key-bindings.c:504).
+        if args_has(args, 'S') {
+            let (mut tty_ox, mut tty_oy, mut tty_sx, mut tty_sy) = (0u32, 0u32, 0u32, 0u32);
+            tty_window_offset(
+                &raw mut (*c).tty,
+                &raw mut tty_ox,
+                &raw mut tty_oy,
+                &raw mut tty_sx,
+                &raw mut tty_sy,
+            );
+            window_copy_scroll(
+                wp,
+                (*c).tty.mouse_slider_mpos,
+                (*event).m.y,
+                tty_oy,
+                args_has(args, 'e') as i32,
+            );
+            return cmd_retval::CMD_RETURN_NORMAL;
         }
 
         cmd_retval::CMD_RETURN_NORMAL

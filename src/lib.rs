@@ -1169,6 +1169,9 @@ enum style_range_type {
     STYLE_RANGE_WINDOW,
     STYLE_RANGE_SESSION,
     STYLE_RANGE_USER,
+    /// C `vendor/tmux/tmux.h:939`: `#[range=control|N]`, N in 0..=9 -- a click
+    /// target inside a drawn format, used by the default pane-border-format.
+    STYLE_RANGE_CONTROL,
 }
 
 impl_tailq_entry!(style_range, entry, tailq_entry<style_range>);
@@ -2450,6 +2453,10 @@ struct tty {
     /// C `vendor/tmux/tmux.h:1769`: where within the scrollbar slider a drag
     /// was grabbed, or -1 when no slider drag is in progress. Read by
     /// `scroll-to-mouse` and `copy-mode -S`.
+    /// C `vendor/tmux/tmux.h`: `int mouse_scrolling_flag` -- latched while a
+    /// scrollbar slider drag is in progress, so motion outside the pane still
+    /// routes to the slider.
+    mouse_scrolling_flag: i32,
     mouse_slider_mpos: i32,
     /// C `vendor/tmux/tmux.h:1770`: `int mouse_last_pane`.
     ///

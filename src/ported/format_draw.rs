@@ -37,7 +37,8 @@ fn format_is_type(fr: &format_range, sy: &style) -> bool {
     match fr.type_ {
         style_range_type::STYLE_RANGE_NONE
         | style_range_type::STYLE_RANGE_LEFT
-        | style_range_type::STYLE_RANGE_RIGHT => true,
+        | style_range_type::STYLE_RANGE_RIGHT
+        | style_range_type::STYLE_RANGE_CONTROL => true,
         style_range_type::STYLE_RANGE_PANE
         | style_range_type::STYLE_RANGE_WINDOW
         | style_range_type::STYLE_RANGE_SESSION => fr.argument == sy.range_argument,
@@ -1319,6 +1320,12 @@ pub unsafe fn format_draw(
 
                 match sr.type_ {
                     style_range_type::STYLE_RANGE_NONE => (),
+                    style_range_type::STYLE_RANGE_CONTROL => {
+                        log_debug!(
+                            "{}: range control|{} at {}-{}",
+                            func, sr.argument, sr.start, sr.end
+                        );
+                    }
                     style_range_type::STYLE_RANGE_LEFT => {
                         log_debug!("{}: range left at {}-{}", func, sr.start, sr.end);
                     }

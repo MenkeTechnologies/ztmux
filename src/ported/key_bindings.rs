@@ -422,7 +422,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
 /// C `vendor/tmux/key-bindings.c:349`: `void key_bindings_init(void)`
 pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
-    static DEFAULTS: [&str; 278] = [
+    static DEFAULTS: [&str; 283] = [
         // Prefix keys.
         "bind -N 'Send the prefix key' C-b { send-prefix }",
         "bind -N 'Rotate through the panes' C-o { rotate-window }",
@@ -540,6 +540,9 @@ pub unsafe fn key_bindings_init() {
         /* Mouse button 1 drag on border. */
         "bind -n MouseDrag1Border { resize-pane -M }",
         "bind -n M-MouseDrag1Border { move-pane -M }",
+        /* Mouse button 1 down on default pane-border-format */
+        "bind -n MouseDown1Control9 { display-menu -t= -xM -yM -O -T 'Kill pane #{pane_index}?' 'Yes' 'y' { kill-pane -t= } 'No' 'n' {}}",
+        "bind -n MouseDown1Control8 { resize-pane -Z }",
         /* ztmux: right-click a pane BORDER for the pane context menu. Bound to
          * the border (not the pane body) so a TUI running inside the pane keeps
          * all its own right-click/mouse events - the menu never shadows it. `-O`
@@ -547,6 +550,10 @@ pub unsafe fn key_bindings_init() {
         /* Mouse button 1 down on status line. */
         "bind -n MouseDown1Status { switch-client -t= }",
         "bind -n C-MouseDown1Status { swap-window -t@ }",
+        /* Mouse on scrollbar. */
+        "bind -n MouseDown1ScrollbarUp { if -Ft= '#{pane_in_mode}' { send -X page-up } {copy-mode -u } }",
+        "bind -n MouseDown1ScrollbarDown { if -Ft= '#{pane_in_mode}' { send -X page-down } {copy-mode -d } }",
+        "bind -n MouseDrag1ScrollbarSlider { if -Ft= '#{pane_in_mode}' { send -X scroll-to-mouse } { copy-mode -S } }",
         /* Mouse wheel down on status line. */
         "bind -n WheelDownStatus { next-window }",
         /* Mouse wheel up on status line. */

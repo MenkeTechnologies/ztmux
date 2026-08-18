@@ -16,7 +16,9 @@
 # Keys listed in SKIP below are excluded because they are known to differ, each
 # for a reason recorded elsewhere. The 32 command-prompt -P keys that used to sit
 # here left the list when the in-pane prompt was ported (cases 1506/1507), and the
-# three pane-menu keys left it when the truncated comparison below replaced them. Every OTHER key must match byte-for-byte, so a
+# three pane-menu keys left it when the truncated comparison below replaced them,
+# and the five scrollbar/control keys left it when the 19 mouse locations landed
+# (case 1511). Every OTHER key must match byte-for-byte, so a
 # new divergence on any of them fails this case. Shrinking SKIP is the point: a
 # key leaves the list when the feature behind it lands.
 #
@@ -37,11 +39,6 @@ my @skip = (
     "prefix H", "prefix I", "prefix R", "prefix S", "prefix T",
     "prefix W", "prefix y", "prefix +", "root MouseDown3Border",
 
-    # The scrollbar and control mouse locations the six-location keyc table
-    # cannot name. Covered by parity/known_gaps/mouse_scrollbar_locations.sh.
-    "root MouseDown1ScrollbarUp", "root MouseDown1ScrollbarDown",
-    "root MouseDrag1ScrollbarSlider",
-    "root MouseDown1Control8", "root MouseDown1Control9",
 
 );
 my %skip = map { $_ => 1 } @skip;

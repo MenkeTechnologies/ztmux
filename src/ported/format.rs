@@ -1625,6 +1625,7 @@ pub unsafe fn format_cb_mouse_status_range(ft: *mut format_tree) -> format_table
             style_range_type::STYLE_RANGE_WINDOW => "window".into(),
             style_range_type::STYLE_RANGE_SESSION => "session".into(),
             style_range_type::STYLE_RANGE_USER => format!("{}", _s((*sr).string.as_ptr())).into(),
+            style_range_type::STYLE_RANGE_CONTROL => "control".into(),
         }
     }
 }

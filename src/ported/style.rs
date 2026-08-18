@@ -149,6 +149,19 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
                         (*sy).range_type = style_range_type::STYLE_RANGE_RIGHT;
                         (*sy).range_argument = 0;
                         style_set_range_string(sy, c!(""));
+                    } else if strcaseeq_(tmp.add(6), "control") {
+                        // C style.c:150-158: `range=control|N`, N in 0..=9. The
+                        // default pane-border-format uses two of these as click
+                        // targets, which become the CONTROL0-9 mouse locations.
+                        if found.is_null() {
+                            break 'error;
+                        }
+                        let Ok(n) = strtonum(found, 0, 9) else {
+                            break 'error;
+                        };
+                        (*sy).range_type = style_range_type::STYLE_RANGE_CONTROL;
+                        (*sy).range_argument = n;
+                        style_set_range_string(sy, c!(""));
                     } else if strcaseeq_(tmp.add(6), "pane") {
                         if found.is_null() {
                             break 'error;
@@ -1026,6 +1039,45 @@ mod tests {
             assert!(sy.range_type == style_range_type::STYLE_RANGE_WINDOW);
             assert_eq!(sy.range_argument, 5);
             assert_eq!(tostring(&raw const sy), "range=window|5");
+        }
+    }
+
+    // `range=control|N` marks a numbered click target inside a drawn format
+    // (style.c:150-158); a press there becomes one of the CONTROL0-9 mouse
+    // locations. N is bounded to 0..=9 by strtonum, and unlike window|N the
+    // argument is REQUIRED -- the default pane-border-format relies on both
+    // facts for its Zoom (|8) and Kill (|9) buttons.
+    #[test]
+    fn range_control_parses_and_bounds_its_argument() {
+        let _g = lock();
+        unsafe {
+            for n in [0u32, 1, 8, 9] {
+                let (rc, sy) = parse(&format!("range=control|{n}"));
+                assert_eq!(rc, 0, "control|{n} must parse");
+                assert!(sy.range_type == style_range_type::STYLE_RANGE_CONTROL);
+                assert_eq!(sy.range_argument, n);
+                // NOTE: upstream's style_tostring has no STYLE_RANGE_CONTROL
+                // branch (style.c has one only for LEFT/RIGHT/PANE/WINDOW/
+                // SESSION/USER), and its `tmp` is initialised to "", so a
+                // control range prints as a bare `range=`. That looks like an
+                // upstream gap, but the port matches it rather than inventing a
+                // better rendering -- the C is the spec.
+                assert_eq!(tostring(&raw const sy), "range=");
+            }
+
+            // Out of the 0..=9 range, non-numeric, and the missing argument are
+            // all errors -- the C goes to `error` for each.
+            for bad in ["range=control|10", "range=control|99", "range=control|-1",
+                        "range=control|x", "range=control"] {
+                let (rc, _) = parse(bad);
+                assert_eq!(rc, -1, "{bad} must be rejected");
+            }
+
+            // It composes with other directives without disturbing them.
+            let (rc, sy) = parse("fg=red,range=control|4,bold");
+            assert_eq!(rc, 0);
+            assert!(sy.range_type == style_range_type::STYLE_RANGE_CONTROL);
+            assert_eq!(sy.range_argument, 4);
         }
     }
 

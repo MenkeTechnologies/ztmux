@@ -52,6 +52,19 @@ macro_rules! KEYC_MOUSE_STRING {
                 key_string_table_entry{string: concat!($s, "StatusRight"), key: keyc::[<KEYC_ $name _STATUS_RIGHT>] as u64},
                 key_string_table_entry{string: concat!($s, "StatusDefault"), key: keyc::[<KEYC_ $name _STATUS_DEFAULT>] as u64 },
                 key_string_table_entry{string: concat!($s, "Border"), key: keyc::[<KEYC_ $name _BORDER>] as u64},
+                key_string_table_entry{string: concat!($s, "ScrollbarUp"), key: keyc::[<KEYC_ $name _SCROLLBAR_UP>] as u64},
+                key_string_table_entry{string: concat!($s, "ScrollbarSlider"), key: keyc::[<KEYC_ $name _SCROLLBAR_SLIDER>] as u64},
+                key_string_table_entry{string: concat!($s, "ScrollbarDown"), key: keyc::[<KEYC_ $name _SCROLLBAR_DOWN>] as u64},
+                key_string_table_entry{string: concat!($s, "Control0"), key: keyc::[<KEYC_ $name _CONTROL0>] as u64},
+                key_string_table_entry{string: concat!($s, "Control1"), key: keyc::[<KEYC_ $name _CONTROL1>] as u64},
+                key_string_table_entry{string: concat!($s, "Control2"), key: keyc::[<KEYC_ $name _CONTROL2>] as u64},
+                key_string_table_entry{string: concat!($s, "Control3"), key: keyc::[<KEYC_ $name _CONTROL3>] as u64},
+                key_string_table_entry{string: concat!($s, "Control4"), key: keyc::[<KEYC_ $name _CONTROL4>] as u64},
+                key_string_table_entry{string: concat!($s, "Control5"), key: keyc::[<KEYC_ $name _CONTROL5>] as u64},
+                key_string_table_entry{string: concat!($s, "Control6"), key: keyc::[<KEYC_ $name _CONTROL6>] as u64},
+                key_string_table_entry{string: concat!($s, "Control7"), key: keyc::[<KEYC_ $name _CONTROL7>] as u64},
+                key_string_table_entry{string: concat!($s, "Control8"), key: keyc::[<KEYC_ $name _CONTROL8>] as u64},
+                key_string_table_entry{string: concat!($s, "Control9"), key: keyc::[<KEYC_ $name _CONTROL9>] as u64},
             ]
         }
     };
@@ -86,6 +99,19 @@ macro_rules! KEYC_MOUSE_STRING_I {
                 key_string_table_entry{string: concat!($s, $i, "StatusRight"), key: keyc::[<KEYC_ $name $i _STATUS_RIGHT>] as u64},
                 key_string_table_entry{string: concat!($s, $i, "StatusDefault"), key: keyc::[<KEYC_ $name $i _STATUS_DEFAULT>] as u64 },
                 key_string_table_entry{string: concat!($s, $i, "Border"), key: keyc::[<KEYC_ $name $i _BORDER>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "ScrollbarUp"), key: keyc::[<KEYC_ $name $i _SCROLLBAR_UP>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "ScrollbarSlider"), key: keyc::[<KEYC_ $name $i _SCROLLBAR_SLIDER>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "ScrollbarDown"), key: keyc::[<KEYC_ $name $i _SCROLLBAR_DOWN>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "Control0"), key: keyc::[<KEYC_ $name $i _CONTROL0>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "Control1"), key: keyc::[<KEYC_ $name $i _CONTROL1>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "Control2"), key: keyc::[<KEYC_ $name $i _CONTROL2>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "Control3"), key: keyc::[<KEYC_ $name $i _CONTROL3>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "Control4"), key: keyc::[<KEYC_ $name $i _CONTROL4>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "Control5"), key: keyc::[<KEYC_ $name $i _CONTROL5>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "Control6"), key: keyc::[<KEYC_ $name $i _CONTROL6>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "Control7"), key: keyc::[<KEYC_ $name $i _CONTROL7>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "Control8"), key: keyc::[<KEYC_ $name $i _CONTROL8>] as u64},
+                key_string_table_entry{string: concat!($s, $i, "Control9"), key: keyc::[<KEYC_ $name $i _CONTROL9>] as u64},
             ]
         }
     };
@@ -106,10 +132,10 @@ macro_rules! KEYC_MOUSE_STRING11 {
     };
 }
 
-static KEY_STRING_TABLE: [key_string_table_entry; 469] = const {
+static KEY_STRING_TABLE: [key_string_table_entry; 1314] = const {
     let mut out_i: usize = 0;
-    let mut out: [key_string_table_entry; 469] =
-        [key_string_table_entry { string: "", key: 0 }; 469];
+    let mut out: [key_string_table_entry; 1314] =
+        [key_string_table_entry { string: "", key: 0 }; 1314];
 
     let function_keys = [
         key_string_table_entry::new("F1", keyc::KEYC_F1 as u64 | KEYC_IMPLIED_META),
