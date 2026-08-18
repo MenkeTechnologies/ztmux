@@ -33,7 +33,6 @@ publish      = true
 [features]
 default     = ["sixel"]
 cgroups     = []
-hyperlinks  = []
 iutf8       = []
 ncurses     = []
 nokerninfo  = []
@@ -48,6 +47,11 @@ utf8proc    = []
 # any effect.
 static      = []
 dynamic     = []
+
+# Was the gate on the OSC 8 `Hls` capability, mirroring an ncurses-version
+# #ifdef in tty-features.c. ztmux links no ncurses, so there is nothing to
+# gate: the capability is unconditional and this flag does nothing.
+hyperlinks  = []
 
 [dependencies]
 bitflags     = { version = "2.9.1" }

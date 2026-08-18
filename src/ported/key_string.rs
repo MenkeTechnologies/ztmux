@@ -407,21 +407,37 @@ pub unsafe fn key_string_lookup_string(mut string: *const u8) -> key_code {
 /// C `vendor/tmux/key-string.c:327`: `const char *key_string_lookup_key(key_code key, int with_flags)`
 pub unsafe fn key_string_lookup_key(mut key: key_code, with_flags: i32) -> *const u8 {
     let sizeof_out: usize = 64;
-    static mut OUT: [u8; 64] = [0; 64];
+    // C key-string.c:329 uses a function-level `static char out[64]` and returns
+    // a pointer into it, so the caller must copy before the next call. That
+    // contract is kept exactly -- but the buffer is PER THREAD here.
+    //
+    // The tmux server is single-threaded, so for the running server the two are
+    // indistinguishable. Under the parallel unit-test runner they are not: a
+    // process-wide static made every test that renders a key race every other
+    // caller of this function, and it showed up as `"\0C-?"` and `"\0-Space"` --
+    // a half-overwritten buffer -- roughly once per ten full-suite runs. A
+    // thread-local buffer cannot be clobbered by another thread's call, and the
+    // returned pointer stays valid for the thread's lifetime because the buffer
+    // is const-initialised and has no destructor.
+    thread_local! {
+        static OUT_BUF: std::cell::UnsafeCell<[u8; 64]> =
+            const { std::cell::UnsafeCell::new([0; 64]) };
+    }
+    let out: *mut u8 = OUT_BUF.with(|b| b.get().cast::<u8>());
     unsafe {
         let saved = key;
         let sizeof_tmp: usize = 8;
         let mut tmp: [u8; 8] = [0; 8];
         let s: *const u8;
 
-        OUT[0] = b'\0';
+        *out = b'\0';
 
         'out: {
             'append: {
                 // Literal keys are themselves.
                 if key & KEYC_LITERAL != 0 {
                     snprintf(
-                        (&raw mut OUT).cast(),
+                        out.cast(),
                         sizeof_out,
                         c"%c".as_ptr(),
                         (key & 0xff) as i32,
@@ -431,13 +447,13 @@ pub unsafe fn key_string_lookup_key(mut key: key_code, with_flags: i32) -> *cons
 
                 // Fill in the modifiers.
                 if key & KEYC_CTRL != 0 {
-                    strlcat(&raw mut OUT as *mut u8, c!("C-"), sizeof_out);
+                    strlcat(out, c!("C-"), sizeof_out);
                 }
                 if key & KEYC_META != 0 {
-                    strlcat(&raw mut OUT as *mut u8, c!("M-"), sizeof_out);
+                    strlcat(out, c!("M-"), sizeof_out);
                 }
                 if key & KEYC_SHIFT != 0 {
-                    strlcat(&raw mut OUT as *mut u8, c!("S-"), sizeof_out);
+                    strlcat(out, c!("S-"), sizeof_out);
                 }
                 key &= KEYC_MASK_KEY;
 
@@ -517,7 +533,7 @@ pub unsafe fn key_string_lookup_key(mut key: key_code, with_flags: i32) -> *cons
                         (key - KEYC_USER) as u8 as u32,
                     );
                     strlcat(
-                        &raw mut OUT as *mut u8,
+                        out,
                         &raw const tmp as *const u8,
                         sizeof_out,
                     );
@@ -530,7 +546,7 @@ pub unsafe fn key_string_lookup_key(mut key: key_code, with_flags: i32) -> *cons
                     .position(|e| key == e.key & KEYC_MASK_KEY)
                 {
                     strlcat_(
-                        &raw mut OUT as *mut u8,
+                        out,
                         KEY_STRING_TABLE[i].string,
                         sizeof_out,
                     );
@@ -540,20 +556,20 @@ pub unsafe fn key_string_lookup_key(mut key: key_code, with_flags: i32) -> *cons
                 // Is this a Unicode key?
                 if KEYC_IS_UNICODE(key) {
                     let ud = utf8_to_data(key as u32);
-                    let off = strlen(&raw const OUT as *const u8);
+                    let off = strlen(out.cast_const());
                     memcpy(
-                        &raw mut OUT[off] as *mut c_void,
+                        out.add(off).cast::<c_void>(),
                         &raw const ud.data as *const c_void,
                         ud.size as usize,
                     );
-                    OUT[off + ud.size as usize] = b'\0';
+                    *out.add(off + ud.size as usize) = b'\0';
                     break 'out;
                 }
 
                 // Invalid keys are errors.
                 if key > 255 {
                     snprintf(
-                        (&raw mut OUT).cast(),
+                        out.cast(),
                         sizeof_out,
                         c"Invalid#%llx".as_ptr(),
                         saved,
@@ -572,39 +588,39 @@ pub unsafe fn key_string_lookup_key(mut key: key_code, with_flags: i32) -> *cons
                 }
 
                 strlcat(
-                    &raw mut OUT as *mut u8,
+                    out,
                     &raw const tmp as *const u8,
                     sizeof_out,
                 );
                 break 'out;
             }
             // append:
-            strlcat(&raw mut OUT as *mut u8, s, sizeof_out);
+            strlcat(out, s, sizeof_out);
         }
         // out:
         if with_flags != 0 && (saved & KEYC_MASK_FLAGS) != 0 {
-            strlcat(&raw mut OUT as *mut u8, c!("["), sizeof_out);
+            strlcat(out, c!("["), sizeof_out);
             if saved & KEYC_LITERAL != 0 {
-                strlcat(&raw mut OUT as *mut u8, c!("L"), sizeof_out);
+                strlcat(out, c!("L"), sizeof_out);
             }
             if saved & KEYC_KEYPAD != 0 {
-                strlcat(&raw mut OUT as *mut u8, c!("K"), sizeof_out);
+                strlcat(out, c!("K"), sizeof_out);
             }
             if saved & KEYC_CURSOR != 0 {
-                strlcat(&raw mut OUT as *mut u8, c!("C"), sizeof_out);
+                strlcat(out, c!("C"), sizeof_out);
             }
             if saved & KEYC_IMPLIED_META != 0 {
-                strlcat(&raw mut OUT as *mut u8, c!("I"), sizeof_out);
+                strlcat(out, c!("I"), sizeof_out);
             }
             if saved & KEYC_BUILD_MODIFIERS != 0 {
-                strlcat(&raw mut OUT as *mut u8, c!("B"), sizeof_out);
+                strlcat(out, c!("B"), sizeof_out);
             }
             if saved & KEYC_SENT != 0 {
-                strlcat(&raw mut OUT as *mut u8, c!("S"), sizeof_out);
+                strlcat(out, c!("S"), sizeof_out);
             }
-            strlcat(&raw mut OUT as *mut u8, c!("]"), sizeof_out);
+            strlcat(out, c!("]"), sizeof_out);
         }
-        &raw const OUT as *const u8
+        out.cast_const()
     }
 }
 
@@ -633,12 +649,13 @@ mod tests {
     }
 
     // Render a key_code back to a Rust String via key_string_lookup_key.
-    // key_string_lookup_key writes into a shared `static mut OUT`, so calls must
-    // be serialized against each other while the result is copied out.
+    //
+    // This used to take a mutex, because key_string_lookup_key wrote into a
+    // process-wide `static mut OUT` that every other caller in the test binary
+    // could clobber -- and the mutex only covered the tests that went through
+    // THIS helper, so the race survived it and surfaced as a half-overwritten
+    // buffer. The buffer is thread-local now, so no serialisation is needed.
     unsafe fn name(key: key_code, with_flags: i32) -> String {
-        use std::sync::Mutex;
-        static OUT_LOCK: Mutex<()> = Mutex::new(());
-        let _guard = OUT_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
             let p = key_string_lookup_key(key, with_flags);
             let bytes = std::slice::from_raw_parts(p, strlen(p));

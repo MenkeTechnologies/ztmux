@@ -59,14 +59,22 @@ static TTY_FEATURE_CLIPBOARD: tty_feature = tty_feature::new(
     term_flags::empty(),
 );
 
-// #if defined (__OpenBSD__) || (defined(NCURSES_VERSION_MAJOR) && (NCURSES_VERSION_MAJOR > 5 ||  (NCURSES_VERSION_MAJOR == 5 && NCURSES_VERSION_MINOR > 8)))
-
 /// Terminal supports OSC 8 hyperlinks.
-#[cfg(feature = "hyperlinks")]
+///
+/// C tty-features.c:98 wraps this capability in
+/// `#if __OpenBSD__ || NCURSES_VERSION > 5.8`, a BUILD-TIME test of whether the
+/// local ncurses can express an extended capability name. ztmux links no
+/// ncurses -- `tty_term_apply` matches the name against its own table
+/// (`tty_term.rs`, `TTYC_HLS` = `Hls`) and `tty_putcode_ss` emits the string
+/// itself -- so the condition has nothing to test and the capability is always
+/// present, which is what upstream compiles to on every platform ztmux targets.
+///
+/// It used to sit behind a `hyperlinks` cargo feature that is NOT in
+/// `default`, so every shipped build had it empty and dropped OSC 8 entirely:
+/// `printf '\033]8;;http://x\033\\LINK\033]8;;\033\\'` in a pane came back
+/// as bare `LINK`, and `#[link=...]` in a format drew nothing.
 static TTY_FEATURE_HYPERLINKS_CAPABILITIES: &[&str] =
-    &["*:Hls=\\E]8;%?%p1%l%tid=%p1%s%;;%p2%s\\E\\\\"];
-#[cfg(not(feature = "hyperlinks"))]
-static TTY_FEATURE_HYPERLINKS_CAPABILITIES: &[&str] = &[];
+    &["Hls=\\E]8;%?%p1%l%tid=%p1%s%;;%p2%s\\E\\\\"];
 static TTY_FEATURE_HYPERLINKS: tty_feature = tty_feature::new(
     "hyperlinks",
     TTY_FEATURE_HYPERLINKS_CAPABILITIES,
@@ -219,7 +227,16 @@ static TTY_FEATURE_SIXEL: tty_feature = tty_feature::new(
 );
 
 /// Available terminal features.
-static TTY_FEATURES: [&tty_feature; 20] = [
+/// Terminal supports the OSC 9;4 progress bar.
+/// C `vendor/tmux/tty-features.c:361`: `tty_feature_progressbar`.
+static TTY_FEATURE_PROGRESSBAR_CAPABILITIES: &[&str] = &["Spb=\\E]9;4;%p1%d;%p2%d\\E\\\\"];
+static TTY_FEATURE_PROGRESSBAR: tty_feature = tty_feature::new(
+    "progressbar",
+    TTY_FEATURE_PROGRESSBAR_CAPABILITIES,
+    term_flags::empty(),
+);
+
+static TTY_FEATURES: [&tty_feature; 21] = [
     &TTY_FEATURE_256,
     &TTY_FEATURE_BPASTE,
     &TTY_FEATURE_CCOLOUR,
@@ -233,6 +250,7 @@ static TTY_FEATURES: [&tty_feature; 20] = [
     &TTY_FEATURE_MOUSE,
     &TTY_FEATURE_OSC7,
     &TTY_FEATURE_OVERLINE,
+    &TTY_FEATURE_PROGRESSBAR,
     &TTY_FEATURE_RECTFILL,
     &TTY_FEATURE_RGB,
     &TTY_FEATURE_SIXEL,
@@ -341,12 +359,20 @@ pub unsafe fn tty_default_features(feat: *mut i32, name: *const u8, version: u32
     }
 
     // TODO note version isn't init in the C code
+    //
+    // Entry-for-entry with C tty-features.c:524-611. This table is what a
+    // terminal gets from its XDA/DA2 identification alone, so anything missing
+    // here is a feature the user never gets no matter what their terminal
+    // supports -- and three whole terminals used to be absent.
     #[rustfmt::skip]
     static TABLE: &[entry] = &[
         entry { name: c"mintty", features: concat!( TTY_FEATURES_BASE_MODERN_XTERM!(), ",ccolour,cstyle,extkeys,margins,overline,usstyle"), version: 0, },
-        entry { name: c"tmux", features: concat!( TTY_FEATURES_BASE_MODERN_XTERM!(), ",ccolour,cstyle,focus,overline,usstyle,hyperlinks"), version: 0, },
+        entry { name: c"tmux", features: concat!( TTY_FEATURES_BASE_MODERN_XTERM!(), ",ccolour,cstyle,extkeys,focus,overline,usstyle,hyperlinks,progressbar"), version: 0, },
         entry { name: c"rxvt-unicode", features: "256,bpaste,ccolour,cstyle,mouse,title,ignorefkeys", version: 0, },
-        entry { name: c"iTerm2", features: concat!( TTY_FEATURES_BASE_MODERN_XTERM!(), ",cstyle,extkeys,margins,usstyle,sync,osc7,hyperlinks"), version: 0, },
+        entry { name: c"iTerm2", features: concat!( TTY_FEATURES_BASE_MODERN_XTERM!(), ",cstyle,extkeys,margins,usstyle,sync,osc7,hyperlinks,progressbar"), version: 0, },
+        entry { name: c"foot", features: concat!( TTY_FEATURES_BASE_MODERN_XTERM!(), ",ccolour,cstyle,extkeys,usstyle,sync,osc7,hyperlinks"), version: 0, },
+        entry { name: c"WezTerm", features: concat!( TTY_FEATURES_BASE_MODERN_XTERM!(), ",ccolour,cstyle,extkeys,focus,hyperlinks,usstyle"), version: 0, },
+        entry { name: c"ghostty", features: concat!( TTY_FEATURES_BASE_MODERN_XTERM!(), ",ccolour,cstyle,extkeys,focus,overline,hyperlinks,osc7,sync,usstyle,progressbar"), version: 0, },
         // xterm also supports DECSLRM and DECFRA, but they can be
         // disabled so not set it here - they will be added if
         // secondary DA shows VT420.
@@ -397,30 +423,30 @@ mod tests {
         }
     }
 
-    // The 20 feature names in `TTY_FEATURES` array order (bit index == position).
-    // Mirrors vendor/tmux/tty-features.c:372 `tty_features[]` but WITHOUT the
-    // "progressbar" entry, which this port omits (see TTY_FEATURES, 20 entries).
-    const NAMES: [&str; 20] = [
-        "256",           // 0
-        "bpaste",        // 1
-        "ccolour",       // 2
-        "clipboard",     // 3
-        "hyperlinks",    // 4
-        "cstyle",        // 5
-        "extkeys",       // 6
-        "focus",         // 7
-        "ignorefkeys",   // 8
-        "margins",       // 9
-        "mouse",         // 10
-        "osc7",          // 11
-        "overline",      // 12
-        "rectfill",      // 13
-        "RGB",           // 14
-        "sixel",         // 15
-        "strikethrough", // 16
-        "sync",          // 17
-        "title",         // 18
-        "usstyle",       // 19
+    // The 21 feature names in `TTY_FEATURES` array order (bit index == position).
+    // Mirrors vendor/tmux/tty-features.c:372 `tty_features[]` exactly.
+    const NAMES: [&str; 21] = [
+        "256",             // 0
+        "bpaste",          // 1
+        "ccolour",         // 2
+        "clipboard",       // 3
+        "hyperlinks",      // 4
+        "cstyle",          // 5
+        "extkeys",         // 6
+        "focus",           // 7
+        "ignorefkeys",     // 8
+        "margins",         // 9
+        "mouse",           // 10
+        "osc7",            // 11
+        "overline",        // 12
+        "progressbar",     // 13
+        "rectfill",        // 14
+        "RGB",             // 15
+        "sixel",           // 16
+        "strikethrough",   // 17
+        "sync",            // 18
+        "title",           // 19
+        "usstyle",         // 20
     ];
 
     // C `tty_get_features`, vendor/tmux/tty-features.c:431: an all-clear feat
@@ -472,25 +498,25 @@ mod tests {
     fn combining_features() {
         unsafe {
             let feat = add("256,RGB,mouse");
-            // array order: 256(0), mouse(10), RGB(14).
+            // array order: 256(0), mouse(10), RGB(15).
             assert_eq!(get_features_string(feat), "256,mouse,RGB");
-            assert_eq!(feat, (1 << 0) | (1 << 10) | (1 << 14));
+            assert_eq!(feat, (1 << 0) | (1 << 10) | (1 << 15));
         }
     }
 
-    // All 20 features at once -> the full array-order list; and a fully-set int
-    // (bits 0..19) renders the same. Boundary on the top valid bit (19).
+    // All 21 features at once -> the full array-order list; and a fully-set int
+    // (bits 0..20) renders the same. Boundary on the top valid bit (20).
     #[test]
     fn all_features_roundtrip() {
         unsafe {
             let full = NAMES.join(",");
             let feat = add(&full);
-            assert_eq!(feat, (1 << 20) - 1);
+            assert_eq!(feat, (1 << 21) - 1);
 
             let expected = NAMES.join(",");
             assert_eq!(get_features_string(feat), expected);
             // Rendering directly from the fully-set bitmask matches too.
-            assert_eq!(get_features_string((1 << 20) - 1), expected);
+            assert_eq!(get_features_string((1 << 21) - 1), expected);
         }
     }
 
@@ -620,9 +646,13 @@ mod tests {
         }
     }
 
-    // "tmux" terminal entry: base plus ccolour,cstyle,focus,overline,usstyle,
-    // hyperlinks. The hyperlinks NAME is registered regardless of whether the
-    // hyperlinks build feature populates its capability list.
+    // "tmux" terminal entry (C tty-features.c:536): base plus ccolour, cstyle,
+    // extkeys, focus, overline, usstyle, hyperlinks, progressbar.
+    //
+    // This assertion used to omit extkeys and progressbar, matching a drifted
+    // table rather than the C -- so the test passed while a ztmux client inside
+    // tmux silently lost both. Cross-checked against the reference binary:
+    // `tmux display-message -p '#{client_termfeatures}'` prints exactly this.
     #[test]
     fn default_features_tmux_terminal() {
         unsafe {
@@ -630,13 +660,13 @@ mod tests {
             tty_default_features(&raw mut feat, c!("tmux"), 0);
             assert_eq!(
                 get_features_string(feat),
-                "256,bpaste,ccolour,clipboard,hyperlinks,cstyle,focus,mouse,overline,RGB,strikethrough,title,usstyle"
+                "256,bpaste,ccolour,clipboard,hyperlinks,cstyle,extkeys,focus,mouse,overline,progressbar,RGB,strikethrough,title,usstyle"
             );
         }
     }
 
-    // iTerm2 entry: base plus cstyle,extkeys,margins,usstyle,sync,osc7,hyperlinks
-    // (note: NO ccolour, unlike mintty/tmux).
+    // iTerm2 entry: base plus cstyle,extkeys,margins,usstyle,sync,osc7,
+    // hyperlinks,progressbar (note: NO ccolour, unlike mintty/tmux).
     #[test]
     fn default_features_iterm2() {
         unsafe {
@@ -644,7 +674,7 @@ mod tests {
             tty_default_features(&raw mut feat, c!("iTerm2"), 0);
             assert_eq!(
                 get_features_string(feat),
-                "256,bpaste,clipboard,hyperlinks,cstyle,extkeys,margins,mouse,osc7,RGB,strikethrough,sync,title,usstyle"
+                "256,bpaste,clipboard,hyperlinks,cstyle,extkeys,margins,mouse,osc7,progressbar,RGB,strikethrough,sync,title,usstyle"
             );
         }
     }
@@ -678,16 +708,43 @@ mod tests {
         }
     }
 
-    // The top valid bit (usstyle, index 19) renders alone, and rendering a
-    // bitmask with an out-of-range bit set (bit 20+) simply ignores it — the
-    // loop only walks the 20 known features.
+    // The top valid bit (usstyle, index 20) renders alone, and rendering a
+    // bitmask with an out-of-range bit set (bit 21+) simply ignores it — the
+    // loop only walks the 21 known features.
     #[test]
     fn top_bit_and_out_of_range_bits() {
         unsafe {
-            assert_eq!(get_features_string(1 << 19), "usstyle");
-            // Bit 20 has no feature; it contributes nothing to the rendering.
-            assert_eq!(get_features_string((1 << 19) | (1 << 20)), "usstyle");
-            assert_eq!(get_features_string(1 << 20), "");
+            assert_eq!(get_features_string(1 << 20), "usstyle");
+            // Bit 21 has no feature; it contributes nothing to the rendering.
+            assert_eq!(get_features_string((1 << 20) | (1 << 21)), "usstyle");
+            assert_eq!(get_features_string(1 << 21), "");
+        }
+    }
+
+    // The three terminals next-3.7 added and this port was missing entirely, so
+    // a user on any of them got NO feature detection at all. Strings derived
+    // from C tty-features.c:568-600 in `tty_features[]` array order.
+    #[test]
+    fn default_features_terminals_added_in_next_3_7() {
+        unsafe {
+            for (name, want) in [
+                (
+                    c!("foot"),
+                    "256,bpaste,ccolour,clipboard,hyperlinks,cstyle,extkeys,mouse,osc7,RGB,strikethrough,sync,title,usstyle",
+                ),
+                (
+                    c!("WezTerm"),
+                    "256,bpaste,ccolour,clipboard,hyperlinks,cstyle,extkeys,focus,mouse,RGB,strikethrough,title,usstyle",
+                ),
+                (
+                    c!("ghostty"),
+                    "256,bpaste,ccolour,clipboard,hyperlinks,cstyle,extkeys,focus,mouse,osc7,overline,progressbar,RGB,strikethrough,sync,title,usstyle",
+                ),
+            ] {
+                let mut feat: i32 = 0;
+                tty_default_features(&raw mut feat, name, 0);
+                assert_eq!(get_features_string(feat), want, "terminal {}", _s(name));
+            }
         }
     }
 }

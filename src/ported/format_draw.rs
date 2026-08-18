@@ -900,6 +900,10 @@ pub unsafe fn format_draw(
         ];
 
         let os: *mut screen = (*octx).s;
+        // C format-draw.c:713: the hyperlink set a `link=` style writes into is
+        // the target SCREEN's, so the id in the cell is meaningful to whatever
+        // later re-serialises that screen.
+        let hl: *mut hyperlinks = (*os).hyperlinks;
         let mut s: [screen; TOTAL] = zeroed();
 
         let mut ctx: [screen_write_ctx; TOTAL] = zeroed();
@@ -923,6 +927,9 @@ pub unsafe fn format_draw(
 
         let mut gc: grid_cell = zeroed();
         let mut current_default: grid_cell = zeroed();
+        // C format-draw.c:724/734-736: `base` is repointed at a LOCAL copy so
+        // `set-default` can rewrite what `pop-default` later restores to.
+        let mut base_default: grid_cell = zeroed();
         let mut sy: style = zeroed();
         let mut saved_sy: style = zeroed();
 
@@ -931,7 +938,9 @@ pub unsafe fn format_draw(
         let mut fr = null_mut();
         let mut frs: format_ranges = zeroed();
 
+        memcpy__(&raw mut base_default, base);
         memcpy__(&raw mut current_default, base);
+        let base: *const grid_cell = &raw const base_default;
         style_set(&raw mut sy, &raw mut current_default);
         tailq_init(&raw mut frs);
         // log_debug("%s: %s", __func__, expanded);
@@ -1046,6 +1055,17 @@ pub unsafe fn format_draw(
                     sy.gc.fg = (*base).fg;
                 }
 
+                // Resolve any hyperlink and store it in the cell. The URI
+                // doubles as the internal ID so repeated links share one entry
+                // and the ID stays stable across redraws.
+                // C format-draw.c:846-851.
+                let link_uri = style_link(&raw mut sy);
+                sy.gc.link = if !link_uri.is_null() && !hl.is_null() {
+                    hyperlinks_put(hl, link_uri, link_uri)
+                } else {
+                    0
+                };
+
                 // If this style has a fill colour, store it for later.
                 if sy.fill != 8 {
                     fill = sy.fill;
@@ -1057,6 +1077,13 @@ pub unsafe fn format_draw(
                     sy.default_type = style_default_type::STYLE_DEFAULT_BASE;
                 } else if sy.default_type == style_default_type::STYLE_DEFAULT_POP {
                     memcpy__(&raw mut current_default, base);
+                    sy.default_type = style_default_type::STYLE_DEFAULT_BASE;
+                } else if sy.default_type == style_default_type::STYLE_DEFAULT_SET {
+                    // C format-draw.c:865-870: unlike push/pop this moves the
+                    // BASE too, so everything after it -- including a later
+                    // `pop-default` -- resolves against the new cell.
+                    memcpy__(&raw mut base_default, &raw const saved_sy.gc);
+                    memcpy__(&raw mut current_default, &raw const saved_sy.gc);
                     sy.default_type = style_default_type::STYLE_DEFAULT_BASE;
                 }
 

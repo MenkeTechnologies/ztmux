@@ -1150,7 +1150,8 @@ unsafe fn grid_string_cells_code(
     len: usize,
     flags: grid_string_flags,
     sc: *mut screen,
-) -> bool {
+    has_link: *mut bool,
+) {
     unsafe {
         let mut oldc: [c_int; 64] = [0; 64];
         let mut newc: [c_int; 64] = [0; 64];
@@ -1163,7 +1164,6 @@ unsafe fn grid_string_cells_code(
         let mut tmp: [u8; 64] = [0; 64];
         let mut uri: *const u8 = null();
         let mut id: *const u8 = null();
-        let mut has_link = false;
 
         static ATTRS: [(grid_attr, c_uint); 13] = [
             (grid_attr::GRID_ATTR_BRIGHT, 1),
@@ -1295,7 +1295,14 @@ unsafe fn grid_string_cells_code(
             }
         }
 
-        // Add hyperlink if changed
+        // Add hyperlink if changed.
+        //
+        // C grid.c:1166 threads `int *has_link` ACROSS cells: the closing
+        // sequence is only written when a link was open on an earlier cell. This
+        // used to be a local re-initialised to false on every call and returned
+        // by value, so the `else if` could never fire and `capture-pane -e` never
+        // closed a hyperlink -- it emitted the opening OSC 8 and then let it run
+        // to the end of the capture.
         if !sc.is_null() && !(*sc).hyperlinks.is_null() && (*lastgc).link != (*gc).link {
             if hyperlinks_get(
                 (*sc).hyperlinks,
@@ -1304,13 +1311,12 @@ unsafe fn grid_string_cells_code(
                 &raw mut id,
                 null_mut(),
             ) {
-                has_link = grid_string_cells_add_hyperlink(buf, len, id, uri, flags);
-            } else if has_link {
+                *has_link = grid_string_cells_add_hyperlink(buf, len, id, uri, flags);
+            } else if *has_link {
                 grid_string_cells_add_hyperlink(buf, len, c!(""), c!(""), flags);
-                has_link = false;
+                *has_link = false;
             }
         }
-        has_link
     }
 }
 
@@ -1366,14 +1372,16 @@ pub unsafe fn grid_string_cells(
                 continue;
             }
 
-            if flags.intersects(grid_string_flags::GRID_STRING_WITH_SEQUENCES) {
-                has_link = grid_string_cells_code(
+            if !lastgc.is_null() && flags.intersects(grid_string_flags::GRID_STRING_WITH_SEQUENCES)
+            {
+                grid_string_cells_code(
                     *lastgc,
                     &gc,
                     code.as_mut_ptr(),
                     code.len(),
                     flags,
-                    s
+                    s,
+                    &raw mut has_link,
                 );
                 codelen = strlen(code.as_ptr());
                 std::ptr::copy(&gc, *lastgc, 1);

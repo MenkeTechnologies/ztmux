@@ -43,7 +43,16 @@ pub static mut STYLE_DEFAULT: style = style {
     pad: STYLE_PAD_DEFAULT,
 
     default_type: style_default_type::STYLE_DEFAULT_BASE,
+
+    link: 0,
 };
+
+/// C `vendor/tmux/style.c:54`: `static struct hyperlinks *style_hyperlinks`.
+///
+/// Global hyperlink set holding the URIs for `#[link=...]` styles, so a style
+/// carries only the small id and repeated links share one entry. Created on
+/// first use, exactly as the C does -- a style with no `link=` never allocates.
+pub static mut STYLE_HYPERLINKS: *mut hyperlinks = null_mut();
 
 /// C `vendor/tmux/style.c:58`: `static void style_set_range_string(struct style *sy, const char *s)`
 pub unsafe fn style_set_range_string(sy: *mut style, s: *const u8) {
@@ -96,6 +105,7 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
                     (*sy).gc.us = (*base).us;
                     (*sy).gc.attr = (*base).attr;
                     (*sy).gc.flags = (*base).flags;
+                    (*sy).link = 0; // C style.c:102
                 } else if strcaseeq_(tmp, "ignore") {
                     (*sy).ignore = 1;
                 } else if strcaseeq_(tmp, "noignore") {
@@ -104,6 +114,8 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
                     (*sy).default_type = style_default_type::STYLE_DEFAULT_PUSH;
                 } else if strcaseeq_(tmp, "pop-default") {
                     (*sy).default_type = style_default_type::STYLE_DEFAULT_POP;
+                } else if strcaseeq_(tmp, "set-default") {
+                    (*sy).default_type = style_default_type::STYLE_DEFAULT_SET;
                 } else if strcaseeq_(tmp, "nolist") {
                     (*sy).list = style_list::STYLE_LIST_OFF;
                 } else if strncasecmp(tmp, c!("list="), 5) == 0 {
@@ -278,6 +290,17 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
                         break 'error;
                     };
                     (*sy).pad = n as i32;
+                } else if strncasecmp(tmp, c!("link="), 5) == 0 {
+                    // C style.c:276-284. The URI doubles as the internal id, so
+                    // the same URI written twice resolves to the same entry.
+                    if *tmp.add(5) == b'\0' {
+                        (*sy).link = 0;
+                    } else {
+                        if STYLE_HYPERLINKS.is_null() {
+                            STYLE_HYPERLINKS = hyperlinks_init();
+                        }
+                        (*sy).link = hyperlinks_put(STYLE_HYPERLINKS, tmp.add(5), tmp.add(5));
+                    }
                 } else if strcaseeq_(tmp, "none") {
                     (*sy).gc.attr = grid_attr::empty();
                 } else if end > 2 && strncasecmp(tmp, c!("no"), 2) == 0 {
@@ -285,10 +308,9 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
                     // removed -- it SETS a bit of its own. Everything else after
                     // `no` names an attribute to clear.
                     //
-                    // The C also takes `nolink` here; `link=` is unported (see
-                    // docs/BUGS.md), so that keyword still falls through to the
-                    // error path exactly as `link=` itself does.
-                    if strcmp(tmp.add(2), c!("attr")) == 0 {
+                    if strcmp(tmp.add(2), c!("link")) == 0 {
+                        (*sy).link = 0;
+                    } else if strcmp(tmp.add(2), c!("attr")) == 0 {
                         (*sy).gc.attr |= grid_attr::GRID_ATTR_NOATTR;
                     } else {
                         let Ok(value) = attributes_fromstring(cstr_to_str(tmp.add(2))) else {
@@ -453,6 +475,8 @@ pub unsafe fn style_tostring(sy: *const style) -> *const u8 {
                 tmp = c!("push-default");
             } else if (*sy).default_type == style_default_type::STYLE_DEFAULT_POP {
                 tmp = c!("pop-default");
+            } else if (*sy).default_type == style_default_type::STYLE_DEFAULT_SET {
+                tmp = c!("set-default");
             }
             off += xsnprintf_!(
                 s.add(off as usize),
@@ -531,22 +555,62 @@ pub unsafe fn style_tostring(sy: *const style) -> *const u8 {
             .unwrap() as i32;
             comma = c!(",");
         }
-        #[expect(unused_assignments)]
+        // C style.c:411-414 advances `off` here. It used to be written as a
+        // non-advancing final block because it WAS last; `link=` now follows it,
+        // and without the advance `pad=2,link=...` would overwrite the pad text.
         if (*sy).pad >= 0 {
-            _ = xsnprintf_!(
+            off += xsnprintf_!(
                 s.add(off as usize),
                 size_of::<s_type>() - off as usize,
                 "{}pad={}",
                 _s(comma),
                 (*sy).pad,
-            );
+            )
+            .unwrap() as i32;
             comma = c!(",");
         }
 
+        // C style.c:416-419. Written with the same non-advancing xsnprintf as
+        // `pad=` above: it is the last directive, so `off` is never read again.
+        let uri = style_link(sy.cast_mut());
+        #[expect(unused_assignments)]
+        if !uri.is_null() {
+            _ = xsnprintf_!(
+                s.add(off as usize),
+                size_of::<s_type>() - off as usize,
+                "{}link={}",
+                _s(comma),
+                _s(uri),
+            );
+            comma = c!(",");
+        }
         if *s == b'\0' {
             return c!("default");
         }
         s
+    }
+}
+
+/// C `vendor/tmux/style.c:428`: `const char *style_link(struct style *sy)`
+///
+/// The URI behind a style's `link=`, or NULL when it has none.
+pub unsafe fn style_link(sy: *mut style) -> *const u8 {
+    unsafe {
+        let mut uri: *const u8 = null_mut();
+
+        if (*sy).link == 0 || STYLE_HYPERLINKS.is_null() {
+            return null_mut();
+        }
+        if !hyperlinks_get(
+            STYLE_HYPERLINKS,
+            (*sy).link,
+            &raw mut uri,
+            null_mut(),
+            null_mut(),
+        ) {
+            return null_mut();
+        }
+        uri
     }
 }
 
@@ -674,21 +738,24 @@ pub unsafe fn style_copy(dst: *mut style, src: *const style) {
 
 #[cfg(test)]
 mod tests {
-    // Notes on two latent bugs in this port that these tests deliberately work
-    // around (they are in the production code, not the tests, so they are not
-    // "fixed" here):
+    // Two bugs this module's tests were written around are now FIXED in the
+    // production code, and the tests below assert the correct behaviour rather
+    // than the defect. Kept as a record of what they were, because both are easy
+    // to reintroduce:
     //
-    // 1. style_tostring off-by-one: xsnprintf__ (src/xmalloc.rs) returns the
-    //    formatted length *including* the NUL, but style_tostring advances `off`
-    //    like C's xsnprintf (which excludes the NUL). So every field after the
-    //    first is written past an embedded NUL and is lost to strlen. Renders of
-    //    styles with two or more fields are therefore truncated to the first
-    //    field. Consequently tostring is only asserted for single-field styles;
-    //    multi-field cases are verified via the parsed struct fields instead.
+    // 1. style_tostring off-by-one. xsnprintf__ (src/ported/xmalloc.rs) used to
+    //    return the formatted length INCLUDING the NUL while style_tostring
+    //    advances `off` like C's xsnprintf, which excludes it -- so every field
+    //    after the first landed past an embedded NUL and was lost to strlen, and
+    //    any style with two or more directives rendered truncated to the first.
+    //    xsnprintf__ now returns the length excluding the NUL, and every block in
+    //    style_tostring must keep advancing `off` (see
+    //    pad_and_link_both_survive_tostring for the case that catches a block
+    //    that stops).
     //
-    // 2. range=user render segfaults: style_tostring passes the range_string
-    //    [u8; 16] array by value to a variadic snprintf("%s"), which is UB. The
-    //    user-range case is verified via fields only.
+    // 2. range=user rendered by passing the range_string [u8; 16] array BY VALUE
+    //    to a variadic snprintf("%s"), which is UB and segfaulted. It passes
+    //    `.as_ptr()` now, as the C's array-to-pointer decay does.
     use super::*;
     use std::ffi::CString;
     use std::sync::Mutex;
@@ -1047,6 +1114,68 @@ mod tests {
     // locations. N is bounded to 0..=9 by strtonum, and unlike window|N the
     // argument is REQUIRED -- the default pane-border-format relies on both
     // facts for its Zoom (|8) and Kill (|9) buttons.
+    // style_tostring writes the directives in a fixed order and each one has to
+    // advance `off`. `pad=` was written as a non-advancing FINAL block, correct
+    // only while it WAS final -- `link=` now follows it, so a style carrying both
+    // would have had the link overwrite the pad text.
+    #[test]
+    fn pad_and_link_both_survive_tostring() {
+        let _g = lock();
+        unsafe {
+            let (rc, sy) = parse("pad=2,link=http://a");
+            assert_eq!(rc, 0);
+            assert_eq!(tostring(&raw const sy), "pad=2,link=http://a");
+        }
+    }
+
+    // C style.c:276-284 keys the hyperlink store on the URI, so the same URI
+    // twice is one entry and a different URI is another. `nolink` and `default`
+    // both clear it (style.c:102, :246-247).
+    #[test]
+    fn link_directive_stores_clears_and_shares() {
+        let _g = lock();
+        unsafe {
+            let (rca, mut a) = parse("link=http://a");
+            let (rcb, b) = parse("link=http://a");
+            let (rcc, mut c) = parse("link=http://b");
+            assert_eq!((rca, rcb, rcc), (0, 0, 0));
+            assert_ne!(a.link, 0);
+            assert_eq!(a.link, b.link, "same URI must share one entry");
+            assert_ne!(a.link, c.link, "a different URI must get its own");
+
+            assert_eq!(cstr_to_str(style_link(&raw mut a)), "http://a");
+            assert_eq!(cstr_to_str(style_link(&raw mut c)), "http://b");
+
+            // nolink clears it; so does `default`; so does an empty URI.
+            for spec in ["link=http://a,nolink", "link=http://a,default", "link="] {
+                let (rc, mut d) = parse(spec);
+                assert_eq!(rc, 0, "{spec}");
+                assert_eq!(d.link, 0, "{spec}");
+                assert!(style_link(&raw mut d).is_null(), "{spec}");
+            }
+        }
+    }
+
+    // set-default is the third STYLE_DEFAULT_* value (C style.c:112, :367). It was
+    // absent from the enum entirely, so the directive failed to parse and any
+    // config using it lost the whole option.
+    #[test]
+    fn set_default_parses_and_round_trips() {
+        let _g = lock();
+        unsafe {
+            for (spec, want) in [
+                ("push-default", style_default_type::STYLE_DEFAULT_PUSH),
+                ("pop-default", style_default_type::STYLE_DEFAULT_POP),
+                ("set-default", style_default_type::STYLE_DEFAULT_SET),
+            ] {
+                let (rc, sy) = parse(spec);
+                assert_eq!(rc, 0, "{spec}");
+                assert!(sy.default_type == want, "{spec}");
+                assert_eq!(tostring(&raw const sy), spec);
+            }
+        }
+    }
+
     #[test]
     fn range_control_parses_and_bounds_its_argument() {
         let _g = lock();
@@ -1446,32 +1575,25 @@ mod tests {
     // These two assert the CORRECT tmux behavior for the latent bugs the
     // module comment above describes, so they flip to passing once fixed.
 
-    // ztmux BUG: style_tostring truncates any style with 2+ fields to just the
-    // first field. xsnprintf__ (src/xmalloc.rs) returns the formatted length
-    // INCLUDING the NUL, but style_tostring advances `off` like C's xsnprintf,
-    // which EXCLUDES it (vendor/tmux/style.c). So every field after the first is
-    // written one byte past an embedded NUL and lost to strlen. Remove #[ignore]
-    // once xsnprintf__ returns the length excluding the NUL, like C.
+    // A style with two directives renders BOTH. This used to yield only
+    // "align=left": xsnprintf__ counted the NUL, so `fill=red` was written one
+    // byte past an embedded NUL and lost to strlen (see note 1 at the top).
     #[test]
-    fn bug_tostring_multifield_truncated() {
+    fn tostring_renders_every_field_not_just_the_first() {
         let _g = lock();
         unsafe {
             let mut sy = make_style();
             sy.align = style_align::STYLE_ALIGN_LEFT;
             sy.fill = 1; // red
-            // tmux renders both fields; ztmux currently yields only "align=left".
             assert_eq!(tostring(&raw const sy), "align=left,fill=red");
         }
     }
 
-    // ztmux BUG: the range=user path passes the range_string [u8; 16] array BY
-    // VALUE to a variadic snprintf("user|%s", ...) instead of a pointer, which is
-    // undefined behavior. WARNING: unlike the other ignored bug-tests, this one
-    // CRASHES the process (SIGSEGV) when actually run (e.g. via `--ignored`) — it
-    // does not fail cleanly, so run it in isolation. Remove #[ignore] once
-    // range_string is passed as `.as_ptr()`, matching vendor/tmux/style.c.
+    // range=user renders its string. This used to SIGSEGV: the [u8; 16] array was
+    // passed by value to a variadic snprintf("user|%s"), where the C relies on
+    // array-to-pointer decay (see note 2 at the top).
     #[test]
-    fn bug_tostring_user_range_crashes() {
+    fn tostring_renders_a_user_range_string() {
         let _g = lock();
         unsafe {
             let mut sy = make_style();

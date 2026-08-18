@@ -1197,6 +1197,7 @@ enum style_default_type {
     STYLE_DEFAULT_BASE,
     STYLE_DEFAULT_PUSH,
     STYLE_DEFAULT_POP,
+    STYLE_DEFAULT_SET,
 }
 
 /// C `vendor/tmux/tmux.h:1479`: `pane-scrollbars` values.
@@ -1239,6 +1240,12 @@ struct style {
     pad: i32,
 
     default_type: style_default_type,
+
+    /// C `vendor/tmux/tmux.h:1005`: the id of this style's `link=` URI in the
+    /// global hyperlink set, or 0 for no link. The URI itself lives in
+    /// `style.rs`'s `STYLE_HYPERLINKS` so that repeated `link=` directives share
+    /// one entry and the id stays stable across redraws.
+    link: u32,
 }
 
 /// C `vendor/tmux/tmux.h:960`: no `width=` given.
