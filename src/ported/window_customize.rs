@@ -15,15 +15,8 @@ use crate::*;
 use crate::options_::*;
 
 
-static WINDOW_CUSTOMIZE_DEFAULT_FORMAT: &str = concat!(
-    "#{?is_option,",
-    "#{?option_is_global,,#[reverse](#{option_scope})#[default] }",
-    "#[ignore]",
-    "#{option_value}#{?option_unit, #{option_unit},}",
-    ",",
-    "#{key}",
-    "}"
-);
+/// C `vendor/tmux/window-customize.c`: `WINDOW_CUSTOMIZE_DEFAULT_FORMAT`, as the preprocessor emits it.
+static WINDOW_CUSTOMIZE_DEFAULT_FORMAT: &str = r##"#{?is_option,#{?option_is_global,,#[reverse](#{option_scope})#[default] }#[fg=themelightgrey]#[ignore]#{option_value}#{?option_unit, #{option_unit},},#{key}}"##;
 
 static WINDOW_CUSTOMIZE_MENU_ITEMS: [menu_item; 8] = [
     menu_item::new("Select", '\r' as key_code, null_mut()),

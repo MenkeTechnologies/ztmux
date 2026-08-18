@@ -422,7 +422,7 @@ unsafe fn key_bindings_init_done(_item: *mut cmdq_item, _data: *mut c_void) -> c
 /// C `vendor/tmux/key-bindings.c:349`: `void key_bindings_init(void)`
 pub unsafe fn key_bindings_init() {
     #[rustfmt::skip]
-    static DEFAULTS: [&str; 279] = [
+    static DEFAULTS: [&str; 278] = [
         // Prefix keys.
         "bind -N 'Send the prefix key' C-b { send-prefix }",
         "bind -N 'Rotate through the panes' C-o { rotate-window }",
@@ -435,13 +435,13 @@ pub unsafe fn key_bindings_init() {
         "bind -N 'Split window horizontally' % { split-window -h }",
         "bind -N 'Kill current window' & { confirm-before -p\"kill-window #W? (y/n)\" kill-window }",
         "bind -N 'Prompt for window index to select' \"'\" { command-prompt -T window-target -pindex { select-window -t ':%%' } }",
+        "bind -N 'New floating pane' * { new-pane }",
         "bind -N 'Switch to previous client' ( { switch-client -p }",
         "bind -N 'Switch to next client' ) { switch-client -n }",
         "bind -N 'Rename current window' , { command-prompt -I'#W' { rename-window -- '%%' } }",
         "bind -N 'Delete the most recent paste buffer' - { delete-buffer }",
         "bind -N 'Move the current window' . { command-prompt -T target { move-window -t '%%' } }",
         "bind -N 'Describe key binding' '/' { command-prompt -kpkey  { list-keys -1N '%%' } }",
-        "bind -N 'New floating pane' * { new-pane }",
         "bind -N 'Select window 0' 0 { select-window -t:=0 }",
         "bind -N 'Select window 1' 1 { select-window -t:=1 }",
         "bind -N 'Select window 2' 2 { select-window -t:=2 }",
@@ -544,7 +544,6 @@ pub unsafe fn key_bindings_init() {
          * the border (not the pane body) so a TUI running inside the pane keeps
          * all its own right-click/mouse events - the menu never shadows it. `-O`
          * keeps the menu open on release (click-to-select, no hold-and-drag). */
-        concat!("bind -n MouseDown3Border { display-menu -O -t= -xM -yM -T '#[align=centre]#{pane_index} (#{pane_id})' ", DEFAULT_PANE_MENU!(), " }"),
         /* Mouse button 1 down on status line. */
         "bind -n MouseDown1Status { switch-client -t= }",
         "bind -n C-MouseDown1Status { swap-window -t@ }",
@@ -582,6 +581,7 @@ pub unsafe fn key_bindings_init() {
         "bind -Tcopy-mode C-v { send -X page-down }",
         "bind -Tcopy-mode C-w { send -X copy-pipe-and-cancel }",
         "bind -Tcopy-mode Escape { send -X cancel }",
+        "bind -Tcopy-mode C-[ { send -X cancel }",
         "bind -Tcopy-mode Space { send -X page-down }",
         "bind -Tcopy-mode , { send -X jump-reverse }",
         "bind -Tcopy-mode \\; { send -X jump-again }",
@@ -639,7 +639,6 @@ pub unsafe fn key_bindings_init() {
         "bind -Tcopy-mode M-Down { send -X halfpage-down }",
         "bind -Tcopy-mode C-Up { send -X scroll-up }",
         "bind -Tcopy-mode C-Down { send -X scroll-down }",
-        "bind -Tcopy-mode C-[ { send -X cancel }",
         "bind -Tcopy-mode M-C-Up { send -X previous-prompt }",
         "bind -Tcopy-mode M-C-Down { send -X next-prompt }",
         /* Copy mode (vi) keys. */
@@ -733,8 +732,13 @@ pub unsafe fn key_bindings_init() {
         "bind -Tcopy-mode-vi C-Down { send -X scroll-down }",
     ];
 
-    // ztmux extension bindings — NOT part of the tmux C port. The `DEFAULTS`
-    // table above stays byte-identical to `vendor/tmux/key-bindings.c`; these
+    // ztmux extension bindings — NOT part of the tmux C port. `DEFAULTS` above is
+    // `vendor/tmux/key-bindings.c:352-673` element-for-element and in the same
+    // order, MINUS the five root bindings whose mouse locations the flat `keyc`
+    // encoding cannot name (MouseDown1ScrollbarUp/Down, MouseDrag1ScrollbarSlider,
+    // MouseDown1Control8/9 — see parity/known_gaps/mouse_scrollbar_locations.sh).
+    // It contains nothing the C does not have: 278 elements against the C's 283.
+    // Everything ztmux adds lives in this array instead; these
     // extra prefix keys launch the original client subcommands in src/extensions
     // via display-popup (which gives them the TTY a ratatui/one-shot tool needs).
     // Keys chosen from those left unbound by the default prefix table:
@@ -752,7 +756,13 @@ pub unsafe fn key_bindings_init() {
     // (scrollback-to-$EDITOR, the multi-pane selection). They may use `#{...}`
     // formats freely; only the `display-popup` *command* above cannot.
     #[rustfmt::skip]
-    static ZTMUX_EXTENSION_BINDINGS: [&str; 15] = [
+    static ZTMUX_EXTENSION_BINDINGS: [&str; 16] = [
+        // ztmux original: a context menu on the pane BORDER. The C binds only
+        // MouseDown1Border, MouseDrag1Border and M-MouseDrag1Border
+        // (key-bindings.c:469, :472, :473), so this belongs here rather than in
+        // DEFAULTS, where it used to sit and quietly falsify the invariant below.
+        concat!("bind -n MouseDown3Border { display-menu -O -t= -xM -yM -T '#[align=centre]#{pane_index} (#{pane_id})' ", DEFAULT_PANE_MENU!(), " }"),
+
         "bind -N 'ztmux: live server dashboard' C-d { display-popup -E -w 90% -h 90% 'ztmux -S \"${TMUX%%,*}\" dashboard' }",
         // Toggle a real floating pane: a genuine window pane with a floating
         // layout cell, so it can be moved (`move-pane`, M-drag) and resized

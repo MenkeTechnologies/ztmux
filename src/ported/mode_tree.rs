@@ -42,6 +42,13 @@ enum mode_tree_search_dir {
     MODE_TREE_SEARCH_BACKWARD,
 }
 
+/// C `vendor/tmux/mode-tree.c:39`/`:43`: `MODE_TREE_PREFIX_STYLE` spliced into
+/// `MODE_TREE_PREFIX_FORMAT` in five places. Reproduced as the preprocessor's
+/// flat output so `format_expand` sees the same bytes -- regenerate with
+/// `cc -E -P` over mode-tree.c:39-56 rather than editing by hand. The runs of
+/// literal spaces are load-bearing column widths.
+const MODE_TREE_PREFIX_FORMAT: &std::ffi::CStr = c"#{?mode_tree_selected,#[default]#[noacs],#[fg=themelightgrey]#[bg=default]#[noacs]}#{p/#{mode_tree_key_width}:#{?#{!=:#{mode_tree_key},},(#{mode_tree_key}),}}#{R:#{?mode_tree_parent_last,    ,#[acs]x#{?mode_tree_selected,#[default]#[noacs],#[fg=themelightgrey]#[bg=default]#[noacs]}   },#{mode_tree_repeat}}#{?mode_tree_branch,#[acs]#{?mode_tree_last,mq,tq}#{?mode_tree_selected,#[default]#[noacs],#[fg=themelightgrey]#[bg=default]#[noacs]}> ,}#{?mode_tree_has_children,#{?mode_tree_expanded,#[fg=themered]-#{?mode_tree_selected,#[default]#[noacs],#[fg=themelightgrey]#[bg=default]#[noacs]} ,#[fg=themegreen]+#{?mode_tree_selected,#[default]#[noacs],#[fg=themelightgrey]#[bg=default]#[noacs]} },#{?mode_tree_flat,,  }}";
+
 pub type mode_tree_list = tailq_head<mode_tree_item>;
 
 #[repr(C)]
@@ -74,6 +81,9 @@ pub struct mode_tree_data {
     line_list: Vec<mode_tree_line>,
 
     depth: u32,
+    /// C `vendor/tmux/mode-tree.c:90`: deepest level reached by the last build;
+    /// sizes the per-depth alignment table in `mode_tree_draw`.
+    maxdepth: u32,
 
     width: u32,
     height: u32,
@@ -128,6 +138,9 @@ pub struct mode_tree_item {
 
     draw_as_parent: i32,
     no_tag: i32,
+    /// C `vendor/tmux/mode-tree.c:131`: -1 aligns the name left, 0 (default)
+    /// does not align, 1 aligns right.
+    align: i32,
 
     children: mode_tree_list,
     entry: tailq_entry<mode_tree_item>,
@@ -219,6 +232,10 @@ unsafe fn mode_tree_build_lines(mtd: *mut mode_tree_data, mtl: *mut mode_tree_li
         let mut flat = 1;
 
         (*mtd).depth = depth;
+        // C mode-tree.c:307-308.
+        if depth > (*mtd).maxdepth {
+            (*mtd).maxdepth = depth;
+        }
         for mti in tailq_foreach(mtl).map(NonNull::as_ptr) {
             (*mtd).line_list.push(mode_tree_line {
                 item: mti,
@@ -507,6 +524,7 @@ pub unsafe fn mode_tree_start(
             saved: zeroed(),
             line_list: Vec::default(),
             depth: Default::default(),
+            maxdepth: Default::default(),
             width: Default::default(),
             height: Default::default(),
             offset: Default::default(),
@@ -624,6 +642,8 @@ pub unsafe fn mode_tree_build(mtd: *mut mode_tree_data) {
         tailq_init(&raw mut (*mtd).saved);
 
         mode_tree_clear_lines(mtd);
+        // C mode-tree.c:681-683: clear_lines, maxdepth = 0, build_lines.
+        (*mtd).maxdepth = 0;
         mode_tree_build_lines(mtd, &raw mut (*mtd).children, 0);
 
         if !(*mtd).line_list.is_empty() && tag == u64::MAX {
@@ -746,6 +766,15 @@ pub unsafe fn mode_tree_no_tag(mti: *mut mode_tree_item) {
     }
 }
 
+/// Set the alignment of the item name: -1 to align left, 0 (default) to not
+/// align, or 1 to align right.
+/// C `vendor/tmux/mode-tree.c:798`: `void mode_tree_align(struct mode_tree_item *mti, int align)`
+pub unsafe fn mode_tree_align(mti: *mut mode_tree_item, align: i32) {
+    unsafe {
+        (*mti).align = align;
+    }
+}
+
 /// C `vendor/tmux/mode-tree.c:805`: `void mode_tree_remove(struct mode_tree_data *mtd, struct mode_tree_item *mti)`
 pub unsafe fn mode_tree_remove(mtd: *mut mode_tree_data, mti: *mut mode_tree_item) {
     unsafe {
@@ -793,6 +822,8 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
 
             screen_write_start(&raw mut ctx, s);
             screen_write_clearscreen(&raw mut ctx, 8);
+            // C mode-tree.c:852.
+            let ft = format_create_defaults(null_mut(), null_mut(), null_mut(), null_mut(), wp);
 
             let mut keylen: i32 = 0;
             for line in &mtd.line_list {
@@ -802,6 +833,18 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
                 }
                 if (*mti).keylen as i32 + 3 > keylen {
                     keylen = (*mti).keylen as i32 + 3;
+                }
+            }
+
+            // C mode-tree.c:863-871: the widest aligned name at each depth, so an
+            // aligned row right-justifies its name into that column. The C sizes
+            // this `alignlen[mtd->maxdepth + 1]` and measures with strlen, i.e.
+            // by BYTES, so this does too.
+            let mut alignlen: Vec<usize> = vec![0; mtd.maxdepth as usize + 1];
+            for line in &mtd.line_list {
+                let mti = line.item;
+                if (*mti).align != 0 && strlen((*mti).name) > alignlen[line.depth as usize] {
+                    alignlen[line.depth as usize] = strlen((*mti).name);
                 }
             }
 
@@ -817,62 +860,77 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
 
                 screen_write_cursormove(&raw mut ctx, 0, i as i32 - mtd.offset as i32, 0);
 
-                let pad = keylen - 2 - (*mti).keylen as i32;
-                let key = if (*mti).key != KEYC_NONE {
-                    format_nul!("({0}){2:>1$}", _s((*mti).keystr), pad as usize, "")
-                } else {
-                    xstrdup_(c"").as_ptr()
-                };
+                let line_depth = mtd.line_list[i].depth;
+                let line_last = mtd.line_list[i].last;
+                let line_flat = mtd.line_list[i].flat;
 
-                let symbol = if mtd.line_list[i].flat != 0 {
-                    c!("")
-                } else if tailq_empty(&raw const (*mti).children) {
-                    c!("  ")
-                } else if (*mti).expanded {
-                    c!("- ")
+                // C mode-tree.c:883-909: the per-row variables the prefix format reads.
+                if (*mti).key != KEYC_NONE {
+                    format_add!(ft, "mode_tree_key", "{}", _s((*mti).keystr));
                 } else {
-                    c!("+ ")
-                };
-
-                let start: *mut u8;
-                if mtd.line_list[i].depth == 0 {
-                    start = xstrdup(symbol).as_ptr();
+                    format_add!(ft, "mode_tree_key", "{}", "");
+                }
+                format_add!(ft, "mode_tree_key_width", "{}", keylen);
+                format_add!(ft, "mode_tree_selected", "{}", (i as u32 == mtd.current) as i32);
+                if line_depth == 0 {
+                    format_add!(ft, "mode_tree_repeat", "{}", 0u32);
+                    format_add!(ft, "mode_tree_branch", "{}", "0");
+                    format_add!(ft, "mode_tree_parent_last", "{}", "0");
                 } else {
-                    let size = (4 * mtd.line_list[i].depth as usize) + 32;
-
-                    start = xcalloc(1, size).as_ptr().cast();
-                    for _ in 1..mtd.line_list[i].depth {
-                        if !(*mti).parent.is_null()
-                            && mtd.line_list[(*(*mti).parent).line as usize].last != 0
-                        {
-                            strlcat(start, c!("    "), size);
-                        } else {
-                            strlcat(start, c!("\x01x\x01   "), size);
-                        }
-                    }
-                    if mtd.line_list[i].last != 0 {
-                        strlcat(start, c!("\x01mq\x01> "), size);
+                    format_add!(ft, "mode_tree_repeat", "{}", line_depth - 1);
+                    format_add!(ft, "mode_tree_branch", "{}", "1");
+                    if !(*mti).parent.is_null()
+                        && mtd.line_list[(*(*mti).parent).line as usize].last != 0
+                    {
+                        format_add!(ft, "mode_tree_parent_last", "{}", "1");
                     } else {
-                        strlcat(start, c!("\x01tq\x01> "), size);
+                        format_add!(ft, "mode_tree_parent_last", "{}", "0");
                     }
-                    strlcat(start, symbol, size);
+                }
+                if tailq_empty(&raw const (*mti).children) {
+                    format_add!(ft, "mode_tree_has_children", "{}", "0");
+                } else {
+                    format_add!(ft, "mode_tree_has_children", "{}", "1");
+                }
+                format_add!(ft, "mode_tree_last", "{}", line_last);
+                format_add!(ft, "mode_tree_expanded", "{}", (*mti).expanded as i32);
+                format_add!(ft, "mode_tree_flat", "{}", line_flat);
+
+                // C mode-tree.c:910-913.
+                let prefix = format_expand(ft, MODE_TREE_PREFIX_FORMAT.as_ptr().cast());
+                let mut prefix_width = format_width(cstr_to_str(prefix));
+                if prefix_width > w {
+                    prefix_width = w;
                 }
 
-                let tag = if (*mti).tagged != 0 { c!("*") } else { c!("") };
-                let text = format_nul!(
-                    "{1:<0$}{2}{3}{4}{5}",
-                    keylen as usize,
-                    _s(key),
-                    _s(start),
-                    _s((*mti).name),
-                    _s(tag),
-                    if !(*mti).text.is_null() { ": " } else { "" },
-                );
-                let mut width = utf8_cstrwidth(text);
-                if width > w {
-                    width = w;
+                // C mode-tree.c:915-924. `%*s` right-justifies the name into
+                // align * alignlen[depth] BYTES.
+                let tag = if (*mti).tagged != 0 { "*" } else { "" };
+                let separator = if !(*mti).text.is_null() {
+                    "#[fg=themelightgrey]: #[default]"
+                } else {
+                    ""
+                };
+                // C: `"%*s%s%s", mti->align * alignlen[line->depth], name, tag,
+                // separator`. The width is SIGNED: positive right-justifies the
+                // name, negative left-justifies it. Rust's formatter has no
+                // negative width, so the padding is built explicitly.
+                let namelen = strlen((*mti).name);
+                let signed_w = (*mti).align as isize * alignlen[line_depth as usize] as isize;
+                let padding = " ".repeat(signed_w.unsigned_abs().saturating_sub(namelen));
+                let text = if signed_w >= 0 {
+                    format_nul!("{}{}{}{}", padding, _s((*mti).name), tag, separator)
+                } else {
+                    format_nul!("{}{}{}{}", _s((*mti).name), padding, tag, separator)
+                };
+
+                // C mode-tree.c:925-929.
+                let mut text_width = format_width(cstr_to_str(text));
+                let left = w.saturating_sub(prefix_width);
+                if text_width > left {
+                    text_width = left;
                 }
-                free_(start);
+                let width = prefix_width + text_width;
 
                 // C mode-tree.c:931: a tagged row is drawn in the theme's cyan.
                 if (*mti).tagged != 0 {
@@ -880,35 +938,57 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
                     gc0.fg = colour_theme_slot::COLOUR_THEME_CYAN | COLOUR_FLAG_THEME;
                 }
 
+                // C mode-tree.c:936-965. The non-current arm draws the prefix
+                // from the DEFAULT cell, not gc0, which is what keeps a tagged
+                // row's prefix out of the theme cyan.
+                let cy = i as i32 - mtd.offset as i32;
                 if i as u32 != mtd.current {
                     screen_write_clearendofline(&raw mut ctx, 8);
-                    screen_write_nputs!(&raw mut ctx, w as isize, &raw mut gc0, "{}", _s(text),);
-                    if let Some(text) = cstr_to_str_((*mti).text) {
-                        format_draw(
-                            &raw mut ctx,
-                            &raw mut gc0,
-                            w - width,
-                            text,
-                            null_mut(),
-                            0,
-                        );
+                    format_draw(
+                        &raw mut ctx,
+                        &raw const GRID_DEFAULT_CELL,
+                        prefix_width,
+                        cstr_to_str(prefix),
+                        null_mut(),
+                        0,
+                    );
+                    if left != 0 {
+                        screen_write_cursormove(&raw mut ctx, prefix_width as i32, cy, 0);
+                        format_draw(&raw mut ctx, &raw const gc0, left, cstr_to_str(text), null_mut(), 0);
+                        if !(*mti).text.is_null() && width < w {
+                            screen_write_cursormove(&raw mut ctx, width as i32, cy, 0);
+                            format_draw(
+                                &raw mut ctx,
+                                &raw const gc0,
+                                w - width,
+                                cstr_to_str((*mti).text),
+                                null_mut(),
+                                0,
+                            );
+                        }
                     }
                 } else {
                     screen_write_clearendofline(&raw mut ctx, gc.bg as u32);
-                    screen_write_nputs!(&raw mut ctx, w as isize, &raw mut gc, "{}", _s(text));
-                    if !(*mti).text.is_null() {
-                        format_draw(
-                            &raw mut ctx,
-                            &raw mut gc,
-                            w - width,
-                            cstr_to_str((*mti).text),
-                            null_mut(),
-                            0,
-                        );
+                    format_draw(&raw mut ctx, &raw const gc, prefix_width, cstr_to_str(prefix), null_mut(), 0);
+                    if left != 0 {
+                        screen_write_cursormove(&raw mut ctx, prefix_width as i32, cy, 0);
+                        format_draw(&raw mut ctx, &raw const gc, left, cstr_to_str(text), null_mut(), 0);
+                        if !(*mti).text.is_null() && width < w {
+                            screen_write_cursormove(&raw mut ctx, width as i32, cy, 0);
+                            format_draw(
+                                &raw mut ctx,
+                                &raw const gc,
+                                w - width,
+                                cstr_to_str((*mti).text),
+                                null_mut(),
+                                0,
+                            );
+                        }
                     }
                 }
+                // C mode-tree.c:966-967.
                 free_(text);
-                free_(key);
+                free_(prefix);
 
                 // C mode-tree.c:969: put the foregrounds back for the next row.
                 if (*mti).tagged != 0 {
@@ -916,6 +996,10 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
                     gc0.fg = dfg0;
                 }
             }
+
+            // C mode-tree.c:974: freed BEFORE the preview short-circuit, as the
+            // C frees before its `goto done`.
+            format_free(ft);
 
             let sy = screen_size_y(s);
             if !mtd.preview || sy <= 4 || h <= 4 || sy - h <= 4 || w <= 4 {

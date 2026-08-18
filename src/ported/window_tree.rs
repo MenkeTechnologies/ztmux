@@ -16,28 +16,13 @@ use crate::cmd_::cmd_queue::cmdq_get_callback1;
 use crate::options_::options_get_string_;
 
 const WINDOW_TREE_DEFAULT_COMMAND: &str = "switch-client -Zt '%%'";
-const WINDOW_TREE_DEFAULT_FORMAT: &str = concat!(
-    "#{?pane_format,",
-    "#{?pane_marked,#[reverse],}",
-    "#{pane_current_command}#{?pane_active,*,}#{?pane_marked,M,}",
-    "#{?#{&&:#{pane_title},#{!=:#{pane_title},#{host_short}}},: ",
-    "\"#{pane_title}\",}",
-    ",",
-    "#{?window_format,",
-    "#{?window_marked_flag,#[reverse],}",
-    "#{window_name}#{window_flags}",
-    "#{?#{&&:#{==:#{window_panes},1},#{&&:#{pane_title},#{!=:#{pane_title},#{",
-    "host_short}}}},: \"#{pane_title}\",}",
-    ",",
-    "#{session_windows} windows",
-    "#{?session_grouped, ",
-    "(group #{session_group}: ",
-    "#{session_group_list}),",
-    "}",
-    "#{?session_attached, (attached),}",
-    "}",
-    "}"
-);
+/// C `vendor/tmux/window-tree.c:39`: `WINDOW_TREE_DEFAULT_FORMAT`.
+/// Reproduced as the preprocessor's flat output -- regenerate with `cc -E -P`
+/// over that define rather than editing by hand. The port previously carried an
+/// older revision of this string (`#[reverse]` for a marked pane/window where the
+/// C uses `#[fg=thememagenta]`, no `#[fg=themelightgrey]` before the flags, no
+/// `pane_floating_flag` arm), which is why choose-tree rows differed in colour.
+const WINDOW_TREE_DEFAULT_FORMAT: &str = r##"#{?pane_format,#{?pane_marked,#[fg=thememagenta],}#{?pane_floating_flag,#[underscore],}#{pane_current_command}#[fg=themelightgrey]#{pane_flags}#{?#{&&:#{pane_title},#{!=:#{pane_title},#{host_short}}},: "#{pane_title}",},window_format,#{?window_marked_flag,#[fg=thememagenta],}#{window_name}#[fg=themelightgrey]#{window_flags}#{?#{&&:#{==:#{window_panes},1},#{&&:#{pane_title},#{!=:#{pane_title},#{host_short}}}},: "#{pane_title}",},#[fg=themelightgrey]#{session_windows} windows#{?session_grouped, (group #{session_group}: #{session_group_list}),}#{?session_attached, (attached),}}"##;
 
 const WINDOW_TREE_DEFAULT_KEY_FORMAT: &CStr = cstring_concat!(
     "#{?#{e|<:#{line},10},",
@@ -257,7 +242,7 @@ unsafe fn window_tree_build_pane(
             format_single(null_mut(), cstr_to_str((*data.as_ptr()).format_ptr()), null_mut(), s, wl, wp);
         let name = format_nul!("{idx}");
 
-        mode_tree_add(
+        let mti = mode_tree_add(
             (*data.as_ptr()).data,
             parent,
             item.cast(),
@@ -268,6 +253,8 @@ unsafe fn window_tree_build_pane(
         );
         free_(text);
         free_(name);
+        // C window-tree.c:300.
+        mode_tree_align(mti, 1);
     }
 }
 
@@ -345,6 +332,9 @@ unsafe fn window_tree_build_window(
             );
             free_(text);
             free_(name);
+            // C window-tree.c:355. The session-level add has no align call in
+            // the C -- grep gives exactly two sites, :300 and :355.
+            mode_tree_align(mti, 1);
 
             let wp = tailq_first(&raw mut (*(*wl).window).panes);
             if wp.is_null() {

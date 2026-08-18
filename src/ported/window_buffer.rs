@@ -16,17 +16,8 @@ use crate::*;
 const WINDOW_BUFFER_DEFAULT_COMMAND: &str = "paste-buffer -p -b '%%'";
 const WINDOW_BUFFER_DEFAULT_FORMAT: &str = "#{t/p:buffer_created}: #{buffer_sample}";
 
-const WINDOW_BUFFER_DEFAULT_KEY_FORMAT: &str = concat!(
-    "#{?#{e|<:#{line},10},", //
-    "#{line}",
-    ",",
-    "#{?#{e|<:#{line},36},",
-    "M-#{a:#{e|+:97,#{e|-:#{line},10}}}",
-    ",",
-    "",
-    "}",
-    "}"
-);
+/// C `vendor/tmux/window-buffer.c`: `WINDOW_BUFFER_DEFAULT_KEY_FORMAT`, as the preprocessor emits it.
+const WINDOW_BUFFER_DEFAULT_KEY_FORMAT: &str = r##"#{?#{e|<:#{line},10},#{line},#{e|<:#{line},36},M-#{a:#{e|+:97,#{e|-:#{line},10}}}}"##;
 
 static WINDOW_BUFFER_MENU_ITEMS: [menu_item; 11] = [
     menu_item::new("Paste", 'p' as u64, null_mut()),
