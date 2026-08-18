@@ -783,6 +783,11 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
             memcpy__(&raw mut box_gc, &raw const GRID_DEFAULT_CELL);
             style_apply(&raw mut box_gc, oo, c!("tree-mode-border-style"), null_mut());
 
+            // C mode-tree.c:844: the foregrounds a tagged row temporarily
+            // replaces, restored after that row is drawn.
+            let dfg = gc.fg;
+            let dfg0 = gc0.fg;
+
             let w = mtd.width;
             let h = mtd.height;
 
@@ -869,9 +874,10 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
                 }
                 free_(start);
 
+                // C mode-tree.c:931: a tagged row is drawn in the theme's cyan.
                 if (*mti).tagged != 0 {
-                    gc.attr ^= grid_attr::GRID_ATTR_BRIGHT;
-                    gc0.attr ^= grid_attr::GRID_ATTR_BRIGHT;
+                    gc.fg = colour_theme_slot::COLOUR_THEME_CYAN | COLOUR_FLAG_THEME;
+                    gc0.fg = colour_theme_slot::COLOUR_THEME_CYAN | COLOUR_FLAG_THEME;
                 }
 
                 if i as u32 != mtd.current {
@@ -904,9 +910,10 @@ pub unsafe fn mode_tree_draw(mtd: &mut mode_tree_data) {
                 free_(text);
                 free_(key);
 
+                // C mode-tree.c:969: put the foregrounds back for the next row.
                 if (*mti).tagged != 0 {
-                    gc.attr ^= grid_attr::GRID_ATTR_BRIGHT;
-                    gc0.attr ^= grid_attr::GRID_ATTR_BRIGHT;
+                    gc.fg = dfg;
+                    gc0.fg = dfg0;
                 }
             }
 

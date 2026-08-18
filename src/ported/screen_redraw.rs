@@ -1368,6 +1368,84 @@ unsafe fn redraw_draw_pane_lines(dctx: *mut redraw_draw_ctx, wp: *mut window_pan
 }
 
 /// Draw lines.
+/// Draw a pane's own prompt (`command-prompt -P`) over its bottom row -- or its
+/// top row when the status line is at the bottom -- clipped to the visible area.
+/// C `vendor/tmux/screen-redraw.c:1525`: `static void redraw_draw_pane_prompt(struct redraw_draw_ctx *dctx, struct window_pane *wp)`
+unsafe fn redraw_draw_pane_prompt(dctx: *mut redraw_draw_ctx, wp: *mut window_pane) {
+    unsafe {
+        let scene = (*dctx).scene;
+        let c = (*scene).c;
+        let tty = &raw mut (*c).tty;
+        let mut screen: screen = zeroed();
+        let mut ctx: screen_write_ctx = zeroed();
+        let mut pdd: prompt_draw_data = zeroed();
+        let (ox, oy) = ((*scene).ox as i32, (*scene).oy as i32);
+        let (sx, sy) = ((*scene).sx as i32, (*scene).sy as i32);
+        let (line, cy, px, offset, mut width, wy);
+
+        if (*wp).prompt.is_null() || (*wp).sx == 0 || (*wp).sy == 0 {
+            return;
+        }
+
+        // The prompt takes the row furthest from the status line.
+        if (*dctx).flags & REDRAW_STATUS_TOP == 0 {
+            wy = (*wp).yoff + (*wp).sy as i32 - 1;
+        } else {
+            wy = (*wp).yoff;
+        }
+        if wy < oy || wy >= oy + sy {
+            return;
+        }
+        line = wy - oy;
+        if (*dctx).flags & REDRAW_STATUS_TOP != 0 {
+            cy = (*dctx).status_lines as i32 + line;
+        } else {
+            cy = line;
+        }
+
+        if (*wp).xoff + (*wp).sx as i32 <= ox || (*wp).xoff >= ox + sx {
+            return;
+        }
+        if (*wp).xoff < ox {
+            offset = ox - (*wp).xoff;
+            px = 0;
+        } else {
+            offset = 0;
+            px = (*wp).xoff - ox;
+        }
+        width = (*wp).sx as i32 - offset;
+        if px + width > sx {
+            width = sx - px;
+        }
+
+        screen_init(&raw mut screen, (*wp).sx, 1, 0);
+        screen_write_start(&raw mut ctx, &raw mut screen);
+        pdd.ctx = &raw mut ctx;
+        pdd.cursor_x = &raw mut (*wp).prompt_cx;
+        pdd.area_x = 0;
+        pdd.area_width = (*wp).sx;
+        pdd.prompt_line = 0;
+        prompt_draw((*wp).prompt, &raw mut pdd);
+        screen_write_stop(&raw mut ctx);
+
+        // The C passes a NULL tty_style_ctx here; this tree still carries the
+        // older (defaults, palette) pair, whose equivalent is the default cell
+        // and no palette (same mapping as the span draw above).
+        tty_draw_line(
+            tty,
+            &raw mut screen,
+            0,
+            offset as u32,
+            width as u32,
+            px as u32,
+            cy as u32,
+            &raw const GRID_DEFAULT_CELL,
+            null_mut(),
+        );
+        screen_free(&raw mut screen);
+    }
+}
+
 /// C `vendor/tmux/screen-redraw.c:1393`: `static void redraw_draw_lines(struct redraw_draw_ctx *dctx, int flags)`
 unsafe fn redraw_draw_lines(dctx: *mut redraw_draw_ctx, flags: i32) {
     unsafe {
@@ -1646,6 +1724,22 @@ unsafe fn redraw_draw(c: *mut client, wp: *mut window_pane, mut flags: i32) {
             redraw_draw_pane_lines(dctx, wp, flags);
         } else {
             redraw_draw_lines(dctx, flags);
+        }
+
+        // C screen-redraw.c:1677: a pane prompt sits on top of the pane's own
+        // lines, so it is drawn after them.
+        if flags & REDRAW_PANE != 0 {
+            if !wp.is_null() {
+                redraw_draw_pane_prompt(dctx, wp);
+            } else {
+                for loop_ in tailq_foreach::<_, discr_entry>(&raw mut (*(*scene).w).panes)
+                    .map(NonNull::as_ptr)
+                {
+                    if window_pane_visible(loop_) {
+                        redraw_draw_pane_prompt(dctx, loop_);
+                    }
+                }
+            }
         }
 
         // ztmux: the ratatui pane frames and info bar sit on top of the scene.

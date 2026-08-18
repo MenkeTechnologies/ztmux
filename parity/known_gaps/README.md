@@ -25,12 +25,6 @@ ported surface `parity/cases/` measures — they are unbuilt surface.
 
 ## The cases
 
-`cmd_prompt_in_pane.sh` — `command-prompt -P`, the in-pane prompt next-3.7 moved
-off the status line. 32 of the default copy-mode bindings carry the flag; ztmux's
-`struct window_pane` has no prompt fields, so there is nothing for `PROMPT_ISPANE`
-to set and the default table was written without it. Visible through `list-keys`
-without a client, because the flag is part of the binding string.
-
 `mouse_scrollbar_locations.sh` — the scrollbar and control mouse locations. The C
 names 19 locations per mouse family (`tmux.h:178-197`); ztmux's `keyc` table is
 the older six, with no code for `SCROLLBAR_UP` / `_SLIDER` / `_DOWN` or
@@ -38,7 +32,10 @@ the older six, with no code for `SCROLLBAR_UP` / `_SLIDER` / `_DOWN` or
 `copy-mode -S` is unreachable because the slider drag is its only default caller.
 
 Everything else that lived here has graduated into
-`parity/cases/`: `pane_zoomed_flag`, `session_*_flag`, the terminal-feature
+`parity/cases/`: `cmd_prompt_in_pane` (the `command-prompt -P` in-pane prompt,
+promoted once `window_pane` gained its prompt fields and `window.c`'s pane-prompt
+functions were ported — now `parity/cases/1506_command_prompt_in_pane.sh` and
+`1507_pane_prompt_render.sh`), `pane_zoomed_flag`, `session_*_flag`, the terminal-feature
 flags, `codepoint-widths` / `variation-selector-always-wide`,
 `default-client-command`, `get-clipboard`, the `theme` / `dark-theme-*` /
 `light-theme-*` palette options (plus `themeX` colour-name parsing), the

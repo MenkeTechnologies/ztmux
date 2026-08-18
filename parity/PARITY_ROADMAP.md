@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1201/1201 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 cases.
+**1203/1203 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 cases.
 
 Case **1498** is structural rather than another probe: it diffs the *whole*
 default binding table against next-3.7's, which nothing had done before. The
@@ -114,6 +114,22 @@ both are pinned here:
   target and `attach -t <window>` was accepted where tmux refuses.
 
 Both were mutation-tested: reverting either fix turns its case red.
+
+Cases **1506–1507** close the in-pane prompt gap. next-3.7 moved the prompt off
+the status line and into the pane for the copy-mode bindings that take input, and
+32 of the default bindings carry the `-P` that asks for it. The port had the flag
+in its `prompt_flags` enum and nothing behind it, so the default table had been
+written without `-P` to match what the port could do — which made the gap
+self-consistent and invisible. Closing it needed `window_pane` to gain
+`prompt`/`prompt_data`/`prompt_cx`, `window.c`'s five pane-prompt functions and
+two callbacks, the `-P` dispatch in `cmd-command-prompt` (including the
+multi-prompt update branch that writes the next question back to the pane), the
+key routing that prefers the active pane and falls back to the first visible pane
+holding a prompt, and `redraw_draw_pane_prompt`. 1506 pins the flag and the 32
+bindings; 1507 pins where the prompt lands, through a client, asserting the status
+row as well as the prompt row — a port that drew the prompt correctly but ate the
+status bar would otherwise pass. The 32 keys left case 1498's exclusion list at the
+same time, so they are blocking again.
 
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
@@ -513,10 +529,18 @@ so a regression in ported behavior cannot land.
 
 `parity/known_gaps/` is the inverse of `parity/cases/`: next-3.7 features ztmux
 does **not** implement yet, each pinned by a case that is expected to *diverge*
-from the reference. **It is now empty.** The last case, the `switch-mode`
-command, closed with the Round-12 `prompt.c` / `window-switch.c` port and is
-covered by `parity/cases/1488_switch_mode.sh` and
-`parity/cases/1489_switch_mode_draw.sh`.
+from the reference. **One case remains**: `mouse_scrollbar_locations.sh`. The
+scrollbar geometry and drawing are ported, but the `keyc` mouse table is the
+older flat six-location enum where the C computes `base + (button << 8) +
+location` over 19, so `SCROLLBAR_UP` / `_SLIDER` / `_DOWN` and `CONTROL0`-`9`
+have no key code to name and five default root bindings have nothing to attach
+to. Closing it is an encoding migration rather than a patch — and it would also
+retire the sort in case 1498, which exists only because the flat enum orders
+`list-keys` differently from the C's type-shifted one.
+
+`cmd_prompt_in_pane.sh` left this directory when the in-pane prompt was ported;
+it is now `parity/cases/1506_command_prompt_in_pane.sh` with the rendering pinned
+by `1507_pane_prompt_render.sh`.
 
 ```sh
 bash parity/run_known_gaps.sh   # "GAP" = still unported (expected); "CLOSED" = ported, promote it
@@ -524,11 +548,11 @@ bash parity/run_known_gaps.sh   # "GAP" = still unported (expected); "CLOSED" = 
 
 The runner is an advisory tripwire — it exits non-zero only when a gap closes
 (the feature got ported and its case should move to `parity/cases/`), so it never
-reddens CI merely because the gaps still exist. With the directory empty it
+reddens CI merely because the gaps still exist. Should the directory ever empty it
 exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
 left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1201/1201 ported surface; they measure
+proof. These gaps do not count against the 1203/1203 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite

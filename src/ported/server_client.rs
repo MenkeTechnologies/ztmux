@@ -2528,6 +2528,39 @@ pub unsafe fn server_client_handle_key(c: *mut client, event: *mut key_event) ->
                     | prompt_key_result::PROMPT_KEY_MOVE => (),
                 }
             }
+
+            // C server-client.c:1650-1671: a pane may own the prompt instead
+            // (`command-prompt -P`). Prefer the active pane, else the first
+            // visible pane that has one.
+            let mut wp = (*(*(*s).curw).window).active;
+            if wp.is_null() || window_pane_has_prompt(wp) == 0 {
+                for candidate in
+                    tailq_foreach::<_, discr_entry>(&raw mut (*(*(*s).curw).window).panes)
+                        .map(NonNull::as_ptr)
+                {
+                    if window_pane_has_prompt(candidate) != 0
+                        && window_pane_visible(candidate)
+                    {
+                        wp = candidate;
+                        break;
+                    }
+                }
+            }
+            if !wp.is_null()
+                && window_pane_has_prompt(wp) != 0
+                && window_pane_visible(wp)
+            {
+                match window_pane_prompt_key(wp, c, (*event).key, &raw mut (*event).m) {
+                    prompt_key_result::PROMPT_KEY_HANDLED
+                    | prompt_key_result::PROMPT_KEY_CLOSE
+                    | prompt_key_result::PROMPT_KEY_MOVE => return 0,
+                    prompt_key_result::PROMPT_KEY_NOT_HANDLED => {
+                        if KEYC_IS_MOUSE((*event).key) {
+                            return 0;
+                        }
+                    }
+                }
+            }
         }
 
         // Add the key to the queue so it happens after any commands queued by previous keys.

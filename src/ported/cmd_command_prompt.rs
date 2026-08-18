@@ -17,7 +17,7 @@ pub static CMD_COMMAND_PROMPT_ENTRY: cmd_entry = cmd_entry {
     name: "command-prompt",
     alias: None,
 
-    args: args_parse::new("1CbeFiklI:Np:t:T:", 0, 1, Some(cmd_command_prompt_args_parse)),
+    args: args_parse::new("1CbeFiklI:NPp:t:T:", 0, 1, Some(cmd_command_prompt_args_parse)),
     usage: "[-1Cbeikl] [-I inputs] [-p prompts] [-t target-client] [-T prompt-type] [template]",
 
     flags: cmd_flag::CMD_CLIENT_TFLAG,
@@ -38,6 +38,10 @@ struct cmd_command_prompt_cdata<'a> {
 
     flags: prompt_flags,
     prompt_type: prompt_type,
+
+    /// C `vendor/tmux/cmd-command-prompt.c:65`: the pane that owns this prompt
+    /// under `-P`, or null when the prompt lives on the status line.
+    wp: *mut window_pane,
 
     prompts: *mut cmd_command_prompt_prompt,
     count: u32,
@@ -72,7 +76,16 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
         let mut wait = !args_has(args, 'b');
         let mut space = 1;
 
-        if !(*tc).prompt.is_null() {
+        // C cmd-command-prompt.c:95-99: -P puts the prompt in the target PANE
+        // instead of on the status line, so the "already open" test is against
+        // that pane rather than against the client.
+        let wp: *mut window_pane = (*target).wp;
+        let pane = args_has(args, 'P');
+        if pane {
+            if wp.is_null() || window_pane_has_prompt(wp) != 0 {
+                return cmd_retval::CMD_RETURN_NORMAL;
+            }
+        } else if !(*tc).prompt.is_null() {
             return cmd_retval::CMD_RETURN_NORMAL;
         }
         if args_has(args, 'i') {
@@ -82,6 +95,9 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
         let mut cdata: Box<cmd_command_prompt_cdata> = Box::default();
         if wait {
             cdata.item = item;
+        }
+        if pane {
+            cdata.wp = wp;
         }
         cdata.state =
             args_make_commands_prepare(self_, item, 0, c!("%1"), wait, args_has(args, 'F'));
@@ -178,19 +194,39 @@ unsafe fn cmd_command_prompt_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
             cdata.flags |= prompt_flags::PROMPT_NOFREEZE;
         }
 
+        if pane {
+            cdata.flags |= prompt_flags::PROMPT_ISPANE;
+        }
         let flags = cdata.flags;
         let prompt_type = cdata.prompt_type;
-        status_prompt_set(
-            tc,
-            target,
-            (*cdata.prompts).prompt,
-            (*cdata.prompts).input,
-            cmd_command_prompt_callback,
-            cmd_command_prompt_free,
-            Box::into_raw(cdata),
-            flags,
-            prompt_type,
-        );
+        let msg = (*cdata.prompts).prompt;
+        let input = (*cdata.prompts).input;
+        if pane {
+            window_pane_set_prompt(
+                wp,
+                tc,
+                target,
+                msg,
+                input,
+                cmd_command_prompt_callback,
+                cmd_command_prompt_free,
+                Box::into_raw(cdata),
+                flags,
+                prompt_type,
+            );
+        } else {
+            status_prompt_set(
+                tc,
+                target,
+                msg,
+                input,
+                cmd_command_prompt_callback,
+                cmd_command_prompt_free,
+                Box::into_raw(cdata),
+                flags,
+                prompt_type,
+            );
+        }
 
         if !wait {
             return cmd_retval::CMD_RETURN_NORMAL;
@@ -224,7 +260,17 @@ unsafe fn cmd_command_prompt_callback(
                 (*cdata).current += 1;
                 if (*cdata).current != (*cdata).count {
                     let prompt = (*cdata).prompts.add((*cdata).current as usize);
-                    status_prompt_update(c, (*prompt).prompt, (*prompt).input);
+                    // C cmd-command-prompt.c:218: a -P prompt's next question is
+                    // written back to the pane, not to the status line.
+                    if !(*cdata).wp.is_null() {
+                        window_pane_update_prompt(
+                            (*cdata).wp,
+                            (*prompt).prompt,
+                            (*prompt).input,
+                        );
+                    } else {
+                        status_prompt_update(c, (*prompt).prompt, (*prompt).input);
+                    }
                     return prompt_result::PROMPT_CONTINUE;
                 }
             }

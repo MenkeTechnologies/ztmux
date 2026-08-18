@@ -4,6 +4,22 @@ Fixes to the ztmux port, most recent first.
 
 ## Open
 
+### `mode_tree_draw` row composition predates next-3.7
+
+- **Symptom:** rows in `choose-tree` / `choose-buffer` differ from the reference
+  beyond the tagged-row colour fixed on 2026-08-18: next-3.7 draws a
+  `MODE_TREE_PREFIX_FORMAT` prefix through `format_draw` (which is where the
+  green `+` for an expanded parent comes from) and a
+  `#[fg=themelightgrey]: #[default]` separator before `mti->text`; the port
+  composes one string from key/prefix/name/tag and draws it with
+  `screen_write_nputs`.
+- **Measurement:** with a client attached and a row tagged, the reference emits
+  the prefix and separator styling and the port does not. The tagged colour
+  itself now matches.
+- **Scope:** this is the row-drawing block of `mode_tree_draw`
+  (`mode-tree.c:873`–`:972`), not a single line; the alignment array,
+  `format_width` clipping and the prefix/text split all move together.
+
 ### Two client theme hooks are absent from the options table
 
 - **Symptom:** `set-hook -g client-light-theme ...` fails with `invalid option`;
@@ -37,6 +53,15 @@ Fixes to the ztmux port, most recent first.
   optional-argument form for a flag the C reads with `args_has`
   (`cmd-refresh-client.c:263`), which is the one entry most likely to be a
   transcription artefact.
+- **Stale as of 2026-08-18, and the count needs re-measuring.**
+  `command-prompt` no longer belongs on this list: its template is now
+  `1CbeFiklI:NPp:t:T:`, character-for-character the C's, after `-P` was added
+  with the in-pane prompt. Spot-checking the other three it names — `-C`, `-e`,
+  `-l` — they parse too, so they were already present when this entry was
+  written. The headline **27** was produced by a full template comparison that
+  has not been re-run; it is left unchanged rather than decremented to a number
+  that has not been measured. Re-running that comparison is the fix, and it
+  should be done before this entry is quoted again.
 - **Largest block:** `break-pane`'s five are next-3.7's floating-pane geometry,
   dispatched in C to `cmd_break_pane_float` (`cmd-break-pane.c:50`), which the
   port does not have — one feature, not five flags.
@@ -209,6 +234,53 @@ Fixes to the ztmux port, most recent first.
   `style_copy`/`style_set`, which are whole-struct copies.
 - **Found by:** the same style-directive check that turned up `width=`/`pad=`
   below.
+
+## 2026-08-18 (in-pane prompt)
+
+### `command-prompt -P` was unported, so every copy-mode prompt sat on the status line
+
+- **Symptom:** pressing `?`, `/` or `:` in copy mode drew the prompt on the status
+  row, replacing the status bar. next-3.7 draws it inside the pane on the row
+  above and leaves the status bar visible. Same for `g` (goto line) and the
+  jump keys, and for any user config reaching them — Hashrocket's `dotmatrix`
+  binds `prefix e` to `copy-mode \; send-keys "?Error" C-m`, which lands here.
+- **Root cause:** the flag existed in `prompt_flags` with nothing behind it.
+  `struct window_pane` had no `prompt` / `prompt_data` / `prompt_cx`, none of
+  `window.c`'s five pane-prompt functions were ported, and `cmd-command-prompt`
+  did not accept `-P`. The default binding table had then been written *without*
+  the flag to match what the port could do, which made the whole thing
+  self-consistent: nothing looked broken, and no state-level check could see it.
+- **Fix:** ported `struct window_pane_prompt` and its two callbacks,
+  `window_pane_set_prompt` / `_clear_prompt` / `_has_prompt` / `_update_prompt` /
+  `_prompt_key` (`window.c:82`, `:1442`–`:1580`); added the three `window_pane`
+  fields; added `-P` to `cmd-command-prompt` with the pane-vs-status dispatch and
+  the multi-prompt update branch (`cmd-command-prompt.c:95`, `:179`, `:218`); the
+  key routing that prefers the active pane and falls back to the first visible
+  pane holding a prompt (`server-client.c:1650`); and `redraw_draw_pane_prompt`
+  (`screen-redraw.c:1525`, called at `:1677`). Restored `-P` on all 32 default
+  bindings.
+- **Verified:** through a real client, both binaries now draw `(search up)` on
+  row 23 and keep the status bar on row 24, with the same search outcome. The
+  known gap reports `CLOSED`; promoted to case **1506**, rendering pinned by case
+  **1507**, and the 32 keys deleted from case 1498's exclusion list so they are
+  blocking again.
+
+### Tagged rows in `choose-tree` used a bright attribute instead of the theme colour
+
+- **Symptom:** a tagged row in `choose-tree` / `choose-buffer` was drawn bold
+  where next-3.7 draws it in the theme's cyan.
+- **Fix:** ported `enum colour_theme` and applied
+  `COLOUR_THEME_CYAN|COLOUR_FLAG_THEME` to `gc`/`gc0` before the row is drawn,
+  restoring the saved foregrounds after — the save/restore shape the C uses
+  (`mode-tree.c:844`, `:931`, `:969`) in place of the port's bright-attribute
+  toggle. Verified through a client: the tagged row now carries the same
+  `38;2;95;158;160` the reference emits.
+- **Not claimed as closed:** the surrounding row *composition* in
+  `mode_tree_draw` is still at an older revision — next-3.7 splits the row into a
+  `MODE_TREE_PREFIX_FORMAT` prefix drawn with `format_draw` plus a styled
+  separator, and the port draws a single composed string. So the tagged
+  highlight is now faithful while `choose-tree` rendering as a whole is not.
+  Recorded as open below rather than presented as a finished port.
 
 ## 2026-08-18 (Hashrocket dotmatrix acceptance round)
 

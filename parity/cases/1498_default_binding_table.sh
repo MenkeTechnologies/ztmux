@@ -14,7 +14,8 @@
 # and only real differences in the resulting command survive.
 #
 # Keys listed in SKIP below are excluded because they are known to differ, each
-# for a reason recorded elsewhere. Every OTHER key must match byte-for-byte, so a
+# for a reason recorded elsewhere. The 32 command-prompt -P keys that used to sit
+# here left the list when the in-pane prompt was ported (cases 1506/1507). Every OTHER key must match byte-for-byte, so a
 # new divergence on any of them fails this case. Shrinking SKIP is the point: a
 # key leaves the list when the feature behind it lands.
 #
@@ -34,20 +35,6 @@ my @skip = (
     "prefix C-d", "prefix C-f", "prefix C-s", "prefix e", "prefix G",
     "prefix H", "prefix I", "prefix R", "prefix S", "prefix T",
     "prefix W", "prefix y", "prefix +", "root MouseDown3Border",
-
-    # command-prompt -P, the in-pane prompt. 32 keys; window_pane has no prompt
-    # fields, so the port omits the flag. Covered by
-    # parity/known_gaps/cmd_prompt_in_pane.sh.
-    "copy-mode C-r", "copy-mode C-s", "copy-mode f", "copy-mode F",
-    "copy-mode g", "copy-mode t", "copy-mode T",
-    "copy-mode M-1", "copy-mode M-2", "copy-mode M-3", "copy-mode M-4",
-    "copy-mode M-5", "copy-mode M-6", "copy-mode M-7", "copy-mode M-8",
-    "copy-mode M-9",
-    "copy-mode-vi :", "copy-mode-vi ?", "copy-mode-vi /",
-    "copy-mode-vi f", "copy-mode-vi F", "copy-mode-vi t", "copy-mode-vi T",
-    "copy-mode-vi 1", "copy-mode-vi 2", "copy-mode-vi 3", "copy-mode-vi 4",
-    "copy-mode-vi 5", "copy-mode-vi 6", "copy-mode-vi 7", "copy-mode-vi 8",
-    "copy-mode-vi 9",
 
     # The scrollbar and control mouse locations the six-location keyc table
     # cannot name. Covered by parity/known_gaps/mouse_scrollbar_locations.sh.

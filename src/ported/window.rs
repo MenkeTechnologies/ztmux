@@ -2592,6 +2592,214 @@ pub unsafe fn window_pane_mode(wp: *mut window_pane) -> i32 {
     }
 }
 
+/// Prompt input callback.
+/// C `vendor/tmux/window.c:1442`: `static enum prompt_result window_pane_prompt_input_callback(void *data, const char *s, enum prompt_key_result key)`
+unsafe fn window_pane_prompt_input_callback(
+    data: NonNull<c_void>,
+    s: *const u8,
+    key: prompt_key_result,
+) -> prompt_result {
+    unsafe {
+        let wpp: *mut window_pane_prompt = data.as_ptr().cast();
+
+        if let Some(inputcb) = (*wpp).inputcb {
+            let Some(d) = NonNull::new((*wpp).data) else {
+                return prompt_result::PROMPT_CLOSE;
+            };
+            return inputcb((*wpp).c, d, s, key);
+        }
+        prompt_result::PROMPT_CLOSE
+    }
+}
+
+/// Prompt free callback.
+/// C `vendor/tmux/window.c:1454`: `static void window_pane_prompt_free_callback(void *data)`
+unsafe fn window_pane_prompt_free_callback(data: NonNull<c_void>) {
+    unsafe {
+        let wpp: *mut window_pane_prompt = data.as_ptr().cast();
+
+        // The pane is re-found by id: the input callback may have destroyed it.
+        let wp = window_pane_find_by_id((*wpp).wp_id);
+        if !wp.is_null() && (*wp).prompt_data == wpp {
+            (*wp).prompt_data = null_mut();
+        }
+        if let Some(freecb) = (*wpp).freecb
+            && let Some(d) = NonNull::new((*wpp).data)
+        {
+            freecb(d);
+        }
+        free_(wpp);
+    }
+}
+
+/// Open a prompt owned by a pane, drawn over the pane instead of the status.
+/// C `vendor/tmux/window.c:1469`: `void window_pane_set_prompt(struct window_pane *wp, struct client *c, struct cmd_find_state *fs, const char *msg, const char *input, status_prompt_input_cb inputcb, prompt_free_cb freecb, void *data, int flags, enum prompt_type type)`
+#[expect(clippy::too_many_arguments)]
+pub unsafe fn window_pane_set_prompt<T>(
+    wp: *mut window_pane,
+    c: *mut client,
+    fs: *mut cmd_find_state,
+    msg: *const u8,
+    input: *const u8,
+    inputcb: unsafe fn(*mut client, NonNull<T>, *const u8, prompt_key_result) -> prompt_result,
+    freecb: unsafe fn(NonNull<T>),
+    data: *mut T,
+    flags: prompt_flags,
+    type_: prompt_type,
+) {
+    unsafe {
+        let mut s: *mut session = null_mut();
+        if !c.is_null() {
+            s = (*c).session;
+        }
+
+        window_pane_clear_prompt(wp);
+
+        let wpp: *mut window_pane_prompt = xcalloc_::<window_pane_prompt>(1).as_ptr();
+        (*wpp).wp_id = (*wp).id;
+        (*wpp).c = c;
+        // Same erasure status_prompt_set performs: the prompt object stores a
+        // void-data callback pair, and the concrete type is recovered by the
+        // callback itself.
+        (*wpp).inputcb = Some(std::mem::transmute::<
+            unsafe fn(*mut client, NonNull<T>, *const u8, prompt_key_result) -> prompt_result,
+            unsafe fn(*mut client, NonNull<c_void>, *const u8, prompt_key_result) -> prompt_result,
+        >(inputcb));
+        (*wpp).freecb = Some(std::mem::transmute::<
+            unsafe fn(NonNull<T>),
+            unsafe fn(NonNull<c_void>),
+        >(freecb));
+        (*wpp).data = data.cast();
+
+        let mut pd: prompt_create_data = zeroed();
+        prompt_set_options(&raw mut pd, s);
+        pd.fs = fs;
+        pd.prompt = msg;
+        pd.input = input;
+        pd.type_ = type_;
+        pd.flags = flags;
+        pd.inputcb = Some(window_pane_prompt_input_callback);
+        pd.freecb = Some(window_pane_prompt_free_callback);
+        pd.data = wpp.cast();
+
+        (*wp).prompt = prompt_create(&raw const pd);
+        (*wp).prompt_data = wpp;
+        (*wp).flags |= window_pane_flags::PANE_REDRAW;
+
+        prompt_incremental_start((*wp).prompt);
+    }
+}
+
+/// Close a pane prompt.
+/// C `vendor/tmux/window.c:1507`: `void window_pane_clear_prompt(struct window_pane *wp)`
+pub unsafe fn window_pane_clear_prompt(wp: *mut window_pane) {
+    unsafe {
+        let prompt = (*wp).prompt;
+
+        if prompt.is_null() {
+            return;
+        }
+        (*wp).prompt = null_mut();
+        prompt_free(prompt);
+        (*wp).flags |= window_pane_flags::PANE_REDRAW;
+    }
+}
+
+/// Does this pane have an open prompt?
+/// C `vendor/tmux/window.c:1520`: `int window_pane_has_prompt(struct window_pane *wp)`
+pub unsafe fn window_pane_has_prompt(wp: *mut window_pane) -> i32 {
+    unsafe { (!(*wp).prompt.is_null()) as i32 }
+}
+
+/// Replace the message and input of an open pane prompt.
+/// C `vendor/tmux/window.c:1527`: `void window_pane_update_prompt(struct window_pane *wp, const char *msg, const char *input)`
+pub unsafe fn window_pane_update_prompt(
+    wp: *mut window_pane,
+    msg: *const u8,
+    input: *const u8,
+) {
+    unsafe {
+        if !(*wp).prompt.is_null() {
+            prompt_update((*wp).prompt, msg, input);
+            (*wp).flags |= window_pane_flags::PANE_REDRAW;
+        }
+    }
+}
+
+/// Pass a key to a pane prompt. The client is set transiently for the duration
+/// of the key in case the prompt or pane is destroyed by the callback.
+/// C `vendor/tmux/window.c:1544`: `enum prompt_key_result window_pane_prompt_key(struct window_pane *wp, struct client *c, key_code key, struct mouse_event *m)`
+pub unsafe fn window_pane_prompt_key(
+    mut wp: *mut window_pane,
+    c: *mut client,
+    key: key_code,
+    m: *mut mouse_event,
+) -> prompt_key_result {
+    unsafe {
+        let prompt = (*wp).prompt;
+        let wpp = (*wp).prompt_data;
+        let result: prompt_key_result;
+        let wp_id = (*wp).id;
+        let mut x: u32 = 0;
+        let mut y: u32 = 0;
+        let py: u32;
+        let mut redraw: i32 = 0;
+
+        if prompt.is_null() {
+            return prompt_key_result::PROMPT_KEY_NOT_HANDLED;
+        }
+
+        if !wpp.is_null() {
+            (*wpp).c = c;
+        }
+        if KEYC_IS_MOUSE(key) {
+            if m.is_null()
+                || MOUSE_BUTTONS((*m).b) != MOUSE_BUTTON_1
+                || MOUSE_DRAG((*m).b)
+                || MOUSE_RELEASE((*m).b)
+                || cmd_mouse_at(wp, m, &raw mut x, &raw mut y, 0) != 0
+            {
+                result = prompt_key_result::PROMPT_KEY_NOT_HANDLED;
+            } else {
+                if !c.is_null() && status_at_line(c) == 0 {
+                    py = 0;
+                } else {
+                    py = (*wp).sy - 1;
+                }
+                if y == py {
+                    result = prompt_mouse(prompt, x, 0, (*wp).sx, &raw mut redraw);
+                } else {
+                    result = prompt_key_result::PROMPT_KEY_NOT_HANDLED;
+                }
+            }
+        } else {
+            result = prompt_key(prompt, key, &raw mut redraw);
+        }
+
+        wp = window_pane_find_by_id(wp_id);
+        if wp.is_null() {
+            return result;
+        }
+        if !wpp.is_null() && (*wp).prompt_data == wpp {
+            (*wpp).c = null_mut();
+        }
+
+        // Only an explicit close or the prompt marking itself closed ends it;
+        // cursor movement and editing keep it open.
+        if (*wp).prompt == prompt
+            && (result == prompt_key_result::PROMPT_KEY_CLOSE || prompt_closed(prompt) != 0)
+        {
+            window_pane_clear_prompt(wp);
+        }
+
+        if redraw != 0 || (*wp).prompt != prompt {
+            (*wp).flags |= window_pane_flags::PANE_REDRAW;
+        }
+
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -873,9 +873,26 @@ enum client_theme {
 const COLOUR_FLAG_256: i32 = 0x01000000;
 const COLOUR_FLAG_RGB: i32 = 0x02000000;
 const COLOUR_FLAG_THEME: i32 = 0x04000000;
+/// Theme colours. C `vendor/tmux/tmux.h:739`: `enum colour_theme`.
+///
+/// The index half of a `COLOUR_FLAG_THEME` colour: the slot a theme name
+/// resolves to, matching the order of `COLOUR_THEME_TABLE` in `colour.rs`.
+#[expect(dead_code)]
+mod colour_theme_slot {
+    pub const COLOUR_THEME_BLACK: i32 = 0;
+    pub const COLOUR_THEME_WHITE: i32 = 1;
+    pub const COLOUR_THEME_LIGHT_GREY: i32 = 2;
+    pub const COLOUR_THEME_DARK_GREY: i32 = 3;
+    pub const COLOUR_THEME_GREEN: i32 = 4;
+    pub const COLOUR_THEME_YELLOW: i32 = 5;
+    pub const COLOUR_THEME_RED: i32 = 6;
+    pub const COLOUR_THEME_BLUE: i32 = 7;
+    pub const COLOUR_THEME_CYAN: i32 = 8;
+    pub const COLOUR_THEME_MAGENTA: i32 = 9;
+}
+
 // vendor/tmux/tmux.h:752 `#define COLOUR_THEME_COUNT 10` — number of theme
-// colour slots (the `enum` of COLOUR_THEME_* slots is not yet ported; only the
-// count is needed here, for the client's `theme_colours` array).
+// colour slots, sized for the client's `theme_colours` array.
 const COLOUR_THEME_COUNT: usize = 10;
 
 /// Special colours.
@@ -1889,6 +1906,16 @@ struct window_pane {
     /// `searchstr_ptr()`.
     searchstr: Option<std::ffi::CString>,
     searchregex: i32,
+
+    /// C `vendor/tmux/tmux.h:1353`: `struct prompt *prompt` — an open prompt
+    /// owned by this pane and drawn over it rather than on the status line
+    /// (`command-prompt -P`). Null when the pane has no prompt.
+    prompt: *mut prompt,
+    /// C `vendor/tmux/tmux.h:1354`: `struct window_pane_prompt *prompt_data`
+    prompt_data: *mut window_pane_prompt,
+    /// C `vendor/tmux/tmux.h:1355`: column the prompt's cursor ended up at,
+    /// written by `prompt_draw`.
+    prompt_cx: c_uint,
 
     border_gc_set: i32,
     border_gc: grid_cell,
@@ -2912,6 +2939,21 @@ type mode_tree_prompt_input_cb =
     Option<unsafe fn(*mut client, NonNull<c_void>, *const u8, prompt_key_result) -> prompt_result>;
 /// C `vendor/tmux/tmux.h:2089`: `typedef void (*prompt_free_cb)(void *)`
 type prompt_free_cb = Option<unsafe fn(NonNull<c_void>)>;
+
+/// A prompt owned by a pane rather than by the status line.
+/// C `vendor/tmux/window.c:82`: `struct window_pane_prompt`.
+///
+/// The pane is held by id, not by pointer: the input callback can destroy the
+/// pane, so the free callback has to re-find it to know whether the pane it was
+/// attached to still exists.
+#[repr(C)]
+struct window_pane_prompt {
+    wp_id: c_uint,
+    c: *mut client,
+    inputcb: status_prompt_input_cb,
+    freecb: prompt_free_cb,
+    data: *mut c_void,
+}
 
 type overlay_check_cb =
     Option<unsafe fn(*mut client, *mut c_void, u32, u32, u32) -> *mut visible_ranges>;
