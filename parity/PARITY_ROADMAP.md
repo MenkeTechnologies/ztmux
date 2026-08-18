@@ -65,8 +65,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1203/1203 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 cases.
+**1205/1205 cases pass (100%) vs the vendored tmux — zero known divergences.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 cases.
 
 Case **1498** is structural rather than another probe: it diffs the *whole*
 default binding table against next-3.7's, which nothing had done before. The
@@ -78,15 +78,27 @@ on five menus, a hand-written session menu, and 16 bindings missing the `--`
 before their argument). It compares what `list-keys` prints rather than the
 source text, so it is a diff of what each binary actually *parsed*: cosmetic
 transcription differences that parse to the same command list are canonicalised
-away by the round trip. 243 of the 283 bindings are compared; the 40 excluded are
-listed by key in the case with the reason for each, and the list shrinks as the
-features behind them land. The output is sorted, because `list-keys` walks each
+away by the round trip. **278 of the 283 bindings are compared**; the 19 keys still
+excluded are listed by key in the case with the reason for each, and the list
+shrinks as the features behind them land — the 32 `command-prompt -P` keys left
+it when the in-pane prompt landed, and the three pane-menu keys left it when the
+truncated comparison replaced them.
+
+A `SKIP` entry used to make a key **invisible rather than merely uncompared**:
+the case passed with `prefix >` deleted outright and `root MouseDown3Pane` rebound
+to something unrelated, and the `compared N` guard could not catch it because `N`
+counts only non-skipped lines. The three pane-menu keys — which carry roughly
+3.3 KB of C-derived menu content that no other case covers — are now compared up
+to the last row the C defines (`z { resize-pane -Z }`, `key-bindings.c:72`), with
+`NO-MARKER` printed if it is absent, so deletion and gutting both go red. The
+remaining 19 are structurally uncomparable by a parity case: 14 exist only in
+ztmux and 5 only in the reference. The output is sorted, because `list-keys` walks each
 table in key-code order and ztmux's flat `keyc` enum orders differently from the
 C's type-shifted one — so the case compares the set of bindings and their
 commands, not their order, until that encoding migrates. Both halves were
 mutation-tested: reintroducing the `MouseDown1Status` command and dropping one
 `--` each turn the case red.
-Cases **1499–1505** are an acceptance round rather than a probe block: they take
+Cases **1499–1509** are an acceptance round rather than a probe block: they take
 [hashrocket/dotmatrix](https://github.com/hashrocket/dotmatrix)'s `.tmux.conf` —
 a config a whole shop runs — and ask whether ztmux loads and executes it the way
 tmux does. The config is written out and read with `source-file` rather than
@@ -130,6 +142,27 @@ bindings; 1507 pins where the prompt lands, through a client, asserting the stat
 row as well as the prompt row — a port that drew the prompt correctly but ate the
 status bar would otherwise pass. The 32 keys left case 1498's exclusion list at the
 same time, so they are blocking again.
+
+Cases **1508–1509** close the last two client-visible gaps this round found.
+1508 compares all four mode-tree screens — `choose-tree`, `choose-client`,
+`choose-buffer` and `customize-mode`, i.e. `prefix w`/`s`/`=`/`D` — through an
+attached client. None of that was reachable server-side, because `mode_tree_draw`
+only runs for a client, so the whole row composition had drifted to an older
+revision unnoticed: no `MODE_TREE_PREFIX_FORMAT`, no per-depth alignment, a
+hand-composed row string, and four mode format-string constants each frozen at an
+older tmux (`#[reverse]` where the C has `#[fg=thememagenta]`, missing
+`#[fg=themelightgrey]`, and the C's multi-branch `#{?a,b,c,d,e}` rewritten as
+nested conditionals). The case asserts the box title as well as the rows, which is
+what caught a missing `mode_tree_view_name` call.
+
+1509 pins non-UTF-8 byte handling. The port dropped invalid bytes where the C
+enters U+FFFD, so every column after one shifted. The case asserts **both**
+directions — invalid bytes producing replacement characters *and* valid CJK,
+emoji and box-drawing rendering untouched — because the failure mode of getting
+`utf8started`'s ordering backwards is worse than the original bug.
+
+Both were authored against the nested-client technique cases 1504 and 1507
+introduced, which is now the only way this suite can see anything a client draws.
 
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
@@ -552,7 +585,7 @@ reddens CI merely because the gaps still exist. Should the directory ever empty 
 exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
 left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1203/1203 ported surface; they measure
+proof. These gaps do not count against the 1205/1205 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite
