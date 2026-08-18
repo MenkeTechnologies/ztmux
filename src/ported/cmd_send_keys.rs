@@ -25,9 +25,13 @@ pub static CMD_SEND_KEYS_ENTRY: cmd_entry = cmd_entry {
 
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
 
+    // C cmd-send-keys.c:42-43. CMD_READONLY here is only safe alongside the
+    // explicit gate in cmd_send_keys_exec below, which rejects a read-only
+    // client unless -X (a copy-mode command, which cannot reach pane input).
     flags: cmd_flag::CMD_AFTERHOOK
         .union(cmd_flag::CMD_CLIENT_CFLAG)
-        .union(cmd_flag::CMD_CLIENT_CANFAIL),
+        .union(cmd_flag::CMD_CLIENT_CANFAIL)
+        .union(cmd_flag::CMD_READONLY),
     exec: cmd_send_keys_exec,
 
     source: cmd_entry_flag::zeroed(),
@@ -167,6 +171,14 @@ pub unsafe fn cmd_send_keys_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
         let mut np: u32 = 1;
         let count = args_count(args);
         let mut cause: *mut u8 = null_mut();
+
+        // C cmd-send-keys.c:178-181: a read-only client may not inject keys into
+        // a pane. -X is exempt because it dispatches a copy-mode command rather
+        // than reaching the pane's input.
+        if !tc.is_null() && (*tc).flags.intersects(client_flag::READONLY) && !args_has(args, 'X') {
+            cmdq_error!(item, "client is read-only");
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
 
         if args_has(args, 'N') {
             np = args_strtonum_and_expand(args, b'N', 1, u32::MAX as i64, item, &raw mut cause)

@@ -922,6 +922,9 @@ bitflags::bitflags! {
         const GRID_ATTR_UNDERSCORE_4 = 0x800;
         const GRID_ATTR_UNDERSCORE_5 = 0x1000;
         const GRID_ATTR_OVERLINE = 0x2000;
+        /// C `vendor/tmux/tmux.h:778`: set by the style keyword `noattr`, which
+        /// asks a selection not to inherit the attributes of the text under it.
+        const GRID_ATTR_NOATTR = 0x4000;
     }
 }
 

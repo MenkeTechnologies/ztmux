@@ -23,7 +23,7 @@ pub fn attributes_tostring(attr: grid_attr) -> Cow<'static, str> {
     }
 
     Cow::Owned(format!(
-        "{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         if attr.intersects(grid_attr::GRID_ATTR_CHARSET) { "acs," } else { "" },
         if attr.intersects(grid_attr::GRID_ATTR_BRIGHT) { "bright," } else { "" },
         if attr.intersects(grid_attr::GRID_ATTR_DIM ) { "dim," } else { "" },
@@ -38,6 +38,7 @@ pub fn attributes_tostring(attr: grid_attr) -> Cow<'static, str> {
         if attr.intersects(grid_attr::GRID_ATTR_UNDERSCORE_4) { "dotted-underscore," } else { "" },
         if attr.intersects(grid_attr::GRID_ATTR_UNDERSCORE_5) { "dashed-underscore," } else { "" },
         if attr.intersects(grid_attr::GRID_ATTR_OVERLINE) { "overline," } else { "" },
+        if attr.intersects(grid_attr::GRID_ATTR_NOATTR) { "noattr," } else { "" },
     ))
 }
 
@@ -242,8 +243,9 @@ mod tests {
         }
     }
 
-    // With all fourteen flags set, tostring emits them in fixed table order,
-    // comma-separated, with a trailing comma (attributes.c:34).
+    // With all fifteen flags set, tostring emits them in fixed table order,
+    // comma-separated, with a trailing comma (attributes.c:34-49). `noattr` is
+    // last and is emitted by tostring even though it has no table entry.
     #[test]
     fn test_attributes_tostring_all_flags_order() {
         let all = grid_attr::all();
@@ -251,7 +253,7 @@ mod tests {
             attributes_tostring(all).as_ref(),
             "acs,bright,dim,underscore,blink,reverse,hidden,italics,\
              strikethrough,double-underscore,curly-underscore,\
-             dotted-underscore,dashed-underscore,overline,"
+             dotted-underscore,dashed-underscore,overline,noattr,"
         );
     }
 
@@ -414,10 +416,16 @@ mod tests {
     // directly, attributes.c:34 emit order vs :92 parse loop).
     #[test]
     fn test_attributes_fromstring_all_flags_roundtrip() {
-        let all = grid_attr::all();
+        // GRID_ATTR_NOATTR is deliberately asymmetric, exactly as in the C:
+        // attributes_tostring names it (attributes.c:49) but the table it parses
+        // from has no `noattr` entry (attributes.c:60-80) -- the keyword is taken
+        // by style_parse instead (style.c:247-249). So every OTHER flag must
+        // round-trip, and `noattr` must NOT parse.
+        let all = grid_attr::all() & !grid_attr::GRID_ATTR_NOATTR;
         let s = attributes_tostring(all);
         let trimmed = s.trim_end_matches(',');
         assert_eq!(attributes_fromstring(trimmed), Ok(all));
+        assert!(attributes_fromstring("noattr").is_err());
     }
 
     // "acs" alone parses to just GRID_ATTR_CHARSET and tostring names it "acs,",

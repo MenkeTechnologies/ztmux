@@ -332,7 +332,11 @@ pub unsafe extern "C-unwind" fn tty_start_timer_callback(
         let c = (*tty).client;
 
         log_debug!("{}: start timer fired", _s((*c).name));
-        if (*tty)
+        // C tty.c:318: features are applied when the terminal answered NONE of
+        // DA/DA2/XDA -- the timer is the fallback for terminals that reply to
+        // nothing (screen, and tmux inside tmux). The test was inverted here, so
+        // exactly those terminals never got tty_update_features.
+        if !(*tty)
             .flags
             .intersects(tty_flags::TTY_HAVEDA | tty_flags::TTY_HAVEDA2 | tty_flags::TTY_HAVEXDA)
         {
@@ -437,7 +441,9 @@ pub unsafe fn tty_send_requests(tty: *mut tty) {
         }
 
         if (*(*tty).term).flags.intersects(term_flags::TERM_VT100LIKE) {
-            // TODO I think the original C code has a bug and it should be as follows, double check
+            // Matches the C exactly (`~tty->flags & TTY_HAVEDA` is `!intersects`);
+            // the C additionally sets TTY_WAITBG|TTY_WAITFG here, which this tree
+            // does not have -- recorded in docs/BUGS.md rather than added blind.
             if !(*tty).flags.intersects(tty_flags::TTY_HAVEDA) {
                 tty_puts(tty, c!("\x1b[c"));
             }

@@ -350,11 +350,14 @@ unsafe fn window_tree_build_window(
             if wp.is_null() {
                 break 'empty;
             }
-            if tailq_next::<_, window_pane, discr_entry>(wp).is_null() {
-                if !window_tree_filter_pane(s, wl, wp, cstr_to_str_(filter)) {
-                    break 'empty;
-                }
-                return 1;
+            // C window-tree.c:360-363: a single-pane window only checks the
+            // filter here and then FALLS THROUGH to build its pane child. The
+            // early return meant single-pane windows -- most of them -- got no
+            // expander in choose-tree.
+            if tailq_next::<_, window_pane, discr_entry>(wp).is_null()
+                && !window_tree_filter_pane(s, wl, wp, cstr_to_str_(filter))
+            {
+                break 'empty;
             }
 
             l = null_mut();

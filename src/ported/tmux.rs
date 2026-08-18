@@ -547,9 +547,14 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
         if std::env::var("TMUX").is_ok() {
             flags |= client_flag::UTF8;
         } else {
-            let s = std::env::var("LC_ALL")
-                .or_else(|_| std::env::var("LC_CTYPE"))
-                .or_else(|_| std::env::var("LANG"))
+            // C tmux.c:495-500 tests `s == NULL || *s == '\0'` at each step, so a
+            // variable that is EXPORTED BUT EMPTY falls through to the next one.
+            // `env::var(..).or_else(..)` only falls through when the variable is
+            // absent, so `LC_ALL=` used to halt the chain and lose UTF-8.
+            let nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+            let s = nonempty("LC_ALL")
+                .or_else(|| nonempty("LC_CTYPE"))
+                .or_else(|| nonempty("LANG"))
                 .unwrap_or_default()
                 .to_ascii_lowercase();
 

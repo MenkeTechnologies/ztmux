@@ -268,10 +268,21 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
                 } else if strcaseeq_(tmp, "none") {
                     (*sy).gc.attr = grid_attr::empty();
                 } else if end > 2 && strncasecmp(tmp, c!("no"), 2) == 0 {
-                    let Ok(value) = attributes_fromstring(cstr_to_str(tmp.add(2))) else {
-                        break 'error;
-                    };
-                    (*sy).gc.attr &= !value;
+                    // C style.c:247-255: `noattr` is not a table entry that gets
+                    // removed -- it SETS a bit of its own. Everything else after
+                    // `no` names an attribute to clear.
+                    //
+                    // The C also takes `nolink` here; `link=` is unported (see
+                    // docs/BUGS.md), so that keyword still falls through to the
+                    // error path exactly as `link=` itself does.
+                    if strcmp(tmp.add(2), c!("attr")) == 0 {
+                        (*sy).gc.attr |= grid_attr::GRID_ATTR_NOATTR;
+                    } else {
+                        let Ok(value) = attributes_fromstring(cstr_to_str(tmp.add(2))) else {
+                            break 'error;
+                        };
+                        (*sy).gc.attr &= !value;
+                    }
                 } else {
                     let Ok(value) = attributes_fromstring(cstr_to_str(tmp)) else {
                         break 'error;

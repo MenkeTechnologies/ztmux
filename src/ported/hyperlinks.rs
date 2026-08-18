@@ -15,6 +15,8 @@
 use crate::*;
 
 const MAX_HYPERLINKS: u32 = 5000;
+/// C `vendor/tmux/hyperlinks.c:44`: `#define MAX_HYPERLINK_URI 1024`
+const MAX_HYPERLINK_URI: usize = 1024;
 
 static HYPERLINKS_NEXT_EXTERNAL_ID: AtomicU64 = AtomicU64::new(1);
 static GLOBAL_HYPERLINKS_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -130,6 +132,13 @@ pub unsafe fn hyperlinks_put(
             uri_in,
             vis_flags::VIS_OCTAL | vis_flags::VIS_CSTYLE,
         );
+        // C hyperlinks.c:148-152: an over-long URI is dropped, not stored. Tools
+        // that emit OSC 8 (gh, delta, eza, rg --hyperlink-format) can produce
+        // them, and without the cap they are passed through to the terminal.
+        if strlen(uri) > MAX_HYPERLINK_URI {
+            free_(uri);
+            return 0;
+        }
         utf8_stravis(
             &raw mut internal_id,
             internal_id_in,

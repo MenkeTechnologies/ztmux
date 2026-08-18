@@ -24,7 +24,10 @@ pub static CMD_COPY_MODE_ENTRY: cmd_entry = cmd_entry {
     source: cmd_entry_flag::new(b's', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
 
-    flags: cmd_flag::CMD_AFTERHOOK,
+    // C cmd-copy-mode.c:39 `CMD_AFTERHOOK|CMD_READONLY`: entering copy mode
+    // does not modify the session, so a read-only client is allowed to. The
+    // sibling clock-mode entry below correctly does NOT get this.
+    flags: cmd_flag::CMD_AFTERHOOK.union(cmd_flag::CMD_READONLY),
     exec: cmd_copy_mode_exec,
 };
 

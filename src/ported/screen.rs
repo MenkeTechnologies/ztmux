@@ -706,11 +706,26 @@ pub unsafe fn screen_select_cell(
         }
 
         memcpy__(dst, &raw const (*(*s).sel).cell);
-
+        // C screen.c:638-641: a selection style that leaves fg/bg default shows
+        // the cell's own colours through.
+        if COLOUR_DEFAULT((*dst).fg) {
+            (*dst).fg = (*src).fg;
+        }
+        if COLOUR_DEFAULT((*dst).bg) {
+            (*dst).bg = (*src).bg;
+        }
         utf8_copy(&mut (*dst).data, &(*src).data);
-        (*dst).attr &= !grid_attr::GRID_ATTR_CHARSET;
-        (*dst).attr |= (*src).attr & grid_attr::GRID_ATTR_CHARSET;
         (*dst).flags = (*src).flags;
+
+        // C screen.c:641-644: `noattr` in the selection style means "do not take
+        // the underlying text's attributes" -- only the charset comes through,
+        // so the selection paints as a flat bar instead of inheriting bold or
+        // underline from whatever it happens to cover.
+        if (*dst).attr.intersects(grid_attr::GRID_ATTR_NOATTR) {
+            (*dst).attr |= (*src).attr & grid_attr::GRID_ATTR_CHARSET;
+        } else {
+            (*dst).attr |= (*src).attr;
+        }
         true
     }
 }
