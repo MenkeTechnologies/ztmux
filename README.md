@@ -97,6 +97,31 @@ cargo run --release -- new-session       # start a server + session, like `tmux`
 
 The binary is `ztmux`, and it links no C library beyond libc.
 
+### Shadowing `tmux`
+
+ztmux is the whole multiplexer, so it can stand in for `tmux` itself. Shadowing is opt-in,
+and `ztmux shadow` is the whole opt-in:
+
+```sh
+ztmux shadow                  # install ~/.ztmux/{bin,man,completions}, print the shell lines
+eval "$(ztmux shadow)"        # …apply them here, or paste them into ~/.zshrc
+ztmux shadow -n               # print the lines without installing anything
+```
+
+It installs a `tmux` shim beside a `ztmux` one in `~/.ztmux/bin` (or a directory you name),
+the man pages in `~/.ztmux/man` (`ztmux.1`, `ztmuxall.1`, and a `tmux.1` copy, so `man tmux`
+reads this port's page), and the zsh completion in `~/.ztmux/completions` — `_ztmux`, plus a
+`_tmux` wrapper that shadows the system one by file name, so the shimmed `tmux` completes
+every tmux command *and* every ztmux extension. All of it is compiled into the binary, so
+the install needs nothing from the source tree.
+
+stdout is shell code only (the summary goes to stderr), so the same output both `eval`s and
+pastes; a `PATH`/`MANPATH` line the environment already satisfies is printed commented out,
+and `--all` prints every line uncommented. A real (non-symlink) file keeping a shim's name
+is never clobbered, so `ztmux shadow /usr/local/bin` cannot replace an installed `tmux`.
+Re-run it after a rebuild moves the binary, and `ztmux doctor` reports the install — PATH,
+which `tmux` a command line actually reaches, MANPATH, and the completion — once it exists.
+
 ---
 
 ## [0x02] HOW THE PORT IS BUILT
@@ -229,6 +254,11 @@ They fall into a few families:
   from the command table and the extension list themselves, and needs no server. `banner` prints
   the ztmux banner — the logo, the verb totals, and the socket's live session/window/pane/client
   counts, or that no server is running — which is also the console's opening screen.
+- **Setup** — `shadow` installs the `~/.ztmux` shadow (a `tmux` shim, the man pages, the zsh
+  completion) and prints the `PATH`/`MANPATH`/`fpath` lines that activate it, so
+  `eval "$(ztmux shadow)"` makes `tmux` this port; `doctor` health-checks the build, the
+  terminal, that install, the socket, the reachable server and the resource limits, exiting
+  non-zero on warnings or errors so it drops into a CI gate. See `[0x01]`.
 - **Console** — `repl` runs every line as `ztmux <line>` against the selected socket, with a
   reedline editor: Tab completes the command word (every command, alias, extension and builtin),
   a `-`-prefixed word against that verb's own flags, an option's fixed value set (`-o` →

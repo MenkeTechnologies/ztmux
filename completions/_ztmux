@@ -1937,6 +1937,15 @@ _ztmux-doctor() {
     '--json[machine-readable JSON output]'
 }
 
+_ztmux-shadow() {
+  [[ -n ${tmux_describe} ]] && print "install the ~/.ztmux shadow: tmux shim, man pages, completion (ztmux extension)" && return
+  _arguments -s \
+    ':directory:_files -/' \
+    '-n[print the shell lines without installing]' \
+    '--print[print the shell lines without installing]' \
+    '--all[print every line uncommented]'
+}
+
 _ztmux-stats() {
   [[ -n ${tmux_describe} ]] && print "one-shot server summary report (ztmux extension)" && return
   _arguments -s \

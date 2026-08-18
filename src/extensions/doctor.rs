@@ -128,6 +128,7 @@ pub(crate) fn run(socket: &str) -> i32 {
 fn collect(socket: &str) -> Vec<Check> {
     let mut c = Vec::new();
     build_checks(&mut c);
+    shadow_checks(&mut c);
     terminal_checks(&mut c);
     server_checks(&mut c, socket);
     limit_checks(&mut c);
@@ -155,6 +156,99 @@ fn build_checks(c: &mut Vec<Check>) {
         "platform",
         format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
     ));
+}
+
+/// The `ztmux shadow` install (see [`super::shadow`]), reported only once it
+/// exists: shadowing `tmux` is opt-in, so a machine that never ran `ztmux
+/// shadow` gets no checks — and no warnings — about it at all.
+fn shadow_checks(c: &mut Vec<Check>) {
+    let Some(home) = super::diagnostics::path() else {
+        return;
+    };
+    let bin = home.join("bin");
+    let shim = bin.join("tmux");
+    if !shim.exists() {
+        return;
+    }
+
+    if super::shadow::path_list_contains("PATH", &bin) {
+        c.push(Check::ok("shadow", "PATH", bin.display().to_string()));
+    } else {
+        c.push(Check::warn(
+            "shadow",
+            "PATH",
+            format!("{} not on PATH", bin.display()),
+            r#"eval "$(ztmux shadow)" (or paste its lines into ~/.zshrc)"#,
+        ));
+    }
+
+    // The check that matters: which `tmux` a command line actually reaches.
+    let me = std::env::current_exe()
+        .ok()
+        .map(|p| super::shadow::canon(&p));
+    match first_on_path("tmux") {
+        Some(found) if me.is_some_and(|me| super::shadow::canon(&found) == me) => {
+            c.push(Check::ok("shadow", "tmux", found.display().to_string()));
+        }
+        Some(found) => c.push(Check::warn(
+            "shadow",
+            "tmux",
+            format!("{} is not this binary", found.display()),
+            format!(
+                "another tmux comes first on PATH; put {} ahead of it",
+                bin.display()
+            ),
+        )),
+        None => c.push(Check::warn(
+            "shadow",
+            "tmux",
+            "not on PATH",
+            format!("add {} to PATH to shadow tmux", bin.display()),
+        )),
+    }
+
+    let man = home.join("man");
+    if super::shadow::path_list_contains("MANPATH", &man) {
+        c.push(Check::ok("shadow", "MANPATH", man.display().to_string()));
+    } else {
+        c.push(Check::warn(
+            "shadow",
+            "MANPATH",
+            format!("{} not on MANPATH", man.display()),
+            "`man ztmux` and `man tmux` need it; add the MANPATH line `ztmux shadow` prints",
+        ));
+    }
+
+    // `fpath` is a zsh variable, not an exported one, so this process cannot
+    // see it — only the installed files can be checked from here.
+    let comp = home.join("completions");
+    if comp.join("_ztmux").exists() && comp.join("_tmux").exists() {
+        c.push(Check::ok(
+            "shadow",
+            "completion",
+            comp.display().to_string(),
+        ));
+    } else {
+        c.push(Check::warn(
+            "shadow",
+            "completion",
+            format!("missing in {}", comp.display()),
+            "re-run `ztmux shadow` to reinstall _ztmux and _tmux",
+        ));
+    }
+}
+
+/// The first executable named `name` on `PATH`, the way the shell resolves a
+/// command word.
+fn first_on_path(name: &str) -> Option<std::path::PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .map(|dir| dir.join(name))
+        .find(|candidate| {
+            std::fs::metadata(candidate)
+                .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+        })
 }
 
 fn terminal_checks(c: &mut Vec<Check>) {
@@ -484,6 +578,31 @@ mod tests {
             c.iter()
                 .any(|x| x.name == "event-loop" && !x.value.is_empty())
         );
+    }
+
+    // The shadow group is opt-in: with no `~/.ztmux/bin/tmux` installed it
+    // contributes no checks at all, so `ztmux doctor` cannot start warning
+    // about a feature the user never asked for.
+    #[test]
+    fn shadow_checks_are_silent_until_the_shadow_is_installed() {
+        let mut c = Vec::new();
+        shadow_checks(&mut c);
+        let installed = super::super::diagnostics::path()
+            .is_some_and(|home| home.join("bin").join("tmux").exists());
+        if installed {
+            assert!(c.iter().all(|x| x.group == "shadow"));
+            assert!(c.iter().any(|x| x.name == "tmux"));
+        } else {
+            assert!(c.is_empty(), "checks reported with no shadow installed");
+        }
+    }
+
+    // `first_on_path` resolves a command word the way the shell does: a real
+    // executable, not just any file of that name.
+    #[test]
+    fn first_on_path_finds_an_executable() {
+        assert!(first_on_path("sh").is_some(), "sh must be on PATH");
+        assert!(first_on_path("ztmux-no-such-binary-xyz").is_none());
     }
 
     // Sev is ordered Ok < Warn < Err (so max picks the worst) and each variant

@@ -48,6 +48,12 @@ ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .IR json ]
 .br
 .B ztmux
+.B shadow
+.RI [ directory ]
+.RB [ \-n | \-\-print ]
+.RB [ \-\-all ]
+.br
+.B ztmux
 .RB [ \-L
 .IR socket-name ]
 .RB [ \-S
@@ -1222,6 +1228,69 @@ object with
 .BR \-\-json ).
 The process exit status is the worst severity seen \(en 0 all ok, 1 warnings,
 2 errors \(en so it drops into a CI gate. It is safe to run with no server up.
+.SS ztmux shadow
+.B ztmux shadow
+installs the
+.B ~/.ztmux
+shadow and prints the shell lines that turn it on. ztmux is a port of the whole
+multiplexer, so it can stand in for
+.BR tmux (1)
+itself; shadowing is opt-in and this verb is the whole opt-in. It installs a
+.B tmux
+shim beside a
+.B ztmux
+one in
+.I directory
+(default
+.BR ~/.ztmux/bin ),
+the man pages under
+.B ~/.ztmux/man
+.RB ( ztmux.1 ,
+.BR ztmuxall.1 ,
+and a
+.B tmux.1
+copy, so
+.B man tmux
+reads this port's page), and the zsh completion under
+.B ~/.ztmux/completions
+.RB ( _ztmux ,
+plus a
+.B _tmux
+wrapper that shadows the system one by file name). Everything installed is
+compiled into the binary, so no source tree is needed.
+.PP
+stdout carries shell code only \(en the install summary goes to stderr \(en so
+.B eval \(dq$(ztmux shadow)\(dq
+sets the current shell up and the same lines paste into
+.BR ~/.zshrc .
+A
+.B PATH
+or
+.B MANPATH
+line the environment already satisfies is printed commented out, so an
+.B eval
+never duplicates an entry;
+.B \-\-all
+prints every line uncommented. The
+.B fpath
+line is always live, since
+.B fpath
+is not exported and this process cannot read it. With
+.B \-n
+(or
+.BR \-\-print )
+nothing is installed and only the lines are printed.
+.PP
+Nothing is clobbered: a real (non-symlink) file holding a shim's name is left
+alone, so pointing
+.I directory
+at a directory that already carries the real
+.B tmux
+never replaces it. Re-run after a rebuild that moves the binary.
+.B ztmux doctor
+reports the install \(en PATH, which
+.B tmux
+a command line reaches, MANPATH, and the completion \(en once it exists.
 .SS ztmux stats
 .B ztmux stats
 prints a one-shot summary of the server: session/window/pane/client counts,

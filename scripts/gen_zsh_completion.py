@@ -34,6 +34,16 @@ EXTENSIONS = [
         "environment / server health check (ztmux extension)",
     ),
     (
+        "shadow",
+        [
+            ":directory:_files -/",
+            "-n[print the shell lines without installing]",
+            "--print[print the shell lines without installing]",
+            "--all[print every line uncommented]",
+        ],
+        "install the ~/.ztmux shadow: tmux shim, man pages, completion (ztmux extension)",
+    ),
+    (
         "stats",
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "one-shot server summary report (ztmux extension)",

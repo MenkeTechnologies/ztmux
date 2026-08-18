@@ -9,6 +9,16 @@ use std::io::Write as _;
 use std::path::PathBuf;
 use std::ptr::null_mut;
 
+/// The ztmux home directory — `~/.ztmux` — resolved without creating
+/// anything, so a caller can ask about a path it does not want to bring into
+/// existence (`ztmux shadow`'s install root, and `ztmux doctor` reporting on a
+/// shadow that was never installed). `None` when `$HOME` is unset or empty.
+pub(crate) fn path() -> Option<PathBuf> {
+    std::env::var_os("HOME")
+        .filter(|home| !home.is_empty())
+        .map(|home| PathBuf::from(home).join(".ztmux"))
+}
+
 /// Directory that holds every ztmux log and crash file: `~/.ztmux` (created if
 /// missing, tightened to mode 0700 since logs can contain pane contents).
 ///
@@ -17,9 +27,8 @@ use std::ptr::null_mut;
 /// `log_open`, `dump_backtrace`, and the server panic hook so all output lands
 /// in one predictable place regardless of where the server was launched.
 pub(crate) fn dir() -> PathBuf {
-    let base = match std::env::var_os("HOME") {
-        Some(home) if !home.is_empty() => PathBuf::from(home).join(".ztmux"),
-        _ => return PathBuf::from("."),
+    let Some(base) = path() else {
+        return PathBuf::from(".");
     };
 
     if let Err(err) = std::fs::create_dir_all(&base) {
