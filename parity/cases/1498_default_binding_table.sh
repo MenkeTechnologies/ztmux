@@ -15,7 +15,8 @@
 #
 # Keys listed in SKIP below are excluded because they are known to differ, each
 # for a reason recorded elsewhere. The 32 command-prompt -P keys that used to sit
-# here left the list when the in-pane prompt was ported (cases 1506/1507). Every OTHER key must match byte-for-byte, so a
+# here left the list when the in-pane prompt was ported (cases 1506/1507), and the
+# three pane-menu keys left it when the truncated comparison below replaced them. Every OTHER key must match byte-for-byte, so a
 # new divergence on any of them fails this case. Shrinking SKIP is the point: a
 # key leaves the list when the feature behind it lands.
 #
@@ -42,12 +43,24 @@ my @skip = (
     "root MouseDrag1ScrollbarSlider",
     "root MouseDown1Control8", "root MouseDown1Control9",
 
-    # The pane context menu: ztmux adds entries to it (stack, tab bar, floating
-    # pane, open URL). Verified a strict superset -- it omits nothing the C has,
-    # which case 1497 and the Paste row restored in this commit series cover.
-    "prefix >", "root MouseDown3Pane", "root M-MouseDown3Pane",
 );
 my %skip = map { $_ => 1 } @skip;
+
+# The three pane-context-menu keys are NOT skipped: ztmux appends extra rows
+# (stack, tab bar, floating pane, open URL) to the end of the menu, so the port
+# line is a strict superset whose prefix is the reference line. Comparing each up
+# to and including the LAST row the C defines -- z { resize-pane -Z } at
+# vendor/tmux/key-bindings.c:72 -- compares all 25 C-derived rows on both
+# binaries while tolerating the appended tail.
+#
+# This exists because skipping them was a hole: with all three merely skipped,
+# this case still passed with prefix > DELETED and root MouseDown3Pane rebound to
+# display-message TOTALLY-WRONG. The count guard could not catch that either,
+# because $n counts only non-skipped lines. A missing marker now prints NO-MARKER,
+# so deletion and gutting both go red.
+my %menu = map { $_ => 1 } ("prefix >", "root MouseDown3Pane", "root M-MouseDown3Pane");
+my $tail = "z { resize-pane -Z }";
+
 my $n = 0;
 while (<STDIN>) {
     chomp; s/[ \t]+/ /g; s/^ //; s/ $//;
@@ -56,6 +69,13 @@ while (<STDIN>) {
     my $tk = "";
     for my $i (0 .. $#f) {
         if ($f[$i] eq "-T") { $tk = "$f[$i+1] $f[$i+2]"; last }
+    }
+    if ($menu{$tk}) {
+        my $idx = index($_, $tail);
+        $n++;
+        if ($idx < 0) { print "NO-MARKER $tk\n" }
+        else { print substr($_, 0, $idx + length($tail)), "\n" }
+        next;
     }
     next if $skip{$tk};
     $n++;
