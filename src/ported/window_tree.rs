@@ -24,6 +24,44 @@ const WINDOW_TREE_DEFAULT_COMMAND: &str = "switch-client -Zt '%%'";
 /// `pane_floating_flag` arm), which is why choose-tree rows differed in colour.
 const WINDOW_TREE_DEFAULT_FORMAT: &str = r##"#{?pane_format,#{?pane_marked,#[fg=thememagenta],}#{?pane_floating_flag,#[underscore],}#{pane_current_command}#[fg=themelightgrey]#{pane_flags}#{?#{&&:#{pane_title},#{!=:#{pane_title},#{host_short}}},: "#{pane_title}",},window_format,#{?window_marked_flag,#[fg=thememagenta],}#{window_name}#[fg=themelightgrey]#{window_flags}#{?#{&&:#{==:#{window_panes},1},#{&&:#{pane_title},#{!=:#{pane_title},#{host_short}}}},: "#{pane_title}",},#[fg=themelightgrey]#{session_windows} windows#{?session_grouped, (group #{session_group}: #{session_group_list}),}#{?session_attached, (attached),}}"##;
 
+/// C `vendor/tmux/window-tree.c:148`: `window_tree_pane_info_lines[]`, as the preprocessor emits it.
+/// Regenerate with `cc -E -P` over that table rather than editing by hand.
+static WINDOW_TREE_PANE_INFO_LINES: [&std::ffi::CStr; 8] = [
+    c"#[fg=themelightgrey]Pane          #[#{E:tree-mode-border-style},acs]x#[default] #{pane_index} #[fg=themelightgrey](#{pane_id})#[default]",
+    c"#[fg=themelightgrey]Title         #[#{E:tree-mode-border-style},acs]x#[default] #{pane_title}",
+    c"#[fg=themelightgrey]Command       #[#{E:tree-mode-border-style},acs]x#[default] #{pane_current_command} #[fg=themelightgrey](PID #{pane_pid})#[default]",
+    c"#[fg=themelightgrey]Path          #[#{E:tree-mode-border-style},acs]x#[default] #{pane_current_path}",
+    c"#[fg=themelightgrey]TTY           #[#{E:tree-mode-border-style},acs]x#[default] #{pane_tty}",
+    c"#[fg=themelightgrey]Position      #[#{E:tree-mode-border-style},acs]x#[default] #{pane_x},#{pane_y} #{pane_width}x#{pane_height}",
+    c"#[fg=themelightgrey]Mode          #[#{E:tree-mode-border-style},acs]x#[default] #{?pane_in_mode,#{pane_mode},none}",
+    c"#[fg=themelightgrey]Flags         #[#{E:tree-mode-border-style},acs]x#[default] #{?pane_active,#[fg=themegreen],#[fg=themelightgrey]}active#[default] #{?window_zoomed_flag,#[fg=themegreen],#[fg=themelightgrey]}zoomed#[default] #{?pane_marked,#[fg=themegreen],#[fg=themelightgrey]}marked#[default] #{?pane_synchronized,#[fg=themegreen],#[fg=themelightgrey]}sync#[default] #{?pane_dead,#[fg=themegreen],#[fg=themelightgrey]}dead#[default] #{?pane_pipe,#[fg=themegreen],#[fg=themelightgrey]}piped#[default]",
+];
+
+/// C `vendor/tmux/window-tree.c:172`: `window_tree_window_info_lines[]`, as the preprocessor emits it.
+/// Regenerate with `cc -E -P` over that table rather than editing by hand.
+static WINDOW_TREE_WINDOW_INFO_LINES: [&std::ffi::CStr; 6] = [
+    c"#[fg=themelightgrey]Window        #[#{E:tree-mode-border-style},acs]x#[default] #{window_index}: #{window_name} #[fg=themelightgrey](#{window_id})#[default]",
+    c"#[fg=themelightgrey]Size          #[#{E:tree-mode-border-style},acs]x#[default] #{window_width}x#{window_height}",
+    c"#[fg=themelightgrey]Panes         #[#{E:tree-mode-border-style},acs]x#[default] #{window_panes}",
+    c"#[fg=themelightgrey]Activity Time #[#{E:tree-mode-border-style},acs]x#[default] #{t:window_activity} #[fg=themelightgrey](#{t/r:window_activity})#[default]",
+    c"#[fg=themelightgrey]Sessions      #[#{E:tree-mode-border-style},acs]x#[default] #{s/,/ /:window_linked_sessions_list}",
+    c"#[fg=themelightgrey]Flags         #[#{E:tree-mode-border-style},acs]x#[default] #{?window_active,#[fg=themegreen],#[fg=themelightgrey]}active#[default] #{?window_last_flag,#[fg=themegreen],#[fg=themelightgrey]}last#[default] #{?window_bell_flag,#[fg=themegreen],#[fg=themelightgrey]}bell#[default] #{?window_activity_flag,#[fg=themegreen],#[fg=themelightgrey]}activity#[default] #{?window_silence_flag,#[fg=themegreen],#[fg=themelightgrey]}silence#[default] #{?window_zoomed_flag,#[fg=themegreen],#[fg=themelightgrey]}zoomed#[default] #{?window_marked_flag,#[fg=themegreen],#[fg=themelightgrey]}marked#[default]",
+];
+
+/// C `vendor/tmux/window-tree.c:193`: `window_tree_session_info_lines[]`, as the preprocessor emits it.
+/// Regenerate with `cc -E -P` over that table rather than editing by hand.
+static WINDOW_TREE_SESSION_INFO_LINES: [&std::ffi::CStr; 9] = [
+    c"#[fg=themelightgrey]Session       #[#{E:tree-mode-border-style},acs]x#[default] #{session_name} #[fg=themelightgrey](#{session_id})#[default]",
+    c"#[fg=themelightgrey]Created Time  #[#{E:tree-mode-border-style},acs]x#[default] #{t:session_created} #[fg=themelightgrey](#{t/r:session_created})#[default]",
+    c"#[fg=themelightgrey]Activity Time #[#{E:tree-mode-border-style},acs]x#[default] #{t:session_activity} #[fg=themelightgrey](#{t/r:session_activity})#[default]",
+    c"#[fg=themelightgrey]Attached Time #[#{E:tree-mode-border-style},acs]x#[default] #{?#{t:session_last_attached},#{t:session_last_attached} #[fg=themelightgrey](#{t/r:session_last_attached})#[default],never}",
+    c"#[fg=themelightgrey]Clients       #[#{E:tree-mode-border-style},acs]x#[default] #{s/,/ /:session_attached_list}",
+    c"#[fg=themelightgrey]Windows       #[#{E:tree-mode-border-style},acs]x#[default] #{session_windows}",
+    c"#[fg=themelightgrey]Path          #[#{E:tree-mode-border-style},acs]x#[default] #{session_path}",
+    c"#[fg=themelightgrey]Group         #[#{E:tree-mode-border-style},acs]x#[default] #{?session_grouped,#{session_group} (#{session_group_size}),none}",
+    c"#[fg=themelightgrey]Flags         #[#{E:tree-mode-border-style},acs]x#[default] #{?session_attached,#[fg=themegreen],#[fg=themelightgrey]}attached#[default] #{?session_grouped,#[fg=themegreen],#[fg=themelightgrey]}grouped#[default] #{?session_marked,#[fg=themegreen],#[fg=themelightgrey]}marked#[default] #{?session_bell_flag,#[fg=themegreen],#[fg=themelightgrey]}bell#[default] #{?session_activity_flag,#[fg=themegreen],#[fg=themelightgrey]}activity#[default] #{?session_silence_flag,#[fg=themegreen],#[fg=themelightgrey]}silence#[default]",
+];
+
 const WINDOW_TREE_DEFAULT_KEY_FORMAT: &CStr = cstring_concat!(
     "#{?#{e|<:#{line},10},",
     "#{line}",
@@ -110,6 +148,9 @@ struct window_tree_modedata {
     /// left out of the tree and its preview, so a chooser opened in a pane does
     /// not show that pane back to itself.
     hide_preview_this_pane: bool,
+    /// C `vendor/tmux/window-tree.c:117`: `int preview_is_info` -- the `i` key
+    /// swaps the preview panel for a per-item information panel.
+    preview_is_info: bool,
     /// C `vendor/tmux/window-tree.c:118`: extra prompt flags, set to
     /// `PROMPT_ACCEPT` by -y so the mode's prompts take the default answer.
     prompt_flags: prompt_flags,
@@ -1003,6 +1044,105 @@ unsafe fn window_tree_draw_window(
     }
 }
 
+/// C `vendor/tmux/window-tree.c:803`: `static void window_tree_draw_info(struct window_tree_modedata *data, void *itemdata, struct screen_write_ctx *ctx, u_int sx, u_int sy)`
+///
+/// The `i` view: a per-item information panel drawn in place of the preview. The
+/// tables are stacked innermost-first (pane, then window, then session) with a
+/// horizontal rule between each, and a vertical rule down column 14 joining them.
+unsafe fn window_tree_draw_info(
+    data: *mut window_tree_modedata,
+    itemdata: NonNull<window_tree_itemdata>,
+    ctx: *mut screen_write_ctx,
+    sx: u32,
+    sy: u32,
+) {
+    unsafe {
+        let s = (*ctx).s;
+        let mut sp: Option<NonNull<session>> = None;
+        let mut wlp: Option<NonNull<winlink>> = None;
+        let mut wpp: Option<NonNull<window_pane>> = None;
+        let mut gc: grid_cell = zeroed();
+        let (cx, cy) = ((*s).cx, (*s).cy);
+
+        window_tree_pull_item(itemdata, &raw mut sp, &raw mut wlp, &raw mut wpp);
+        let (Some(sp), Some(wpp)) = (sp, wpp) else {
+            return;
+        };
+
+        // C window-tree.c:820-830: which tables apply to this item type.
+        let mut lines: Vec<&[&std::ffi::CStr]> = Vec::with_capacity(3);
+        let type_ = &raw const (*itemdata.as_ptr()).type_;
+        let is_pane = *type_ == window_tree_type::WINDOW_TREE_PANE;
+        let is_window = *type_ == window_tree_type::WINDOW_TREE_WINDOW;
+        if is_pane {
+            lines.push(&WINDOW_TREE_PANE_INFO_LINES);
+        }
+        if is_pane || is_window {
+            lines.push(&WINDOW_TREE_WINDOW_INFO_LINES);
+        }
+        lines.push(&WINDOW_TREE_SESSION_INFO_LINES);
+
+        let ft = format_create(null_mut(), null_mut(), FORMAT_NONE, format_flags::empty());
+        format_defaults(
+            ft,
+            null_mut(),
+            Some(sp),
+            wlp,
+            Some(wpp),
+        );
+
+        let mut i: u32 = 0;
+        'outer: for (j, table) in lines.iter().enumerate() {
+            // C window-tree.c:841-856: a rule between groups, not before the first.
+            if j != 0 {
+                if i == sy {
+                    break;
+                }
+                window_tree_border_cell(&raw mut gc, (*(*(*data).wp).window).options, null_mut());
+                screen_write_cursormove(ctx, cx as i32, (cy + i) as i32, 0);
+                screen_write_hline(ctx, sx, 0, 0, box_lines::BOX_LINES_DEFAULT, &raw const gc);
+                if sx > 14 {
+                    gc.attr |= grid_attr::GRID_ATTR_CHARSET;
+                    screen_write_cursormove(ctx, (cx + 14) as i32, (cy + i) as i32, 0);
+                    screen_write_putc(ctx, &raw const gc, b'n');
+                }
+                i += 1;
+            }
+            for line in *table {
+                if i == sy {
+                    break 'outer;
+                }
+                // NUL-terminated: format_expand reads a C string, and a Rust &str
+                // would run into the next table entry.
+                let expanded = format_expand(ft, line.as_ptr().cast());
+                screen_write_cursormove(ctx, cx as i32, (cy + i) as i32, 0);
+                format_draw(
+                    ctx,
+                    &raw const GRID_DEFAULT_CELL,
+                    sx,
+                    cstr_to_str(expanded),
+                    null_mut(),
+                    0,
+                );
+                free_(expanded);
+                i += 1;
+            }
+            if i == sy {
+                break;
+            }
+        }
+
+        // C window-tree.c:869-874: the vertical rule joining the groups.
+        if sx > 14 && i < sy {
+            window_tree_border_cell(&raw mut gc, (*(*(*data).wp).window).options, null_mut());
+            screen_write_cursormove(ctx, (cx + 14) as i32, (cy + i) as i32, 0);
+            screen_write_vline(ctx, sy - i, 0, 0, &raw const gc);
+        }
+
+        format_free(ft);
+    }
+}
+
 /// C `vendor/tmux/window-tree.c:880`: `static void window_tree_draw(void *modedata, void *itemdata, struct screen_write_ctx *ctx, u_int sx, u_int sy)`
 unsafe fn window_tree_draw(
     modedata: *mut c_void,
@@ -1022,6 +1162,12 @@ unsafe fn window_tree_draw(
         let Some(wp) = wp else {
             return;
         };
+
+        // C window-tree.c:893-896: the `i` view replaces the preview entirely.
+        if (*data).preview_is_info {
+            window_tree_draw_info(data, item.unwrap(), ctx, sx, sy);
+            return;
+        }
 
         match (*item.unwrap().as_ptr()).type_ {
             window_tree_type::WINDOW_TREE_NONE => (),
@@ -1173,6 +1319,9 @@ unsafe fn window_tree_init(
             command,
             squash_groups: !args_has(args, 'G'),
             hide_preview_this_pane: args_has(args, 'h'),
+            // C window-tree.c: preview_is_info starts 0 (xcalloc); the `i` key
+            // toggles it.
+            preview_is_info: false,
             prompt_flags: if args_has(args, 'y') {
                 prompt_flags::PROMPT_ACCEPT
             } else {
@@ -1639,6 +1788,15 @@ unsafe fn window_tree_key(
                     mode_tree_expand((*data).data, (*fsp).wl as u64);
                     if !mode_tree_set_current((*data).data, (*wme.as_ptr()).wp as u64) {
                         mode_tree_set_current((*data).data, (*fsp).wl as u64);
+                    }
+                }
+                // C window-tree.c:1481-1487.
+                b'i' => {
+                    (*data).preview_is_info = !(*data).preview_is_info;
+                    if (*data).preview_is_info {
+                        mode_tree_view_name((*data).data, "info");
+                    } else {
+                        mode_tree_view_name((*data).data, "preview");
                     }
                 }
                 b'm' => {

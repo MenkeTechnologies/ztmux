@@ -92,6 +92,8 @@ bitflags::bitflags! {
         const FORMAT_WINDOWS = 0x100;
         const FORMAT_PANES = 0x200;
         const FORMAT_PRETTY = 0x400;
+        /// C `vendor/tmux/format.c:120`: `#define FORMAT_RELATIVE 0x800000`
+        const FORMAT_RELATIVE = 0x800000;
         const FORMAT_LENGTH = 0x800;
         const FORMAT_WIDTH = 0x1000;
         const FORMAT_QUOTE_STYLE = 0x2000;
@@ -4081,6 +4083,51 @@ pub unsafe fn format_pretty_time(t: time_t, seconds: i32) -> *mut u8 {
     }
 }
 
+/// Format a time as a relative age, e.g. `4s`, `3m20s`, `2h5m`, `6d1h`.
+/// C `vendor/tmux/format.c:4092`: `static char *format_relative_time(time_t t)`
+unsafe fn format_relative_time(t: time_t) -> *mut u8 {
+    unsafe {
+        // The port's libc shim only supports time(NULL) and asserts on a
+        // non-null argument, so take the return value rather than the out-param
+        // the C uses.
+        let now: time_t = libc::time(null_mut());
+        if t > now {
+            return null_mut();
+        }
+        if t == now {
+            return xstrdup(c!("0s")).as_ptr();
+        }
+        let age = now - t;
+
+        let d = (age / 86400) as u32;
+        let hh = ((age % 86400) / 3600) as u32;
+        let m = ((age % 3600) / 60) as u32;
+        let s = (age % 60) as u32;
+
+        if d != 0 {
+            if hh != 0 {
+                format_nul!("{d}d{hh}h")
+            } else {
+                format_nul!("{d}d")
+            }
+        } else if hh != 0 {
+            if m != 0 {
+                format_nul!("{hh}h{m}m")
+            } else {
+                format_nul!("{hh}h")
+            }
+        } else if m != 0 {
+            if s != 0 {
+                format_nul!("{m}m{s}s")
+            } else {
+                format_nul!("{m}m")
+            }
+        } else {
+            format_nul!("{s}s")
+        }
+    }
+}
+
 /// Find a format entry.
 /// C `vendor/tmux/format.c:4133`: `static char *format_find(struct format_tree *ft, const char *key, int modifiers, const char *time_format)`
 fn format_find(
@@ -4187,7 +4234,9 @@ fn format_find(
             if t == 0 {
                 return null_mut();
             }
-            if modifiers.intersects(format_modifiers::FORMAT_PRETTY) {
+            if modifiers.intersects(format_modifiers::FORMAT_RELATIVE) {
+                found = format_relative_time(t);
+            } else if modifiers.intersects(format_modifiers::FORMAT_PRETTY) {
                 found = format_pretty_time(t, 0);
             } else {
                 if !time_format.is_null() {
@@ -5305,6 +5354,8 @@ pub unsafe fn format_replace(
                                 if (*fm).argc >= 1 {
                                     if !strchr(*(*fm).argv, b'p' as i32).is_null() {
                                         modifiers |= format_modifiers::FORMAT_PRETTY;
+                                    } else if !strchr(*(*fm).argv, b'r' as i32).is_null() {
+                                        modifiers |= format_modifiers::FORMAT_RELATIVE;
                                     } else if (*fm).argc >= 2
                                         && !strchr(*(*fm).argv, b'f' as i32).is_null()
                                     {
