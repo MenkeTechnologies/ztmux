@@ -58,12 +58,12 @@
   </header>
 
   <main class="tutorial-main">
-    <div class="status-banner"><strong>Status: 100% functional &mdash; building, running, and self-hosting its own tooling.</strong> ztmux is the tmux program itself &mdash; server and client &mdash; reimplemented from the C in Rust. It builds and runs (<code>ztmux new-session</code>, <code>ztmux attach</code>), passes its <strong>1244-case parity suite at 100% (byte-for-byte vs upstream tmux, zero known divergences)</strong>, logs every bug its harnesses catch in <a href="BUGS.md">BUGS.md</a> &mdash; fixed, or still open and named &mdash; and ships original extensions the C tmux has no equivalent for.</div>
+    <div class="status-banner"><strong>Status: 100% functional &mdash; building, running, and self-hosting its own tooling.</strong> ztmux is the tmux program itself &mdash; server and client &mdash; reimplemented from the C in Rust. It builds and runs (<code>ztmux new-session</code>, <code>ztmux attach</code>), passes its <strong>1245-case parity suite at 100% (byte-for-byte vs upstream tmux, zero known divergences)</strong>, logs every bug its harnesses catch in <a href="BUGS.md">BUGS.md</a> &mdash; fixed, or still open and named &mdash; and ships original extensions the C tmux has no equivalent for.</div>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>PARITY VS tmux</h2>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-val green">1244</div><div class="stat-label">Cases passing</div></div>
-      <div class="stat-card"><div class="stat-val">1244</div><div class="stat-label">Total parity cases</div></div>
+      <div class="stat-card"><div class="stat-val green">1245</div><div class="stat-label">Cases passing</div></div>
+      <div class="stat-card"><div class="stat-val">1245</div><div class="stat-label">Total parity cases</div></div>
       <div class="stat-card"><div class="stat-val green">100%</div><div class="stat-label">vs tmux next-3.7</div></div>
       <div class="stat-card"><div class="stat-val green">0</div><div class="stat-label">Known divergences</div></div>
     </div>
@@ -72,7 +72,7 @@
       through the vendored <code>tmux</code> (reference) and <code>ztmux</code> (port) and compares byte-for-byte &mdash;
       the same shape as the sibling ports (<a href="https://github.com/MenkeTechnologies/zshrs">zshrs</a> vs
       <code>zsh</code>, <a href="https://github.com/MenkeTechnologies/strykelang">strykelang</a> vs <code>perl</code>).
-      The suite has grown from a handful of format cases to <strong>1244</strong> &mdash; <strong>686</strong> single-format
+      The suite has grown from a handful of format cases to <strong>1245</strong> &mdash; <strong>686</strong> single-format
       cases (<code>*.fmt</code>) and <strong>502</strong> multi-command shell scenarios (<code>*.sh</code>) &mdash; covering
       formats, arithmetic, conditionals, string ops, options, buffers, windows, panes, layouts, copy mode and
       <code>capture-pane</code>, and every one now passes byte-for-byte, with zero known divergences.
@@ -296,7 +296,7 @@
         <tr><td>src/ported/</td><td>the ztmux port</td><td>The living code we own and evolve toward safe, idiomatic Rust</td></tr>
       </tbody>
     </table>
-    <p class="prose">Every ported function carries a back-link to its C origin as a doc comment, e.g. <code>/// C <code>vendor/tmux/grid.c:320</code>: <code>grid_create()</code></code>. The <a href="port_report.html">port report</a> tracks per-function C&rarr;Rust coverage: <strong>2,474</strong> of tmux's <strong>2,696</strong> functions ported so far.</p>
+    <p class="prose">Every ported function carries a back-link to its C origin as a doc comment, e.g. <code>/// C <code>vendor/tmux/grid.c:320</code>: <code>grid_create()</code></code>. The <a href="port_report.html">port report</a> tracks per-function C&rarr;Rust coverage: <strong>2,477</strong> of tmux's <strong>2,696</strong> functions ported so far.</p>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>BUGS THE HARNESS CAUGHT</h2>
     <p class="prose">Verifying against C at every step turns "looks right" into "is right." A sample of faults the harnesses root-caused to a single line &mdash; the parity suite and unit tests, plus a sweep that drives every command against a private socket and, for the paths that only run with a client attached (modes, redraw, status), against a real client on a pty. Aborts are keyed on crash reports rather than on "is the server still up," since a dying client can legitimately take the server with it. Each fault below is now locked by a regression test or a build gate (the full log, including what is still open, is in <a href="BUGS.md">BUGS.md</a>):</p>
@@ -345,14 +345,14 @@
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>TESTING</h2>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-val green">1244/1244</div><div class="stat-label">Parity cases (100%)</div></div>
-      <div class="stat-card"><div class="stat-val">1,818</div><div class="stat-label">Unit tests</div></div>
-      <div class="stat-card"><div class="stat-val">2,474</div><div class="stat-label">C fns ported (of 2,696)</div></div>
-      <div class="stat-card"><div class="stat-val">171k</div><div class="stat-label">Lines of Rust</div></div>
+      <div class="stat-card"><div class="stat-val green">1245/1245</div><div class="stat-label">Parity cases (100%)</div></div>
+      <div class="stat-card"><div class="stat-val">1,821</div><div class="stat-label">Unit tests</div></div>
+      <div class="stat-card"><div class="stat-val">2,477</div><div class="stat-label">C fns ported (of 2,696)</div></div>
+      <div class="stat-card"><div class="stat-val">172k</div><div class="stat-label">Lines of Rust</div></div>
     </div>
     <p class="prose">Several layers stack:</p>
     <ul class="steps">
-      <li><b>Parity</b> &mdash; byte-for-byte against the vendored tmux, <strong>1244</strong> cases, blocking in CI. Two of those surfaces only became testable late: <code>capture-pane</code> reads a pane's backing grid, so drawn output and the command prompt were invisible to it. Attaching a second server inside a pane of the first puts the drawn scene in the outer pane's grid, and makes its keystrokes the inner client's terminal input &mdash; which is how the scrollbar, tree-mode and prompt cases reach them.</li>
+      <li><b>Parity</b> &mdash; byte-for-byte against the vendored tmux, <strong>1245</strong> cases, blocking in CI. Two of those surfaces only became testable late: <code>capture-pane</code> reads a pane's backing grid, so drawn output and the command prompt were invisible to it. Attaching a second server inside a pane of the first puts the drawn scene in the outer pane's grid, and makes its keystrokes the inner client's terminal input &mdash; which is how the scrollbar, tree-mode and prompt cases reach them.</li>
       <li><b>Unit tests</b> &mdash; in-tree, for pure logic: red-black tree invariants under randomized insert/delete, UTF-8 round-trips, layout arithmetic, and the extensions' rendering through ratatui's headless backend.</li>
       <li><b>Crash gate</b> &mdash; <code>tests/server_survives_bad_targets.rs</code> drives the real binary on a private socket and asserts the server survives commands whose target resolves to nothing.</li>
       <li><b>Anti-drift gates</b> &mdash; the three build gates above (<code>ported_fn_names_match_c</code>, <code>no_c_alloc_for_rust_types</code>, <code>no_key_code_truncation</code>).</li>

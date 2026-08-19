@@ -4,11 +4,16 @@ Fixes to the ztmux port, most recent first.
 
 ## Open
 
-Re-measured 2026-08-18 against the current build. Two entries that stood here
+Re-measured 2026-08-18 against the current build. Three entries that stood here
 earlier the same day are gone because the defects are fixed, not because the
 entries were tidied away: the `choose-tree` `i` info view (ported, pinned by case
-1510) and `link=` in a style (ported, pinned by cases 1554/1555). One entry
-shrank to a smaller, sharper claim after live probing, and one new one was added.
+1510), `link=` in a style (ported, pinned by cases 1554/1555), and `dim=` in a
+style, which was added to this list and then closed the same day once
+`tty_style_ctx` came over (case 1556). One entry shrank to a smaller, sharper
+claim after live probing.
+
+Every style directive now agrees with the reference: 53 of them, swept through
+both binaries, zero divergences.
 
 ### One upstream command flag has an arity the port gets wrong
 
@@ -73,26 +78,6 @@ shrank to a smaller, sharper claim after live probing, and one new one was added
   bufferevent. This is the same cluster the `refresh-client -l` entry above is
   blocked on.
 
-### `dim=` in a style is rejected
-
-- **Found 2026-08-18** by sweeping every style directive through both binaries.
-  It is the only one that still differs: `set-option -g status-style 'dim=30'`
-  fails with `invalid style:` under ztmux and is accepted upstream.
-- **Root cause:** `struct style` has no `dim` field, and the value is not just
-  stored — `tty_attributes` dims the resolved fg and bg through `colour_dim`
-  (`tty.c:2650-2658`), reading it from `tty_style_ctx.dim`.
-- **Scope, and why it is not parse-only:** this port has no `tty_style_ctx` at
-  all; `tty_attributes`, `tty_cell`, `tty_draw_line` and
-  `tty_default_attributes` take `defaults`/`palette`/`hyperlinks` as separate
-  parameters. Porting `dim=` means introducing the struct and threading it
-  through all of them plus `screen_write` and `screen_redraw`, and adding
-  `colour_dim`. Accepting the directive without that would store a value nothing
-  reads — a config that looks applied and renders undimmed — so it stays
-  rejected until the render lands.
-- Every other directive now agrees, including the three fixed today
-  (`set-default`, `link=`, `nolink`); the full accept/reject set is pinned by
-  case 1554.
-
 ### `-o json` and `-o tsv` are unusable under a non-UTF-8 locale
 
 - **Symptom:** `LC_ALL=C ztmux list-windows -o json` emits `[_{"session":...`
@@ -134,6 +119,49 @@ shrank to a smaller, sharper claim after live probing, and one new one was added
 - **Not known to be observable.** No probe has been constructed that
   distinguishes the two binaries on this, so it is filed as unported surface
   rather than as a reproduced defect.
+
+## 2026-08-18 (tty_style_ctx, and the last style directive)
+
+### `dim=` was rejected, because the port had nowhere to put it
+
+`dim=` was the one directive of the fifty-odd that the two binaries still
+disagreed on. It was recorded open rather than half-ported, because accepting it
+is trivial and honouring it is not: the C carries the percentage in
+`struct tty_style_ctx` (`tmux.h:1686`) and `tty_attributes` dims the resolved fg
+and bg through `colour_dim` (`tty.c:2649-2659`). This port passed `defaults`,
+`palette` and `hyperlinks` as three separate parameters, so `dim` had nowhere to
+live. A parse-only version would have stored a value nothing read — a config that
+renders undimmed while looking applied.
+
+So the struct came over, as upstream has it. `tty_cell`, `tty_attributes`,
+`tty_default_attributes` and `tty_draw_line` take one `*const tty_style_ctx`
+instead of three parameters; `tty_ctx` carries it where it carried a bare
+palette; callers with no pane context pass NULL exactly where the C does.
+`tty_default_colours` regained its `u_int *dim` out-parameter and
+`tty_style_changed` split back out of it, because that is where the dims are
+produced — `style_add` now returns the resolved style (`style.c:462`) and
+`sy->dim` is cached beside each cell, so `window-style` and `window-active-style`
+dim independently.
+
+**Two things had to land inside `tty_attributes` for the dim to mean anything.**
+`colour_dim` returns a THEME colour untouched and a DEFAULT colour untouched —
+neither has RGB to scale — so the C resolves theme colours and substitutes a
+concrete colour for the default (`tty_dim_default_colour`, `tty.c:2598`) BEFORE
+dimming. This port did its theme mapping down in `tty_check_fg`/`_bg`/`_us`
+instead, which is too late: by then the value has already been compared against
+`last_cell` and handed to `tty_colours`. The C's block at `tty.c:2637-2659` is
+now ported where the C has it, and `tty_check_fg` does the palette lookup and
+theme mapping a second time as it does upstream — both are idempotent.
+
+Verified through a nested client, byte-for-byte: colour196 on colour21 at
+`dim=50` emits `38;2;127;0;0` / `48;2;0;0;127` (the 256-palette form is forced to
+RGB by the dim), `dim=100` collapses to black on black, `dim=25` on red/blue
+gives `96;0;0` / `0;0;96`, and `dim=0` draws exactly what no dim draws. Case 1556
+pins that plus the accept/reject set, and deliberately pins the UNDIMMED
+default-colour path too: under the suite the inner terminal reports no fg/bg and
+has no theme, so `tty_dim_default_colour` returns the colour unchanged and no
+colour sequence is emitted at all. That is the branch a future "just dim it
+anyway" would break.
 
 ## 2026-08-18 (client-render round: what only an attached client could see)
 
