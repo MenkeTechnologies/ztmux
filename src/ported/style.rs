@@ -29,6 +29,7 @@ pub static mut STYLE_DEFAULT: style = style {
         0,
     ),
     ignore: 0,
+    dim: 0,
 
     fill: 8,
     align: style_align::STYLE_ALIGN_DEFAULT,
@@ -238,6 +239,17 @@ pub unsafe fn style_parse(sy: *mut style, base: *const grid_cell, mut in_: *cons
                         break 'error;
                     }
                     (*sy).fill = value;
+                } else if end > 4 && strncasecmp(tmp, c!("dim="), 4) == 0 {
+                    // C style.c:214-221. A trailing `%` is accepted and dropped,
+                    // so `dim=30` and `dim=30%` mean the same thing -- and
+                    // style_tostring always writes the `%` form back.
+                    if *tmp.add(end - 1) == b'%' {
+                        *tmp.add(end - 1) = b'\0';
+                    }
+                    let Ok(n) = strtonum(tmp.add(4), 0, 100) else {
+                        break 'error;
+                    };
+                    (*sy).dim = n;
                 } else if end > 3 && strncasecmp(tmp.add(1), c!("g="), 2) == 0 {
                     let value = colour_fromstring(cstr_to_str(tmp.add(3)));
                     if value == -1 {
@@ -499,6 +511,19 @@ pub unsafe fn style_tostring(sy: *const style) -> *const u8 {
             .unwrap() as i32;
             comma = c!(",");
         }
+        if (*sy).dim != 0 {
+            // C style.c:377-380 always writes the percent form, whichever the
+            // user typed.
+            off += xsnprintf_!(
+                s.add(off as usize),
+                size_of::<s_type>() - off as usize,
+                "{}dim={}%",
+                _s(comma),
+                (*sy).dim,
+            )
+            .unwrap() as i32;
+            comma = c!(",");
+        }
         if (*gc).fg != 8 {
             off += xsnprintf_!(
                 s.add(off as usize),
@@ -678,7 +703,7 @@ pub unsafe fn style_add(
     oo: *mut options,
     name: *const u8,
     mut ft: *mut format_tree,
-) {
+) -> *mut style {
     unsafe {
         let mut ft0: *mut format_tree = null_mut();
 
@@ -705,6 +730,9 @@ pub unsafe fn style_add(
         if !ft0.is_null() {
             format_free(ft0);
         }
+        // C style.c:462 returns it: tty_style_changed reads `sy->dim` off the
+        // result to cache the pane's dim alongside the cell it just filled in.
+        sy
     }
 }
 
@@ -1125,6 +1153,55 @@ mod tests {
             let (rc, sy) = parse("pad=2,link=http://a");
             assert_eq!(rc, 0);
             assert_eq!(tostring(&raw const sy), "pad=2,link=http://a");
+        }
+    }
+
+    // `dim=` (C style.c:214-221): a percentage in 0..=100, with an optional
+    // trailing `%` that the parse drops and the render always writes back.
+    #[test]
+    fn dim_directive_parses_bounds_and_round_trips() {
+        let _g = lock();
+        unsafe {
+            for (spec, want) in [("dim=0", 0), ("dim=30", 30), ("dim=30%", 30), ("dim=100", 100)] {
+                let (rc, sy) = parse(spec);
+                assert_eq!(rc, 0, "{spec}");
+                assert_eq!(sy.dim, want, "{spec}");
+            }
+            // Out of range, negative and non-numeric are all rejected, and a
+            // rejected directive leaves the style untouched (style_parse restores
+            // the saved copy).
+            for spec in ["dim=101", "dim=-1", "dim=abc", "dim="] {
+                let (rc, sy) = parse(spec);
+                assert_eq!(rc, -1, "{spec}");
+                assert_eq!(sy.dim, 0, "{spec}");
+            }
+            // The render always uses the percent form, and sits between `fill=`
+            // and the colours the way the C writes it.
+            let (_, sy) = parse("dim=30");
+            assert_eq!(tostring(&raw const sy), "dim=30%");
+            let (_, sy) = parse("fill=red,dim=40,fg=blue");
+            assert_eq!(tostring(&raw const sy), "fill=red,dim=40%,fg=blue");
+            // dim=0 is the default, so it renders as nothing at all.
+            let (_, sy) = parse("dim=0");
+            assert_eq!(tostring(&raw const sy), "default");
+        }
+    }
+
+    // The `dim` attribute and the `dim=` directive are different things that
+    // happen to share a prefix: one sets GRID_ATTR_DIM, the other a percentage.
+    #[test]
+    fn dim_attribute_and_dim_directive_are_distinct() {
+        let _g = lock();
+        unsafe {
+            let (rc, sy) = parse("dim");
+            assert_eq!(rc, 0);
+            assert!(sy.gc.attr.intersects(grid_attr::GRID_ATTR_DIM));
+            assert_eq!(sy.dim, 0);
+
+            let (rc, sy) = parse("dim=50");
+            assert_eq!(rc, 0);
+            assert!(!sy.gc.attr.intersects(grid_attr::GRID_ATTR_DIM));
+            assert_eq!(sy.dim, 50);
         }
     }
 

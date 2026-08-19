@@ -666,7 +666,7 @@ pub(crate) use window_copy_add;
 pub unsafe fn window_copy_init_ctx_cb(_ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx) {
     unsafe {
         memcpy__(&raw mut (*ttyctx).defaults, &raw const GRID_DEFAULT_CELL);
-        (*ttyctx).palette = null_mut();
+        (*ttyctx).style_ctx.palette = null_mut();
         (*ttyctx).redraw_cb = None;
         (*ttyctx).set_client_cb = None;
         (*ttyctx).arg = null_mut();

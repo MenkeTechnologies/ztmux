@@ -1804,7 +1804,7 @@ pub unsafe fn window_pane_get_bg(wp: *mut window_pane) -> i32 {
         let mut c = window_pane_get_bg_control_client(wp);
         if c == -1 {
             let mut defaults: grid_cell = zeroed();
-            tty_default_colours(&raw mut defaults, wp);
+            tty_default_colours(&raw mut defaults, wp, null_mut());
             c = if COLOUR_DEFAULT(defaults.bg) {
                 window_get_bg_client(wp)
             } else {

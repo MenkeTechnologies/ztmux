@@ -1719,8 +1719,7 @@ pub unsafe fn tty_draw_pane(tty: *mut tty, ctx: *const tty_ctx, py: u32) {
                     rr.nx,
                     rr.px,
                     (*ctx).yoff + py,
-                    &raw const (*ctx).defaults,
-                    (*ctx).palette,
+                    &raw const (*ctx).style_ctx,
                 );
             }
             return;
@@ -1750,8 +1749,7 @@ pub unsafe fn tty_draw_pane(tty: *mut tty, ctx: *const tty_ctx, py: u32) {
                     rr.nx,
                     rr.px,
                     ry,
-                    &raw const (*ctx).defaults,
-                    (*ctx).palette,
+                    &raw const (*ctx).style_ctx,
                 );
             }
         }
@@ -2013,13 +2011,7 @@ pub unsafe fn tty_cmd_insertcharacter(tty: *mut tty, ctx: *const tty_ctx) {
             return;
         }
 
-        tty_default_attributes(
-            tty,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_cursor_pane(tty, ctx, (*ctx).ocx, (*ctx).ocy);
 
@@ -2048,13 +2040,7 @@ pub unsafe fn tty_cmd_deletecharacter(tty: *mut tty, ctx: *const tty_ctx) {
             return;
         }
 
-        tty_default_attributes(
-            tty,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_cursor_pane(tty, ctx, (*ctx).ocx, (*ctx).ocy);
 
@@ -2070,13 +2056,7 @@ pub unsafe fn tty_cmd_deletecharacter(tty: *mut tty, ctx: *const tty_ctx) {
 /// C `vendor/tmux/tty.c:1710`: `void tty_cmd_clearcharacter(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_clearcharacter(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
-        tty_default_attributes(
-            tty,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_clear_pane_line(tty, ctx, (*ctx).ocy, (*ctx).ocx, (*ctx).num, (*ctx).bg);
     }
@@ -2100,13 +2080,7 @@ pub unsafe fn tty_cmd_insertline(tty: *mut tty, ctx: *const tty_ctx) {
             return;
         }
 
-        tty_default_attributes(
-            tty,
-            &(*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_region_pane(tty, ctx, (*ctx).orupper, (*ctx).orlower);
         tty_margin_off(tty);
@@ -2141,13 +2115,7 @@ pub unsafe fn tty_cmd_deleteline(tty: *mut tty, ctx: *const tty_ctx) {
             return;
         }
 
-        tty_default_attributes(
-            tty,
-            &(*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_region_pane(tty, ctx, (*ctx).orupper, (*ctx).orlower);
         tty_margin_off(tty);
@@ -2168,13 +2136,7 @@ pub unsafe fn tty_cmd_deleteline(tty: *mut tty, ctx: *const tty_ctx) {
 /// C `vendor/tmux/tty.c:1772`: `void tty_cmd_clearline(struct tty *tty, const struct tty_ctx *ctx)`
 unsafe fn tty_cmd_clearline(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
-        tty_default_attributes(
-            tty,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_clear_pane_line(tty, ctx, (*ctx).ocy, 0, (*ctx).sx, (*ctx).bg);
     }
@@ -2186,13 +2148,7 @@ unsafe fn tty_cmd_clearendofline(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
         let nx = (*ctx).sx - (*ctx).ocx;
 
-        tty_default_attributes(
-            tty,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_clear_pane_line(tty, ctx, (*ctx).ocy, (*ctx).ocx, nx, (*ctx).bg);
     }
@@ -2202,13 +2158,7 @@ unsafe fn tty_cmd_clearendofline(tty: *mut tty, ctx: *const tty_ctx) {
 /// C `vendor/tmux/tty.c:1790`: `void tty_cmd_clearstartofline(struct tty *tty, const struct tty_ctx *ctx)`
 unsafe fn tty_cmd_clearstartofline(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
-        tty_default_attributes(
-            tty,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_clear_pane_line(tty, ctx, (*ctx).ocy, 0, (*ctx).ocx + 1, (*ctx).bg);
     }
@@ -2237,13 +2187,7 @@ pub unsafe fn tty_cmd_reverseindex(tty: *mut tty, ctx: *const tty_ctx) {
             return;
         }
 
-        tty_default_attributes(
-            tty,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_region_pane(tty, ctx, (*ctx).orupper, (*ctx).orlower);
         tty_margin_pane(tty, ctx);
@@ -2279,13 +2223,7 @@ unsafe fn tty_cmd_linefeed(tty: *mut tty, ctx: *const tty_ctx) {
             return;
         }
 
-        tty_default_attributes(
-            tty,
-            &(*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_region_pane(tty, ctx, (*ctx).orupper, (*ctx).orlower);
         tty_margin_pane(tty, ctx);
@@ -2326,13 +2264,7 @@ pub unsafe fn tty_cmd_scrollup(tty: *mut tty, ctx: *const tty_ctx) {
             return;
         }
 
-        tty_default_attributes(
-            tty,
-            &(*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_region_pane(tty, ctx, (*ctx).orupper, (*ctx).orlower);
         tty_margin_pane(tty, ctx);
@@ -2376,13 +2308,7 @@ pub unsafe fn tty_cmd_scrolldown(tty: *mut tty, ctx: *const tty_ctx) {
             return;
         }
 
-        tty_default_attributes(
-            tty,
-            &(*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_region_pane(tty, ctx, (*ctx).orupper, (*ctx).orlower);
         tty_margin_pane(tty, ctx);
@@ -2401,13 +2327,7 @@ pub unsafe fn tty_cmd_scrolldown(tty: *mut tty, ctx: *const tty_ctx) {
 /// C `vendor/tmux/tty.c:1944`: `void tty_cmd_clearendofscreen(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_clearendofscreen(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
-        tty_default_attributes(
-            tty,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_region_pane(tty, ctx, 0, (*ctx).sy - 1);
         tty_margin_off(tty);
@@ -2430,13 +2350,7 @@ pub unsafe fn tty_cmd_clearendofscreen(tty: *mut tty, ctx: *const tty_ctx) {
 /// C `vendor/tmux/tty.c:1968`: `void tty_cmd_clearstartofscreen(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_clearstartofscreen(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
-        tty_default_attributes(
-            tty,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_region_pane(tty, ctx, 0, (*ctx).sy - 1);
         tty_margin_off(tty);
@@ -2459,13 +2373,7 @@ pub unsafe fn tty_cmd_clearstartofscreen(tty: *mut tty, ctx: *const tty_ctx) {
 /// C `vendor/tmux/tty.c:1992`: `void tty_cmd_clearscreen(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_cmd_clearscreen(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
-        tty_default_attributes(
-            tty,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*ctx).bg,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_default_attributes(tty, (*ctx).bg, &raw const (*ctx).style_ctx);
 
         tty_region_pane(tty, ctx, 0, (*ctx).sy - 1);
         tty_margin_off(tty);
@@ -2487,13 +2395,7 @@ pub unsafe fn tty_cmd_alignmenttest(tty: *mut tty, ctx: *const tty_ctx) {
             return;
         }
 
-        tty_attributes(
-            tty,
-            &raw const GRID_DEFAULT_CELL,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_attributes(tty, &raw const GRID_DEFAULT_CELL, &raw const (*ctx).style_ctx);
 
         tty_region_pane(tty, ctx, 0, (*ctx).sy - 1);
         tty_margin_off(tty);
@@ -2543,9 +2445,8 @@ pub unsafe fn tty_cmd_redrawline(tty: *mut tty, ctx: *const tty_ctx) {
                 rr.nx,
                 rr.px,
                 ry,
-                &raw const (*ctx).defaults,
-                (*ctx).palette,
-            );
+                &raw const (*ctx).style_ctx,
+                );
         }
     }
 }
@@ -2580,8 +2481,7 @@ pub unsafe fn tty_cmd_cell(tty: *mut tty, ctx: *const tty_ctx) {
                     (*gcp).data.width as u32,
                     px,
                     py,
-                    &raw const (*ctx).defaults,
-                    (*ctx).palette,
+                    &raw const (*ctx).style_ctx,
                 );
                 return;
             }
@@ -2597,13 +2497,7 @@ pub unsafe fn tty_cmd_cell(tty: *mut tty, ctx: *const tty_ctx) {
         tty_margin_off(tty);
         tty_cursor_pane_unless_wrap(tty, ctx, (*ctx).ocx, (*ctx).ocy);
 
-        tty_cell(
-            tty,
-            (*ctx).cell,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_cell(tty, (*ctx).cell, &raw const (*ctx).style_ctx);
 
         if (*ctx).num == 1 {
             tty_invalidate(tty);
@@ -2641,13 +2535,7 @@ pub unsafe fn tty_cmd_cells(tty: *mut tty, ctx: *const tty_ctx) {
 
         tty_margin_off(tty);
         tty_cursor_pane_unless_wrap(tty, ctx, (*ctx).ocx, (*ctx).ocy);
-        tty_attributes(
-            tty,
-            (*ctx).cell,
-            &raw const (*ctx).defaults,
-            (*ctx).palette,
-            (*(*ctx).s).hyperlinks,
-        );
+        tty_attributes(tty, (*ctx).cell, &raw const (*ctx).style_ctx);
 
         // Get tty position from pane position for overlay check.
         let px = (*ctx).xoff + (*ctx).ocx - (*ctx).wox;
@@ -2814,13 +2702,59 @@ pub unsafe fn tty_cmd_syncstart(tty: *mut tty, ctx: *const tty_ctx) {
     }
 }
 
+/// C `vendor/tmux/tty.c:88`: `static struct tty_style_ctx tty_default_style_ctx`.
+///
+/// What a caller with no pane context gets: the default cell, no palette, no dim
+/// and no hyperlink store.
+static TTY_DEFAULT_STYLE_CTX: tty_style_ctx = tty_style_ctx {
+    defaults: &raw const GRID_DEFAULT_CELL,
+    palette: null(),
+    dim: 0,
+    hyperlinks: null_mut(),
+};
+
+/// Substitute a concrete colour for a default one before dimming it.
+/// C `vendor/tmux/tty.c:2598`: `static int tty_dim_default_colour(struct tty *tty, int c, int foreground)`
+///
+/// `colour_dim` has no RGB to scale on a default colour, so the terminal's own
+/// fg/bg is used if it reported one, and otherwise the client theme decides
+/// whether "default" means black-on-white or white-on-black.
+unsafe fn tty_dim_default_colour(tty: *mut tty, c: i32, foreground: i32) -> i32 {
+    unsafe {
+        if !COLOUR_DEFAULT(c) {
+            return c;
+        }
+        if foreground != 0 && (*tty).fg != -1 {
+            return (*tty).fg;
+        }
+        if foreground == 0 && (*tty).bg != -1 {
+            return (*tty).bg;
+        }
+        match (*(*tty).client).theme {
+            client_theme::THEME_DARK => {
+                if foreground != 0 {
+                    7
+                } else {
+                    0
+                }
+            }
+            client_theme::THEME_LIGHT => {
+                if foreground != 0 {
+                    0
+                } else {
+                    7
+                }
+            }
+            _ => c,
+        }
+    }
+}
+
 /// C `vendor/tmux/tty.c:2233`: `void tty_cell(struct tty *tty, const struct grid_cell *gc, const struct tty_style_ctx *style_ctx)`
 pub unsafe fn tty_cell(
     tty: *mut tty,
     gc: *const grid_cell,
-    defaults: *const grid_cell,
-    palette: *const colour_palette,
-    hl: *mut hyperlinks,
+    style_ctx: *const tty_style_ctx,
 ) {
     unsafe {
         // Skip last character if terminal is stupid.
@@ -2838,11 +2772,11 @@ pub unsafe fn tty_cell(
 
         // Check the output codeset and apply attributes.
         let gcp = tty_check_codeset(tty, gc);
-        tty_attributes(tty, gcp, defaults, palette, hl);
+        tty_attributes(tty, gcp, style_ctx);
 
         // If it is a single character, write with putc to handle ACS.
         if (*gcp).data.size == 1 {
-            tty_attributes(tty, gcp, defaults, palette, hl);
+            tty_attributes(tty, gcp, style_ctx);
             if (*gcp).data.data[0] < 0x20 || (*gcp).data.data[0] == 0x7f {
                 return;
             }
@@ -3233,11 +3167,17 @@ pub unsafe fn tty_hyperlink(tty: *mut tty, gc: *const grid_cell, hl: *mut hyperl
 pub unsafe fn tty_attributes(
     tty: *mut tty,
     gc: *const grid_cell,
-    defaults: *const grid_cell,
-    palette: *const colour_palette,
-    hl: *mut hyperlinks,
+    mut style_ctx: *const tty_style_ctx,
 ) {
     unsafe {
+        // C tty.c:2626-2628: a NULL context means "no pane", which is the
+        // default cell with no palette and no dim.
+        if style_ctx.is_null() {
+            style_ctx = &raw const TTY_DEFAULT_STYLE_CTX;
+        }
+        let defaults = (*style_ctx).defaults;
+        let palette = (*style_ctx).palette;
+        let hl = (*style_ctx).hyperlinks;
         let tc = &raw mut (*tty).cell;
         let mut gc2: grid_cell = zeroed();
 
@@ -3249,6 +3189,42 @@ pub unsafe fn tty_attributes(
             }
             if gc2.bg == 8 {
                 gc2.bg = (*defaults).bg;
+            }
+            // C tty.c:2637-2643. tty_check_fg/_bg do this again further down;
+            // the C applies it in both places and colour_palette_get is
+            // idempotent, but it has to happen HERE too because the dim below
+            // and the last-cell comparison both read the resolved value.
+            if !palette.is_null() {
+                let changed = colour_palette_get(ptr_to_ref(palette), gc2.fg);
+                if changed != -1 {
+                    gc2.fg = changed;
+                }
+                let changed = colour_palette_get(ptr_to_ref(palette), gc2.bg);
+                if changed != -1 {
+                    gc2.bg = changed;
+                }
+            }
+        }
+        // C tty.c:2646-2648: resolve theme colours before dimming, because a
+        // theme colour has no RGB for colour_dim to scale and would pass through
+        // undimmed.
+        gc2.fg = tty_map_theme_colour(tty, gc2.fg);
+        gc2.bg = tty_map_theme_colour(tty, gc2.bg);
+        gc2.us = tty_map_theme_colour(tty, gc2.us);
+
+        // C tty.c:2649-2659: apply `dim=` from window-style / window-active-style.
+        // A default colour has nothing to scale, so it is replaced by the
+        // terminal's own fg/bg (or the theme's) first.
+        if (*style_ctx).dim != 0 {
+            gc2.fg = tty_dim_default_colour(tty, gc2.fg, 1);
+            gc2.bg = tty_dim_default_colour(tty, gc2.bg, 0);
+            let changed = colour_dim(gc2.fg, (*style_ctx).dim);
+            if changed != -1 {
+                gc2.fg = changed;
+            }
+            let changed = colour_dim(gc2.bg, (*style_ctx).dim);
+            if changed != -1 {
+                gc2.bg = changed;
             }
         }
 
@@ -3748,34 +3724,61 @@ pub unsafe fn tty_window_default_style(gc: *mut grid_cell, wp: *mut window_pane)
     }
 }
 
-/// C `vendor/tmux/tty.c:3144`: `void tty_default_colours(struct grid_cell *gc, struct window_pane *wp, u_int *dim)`
-pub unsafe fn tty_default_colours(gc: *mut grid_cell, wp: *mut window_pane) {
+/// Recompute a pane's cached style cells and dim percentages.
+/// C `vendor/tmux/tty.c:3120`: `static void tty_style_changed(struct window_pane *wp)`
+///
+/// Split out of `tty_default_colours` to match the C, because the dim values are
+/// produced here -- `style_add` returns the resolved style and `sy->dim` is what
+/// gets cached beside each cell.
+unsafe fn tty_style_changed(wp: *mut window_pane) {
     unsafe {
         let oo = (*wp).options;
 
+        log_debug!("%{}: style changed", (*wp).id);
+        (*wp).flags &= !window_pane_flags::PANE_STYLECHANGED;
+
+        let ft = format_create(
+            null_mut(),
+            null_mut(),
+            (FORMAT_PANE | (*wp).id) as i32,
+            format_flags::FORMAT_NOJOBS,
+        );
+        format_defaults(ft, null_mut(), None, None, NonNull::new(wp));
+
+        tty_window_default_style(&raw mut (*wp).cached_active_gc, wp);
+        let sy = style_add(
+            &raw mut (*wp).cached_active_gc,
+            oo,
+            c!("window-active-style"),
+            ft,
+        );
+        (*wp).cached_active_dim = (*sy).dim as u32;
+
+        tty_window_default_style(&raw mut (*wp).cached_gc, wp);
+        let sy = style_add(&raw mut (*wp).cached_gc, oo, c!("window-style"), ft);
+        (*wp).cached_dim = (*sy).dim as u32;
+
+        format_free(ft);
+    }
+}
+
+/// C `vendor/tmux/tty.c:3144`: `void tty_default_colours(struct grid_cell *gc, struct window_pane *wp, u_int *dim)`
+///
+/// `dim` may be null for callers that only want the colours.
+pub unsafe fn tty_default_colours(gc: *mut grid_cell, wp: *mut window_pane, dim: *mut u32) {
+    unsafe {
         memcpy__(gc, &raw const GRID_DEFAULT_CELL);
 
         if (*wp).flags.intersects(window_pane_flags::PANE_STYLECHANGED) {
-            // log_debug("%%%u: style changed", (*wp).id);
-            (*wp).flags &= !window_pane_flags::PANE_STYLECHANGED;
+            tty_style_changed(wp);
+        }
 
-            let ft = format_create(
-                null_mut(),
-                null_mut(),
-                (FORMAT_PANE | (*wp).id) as i32,
-                format_flags::FORMAT_NOJOBS,
-            );
-            format_defaults(ft, null_mut(), None, None, NonNull::new(wp));
-            tty_window_default_style(&raw mut (*wp).cached_active_gc, wp);
-            style_add(
-                &raw mut (*wp).cached_active_gc,
-                oo,
-                c!("window-active-style"),
-                ft,
-            );
-            tty_window_default_style(&raw mut (*wp).cached_gc, wp);
-            style_add(&raw mut (*wp).cached_gc, oo, c!("window-style"), ft);
-            format_free(ft);
+        if !dim.is_null() {
+            *dim = if wp == (*(*wp).window).active {
+                (*wp).cached_active_dim
+            } else {
+                (*wp).cached_dim
+            };
         }
 
         if (*gc).fg == 8 {
@@ -3799,16 +3802,14 @@ pub unsafe fn tty_default_colours(gc: *mut grid_cell, wp: *mut window_pane) {
 /// C `vendor/tmux/tty.c:3168`: `void tty_default_attributes(struct tty *tty, u_int bg, const struct tty_style_ctx *style_ctx)`
 pub unsafe fn tty_default_attributes(
     tty: *mut tty,
-    defaults: *const grid_cell,
-    palette: *const colour_palette,
     bg: u32,
-    hl: *mut hyperlinks,
+    style_ctx: *const tty_style_ctx,
 ) {
     unsafe {
         let mut gc: grid_cell = zeroed();
         memcpy__(&raw mut gc, &raw const GRID_DEFAULT_CELL);
         gc.bg = bg as i32;
-        tty_attributes(tty, &gc, defaults, palette, hl);
+        tty_attributes(tty, &gc, style_ctx);
     }
 }
 

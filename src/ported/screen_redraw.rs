@@ -972,22 +972,19 @@ unsafe fn redraw_draw_pane_span(
         let wp = (*span).data.p_wp;
         let s = (*wp).screen;
         let mut defaults: grid_cell = zeroed();
+        let mut style_ctx = tty_style_ctx::new();
 
-        tty_default_colours(&raw mut defaults, wp);
+        // C screen-redraw.c:1069-1072: the pane's dim comes out of
+        // tty_default_colours alongside its default cell, because both are
+        // resolved from window-style / window-active-style together.
+        tty_default_colours(&raw mut defaults, wp, &raw mut style_ctx.dim);
+        style_ctx.defaults = &raw const defaults;
+        style_ctx.palette = &raw const (*wp).palette;
+        style_ctx.hyperlinks = (*s).hyperlinks;
 
         let px = (*span).data.p_px + (x - (*span).x);
         let py = (*span).data.p_py;
-        tty_draw_line(
-            tty,
-            s,
-            px,
-            py,
-            n,
-            x,
-            y,
-            &raw const defaults,
-            &raw const (*wp).palette,
-        );
+        tty_draw_line(tty, s, px, py, n, x, y, &raw const style_ctx);
     }
 }
 
@@ -1148,7 +1145,7 @@ unsafe fn redraw_draw_border_span(
             tty_puts(tty, END_ISOLATE);
         }
         for _ in 0..n {
-            tty_cell(tty, &raw mut gc, &GRID_DEFAULT_CELL, null_mut(), null_mut());
+            tty_cell(tty, &raw mut gc, null());
         }
         if isolates {
             tty_puts(tty, START_ISOLATE);
@@ -1178,7 +1175,7 @@ unsafe fn redraw_draw_status_span(
             if n > sx - px {
                 n = sx - px;
             }
-            tty_draw_line(tty, s, px, 0, n, x, y, &GRID_DEFAULT_CELL, null_mut());
+            tty_draw_line(tty, s, px, 0, n, x, y, null());
         }
     }
 }
@@ -1246,7 +1243,7 @@ unsafe fn redraw_draw_scrollbar_span(
         slgc.fg = gc.bg;
         slgc.bg = gc.fg;
         let mut pad_gc: grid_cell = zeroed();
-        tty_default_colours(&raw mut pad_gc, wp);
+        tty_default_colours(&raw mut pad_gc, wp, null_mut());
 
         let sb_w = (*sb_style).width as u32;
         let sb_pad = (*sb_style).pad as u32;
@@ -1256,11 +1253,11 @@ unsafe fn redraw_draw_scrollbar_span(
         for i in 0..n {
             if (*span).data.sb_flags & REDRAW_SCROLLBAR_LEFT != 0 {
                 if off + i >= sb_w && off + i < sb_w + sb_pad {
-                    tty_cell(tty, &raw const pad_gc, &GRID_DEFAULT_CELL, null_mut(), null_mut());
+                    tty_cell(tty, &raw const pad_gc, null());
                     continue;
                 }
             } else if off + i < sb_pad {
-                tty_cell(tty, &raw const pad_gc, &GRID_DEFAULT_CELL, null_mut(), null_mut());
+                tty_cell(tty, &raw const pad_gc, null());
                 continue;
             }
 
@@ -1269,7 +1266,7 @@ unsafe fn redraw_draw_scrollbar_span(
             } else {
                 &raw const gc
             };
-            tty_cell(tty, gcp, &GRID_DEFAULT_CELL, null_mut(), null_mut());
+            tty_cell(tty, gcp, null());
         }
     }
 }
@@ -1439,9 +1436,8 @@ unsafe fn redraw_draw_pane_prompt(dctx: *mut redraw_draw_ctx, wp: *mut window_pa
             width as u32,
             px as u32,
             cy as u32,
-            &raw const GRID_DEFAULT_CELL,
-            null_mut(),
-        );
+            null(),
+            );
         screen_free(&raw mut screen);
     }
 }
@@ -1769,17 +1765,7 @@ unsafe fn redraw_draw(c: *mut client, wp: *mut window_pane, mut flags: i32) {
             };
             let sl = (*c).status.active;
             for i in 0..lines {
-                tty_draw_line(
-                    tty,
-                    sl,
-                    0,
-                    i,
-                    u32::MAX,
-                    0,
-                    y + i,
-                    &GRID_DEFAULT_CELL,
-                    null_mut(),
-                );
+                tty_draw_line(tty, sl, 0, i, u32::MAX, 0, y + i, null());
             }
         }
         if let Some(overlay_draw) = (*c).overlay_draw

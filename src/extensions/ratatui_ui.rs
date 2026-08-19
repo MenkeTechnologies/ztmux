@@ -382,13 +382,8 @@ unsafe fn blit_tty(tty: *mut tty, buf: &Buffer, px: u32, py: u32) {
                 (*gc).attr = map_modifier(st.add_modifier);
 
                 tty_cursor(tty, px + x as u32, py + y as u32);
-                tty_cell(
-                    tty,
-                    gc,
-                    &raw const GRID_DEFAULT_CELL,
-                    std::ptr::null(),
-                    std::ptr::null_mut(),
-                );
+                // No pane context: default cell, no palette, no dim.
+                tty_cell(tty, gc, std::ptr::null());
             }
         }
     }
@@ -1697,13 +1692,8 @@ unsafe fn blit_tty_frame(tty: *mut tty, buf: &Buffer, px: u32, py: u32) {
                 (*gc).bg = map_color(st.bg);
                 (*gc).attr = map_modifier(st.add_modifier);
                 tty_cursor(tty, px + x as u32, py + y as u32);
-                tty_cell(
-                    tty,
-                    gc,
-                    &raw const GRID_DEFAULT_CELL,
-                    std::ptr::null(),
-                    std::ptr::null_mut(),
-                );
+                // No pane context: default cell, no palette, no dim.
+                tty_cell(tty, gc, std::ptr::null());
             }
         }
     }

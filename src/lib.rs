@@ -1222,6 +1222,9 @@ const PANE_SCROLLBARS_CHARACTER: u8 = b' ';
 struct style {
     gc: grid_cell,
     ignore: i32,
+    /// C `vendor/tmux/tmux.h:990`: `dim=N`, a percentage in 0..=100 by which the
+    /// resolved fg and bg are darkened at draw time (`colour_dim`). 0 is undimmed.
+    dim: i32,
 
     fill: i32,
     align: style_align,
@@ -1895,6 +1898,11 @@ struct window_pane {
 
     cached_gc: grid_cell,
     cached_active_gc: grid_cell,
+    /// C `vendor/tmux/tmux.h:1332`: the `dim=` percentage from `window-style` and
+    /// `window-active-style`, cached alongside the cells they came from and
+    /// recomputed together in `tty_style_changed`.
+    cached_dim: u32,
+    cached_active_dim: u32,
     palette: colour_palette,
 
     /// The theme this pane last told its program about (`tmux.h:1335`), so a
@@ -2402,6 +2410,40 @@ const TTY_ALL_REQUEST_FLAGS: tty_flags = tty_flags::TTY_HAVEDA
     .union(tty_flags::TTY_HAVEDA2)
     .union(tty_flags::TTY_HAVEXDA);
 
+/// Terminal style context.
+///
+/// C `vendor/tmux/tmux.h:1686`: `struct tty_style_ctx`. Everything the tty layer
+/// needs to resolve a cell's colours: the defaults to substitute for colour 8,
+/// the pane palette, the dim percentage from `window-style`/`window-active-style`,
+/// and the hyperlink store the cell's link id indexes.
+///
+/// This port used to pass `defaults`, `palette` and `hyperlinks` as three separate
+/// parameters, which is why `dim` had nowhere to live and `dim=` was rejected.
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct tty_style_ctx {
+    defaults: *const grid_cell,
+    palette: *const colour_palette,
+    dim: u32,
+    hyperlinks: *mut hyperlinks,
+}
+
+// The raw pointers are read-only handles into long-lived server state; the tmux
+// server is single-threaded, and this matches how the codebase already declares
+// its other pointer-bearing statics (options_table_entry, tty_feature).
+unsafe impl Sync for tty_style_ctx {}
+
+impl tty_style_ctx {
+    const fn new() -> Self {
+        Self {
+            defaults: null(),
+            palette: null(),
+            dim: 0,
+            hyperlinks: null_mut(),
+        }
+    }
+}
+
 /// Client terminal.
 #[repr(C)]
 struct tty {
@@ -2525,7 +2567,7 @@ struct tty_ctx {
 
     // The default colours and palette.
     defaults: grid_cell,
-    palette: *const colour_palette,
+    style_ctx: tty_style_ctx,
 
     // Containing region (usually window) offset and size.
     bigger: i32,

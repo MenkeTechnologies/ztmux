@@ -246,7 +246,7 @@ pub unsafe fn popup_init_ctx_cb(ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx
         let pd = (*ctx).arg.cast::<popup_data>();
 
         memcpy__(&raw mut (*ttyctx).defaults, &raw const (*pd).defaults);
-        (*ttyctx).palette = &raw const (*pd).palette;
+        (*ttyctx).style_ctx.palette = &raw const (*pd).palette;
         (*ttyctx).redraw_cb = Some(popup_redraw_cb);
         (*ttyctx).set_client_cb = Some(popup_set_client_cb);
         (*ttyctx).arg = pd.cast();
@@ -411,18 +411,17 @@ pub unsafe fn popup_draw_cb(c: *mut client, data: *mut c_void, rctx: *mut screen
             (*c).overlay_data = null_mut();
         }
 
+        // C popup.c:314-318: a popup has no pane, so it is never dimmed, but it
+        // does carry its own palette and the hyperlink store of the screen being
+        // drawn.
+        let mut style_ctx = tty_style_ctx::new();
+        style_ctx.defaults = defaults;
+        style_ctx.palette = palette;
+        style_ctx.dim = 0;
+        style_ctx.hyperlinks = s.hyperlinks;
+
         for i in 0..(*pd).sy {
-            tty_draw_line(
-                tty,
-                &raw mut s,
-                0,
-                i,
-                (*pd).sx,
-                px,
-                py + i,
-                defaults,
-                palette,
-            );
+            tty_draw_line(tty, &raw mut s, 0, i, (*pd).sx, px, py + i, &raw const style_ctx);
         }
 
         screen_free(&raw mut s);

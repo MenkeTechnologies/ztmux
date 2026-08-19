@@ -3101,7 +3101,7 @@ unsafe fn input_osc_10(ictx: *mut input_ctx, p: *const u8) {
             }
             c = input_get_fg_control_client(wp);
             if c == -1 {
-                tty_default_colours(&raw mut defaults, wp);
+                tty_default_colours(&raw mut defaults, wp, null_mut());
                 if COLOUR_DEFAULT(defaults.fg) {
                     c = input_get_fg_client(wp);
                 } else {
@@ -3162,7 +3162,7 @@ unsafe fn input_osc_11(ictx: *mut input_ctx, p: *const u8) {
             }
             c = input_get_bg_control_client(wp);
             if c == -1 {
-                tty_default_colours(&raw mut defaults, wp);
+                tty_default_colours(&raw mut defaults, wp, null_mut());
                 if COLOUR_DEFAULT(defaults.bg) {
                     c = input_get_bg_client(wp);
                 } else {

@@ -25,8 +25,9 @@
 //! one of them splits the range with `tty_check_overlay_range` first, so this
 //! function never consults the overlay itself.
 //!
-//! ztmux passes `defaults`/`palette` where the C passes a `struct
-//! tty_style_ctx`; the fields carried are the same.
+//! This used to take `defaults`/`palette` where the C passes a `struct
+//! tty_style_ctx`. It takes the struct now -- the split parameters had no room
+//! for the `dim` field, which is why `dim=` in a style was unimplementable.
 
 use crate::*;
 
@@ -144,10 +145,23 @@ pub unsafe fn tty_draw_line(
     mut nx: u32,
     mut atx: u32,
     aty: u32,
-    defaults: *const grid_cell,
-    palette: *const colour_palette,
+    mut style_ctx: *const tty_style_ctx,
 ) {
     unsafe {
+        // C tty-draw.c:130-136: a NULL context means "no pane" -- the default
+        // cell, no palette, no dim -- but it still carries THIS screen's
+        // hyperlink store, because the ids in its cells index that store.
+        let default_style_ctx = tty_style_ctx {
+            defaults: &raw const GRID_DEFAULT_CELL,
+            palette: null(),
+            dim: 0,
+            hyperlinks: (*s).hyperlinks,
+        };
+        if style_ctx.is_null() {
+            style_ctx = &raw const default_style_ctx;
+        }
+        let defaults = (*style_ctx).defaults;
+
         let gd = (*s).grid;
         let mut gc: grid_cell = zeroed();
         let mut ngc: grid_cell = zeroed();
@@ -155,7 +169,6 @@ pub unsafe fn tty_draw_line(
         let mut gcp: *const grid_cell;
         const SIZEOF_BUF: usize = 1000;
         let mut buf = [0u8; SIZEOF_BUF];
-        let hl = (*s).hyperlinks;
 
         // py is the line in the screen to draw. px is the start x and nx is
         // the width to draw. atx,aty is the line on the terminal to draw it.
@@ -190,7 +203,7 @@ pub unsafe fn tty_draw_line(
         // Start with the default cell as the last cell.
         memcpy__(&raw mut last, &raw const GRID_DEFAULT_CELL);
         last.bg = (*defaults).bg;
-        tty_default_attributes(tty, defaults, palette, 8, hl);
+        tty_default_attributes(tty, 8, style_ctx);
 
         'out: {
             // If there is padding at the start, we must have truncated a wide
@@ -227,7 +240,7 @@ pub unsafe fn tty_draw_line(
                     }
                     bg
                 };
-                tty_attributes(tty, &raw const last, defaults, palette, hl);
+                tty_attributes(tty, &raw const last, style_ctx);
                 tty_draw_line_clear(tty, atx, aty, cx, defaults, bg as u32, 0);
                 if cx == ex {
                     break 'out;
@@ -314,7 +327,7 @@ pub unsafe fn tty_draw_line(
                 // If the state has changed, flush any collected data.
                 if next_state != current_state {
                     if current_state == tty_draw_line_state::TTY_DRAW_LINE_EMPTY {
-                        tty_attributes(tty, &raw const last, defaults, palette, hl);
+                        tty_attributes(tty, &raw const last, style_ctx);
                         tty_draw_line_clear(
                             tty,
                             atx + last_i,
@@ -326,7 +339,7 @@ pub unsafe fn tty_draw_line(
                         );
                         wrapped = 0;
                     } else if next_state != tty_draw_line_state::TTY_DRAW_LINE_SAME && len != 0 {
-                        tty_attributes(tty, &raw const last, defaults, palette, hl);
+                        tty_attributes(tty, &raw const last, style_ctx);
                         if atx + i - width != 0 || wrapped == 0 {
                             tty_cursor(tty, atx + i - width, aty);
                         }

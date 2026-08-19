@@ -199,6 +199,30 @@ pub fn colour_force_rgb(c: i32) -> i32 {
     }
 }
 
+/// Dim a colour by a percentage.
+/// C `vendor/tmux/colour.c:204`: `int colour_dim(int c, u_int dim)`
+///
+/// A default colour has no RGB to scale and a theme colour is resolved later, so
+/// both pass through untouched; the caller substitutes a concrete colour for the
+/// default first (`tty_dim_default_colour`).
+pub fn colour_dim(c: i32, dim: u32) -> i32 {
+    if dim == 0 || COLOUR_DEFAULT(c) || c & COLOUR_FLAG_THEME != 0 {
+        return c;
+    }
+    if dim >= 100 {
+        return colour_join_rgb(0, 0, 0);
+    }
+
+    let c = colour_force_rgb(c);
+    if c == -1 {
+        return -1;
+    }
+    let (r, g, b) = colour_split_rgb(c);
+
+    let scale = |v: u8| ((v as u32 * (100 - dim)) / 100) as u8;
+    colour_join_rgb(scale(r), scale(g), scale(b))
+}
+
 /// Convert colour to a string.
 /// C `vendor/tmux/colour.c:226`: `const char *colour_tostring(int c)`
 pub fn colour_tostring(c: i32) -> Cow<'static, str> {
@@ -1307,6 +1331,37 @@ pub unsafe fn colour_parse_x11(mut p: *const u8) -> i32 {
 
 #[cfg(test)]
 mod tests {
+
+    // C colour.c:204 colour_dim: scale each RGB channel by (100 - dim)%.
+    // A default colour has no RGB to scale and a theme colour is resolved later,
+    // so both pass through -- which is why tty_attributes maps theme colours and
+    // substitutes a concrete colour for the default BEFORE calling this.
+    #[test]
+    fn colour_dim_scales_rgb_and_passes_through_what_it_cannot() {
+        // dim=0 is a no-op whatever the colour.
+        assert_eq!(colour_dim(colour_join_rgb(200, 100, 50), 0), colour_join_rgb(200, 100, 50));
+
+        // 50% halves every channel (integer division, as the C does).
+        assert_eq!(colour_dim(colour_join_rgb(200, 100, 51), 50), colour_join_rgb(100, 50, 25));
+
+        // 100% and above collapse to black without touching the channels.
+        assert_eq!(colour_dim(colour_join_rgb(200, 100, 50), 100), colour_join_rgb(0, 0, 0));
+        assert_eq!(colour_dim(colour_join_rgb(200, 100, 50), 250), colour_join_rgb(0, 0, 0));
+
+        // A default colour is returned unchanged: there is nothing to scale.
+        assert_eq!(colour_dim(8, 50), 8);
+        assert_eq!(colour_dim(-1, 50), -1);
+
+        // So is a theme colour, which is only resolved to RGB later.
+        let theme = 6 | COLOUR_FLAG_THEME;
+        assert_eq!(colour_dim(theme, 50), theme);
+
+        // A palette colour is forced to RGB first, so it does dim.
+        let dimmed = colour_dim(1, 50);
+        assert_ne!(dimmed, 1);
+        assert_ne!(dimmed, -1);
+        assert_eq!(dimmed & COLOUR_FLAG_RGB, COLOUR_FLAG_RGB);
+    }
     use super::*;
 
     #[test]

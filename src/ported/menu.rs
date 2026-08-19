@@ -304,8 +304,7 @@ pub unsafe fn menu_draw_cb(c: *mut client, data: *mut c_void, _rctx: *mut screen
                 (*menu).width + 4,
                 px,
                 py + i,
-                &raw const GRID_DEFAULT_CELL,
-                null_mut(),
+                null(),
             );
         }
     }

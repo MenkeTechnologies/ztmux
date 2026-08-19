@@ -1297,7 +1297,7 @@ pub unsafe fn format_cb_pane_fg(ft: *mut format_tree) -> format_table_type {
             return format_table_type::None;
         }
 
-        tty_default_colours(gc.as_mut_ptr(), wp);
+        tty_default_colours(gc.as_mut_ptr(), wp, null_mut());
 
         colour_tostring((*gc.as_ptr()).fg).into()
     }
@@ -1314,7 +1314,7 @@ pub unsafe fn format_cb_pane_bg(ft: *mut format_tree) -> format_table_type {
             return format_table_type::None;
         }
 
-        tty_default_colours(gc.as_mut_ptr(), wp);
+        tty_default_colours(gc.as_mut_ptr(), wp, null_mut());
 
         colour_tostring((*gc.as_ptr()).bg).into()
     }

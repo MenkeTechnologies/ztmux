@@ -529,22 +529,33 @@ unsafe fn screen_write_initctx(ctx: *mut screen_write_ctx, ttyctx: *mut tty_ctx,
         (*ttyctx).orlower = (*s).rlower;
         (*ttyctx).orupper = (*s).rupper;
 
+        // C screen-write.c:282-284: the context's `defaults` pointer aims at the
+        // cell stored beside it, and the hyperlink store is this screen's.
         memcpy__(&raw mut (*ttyctx).defaults, &raw const GRID_DEFAULT_CELL);
+        (*ttyctx).style_ctx.defaults = &raw const (*ttyctx).defaults;
+        (*ttyctx).style_ctx.hyperlinks = (*(*ctx).s).hyperlinks;
+
         if let Some(init_ctx_cb) = (*ctx).init_ctx_cb {
             init_ctx_cb(ctx, ttyctx);
-            if !(*ttyctx).palette.is_null() {
+            if !(*ttyctx).style_ctx.palette.is_null() {
+                let palette = (*ttyctx).style_ctx.palette;
                 if (*ttyctx).defaults.fg == 8 {
-                    (*ttyctx).defaults.fg = (*(*ttyctx).palette).fg;
+                    (*ttyctx).defaults.fg = (*palette).fg;
                 }
                 if (*ttyctx).defaults.bg == 8 {
-                    (*ttyctx).defaults.bg = (*(*ttyctx).palette).bg;
+                    (*ttyctx).defaults.bg = (*palette).bg;
                 }
             }
         } else {
             (*ttyctx).redraw_cb = Some(screen_write_redraw_cb);
             if !(*ctx).wp.is_null() {
-                tty_default_colours(&raw mut (*ttyctx).defaults, (*ctx).wp);
-                (*ttyctx).palette = &raw mut (*(*ctx).wp).palette;
+                // The pane's dim rides along with its default colours.
+                tty_default_colours(
+                    &raw mut (*ttyctx).defaults,
+                    (*ctx).wp,
+                    &raw mut (*ttyctx).style_ctx.dim,
+                );
+                (*ttyctx).style_ctx.palette = &raw mut (*(*ctx).wp).palette;
                 (*ttyctx).set_client_cb = Some(screen_write_set_client_cb);
                 (*ttyctx).arg = (*ctx).wp.cast();
             }

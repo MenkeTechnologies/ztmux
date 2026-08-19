@@ -149,10 +149,8 @@ unsafe fn cmd_display_panes_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
                 tty_attributes(
                     tty,
                     &raw mut fgc,
-                    &raw const GRID_DEFAULT_CELL,
-                    null_mut(),
-                    null_mut(),
-                );
+                    null(),
+            );
                 #[expect(clippy::int_plus_one)]
                 if (sx as usize) >= len + llen + 1 {
                     len += llen + 1;
@@ -173,9 +171,7 @@ unsafe fn cmd_display_panes_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
             tty_attributes(
                 tty,
                 &raw mut bgc,
-                &raw const GRID_DEFAULT_CELL,
-                null_mut(),
-                null_mut(),
+                null(),
             );
             let mut ptr = &raw mut buf as *mut u8;
             while *ptr != b'\0' {
@@ -205,9 +201,7 @@ unsafe fn cmd_display_panes_draw_pane(ctx: *mut screen_redraw_ctx, wp: *mut wind
             tty_attributes(
                 tty,
                 &raw mut fgc,
-                &raw const GRID_DEFAULT_CELL,
-                null_mut(),
-                null_mut(),
+                null(),
             );
             if rlen != 0 && sx as usize >= rlen {
                 tty_cursor(tty, xoff + sx - rlen as u32, yoff);
