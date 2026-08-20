@@ -120,6 +120,51 @@ both binaries, zero divergences.
   distinguishes the two binaries on this, so it is filed as unported surface
   rather than as a reproduced defect.
 
+## 2026-08-20 (n-ary boolean operators)
+
+### `||` and `&&` were binary, so the mouse wheel stopped opening copy mode
+
+- **Symptom:** wheel-up in an ordinary pane did nothing — copy mode never
+  opened and the scrollback never moved.
+- **Root cause:** `format_replace` grouped `||` and `&&` with the comparison
+  modifiers and evaluated them through `format_choose(es, copy, &left, &right,
+  1)`, which splits at the FIRST top-level comma. The C has them as n-ary
+  operators — `format_bool_op_n` (`format.c:4686`) walks every comma-separated
+  operand and short-circuits. So `#{||:0,0,0}` split into `0` and `0,0`, and
+  `format_true("0,0")` is true because the string is neither empty nor `"0"`, so
+  the whole expression came out `1`. Measured before the fix:
+  `display-message -p '#{||:0,0,0}'` printed `1` under the port and `0` under
+  both `vendor/tmux` (next-3.7) and the system tmux 3.7b.
+- **Why that reached the wheel:** the default binding is
+  `bind -n WheelUpPane { if -F '#{||:#{alternate_on},#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -e } }`
+  (`key-bindings.c:457`). In a plain shell pane all three operands are `0`, so
+  the condition is false and the else branch opens copy mode. Read as two
+  operands it was unconditionally true, so every wheel event took `send -M` and
+  was forwarded to a pane that had never asked for the mouse — which drops it.
+- **When it broke:** `31ec4f7cf8` (2026-08-10) brought that binding to
+  upstream's three-operand form. The port's binding had been the older
+  two-operand text, which the binary reading happened to evaluate correctly, so
+  the defect was latent until the binding itself became faithful.
+- **Fix:** `format_bool_op_n` ported as the C has it, `||` and `&&` moved out of
+  the `cmp` group into `bool_op_n` (`format.c:5414-5417`), and dispatched
+  between the `!!` branch and the comparison branch where the C dispatches them
+  (`format.c:5572-5577`). The `||`/`&&` arms in the comparison chain are gone;
+  the C has none. Short-circuiting comes with it — `&&` stops at the first false
+  operand, `||` at the first true one, so `#{&&:0,#{e|/|:1,0}}` never expands the
+  division, matching the reference.
+- **Why the suite missed it:** all sixteen existing `||` cases used exactly two
+  operands, where the binary reading and the n-ary one agree.
+- **Blast radius beyond the wheel:** every other `||`/`&&` in the default
+  bindings and options table is two-operand, so `WheelUpPane` was the only
+  default site affected. Any user format with three or more operands was wrong
+  the same way.
+- **Pinned by:** parity cases 1557-1561 (the operator itself, including nested
+  operands whose commas must not split the list) and 1562 (the wheel condition,
+  in and out of copy mode), plus the unit test
+  `test_format_expand_boolean_operators_are_n_ary`. Cases 1557, 1560, 1561 and
+  1562 were checked against a rebuild WITHOUT the fix and fail there; 1558 and
+  1559 pin the true path, which both readings get right.
+
 ## 2026-08-18 (tty_style_ctx, and the last style directive)
 
 ### `dim=` was rejected, because the port had nowhere to put it

@@ -4736,6 +4736,54 @@ pub unsafe fn format_search(
     }
 }
 
+/// Handle n-ary boolean operators, "&&" and "||".
+/// C `vendor/tmux/format.c:4686`: `static char *format_bool_op_n(struct format_expand_state *es, const char *fmt, int and)`
+unsafe fn format_bool_op_n(es: *mut format_expand_state, fmt: *const u8, and: c_int) -> *mut u8 {
+    unsafe {
+        let __func__: *const u8 = c!("format_bool_op_n");
+
+        let mut result = and != 0;
+        let mut cp1: *const u8 = fmt;
+
+        while if and != 0 { result } else { !result } {
+            let cp2 = format_skip1(es, cp1, c!(","));
+
+            let raw = if cp2.is_null() {
+                xstrdup(cp1).as_ptr()
+            } else {
+                xstrndup(cp1, cp2.offset_from(cp1) as usize).as_ptr()
+            };
+            let expanded = format_expand1(es, raw);
+            free_(raw);
+            format_log1!(
+                es,
+                __func__,
+                "operator {} has operand: {}",
+                if and != 0 { "&&" } else { "||" },
+                _s(expanded),
+            );
+
+            if and != 0 {
+                result = result && format_true(expanded);
+            } else {
+                result = result || format_true(expanded);
+            }
+            free_(expanded);
+
+            if cp2.is_null() {
+                break;
+            }
+            cp1 = cp2.add(1);
+        }
+
+        if result {
+            xstrdup(c!("1")).as_ptr()
+        } else {
+            xstrdup(c!("0")).as_ptr()
+        }
+    }
+}
+
 /// C `vendor/tmux/format.c:4724`: `static char *format_session_name(struct format_expand_state *es, const char *fmt)`
 pub unsafe fn format_session_name(es: *mut format_expand_state, fmt: *const u8) -> *mut u8 {
     unsafe {
@@ -5255,6 +5303,7 @@ pub unsafe fn format_replace(
 
         let list: *mut format_modifier;
         let mut cmp: *mut format_modifier = null_mut();
+        let mut bool_op_n: *mut format_modifier = null_mut();
         let mut search: *mut format_modifier = null_mut();
 
         let mut sub: *mut *mut format_modifier = null_mut();
@@ -5442,12 +5491,15 @@ pub unsafe fn format_replace(
                             }
                             _ => (),
                         }
+                    } else if (*fm).size == 2
+                        && (streq_((*fm).modifier.as_ptr(), "||")
+                            || streq_((*fm).modifier.as_ptr(), "&&"))
+                    {
+                        bool_op_n = fm;
                     } else if (*fm).size == 2 && streq_((*fm).modifier.as_ptr(), "!!") {
                         modifiers |= format_modifiers::FORMAT_NOT_NOT;
                     } else if (*fm).size == 2
-                        && (streq_((*fm).modifier.as_ptr(), "||")
-                            || streq_((*fm).modifier.as_ptr(), "&&")
-                            || streq_((*fm).modifier.as_ptr(), "==")
+                        && (streq_((*fm).modifier.as_ptr(), "==")
                             || streq_((*fm).modifier.as_ptr(), "!=")
                             || streq_((*fm).modifier.as_ptr(), ">=")
                             || streq_((*fm).modifier.as_ptr(), "<="))
@@ -5615,6 +5667,13 @@ pub unsafe fn format_replace(
                     };
                     format_log1!(es, __func__, "not-not of '{}' is: {}", _s(new), _s(value));
                     free_(new);
+                } else if !bool_op_n.is_null() {
+                    // n-ary boolean operator.
+                    if streq_((*bool_op_n).modifier.as_ptr(), "||") {
+                        value = format_bool_op_n(es, copy, 0);
+                    } else if streq_((*bool_op_n).modifier.as_ptr(), "&&") {
+                        value = format_bool_op_n(es, copy, 1);
+                    }
                 } else if !cmp.is_null() {
                     // Comparison of left and right.
                     if format_choose(es, copy, &raw mut left, &raw mut right, 1) != 0 {
@@ -5642,19 +5701,7 @@ pub unsafe fn format_replace(
                         _s(right),
                     );
 
-                    if streq_((*cmp).modifier.as_ptr(), "||") {
-                        if format_true(left) || format_true(right) {
-                            value = xstrdup(c!("1")).as_ptr();
-                        } else {
-                            value = xstrdup(c!("0")).as_ptr();
-                        }
-                    } else if streq_((*cmp).modifier.as_ptr(), "&&") {
-                        if format_true(left) && format_true(right) {
-                            value = xstrdup(c!("1")).as_ptr();
-                        } else {
-                            value = xstrdup(c!("0")).as_ptr();
-                        }
-                    } else if streq_((*cmp).modifier.as_ptr(), "==") {
+                    if streq_((*cmp).modifier.as_ptr(), "==") {
                         if strcmp(left, right) == 0 {
                             value = xstrdup(c!("1")).as_ptr();
                         } else {
@@ -7412,6 +7459,36 @@ mod tests {
             assert_eq!(
                 take(format_expand(ft, crate::c!("#{s/a/b/:#{l:banana}}"))),
                 b"bbnbnb"
+            );
+            format_free(ft);
+        }
+    }
+
+    // format_expand: "||" and "&&" are n-ary, not binary (format.c:4686
+    // format_bool_op_n walks every comma-separated operand). Read as a binary
+    // operator, `#{||:0,0,0}` splits once and finds "0,0" on the right, which is
+    // non-empty and so true -- the exact misread that made the default
+    // WheelUpPane binding take `send -M` instead of opening copy mode.
+    #[test]
+    fn test_format_expand_boolean_operators_are_n_ary() {
+        unsafe {
+            let ft = format_create(null_mut(), null_mut(), 0, format_flags::empty());
+            assert_eq!(take(format_expand(ft, crate::c!("#{||:0,0,0}"))), b"0");
+            assert_eq!(take(format_expand(ft, crate::c!("#{||:0,0,1}"))), b"1");
+            assert_eq!(take(format_expand(ft, crate::c!("#{&&:1,1,1}"))), b"1");
+            assert_eq!(take(format_expand(ft, crate::c!("#{&&:1,0,1}"))), b"0");
+            // Two operands still behave as they did.
+            assert_eq!(take(format_expand(ft, crate::c!("#{||:0,0}"))), b"0");
+            assert_eq!(take(format_expand(ft, crate::c!("#{&&:1,0}"))), b"0");
+            // A single operand is just its own truth value.
+            assert_eq!(take(format_expand(ft, crate::c!("#{||:0}"))), b"0");
+            assert_eq!(take(format_expand(ft, crate::c!("#{&&:x}"))), b"1");
+            // Nested operands: format_skip1 counts brackets, so a comma inside
+            // #{...} does not split the operand list.
+            assert_eq!(take(format_expand(ft, crate::c!("#{||:#{==:a,b},0,0}"))), b"0");
+            assert_eq!(
+                take(format_expand(ft, crate::c!("#{&&:#{==:a,a},0,#{==:a,a}}"))),
+                b"0"
             );
             format_free(ft);
         }
