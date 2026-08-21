@@ -53,6 +53,17 @@ unsafe fn cmd_switch_client_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
         let wp = target.wp;
 
         if args_has(args, 'r') {
+            // Toggling read-only OFF is a privilege escalation for a read-only
+            // client, so the server's own user has to be the one asking
+            // (C `cmd-switch-client.c:83-89`). Note the C tests the READ-ONLY
+            // flag on the TARGET client but the uid of the CALLING one.
+            if (*tc).flags.intersects(client_flag::READONLY) {
+                let uid = proc_get_peer_uid((*cmdq_get_client(item)).peer);
+                if uid != libc::getuid() {
+                    cmdq_error!(item, "client is read-only");
+                    return cmd_retval::CMD_RETURN_ERROR;
+                }
+            }
             if (*tc).flags.intersects(client_flag::READONLY) {
                 (*tc).flags &= !(client_flag::READONLY | client_flag::IGNORESIZE);
             } else {

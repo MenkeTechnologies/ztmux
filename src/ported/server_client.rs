@@ -333,6 +333,7 @@ pub unsafe fn server_client_create(fd: i32) -> *mut client {
         (*c).queue = cmdq_new().as_ptr();
         rb_init(&raw mut (*c).windows);
         rb_init(&raw mut (*c).files);
+        tailq_init(&raw mut (*c).input_requests);
 
         (*c).tty.sx = 80;
         (*c).tty.sy = 24;
@@ -519,6 +520,7 @@ pub unsafe fn server_client_lost(c: *mut client) {
         tty_term_free_list((*c).term_caps, (*c).term_ncaps);
 
         status_free(c);
+        input_cancel_requests(c);
 
         redraw_free_scene((*c).redraw_scene);
         (*c).redraw_scene = null_mut();
@@ -3427,6 +3429,11 @@ unsafe fn server_client_report_theme(c: *mut client, theme: client_theme) {
             }
             server_redraw_client(c);
         }
+
+        // Ask for the foreground and background colours again. Forced, because
+        // the theme just changed and 2031 is not forwarded to panes until the
+        // reply lands (C `server-client.c:3106-3110`).
+        tty_repeat_requests(&raw mut (*c).tty, 1);
     }
 }
 
@@ -4343,7 +4350,7 @@ pub unsafe fn server_client_dispatch(imsg: *mut imsg, arg: *mut c_void) {
                 if !(*c).flags.intersects(client_flag::CONTROL) {
                     server_client_update_latest(c);
                     tty_resize(&raw mut (*c).tty);
-                    tty_repeat_requests(&raw mut (*c).tty);
+                    tty_repeat_requests(&raw mut (*c).tty, 0);
                     recalculate_sizes();
                     if let Some(overlay_resize) = (*c).overlay_resize {
                         overlay_resize(c, (*c).overlay_data);

@@ -18,7 +18,7 @@ pub static CMD_REFRESH_CLIENT_ENTRY: cmd_entry = cmd_entry {
     name: "refresh-client",
     alias: Some("refresh"),
 
-    args: args_parse::new("A:B:cC:Df:r:F:l::LRSt:U", 0, 1, None),
+    args: args_parse::new("A:B:cC:Df:r:F:lLRSt:U", 0, 1, None),
     usage: "[-cDlLRSU] [-A pane:state] [-B name:what:format] [-C XxY] [-f flags] [-r pane:report] [-t target-client] [adjustment]",
 
     flags: cmd_flag::CMD_AFTERHOOK.union(cmd_flag::CMD_CLIENT_TFLAG),
@@ -191,52 +191,6 @@ pub unsafe fn cmd_refresh_client_update_offset(tc: *mut client, value: *const u8
     }
 }
 
-pub unsafe fn cmd_refresh_client_clipboard(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
-    unsafe {
-        let args = cmd_get_args(self_);
-        let tc = cmdq_get_target_client(item);
-        let mut fs: cmd_find_state = zeroed();
-        // const char *p;
-        // u_int i;
-        // struct cmd_find_state fs;
-
-        let p = args_get_(args, 'l');
-        if p.is_null() {
-            if (*tc).flags.intersects(client_flag::CLIPBOARDBUFFER) {
-                return cmd_retval::CMD_RETURN_NORMAL;
-            }
-            (*tc).flags |= client_flag::CLIPBOARDBUFFER;
-        } else {
-            if cmd_find_target(
-                &raw mut fs,
-                item,
-                cstr_to_str_(p),
-                cmd_find_type::CMD_FIND_PANE,
-                cmd_find_flags::empty(),
-            ) != 0
-            {
-                return cmd_retval::CMD_RETURN_ERROR;
-            }
-            let mut i = 0;
-            for j in 0..(*tc).clipboard_npanes {
-                i = j;
-                if *(*tc).clipboard_panes.add(i as usize) == (*fs.wp).id {
-                    break;
-                }
-            }
-            if i != (*tc).clipboard_npanes {
-                return cmd_retval::CMD_RETURN_NORMAL;
-            }
-            (*tc).clipboard_panes =
-                xreallocarray_((*tc).clipboard_panes, (*tc).clipboard_npanes as usize + 1).as_ptr();
-            *(*tc).clipboard_panes.add((*tc).clipboard_npanes as usize) = (*fs.wp).id;
-            (*tc).clipboard_npanes += 1;
-        }
-        tty_clipboard_query(&raw mut (*tc).tty);
-    }
-    cmd_retval::CMD_RETURN_NORMAL
-}
-
 /// C `vendor/tmux/cmd-refresh-client.c:167`: `static void cmd_refresh_report(struct tty *tty, const char *value)`
 pub unsafe fn cmd_refresh_report(tty: *mut tty, value: *const u8) {
     unsafe {
@@ -342,7 +296,11 @@ pub unsafe fn cmd_refresh_client_exec(self_: *mut cmd, item: *mut cmdq_item) -> 
             }
 
             if args_has(args, 'l') {
-                return cmd_refresh_client_clipboard(self_, item);
+                // C `cmd-refresh-client.c:262-265`: ask the terminal for the
+                // clipboard. The answer comes back through the input request
+                // queue, not through a pane list registered here.
+                tty_clipboard_query(&raw mut (*tc).tty);
+                return cmd_retval::CMD_RETURN_NORMAL;
             }
 
             if args_has(args, 'F') {

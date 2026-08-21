@@ -422,6 +422,7 @@ const unsafe fn ptr_to_mut_ref<'a, T>(value: *mut T) -> Option<&'a mut T> {
 struct discr_all_entry;
 struct discr_by_uri_entry;
 struct discr_by_inner_entry;
+struct discr_centry;
 struct discr_entry;
 struct discr_name_entry;
 struct discr_pending_entry;
@@ -2404,6 +2405,12 @@ bitflags::bitflags! {
         const TTY_HAVEXDA = 0x200;
         const TTY_SYNCING = 0x400;
         const TTY_HAVEDA2 = 0x800; // Secondary DA.
+        // 0x1000 is the C's TTY_WINSIZEQUERY, not ported (see docs/BUGS.md).
+        /// Waiting for the OSC 10 foreground reply.
+        const TTY_WAITFG = 0x2000;
+        /// Waiting for the OSC 11 background reply.
+        const TTY_WAITBG = 0x4000;
+        // 0x8000 is the C's TTY_BRACKETPASTE, not ported (see docs/BUGS.md).
     }
 }
 const TTY_ALL_REQUEST_FLAGS: tty_flags = tty_flags::TTY_HAVEDA
@@ -3062,7 +3069,6 @@ bitflags::bitflags! {
         const CONTROL_PAUSEAFTER = 0x0100000000u64;
         const CONTROL_WAITEXIT   = 0x0200000000u64;
         const WINDOWSIZECHANGED  = 0x0400000000u64;
-        const CLIPBOARDBUFFER    = 0x0800000000u64;
         const BRACKETPASTING     = 0x1000000000u64;
     }
 }
@@ -3256,6 +3262,13 @@ struct client {
 
     files: client_files,
 
+    /// C `tmux.h:2207`: requests this client owes a pane an answer to.
+    input_requests: input_requests,
+
+    /// Vestigial in next-3.7 exactly as here: declared (`tmux.h:2311`) and
+    /// freed on client loss (`server-client.c:475`), read by nothing. The
+    /// pre-next-3.7 `refresh-client -l` registered panes here; the input
+    /// request queue replaced that.
     clipboard_panes: *mut c_uint,
     clipboard_npanes: c_uint,
 

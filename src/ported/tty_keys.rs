@@ -1149,6 +1149,18 @@ pub unsafe fn tty_keys_next(tty: *mut tty) -> i32 {
                                 _ => (),
                             }
 
+                            // Is this a palette response?
+                            match tty_keys_palette(tty, buf.cast(), len, &raw mut size) {
+                                0 => {
+                                    // yes
+                                    key = KEYC_UNKNOWN;
+                                    break 'complete_key;
+                                }
+                                -1 => (), // no, or not valid
+                                1 => break 'partial_key,
+                                _ => (),
+                            }
+
                             // Is this a mouse key press?
                             #[expect(unused_assignments)]
                             match tty_keys_mouse(tty, buf.cast(), len, &raw mut size, &raw mut m) {
@@ -1287,6 +1299,21 @@ pub unsafe fn tty_keys_next(tty: *mut tty) -> i32 {
                     let mut delay = options_get_number___(&*GLOBAL_OPTIONS, "escape-time");
                     if delay == 0 {
                         delay = 1;
+                    }
+                    // C `tty-keys.c:979-985`: while a colour query is
+                    // outstanding, a device-attributes reply is still missing,
+                    // or a pane is waiting on a request, give the terminal time
+                    // to answer rather than reading the reply as keys.
+                    if (*tty)
+                        .flags
+                        .intersects(tty_flags::TTY_WAITFG | tty_flags::TTY_WAITBG)
+                        || !(*tty).flags.contains(TTY_ALL_REQUEST_FLAGS)
+                        || !tailq_empty(&raw const (*c).input_requests)
+                    {
+                        log_debug!("{}: increasing delay (active query)", _s((*c).name));
+                        if delay < 500 {
+                            delay = 500;
+                        }
                     }
                     tv.tv_sec = delay / 1000;
                     tv.tv_usec = ((delay % 1000) * 1000) as libc::suseconds_t;
@@ -1712,7 +1739,6 @@ unsafe fn tty_keys_clipboard(
 ) -> i32 {
     unsafe {
         let c = (*tty).client;
-        let mut wp: *mut window_pane;
         let mut end: usize;
         let mut terminator: usize = 0;
 
@@ -1775,7 +1801,15 @@ unsafe fn tty_keys_clipboard(
         // Adjust end so that it points to the start of the terminator.
         end -= terminator - 1;
 
-        // Get the second argument.
+        // Save which clipboard was used from the second argument. If more than
+        // one is specified (should not happen), ignore the argument.
+        // C `tty-keys.c:1383-1388`.
+        let mut clip: u8 = 0;
+        if end >= 2 && *buf != b';' && *buf.add(1) == b';' {
+            clip = *buf;
+        }
+
+        // Skip the second argument.
         while end != 0 && *buf != b';' {
             buf = buf.add(1);
             end -= 1;
@@ -1800,7 +1834,7 @@ unsafe fn tty_keys_clipboard(
 
         // Convert from base64.
         let needed: usize = (end / 4) * 3;
-        let out: *mut u8 = xmalloc(needed).as_ptr().cast();
+        let mut out: *mut u8 = xmalloc(needed).as_ptr().cast();
         let outlen: i32 = b64_pton(copy, out.cast(), len);
         if outlen == -1 {
             free_(out);
@@ -1809,24 +1843,30 @@ unsafe fn tty_keys_clipboard(
         }
         free_(copy);
 
-        // Create a new paste buffer and forward to panes.
-        // log_debug( c!("%s: %.*s\0"), __func__, outlen, out);
-        if (*c).flags.intersects(client_flag::CLIPBOARDBUFFER) {
-            paste_add(null_mut(), out, outlen as usize);
-            (*c).flags &= !client_flag::CLIPBOARDBUFFER;
-        }
-        let mut i: u32 = 0;
-        while i < (*c).clipboard_npanes {
-            wp = window_pane_find_by_id(*(*c).clipboard_panes.add(i as usize));
-            if !wp.is_null() {
-                input_reply_clipboard((*wp).event, out, outlen as usize, c!("\x1b\\"));
-            }
-            i += 1;
-        }
-        free_((*c).clipboard_panes);
-        (*c).clipboard_panes = null_mut();
-        (*c).clipboard_npanes = 0;
+        log_debug!("tty_keys_clipboard: {}", _s(out));
 
+        // Set reply if any: the pane that asked gets it, in the order it asked
+        // (C `tty-keys.c:1420-1425`).
+        let mut cd = input_request_clipboard_data {
+            buf: out,
+            len: outlen as usize,
+            clip,
+        };
+        input_request_reply(
+            c,
+            input_request_type::INPUT_REQUEST_CLIPBOARD,
+            (&raw mut cd).cast(),
+        );
+
+        // Create a buffer if requested (C `tty-keys.c:1427-1434`).
+        if (*tty).flags.intersects(tty_flags::TTY_OSC52QUERY) {
+            paste_add(null_mut(), out, outlen as usize);
+            out = null_mut();
+            evtimer_del(&raw mut (*tty).clipboard_timer);
+            (*tty).flags &= !tty_flags::TTY_OSC52QUERY;
+        }
+
+        free_(out);
         0
     }
 }
@@ -2131,6 +2171,102 @@ unsafe fn tty_keys_extended_device_attributes(
 
 // Handle foreground or background input. Returns 0 for success, -1 for
 // failure, 1 for partial.
+
+/// Handle OSC 4 palette colour responses.
+///
+/// A pane asked what a palette entry is (`OSC 4 ; N ; ?`) and could not be
+/// answered locally, so the question went to this client's terminal; this is the
+/// answer coming back, and it is routed to whichever pane is still waiting for
+/// that index.
+/// C `vendor/tmux/tty-keys.c:1759`: `static int tty_keys_palette(struct tty *tty, const char *buf, size_t len, size_t *size)`
+unsafe fn tty_keys_palette(tty: *mut tty, buf: *const u8, len: usize, size: *mut usize) -> i32 {
+    unsafe {
+        let c = (*tty).client;
+        let mut tmp: [u8; 128] = [0; 128];
+        let mut endptr: *mut u8 = null_mut();
+
+        *size = 0;
+
+        // First three bytes are always \033]4.
+        if *buf != b'\x1b' {
+            return -1;
+        }
+        if len == 1 {
+            return 1;
+        }
+        if *buf.add(1) != b']' {
+            return -1;
+        }
+        if len == 2 {
+            return 1;
+        }
+        if *buf.add(2) != b'4' {
+            return -1;
+        }
+        if len == 3 {
+            return 1;
+        }
+        if *buf.add(3) != b';' {
+            return -1;
+        }
+        if len == 4 {
+            return 1;
+        }
+
+        // Copy the rest up to \033\ or \007.
+        let mut i = 0usize;
+        while i < tmp.len() - 1 {
+            if 4 + i == len {
+                return 1;
+            }
+            if *buf.add(4 + i) == b'\x07' {
+                break;
+            }
+            if i > 0 && *buf.add(4 + i - 1) == b'\x1b' && *buf.add(4 + i) == b'\\' {
+                break;
+            }
+            tmp[i] = *buf.add(4 + i);
+            i += 1;
+        }
+        if i == tmp.len() - 1 {
+            return -1;
+        }
+        *size = 5 + i;
+        if i == 0 {
+            return 0;
+        }
+        if tmp[i - 1] == b'\x1b' {
+            tmp[i - 1] = b'\0';
+        } else {
+            tmp[i] = b'\0';
+        }
+
+        // Parse index.
+        let idx = strtol((&raw const tmp).cast(), &raw mut endptr, 10);
+        if *endptr != b';' {
+            return -1;
+        }
+        if !(0..=255).contains(&idx) {
+            return -1;
+        }
+
+        // Work out the colour.
+        let mut pd = input_request_palette_data {
+            idx: idx as i32,
+            c: colour_parse_x11(endptr.add(1)),
+        };
+        if pd.c == -1 {
+            return 0;
+        }
+        input_request_reply(
+            c,
+            input_request_type::INPUT_REQUEST_PALETTE,
+            (&raw mut pd).cast(),
+        );
+
+        0
+    }
+}
 
 /// C `vendor/tmux/tty-keys.c:1684`: `int tty_keys_colours(struct tty *tty, const char *buf, size_t len, size_t *size, int *fg, int *bg)`
 pub unsafe fn tty_keys_colours(

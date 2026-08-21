@@ -107,6 +107,17 @@ pub unsafe fn cmd_attach_session(
             server_client_set_flags(c, fflag);
         }
         if rflag {
+            // A client that is ALREADY read-only cannot quietly re-assert the
+            // flag on someone else's behalf: only the server's own user may,
+            // because read-only is what a shared session hangs on
+            // (C `cmd-attach-session.c:111-117`).
+            if (*c).flags.intersects(client_flag::READONLY) {
+                let uid = proc_get_peer_uid((*c).peer);
+                if uid != libc::getuid() {
+                    cmdq_error!(item, "client is read-only");
+                    return cmd_retval::CMD_RETURN_ERROR;
+                }
+            }
             (*c).flags |= client_flag::READONLY | client_flag::IGNORESIZE;
         }
 

@@ -343,6 +343,25 @@ pub unsafe extern "C-unwind" fn tty_start_timer_callback(
             tty_update_features(tty);
         }
         (*tty).flags |= TTY_ALL_REQUEST_FLAGS;
+
+        // C `tty.c:322`: the terminal is not going to answer, so stop waiting.
+        (*tty).flags &= !(tty_flags::TTY_WAITBG | tty_flags::TTY_WAITFG);
+    }
+}
+
+/// Start the timer that gives up on the terminal answering our queries.
+/// C `vendor/tmux/tty.c:326`: `static void tty_start_start_timer(struct tty *tty)`
+unsafe fn tty_start_start_timer(tty: *mut tty) {
+    unsafe {
+        let c = (*tty).client;
+        let tv = libc::timeval {
+            tv_sec: TTY_QUERY_TIMEOUT as i64,
+            tv_usec: 0,
+        };
+
+        log_debug!("{}: start timer started", _s((*c).name));
+        evtimer_del(&raw mut (*tty).start_timer);
+        evtimer_add(&raw mut (*tty).start_timer, &raw const tv);
     }
 }
 
@@ -351,10 +370,6 @@ pub unsafe fn tty_start_tty(tty: *mut tty) {
     unsafe {
         let c = (*tty).client;
         let mut tio: libc::termios = zeroed();
-        let tv = libc::timeval {
-            tv_sec: TTY_QUERY_TIMEOUT as i64,
-            tv_usec: 0,
-        };
 
         setblocking((*c).fd, 0);
         event_add(&raw mut (*tty).event_in, null_mut());
@@ -417,7 +432,7 @@ pub unsafe fn tty_start_tty(tty: *mut tty) {
             tty_start_timer_callback,
             NonNull::new_unchecked(tty),
         );
-        evtimer_add(&raw mut (*tty).start_timer, &raw const tv);
+        tty_start_start_timer(tty);
 
         (*tty).flags |= tty_flags::TTY_STARTED;
         tty_invalidate(tty);
@@ -441,9 +456,7 @@ pub unsafe fn tty_send_requests(tty: *mut tty) {
         }
 
         if (*(*tty).term).flags.intersects(term_flags::TERM_VT100LIKE) {
-            // Matches the C exactly (`~tty->flags & TTY_HAVEDA` is `!intersects`);
-            // the C additionally sets TTY_WAITBG|TTY_WAITFG here, which this tree
-            // does not have -- recorded in docs/BUGS.md rather than added blind.
+            // Matches the C exactly (`~tty->flags & TTY_HAVEDA` is `!intersects`).
             if !(*tty).flags.intersects(tty_flags::TTY_HAVEDA) {
                 tty_puts(tty, c!("\x1b[c"));
             }
@@ -455,6 +468,10 @@ pub unsafe fn tty_send_requests(tty: *mut tty) {
             }
             tty_puts(tty, c!("\x1b]10;?\x1b\\"));
             tty_puts(tty, c!("\x1b]11;?\x1b\\"));
+            // C `tty.c:409`: both colour replies are now outstanding. Until they
+            // arrive (or the start timer gives up) key reads wait longer, so a
+            // reply is not mistaken for a keystroke.
+            (*tty).flags |= tty_flags::TTY_WAITBG | tty_flags::TTY_WAITFG;
         } else {
             (*tty).flags |= TTY_ALL_REQUEST_FLAGS;
         }
@@ -463,23 +480,36 @@ pub unsafe fn tty_send_requests(tty: *mut tty) {
 }
 
 /// C `vendor/tmux/tty.c:414`: `void tty_repeat_requests(struct tty *tty, int force)`
-pub unsafe fn tty_repeat_requests(tty: *mut tty) {
+pub unsafe fn tty_repeat_requests(tty: *mut tty, force: i32) {
     unsafe {
+        let c = (*tty).client;
         let t = libc::time(null_mut());
+        let n = t - (*tty).last_requests;
 
         if !(*tty).flags.intersects(tty_flags::TTY_STARTED) {
             return;
         }
 
-        if t - (*tty).last_requests <= TTY_REQUEST_LIMIT as i64 {
+        // `force` skips the rate limit: a theme change has to be answered now,
+        // not up to TTY_REQUEST_LIMIT seconds later (C `tty.c:421`).
+        if force == 0 && n <= TTY_REQUEST_LIMIT as i64 {
+            log_debug!("{}: not repeating requests ({} seconds)", _s((*c).name), n);
             return;
         }
+        log_debug!(
+            "{}: {}repeating requests ({} seconds)",
+            _s((*c).name),
+            if force != 0 { "(force) " } else { "" },
+            n
+        );
         (*tty).last_requests = t;
 
         if (*(*tty).term).flags.intersects(term_flags::TERM_VT100LIKE) {
             tty_puts(tty, c!("\x1b]10;?\x1b\\"));
             tty_puts(tty, c!("\x1b]11;?\x1b\\"));
+            (*tty).flags |= tty_flags::TTY_WAITBG | tty_flags::TTY_WAITFG;
         }
+        tty_start_start_timer(tty);
     }
 }
 
@@ -3829,13 +3859,6 @@ pub unsafe extern "C-unwind" fn tty_clipboard_query_callback(
     tty: NonNull<tty>,
 ) {
     unsafe {
-        let c = (*tty.as_ptr()).client;
-
-        (*c).flags &= !client_flag::CLIPBOARDBUFFER;
-        free_((*c).clipboard_panes);
-        (*c).clipboard_panes = null_mut();
-        (*c).clipboard_npanes = 0;
-
         (*tty.as_ptr()).flags &= !tty_flags::TTY_OSC52QUERY;
     }
 }

@@ -1123,7 +1123,7 @@ pub unsafe fn popup_display(
             popup_free(pd);
             return -1;
         }
-        (*pd).ictx = input_init(null_mut(), job_get_event((*pd).job), &raw mut (*pd).palette);
+        (*pd).ictx = input_init(null_mut(), job_get_event((*pd).job), &raw mut (*pd).palette, c);
 
         server_client_set_overlay(
             c,

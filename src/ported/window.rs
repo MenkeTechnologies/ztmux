@@ -1523,7 +1523,7 @@ pub unsafe fn window_pane_set_event(wp: *mut window_pane) {
         if (*wp).event.is_null() {
             fatalx("out of memory");
         }
-        (*wp).ictx = input_init(wp, (*wp).event, &raw mut (*wp).palette);
+        (*wp).ictx = input_init(wp, (*wp).event, &raw mut (*wp).palette, null_mut());
 
         bufferevent_enable((*wp).event, EV_READ | EV_WRITE);
     }

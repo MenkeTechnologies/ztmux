@@ -93,11 +93,81 @@ bitflags::bitflags! {
 }
 
 #[repr(i32)]
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 enum input_end_type {
     INPUT_END_ST,
     INPUT_END_BEL,
 }
+
+/// Type of request to client.
+/// C `vendor/tmux/tmux.h:1200`: `enum input_request_type`
+#[repr(i32)]
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum input_request_type {
+    INPUT_REQUEST_PALETTE,
+    INPUT_REQUEST_CLIPBOARD,
+    INPUT_REQUEST_QUEUE,
+}
+
+/// Palette request reply data.
+/// C `vendor/tmux/tmux.h:1207`: `struct input_request_palette_data`
+#[repr(C)]
+pub struct input_request_palette_data {
+    pub idx: i32,
+    pub c: i32,
+}
+
+/// Clipboard request reply data.
+/// C `vendor/tmux/tmux.h:1213`: `struct input_request_clipboard_data`
+#[repr(C)]
+pub struct input_request_clipboard_data {
+    pub buf: *mut u8,
+    pub len: usize,
+    pub clip: u8,
+}
+
+/// Request sent by a pane.
+///
+/// A pane that asks the terminal something it cannot answer itself -- the
+/// palette (OSC 4) or the clipboard (OSC 52) -- has the question forwarded to a
+/// client, and the answer comes back asynchronously. The request records who
+/// was asked and what for, so the reply can be routed back to the right pane
+/// with the terminator it opened with.
+///
+/// C `vendor/tmux/input.c:61`: `struct input_request`
+#[repr(C)]
+pub struct input_request {
+    c: *mut client,
+    ictx: *mut input_ctx,
+
+    type_: input_request_type,
+    t: u64,
+    end: input_end_type,
+
+    idx: i32,
+    data: *mut c_void,
+
+    /// Link in the pane's queue (`ictx->requests`).
+    entry: tailq_entry<input_request>,
+    /// Link in the client's queue (`c->input_requests`).
+    centry: tailq_entry<input_request>,
+}
+/// C `vendor/tmux/tmux.h:1220`: `TAILQ_HEAD(input_requests, input_request)`
+pub type input_requests = tailq_head<input_request>;
+
+impl Entry<input_request> for input_request {
+    unsafe fn entry(this: *mut Self) -> *mut tailq_entry<input_request> {
+        unsafe { &raw mut (*this).entry }
+    }
+}
+impl Entry<input_request, crate::discr_centry> for input_request {
+    unsafe fn entry(this: *mut Self) -> *mut tailq_entry<input_request> {
+        unsafe { &raw mut (*this).centry }
+    }
+}
+
+/// C `vendor/tmux/input.c:76`: `#define INPUT_REQUEST_TIMEOUT 500`
+const INPUT_REQUEST_TIMEOUT: u64 = 500;
 
 /// Input parser context.
 #[repr(C)]
@@ -106,6 +176,9 @@ pub struct input_ctx {
     event: *mut bufferevent,
     ctx: screen_write_ctx,
     palette: *mut colour_palette,
+    /// The client this parser belongs to when there is no pane -- a popup.
+    /// C `input.c:104`.
+    c: *mut client,
 
     cell: input_cell,
 
@@ -138,10 +211,16 @@ pub struct input_ctx {
 
     state: *const input_state,
 
-    timer: event,
+    /// C `input.c:138-140`: requests this pane has outstanding, how many, and
+    /// the timer that gives up on them.
+    requests: input_requests,
+    request_count: u32,
+    request_timer: event,
 
     /// All input received since we were last in the ground state. Sent to control clients on connection.
     since_ground: *mut evbuffer,
+    /// Expires if a terminator has been awaited too long, resetting to ground.
+    ground_timer: event,
 }
 
 // Command table entry.
@@ -888,11 +967,15 @@ unsafe fn input_table_compare(
 /// Timer
 ///
 /// if this expires then have been waiting for a terminator for too long, so reset to ground.
-unsafe extern "C-unwind" fn input_timer_callback(_fd: i32, _events: i16, ictx: NonNull<input_ctx>) {
+unsafe extern "C-unwind" fn input_ground_timer_callback(
+    _fd: i32,
+    _events: i16,
+    ictx: NonNull<input_ctx>,
+) {
     unsafe {
         log_debug!(
             "{}: {} expired",
-            "input_timer_callback",
+            "input_ground_timer_callback",
             _s((*(*ictx.as_ptr()).state).name.as_ptr())
         );
         input_reset(ictx.as_ptr(), 0);
@@ -900,15 +983,15 @@ unsafe extern "C-unwind" fn input_timer_callback(_fd: i32, _events: i16, ictx: N
 }
 
 /// Start the timer.
-unsafe fn input_start_timer(ictx: *mut input_ctx) {
+unsafe fn input_start_ground_timer(ictx: *mut input_ctx) {
     unsafe {
         let tv: timeval = timeval {
             tv_sec: 5,
             tv_usec: 0,
         };
 
-        event_del(&raw mut (*ictx).timer);
-        event_add(&raw mut (*ictx).timer, &raw const tv);
+        event_del(&raw mut (*ictx).ground_timer);
+        event_add(&raw mut (*ictx).ground_timer, &raw const tv);
     }
 }
 
@@ -963,12 +1046,14 @@ pub unsafe fn input_init(
     wp: *mut window_pane,
     bev: *mut bufferevent,
     palette: *mut colour_palette,
+    c: *mut client,
 ) -> *mut input_ctx {
     unsafe {
         let ictx = Box::into_raw(Box::new(input_ctx {
             wp,
             event: bev,
             palette,
+            c,
             input_space: INPUT_BUF_START,
             input_buf: xmalloc(INPUT_BUF_START).as_ptr().cast(),
             since_ground: evbuffer_new(),
@@ -980,8 +1065,15 @@ pub unsafe fn input_init(
         }
 
         evtimer_set(
-            &raw mut (*ictx).timer,
-            input_timer_callback,
+            &raw mut (*ictx).ground_timer,
+            input_ground_timer_callback,
+            NonNull::new(ictx).unwrap(),
+        );
+
+        tailq_init(&raw mut (*ictx).requests);
+        evtimer_set(
+            &raw mut (*ictx).request_timer,
+            input_request_timer_callback,
             NonNull::new(ictx).unwrap(),
         );
 
@@ -1000,10 +1092,14 @@ pub unsafe fn input_free(ictx: *mut input_ctx) {
             }
         }
 
-        event_del(&raw mut (*ictx).timer);
+        for ir in tailq_foreach::<_, ()>(&raw mut (*ictx).requests).map(NonNull::as_ptr) {
+            input_free_request(ir);
+        }
+        event_del(&raw mut (*ictx).request_timer);
 
         free_((*ictx).input_buf);
         evbuffer_free((*ictx).since_ground);
+        event_del(&raw mut (*ictx).ground_timer);
 
         free_(ictx);
     }
@@ -1272,21 +1368,40 @@ pub unsafe fn input_get(ictx: *mut input_ctx, validx: u32, minval: i32, defval: 
 }
 
 macro_rules! input_reply {
-    ($ictx:expr, $($args:expr),* $(,)?) => {
-        crate::input::input_reply_($ictx, format_args!($($args),*))
+    ($ictx:expr, $add:expr, $($args:expr),* $(,)?) => {
+        crate::input::input_reply_($ictx, $add, format_args!($($args),*))
     };
 }
-/// Reply to terminal query.
-unsafe fn input_reply_(ictx: *mut input_ctx, args: std::fmt::Arguments) {
-    unsafe {
-        let bev = (*ictx).event;
-        if bev.is_null() {
-            return;
-        }
 
-        let reply = CString::new(args.to_string()).unwrap();
-        log_debug!("input_reply: {}", _s(reply.as_ptr()));
-        bufferevent_write(bev, reply.as_ptr().cast(), strlen(reply.as_ptr().cast()));
+/// Write a reply to the pane straight away.
+/// C `vendor/tmux/input.c:1143`: `static void input_send_reply(struct input_ctx *ictx, const char *reply)`
+unsafe fn input_send_reply(ictx: *mut input_ctx, reply: *const u8) {
+    unsafe {
+        if !(*ictx).event.is_null() {
+            log_debug!("input_send_reply: {}", _s(reply));
+            bufferevent_write((*ictx).event, reply.cast(), strlen(reply.cast()));
+        }
+    }
+}
+
+/// Reply to terminal query.
+///
+/// With `add` set, a reply that would overtake an outstanding request is queued
+/// behind it instead of being written now, so a pane sees its answers in the
+/// order it asked -- a clipboard or palette round trip through a client takes
+/// time, and everything asked afterwards must wait for it.
+/// C `vendor/tmux/input.c:1153`: `static void input_reply(struct input_ctx *ictx, int add, const char *fmt, ...)`
+unsafe fn input_reply_(ictx: *mut input_ctx, add: i32, args: std::fmt::Arguments) {
+    unsafe {
+        let reply = format_nul!("{}", args);
+
+        if add != 0 && !tailq_empty(&raw const (*ictx).requests) {
+            let ir = input_make_request(ictx, input_request_type::INPUT_REQUEST_QUEUE);
+            (*ir).data = reply.cast();
+        } else {
+            input_send_reply(ictx, reply);
+            free_(reply);
+        }
     }
 }
 
@@ -1305,11 +1420,11 @@ unsafe fn input_report_current_theme(ictx: *mut input_ctx) {
         match (*wp).last_theme {
             client_theme::THEME_DARK => {
                 log_debug!("input_report_current_theme: %{} dark theme", (*wp).id);
-                input_reply!(ictx, "\x1b[?997;1n");
+                input_reply!(ictx, 0, "\x1b[?997;1n");
             }
             client_theme::THEME_LIGHT => {
                 log_debug!("input_report_current_theme: %{} light theme", (*wp).id);
-                input_reply!(ictx, "\x1b[?997;2n");
+                input_reply!(ictx, 0, "\x1b[?997;2n");
             }
             client_theme::THEME_UNKNOWN => {
                 log_debug!("input_report_current_theme: %{} unknown theme", (*wp).id);
@@ -1322,7 +1437,7 @@ unsafe fn input_report_current_theme(ictx: *mut input_ctx) {
 /// C `vendor/tmux/input.c:1174`: `static void input_clear(struct input_ctx *ictx)`
 unsafe fn input_clear(ictx: *mut input_ctx) {
     unsafe {
-        event_del(&raw mut (*ictx).timer);
+        event_del(&raw mut (*ictx).ground_timer);
 
         (*ictx).interm_buf[0] = b'\0';
         (*ictx).interm_len = 0;
@@ -1343,7 +1458,7 @@ unsafe fn input_clear(ictx: *mut input_ctx) {
 /// C `vendor/tmux/input.c:1194`: `static void input_ground(struct input_ctx *ictx)`
 unsafe fn input_ground(ictx: *mut input_ctx) {
     unsafe {
-        event_del(&raw mut (*ictx).timer);
+        event_del(&raw mut (*ictx).ground_timer);
         evbuffer_drain((*ictx).since_ground, EVBUFFER_LENGTH((*ictx).since_ground));
 
         if (*ictx).input_space > INPUT_BUF_START {
@@ -1741,18 +1856,18 @@ unsafe fn input_csi_dispatch(ictx: *mut input_ctx) -> i32 {
                 0 => {
                     #[cfg(feature = "sixel")]
                     {
-                        input_reply!(ictx, "\x1b[?1;2;4c");
+                        input_reply!(ictx, 1, "\x1b[?1;2;4c");
                     }
                     #[cfg(not(feature = "sixel"))]
                     {
-                        input_reply!(ictx, "\x1b[?1;2c");
+                        input_reply!(ictx, 1, "\x1b[?1;2c");
                     }
                 }
                 _ => log_debug!("{}: unknown '{}'", __func__, (*ictx).ch),
             },
             Ok(input_csi_type::INPUT_CSI_DA_TWO) => match input_get(ictx, 0, 0, 0) {
                 -1 => (),
-                0 => input_reply!(ictx, "\x1b[>84;0;0c"),
+                0 => input_reply!(ictx, 1, "\x1b[>84;0;0c"),
                 _ => log_debug!("{}: unknown '{}'", __func__, (*ictx).ch as u8 as char),
             },
             Ok(input_csi_type::INPUT_CSI_ECH) => {
@@ -1801,7 +1916,7 @@ unsafe fn input_csi_dispatch(ictx: *mut input_ctx) -> i32 {
                     _ => 0,
                 };
                 if m > 0 {
-                    input_reply!(ictx, "\x1b[{};{}$y", m, n);
+                    input_reply!(ictx, 1, "\x1b[{};{}$y", m, n);
                 }
             }
             // DECRQM, private modes (input.c:1626-1697).
@@ -1833,13 +1948,13 @@ unsafe fn input_csi_dispatch(ictx: *mut input_ctx) -> i32 {
                     _ => 0,
                 };
                 if m > 0 {
-                    input_reply!(ictx, "\x1b[?{};{}$y", m, n);
+                    input_reply!(ictx, 1, "\x1b[?{};{}$y", m, n);
                 }
             }
             Ok(input_csi_type::INPUT_CSI_DSR) => match input_get(ictx, 0, 0, 0) {
                 -1 => (),
-                5 => input_reply!(ictx, "\x1b[0n"),
-                6 => input_reply!(ictx, "\x1b[{};{}R", (*s).cy + 1, (*s).cx + 1),
+                5 => input_reply!(ictx, 1, "\x1b[0n"),
+                6 => input_reply!(ictx, 1, "\x1b[{};{}R", (*s).cy + 1, (*s).cx + 1),
                 _ => log_debug!("{}: unknown '{}'", __func__, (*ictx).ch as u8 as char),
             },
             Ok(input_csi_type::INPUT_CSI_ED) => {
@@ -1943,7 +2058,7 @@ unsafe fn input_csi_dispatch(ictx: *mut input_ctx) -> i32 {
             }
             Ok(input_csi_type::INPUT_CSI_XDA) => {
                 if input_get(ictx, 0, 0, 0) == 0 {
-                    input_reply!(ictx, "\x1bP>|tmux {}\x1b\\", getversion());
+                    input_reply!(ictx, 1, "\x1bP>|tmux {}\x1b\\", getversion());
                 }
             }
             Err(_) => (),
@@ -2112,9 +2227,9 @@ unsafe fn input_csi_dispatch_sm_graphics(ictx: *mut input_ctx) {
         let o = input_get(ictx, 2, 0, 0);
 
         if n == 1 && (m == 1 || m == 2 || m == 4) {
-            input_reply!(ictx, "\x1b[?{n};0;{SIXEL_COLOUR_REGISTERS}S");
+            input_reply!(ictx, 1, "\x1b[?{n};0;{SIXEL_COLOUR_REGISTERS}S");
         } else {
-            input_reply!(ictx, "\x1b[?{n};3;{o}S");
+            input_reply!(ictx, 1, "\x1b[?{n};3;{o}S");
         }
     }
 }
@@ -2161,21 +2276,21 @@ unsafe fn input_csi_dispatch_winops(ictx: *mut input_ctx) {
                 }
                 14 => {
                     if !w.is_null() {
-                        input_reply!(ictx, "\x1b[4;{};{}t", y * (*w).ypixel, x * (*w).xpixel);
+                        input_reply!(ictx, 1, "\x1b[4;{};{}t", y * (*w).ypixel, x * (*w).xpixel);
                     }
                 }
                 15 => {
                     if !w.is_null() {
-                        input_reply!(ictx, "\x1b[5;{};{}t", y * (*w).ypixel, x * (*w).xpixel,);
+                        input_reply!(ictx, 1, "\x1b[5;{};{}t", y * (*w).ypixel, x * (*w).xpixel,);
                     }
                 }
                 16 => {
                     if !w.is_null() {
-                        input_reply!(ictx, "\x1b[6;{};{}t", (*w).ypixel, (*w).xpixel);
+                        input_reply!(ictx, 1, "\x1b[6;{};{}t", (*w).ypixel, (*w).xpixel);
                     }
                 }
-                18 => input_reply!(ictx, "\x1b[8;{};{}t", y, x),
-                19 => input_reply!(ictx, "\x1b[9;{};{}t", y, x),
+                18 => input_reply!(ictx, 1, "\x1b[8;{};{}t", y, x),
+                19 => input_reply!(ictx, 1, "\x1b[9;{};{}t", y, x),
                 22 => {
                     m += 1;
                     match input_get(ictx, m as u32, 0, -1) {
@@ -2493,13 +2608,94 @@ unsafe fn input_enter_dcs(ictx: *mut input_ctx) {
         log_debug!("input_enter_dcs");
 
         input_clear(ictx);
-        input_start_timer(ictx);
+        input_start_ground_timer(ictx);
         (*ictx).flags &= !input_flags::INPUT_LAST;
     }
 }
 
 /// DCS terminator (ST) received.
 /// C `vendor/tmux/input.c:2595`: `static int input_dcs_dispatch(struct input_ctx *ictx)`
+/// Answer a DECRQSS (DCS $ q Pt ST) -- "what is the current setting of Pt".
+///
+/// Only the cursor style is answerable; anything else gets the C's "not
+/// recognized" reply rather than silence, because a terminal that says nothing
+/// leaves the program inside the pane waiting.
+/// C `vendor/tmux/input.c:2529`: `static int input_handle_decrqss(struct input_ctx *ictx)`
+unsafe fn input_handle_decrqss(ictx: *mut input_ctx) -> i32 {
+    let __func__ = "input_handle_decrqss";
+
+    unsafe {
+        let wp = (*ictx).wp;
+        let sctx = &raw mut (*ictx).ctx;
+        let buf = (*ictx).input_buf;
+        let len = (*ictx).input_len;
+        let s = (*sctx).s;
+        let ps;
+
+        if len < 3 || *buf.add(1) != b' ' || *buf.add(2) != b'q' {
+            // Unrecognized DECRQSS: send DCS 0 $ r Pt ST.
+            input_reply!(ictx, 1, "\x1bP0$r\x1b\\");
+            return 0;
+        }
+
+        // Cursor style query: DCS $ q SP q -- reply DCS 1 $ r SP q <Ps> SP q ST.
+        if (*s).cstyle == screen_cursor_style::SCREEN_CURSOR_BLOCK
+            || (*s).cstyle == screen_cursor_style::SCREEN_CURSOR_UNDERLINE
+            || (*s).cstyle == screen_cursor_style::SCREEN_CURSOR_BAR
+        {
+            let blinking = (*s).mode.intersects(mode_flag::MODE_CURSOR_BLINKING);
+            ps = match (*s).cstyle {
+                screen_cursor_style::SCREEN_CURSOR_BLOCK => {
+                    if blinking {
+                        1
+                    } else {
+                        2
+                    }
+                }
+                screen_cursor_style::SCREEN_CURSOR_UNDERLINE => {
+                    if blinking {
+                        3
+                    } else {
+                        4
+                    }
+                }
+                screen_cursor_style::SCREEN_CURSOR_BAR => {
+                    if blinking {
+                        5
+                    } else {
+                        6
+                    }
+                }
+                _ => 0,
+            };
+        } else {
+            // No explicit runtime style: fall back to the configured
+            // cursor-style option (integer Ps 0..6). Pane options inherit.
+            let oo = if wp.is_null() {
+                GLOBAL_W_OPTIONS
+            } else {
+                (*wp).options
+            };
+            let opt_ps = options_get_number_(oo, "cursor-style");
+
+            // Sanity clamp: valid Ps are 0..6 per DECSCUSR.
+            ps = if !(0..=6).contains(&opt_ps) { 0 } else { opt_ps };
+        }
+
+        log_debug!(
+            "{}: DECRQSS cursor -> Ps={} (cstyle={} mode={:#x})",
+            __func__,
+            ps,
+            (*s).cstyle as i32,
+            (*s).mode.bits()
+        );
+
+        input_reply!(ictx, 1, "\x1bP1$r q{} q\x1b\\", ps);
+        0
+    }
+}
+
+/// C `vendor/tmux/input.c:2594`: `static int input_dcs_dispatch(struct input_ctx *ictx)`
 unsafe fn input_dcs_dispatch(ictx: *mut input_ctx) -> i32 {
     unsafe {
         let func = "input_dcs_dispatch";
@@ -2512,9 +2708,11 @@ unsafe fn input_dcs_dispatch(ictx: *mut input_ctx) -> i32 {
         let prefix = c"tmux;";
         let prefixlen: u32 = 5;
 
-        if wp.is_null() {
-            return 0;
-        }
+        let oo = if wp.is_null() {
+            GLOBAL_W_OPTIONS
+        } else {
+            (*wp).options
+        };
 
         if (*ictx).flags.intersects(input_flags::INPUT_DISCARD) {
             log_debug!("{}: {} bytes (discard)", func, len);
@@ -2534,7 +2732,17 @@ unsafe fn input_dcs_dispatch(ictx: *mut input_ctx) -> i32 {
             }
         }
 
-        let allow_passthrough = options_get_number_((*wp).options, "allow-passthrough");
+        // DCS sequences with intermediate byte '$' (includes DECRQSS).
+        if (*ictx).interm_len == 1 && (*ictx).interm_buf[0] == b'$' {
+            // DECRQSS is DCS $ q Pt ST.
+            if len >= 1 && *buf == b'q' {
+                return input_handle_decrqss(ictx);
+            }
+            // Not DECRQSS. DCS '$' is currently only used by DECRQSS, but leave
+            // other '$' DCS (if any appear in future) to existing handlers.
+        }
+
+        let allow_passthrough = options_get_number_(oo, "allow-passthrough");
         if allow_passthrough == 0 {
             return 0;
         }
@@ -2562,7 +2770,7 @@ unsafe fn input_enter_osc(ictx: *mut input_ctx) {
         log_debug!("input_enter_osc");
 
         input_clear(ictx);
-        input_start_timer(ictx);
+        input_start_ground_timer(ictx);
         (*ictx).flags &= !input_flags::INPUT_LAST;
     }
 }
@@ -2649,7 +2857,7 @@ unsafe fn input_enter_apc(ictx: *mut input_ctx) {
         log_debug!("input_enter_apc");
 
         input_clear(ictx);
-        input_start_timer(ictx);
+        input_start_ground_timer(ictx);
         (*ictx).flags &= !input_flags::INPUT_LAST;
     }
 }
@@ -2681,7 +2889,7 @@ unsafe fn input_enter_rename(ictx: *mut input_ctx) {
         log_debug!("input_enter_rename");
 
         input_clear(ictx);
-        input_start_timer(ictx);
+        input_start_ground_timer(ictx);
         (*ictx).flags &= !input_flags::INPUT_LAST;
     }
 }
@@ -2793,7 +3001,14 @@ unsafe fn input_stop_utf8(ictx: *mut input_ctx) {
 
 /// Reply to a colour request.
 /// C `vendor/tmux/input.c:2873`: `static void input_osc_colour_reply(struct input_ctx *ictx, int add, u_int n, int idx, int c, enum input_end_type end_type)`
-unsafe fn input_osc_colour_reply(ictx: *mut input_ctx, n: u32, mut c: i32) {
+unsafe fn input_osc_colour_reply(
+    ictx: *mut input_ctx,
+    add: i32,
+    n: u32,
+    idx: i32,
+    mut c: i32,
+    end_type: input_end_type,
+) {
     unsafe {
         if c != -1 {
             c = colour_force_rgb(c);
@@ -2803,24 +3018,43 @@ unsafe fn input_osc_colour_reply(ictx: *mut input_ctx, n: u32, mut c: i32) {
         }
         let (r, g, b) = colour_split_rgb(c);
 
-        let end = if (*ictx).input_end == input_end_type::INPUT_END_BEL {
+        let end = if end_type == input_end_type::INPUT_END_BEL {
             c!("\x07")
         } else {
             c!("\x1b\\")
         };
 
-        input_reply!(
-            ictx,
-            "\x1b]{};rgb:{:02x}{:02x}/{:02x}{:02x}/{:02x}{:02x}{}",
-            n,
-            r,
-            r,
-            g,
-            g,
-            b,
-            b,
-            _s(end),
-        );
+        // OSC 4 names the palette entry it is answering about; 10/11/12 do not.
+        if n == 4 {
+            input_reply!(
+                ictx,
+                add,
+                "\x1b]{};{};rgb:{:02x}{:02x}/{:02x}{:02x}/{:02x}{:02x}{}",
+                n,
+                idx,
+                r,
+                r,
+                g,
+                g,
+                b,
+                b,
+                _s(end),
+            );
+        } else {
+            input_reply!(
+                ictx,
+                add,
+                "\x1b]{};rgb:{:02x}{:02x}/{:02x}{:02x}/{:02x}{:02x}{}",
+                n,
+                r,
+                r,
+                g,
+                g,
+                b,
+                b,
+                _s(end),
+            );
+        }
     }
 }
 
@@ -2854,10 +3088,21 @@ unsafe fn input_osc_4(ictx: *mut input_ctx, p: *const u8) {
 
             s = strsep(&raw mut next, c!(";"));
             if streq_(s, "?") {
-                c = colour_palette_get(ptr_to_ref((*ictx).palette), idx as i32);
+                // The C looks the entry up as a 256-colour key, not a bare
+                // index (`idx|COLOUR_FLAG_256`, input.c:2924).
+                c = colour_palette_get(
+                    ptr_to_ref((*ictx).palette),
+                    idx as i32 | COLOUR_FLAG_256,
+                );
                 if c != -1 {
-                    input_osc_colour_reply(ictx, 4, c);
+                    input_osc_colour_reply(ictx, 1, 4, idx as i32, c, (*ictx).input_end);
+                    s = next;
+                    continue;
                 }
+                // Nothing local to answer with, so ask a client's terminal and
+                // reply when it answers (input.c:2931).
+                input_add_request(ictx, input_request_type::INPUT_REQUEST_PALETTE, idx as i32);
+                s = next;
                 continue;
             }
             c = colour_parse_x11(s);
@@ -3108,7 +3353,7 @@ unsafe fn input_osc_10(ictx: *mut input_ctx, p: *const u8) {
                     c = defaults.fg;
                 }
             }
-            input_osc_colour_reply(ictx, 10, c);
+            input_osc_colour_reply(ictx, 1, 10, 0, c, (*ictx).input_end);
             return;
         }
 
@@ -3169,7 +3414,7 @@ unsafe fn input_osc_11(ictx: *mut input_ctx, p: *const u8) {
                     c = defaults.bg;
                 }
             }
-            input_osc_colour_reply(ictx, 11, c);
+            input_osc_colour_reply(ictx, 1, 11, 0, c, (*ictx).input_end);
             return;
         }
 
@@ -3220,7 +3465,7 @@ unsafe fn input_osc_12(ictx: *mut input_ctx, p: *const u8) {
                 if c == -1 {
                     c = (*(*ictx).ctx.s).default_ccolour;
                 }
-                input_osc_colour_reply(ictx, 12, c);
+                input_osc_colour_reply(ictx, 1, 12, 0, c, (*ictx).input_end);
             }
             return;
         }
@@ -3265,96 +3510,408 @@ unsafe fn input_osc_133(ictx: *mut input_ctx, p: *const u8) {
     }
 }
 
-/// Handle the OSC 52 sequence for setting the clipboard.
-/// C `vendor/tmux/input.c:3268`: `static void input_osc_52(struct input_ctx *ictx, const char *p)`
-unsafe fn input_osc_52(ictx: *mut input_ctx, p: *const u8) {
-    let __func__ = "input_osc_52";
+/// Request timer: give up on anything older than the timeout, and flush any
+/// replies queued behind it so a pane is never left waiting on an answer that
+/// will not come.
+/// C `vendor/tmux/input.c:3373`: `static void input_request_timer_callback(int fd, short events, void *arg)`
+unsafe extern "C-unwind" fn input_request_timer_callback(
+    _fd: i32,
+    _events: i16,
+    ictx: NonNull<input_ctx>,
+) {
+    unsafe {
+        let ictx = ictx.as_ptr();
+        let t = get_timer();
 
+        for ir in tailq_foreach::<_, ()>(&raw mut (*ictx).requests).map(NonNull::as_ptr) {
+            if (*ir).t >= t.saturating_sub(INPUT_REQUEST_TIMEOUT) {
+                continue;
+            }
+            if (*ir).type_ == input_request_type::INPUT_REQUEST_QUEUE {
+                input_send_reply((*ir).ictx, (*ir).data.cast());
+            }
+            input_free_request(ir);
+        }
+        if (*ictx).request_count != 0 {
+            input_start_request_timer(ictx);
+        }
+    }
+}
+
+/// Start the request timer.
+/// C `vendor/tmux/input.c:3392`: `static void input_start_request_timer(struct input_ctx *ictx)`
+unsafe fn input_start_request_timer(ictx: *mut input_ctx) {
+    unsafe {
+        let tv = libc::timeval {
+            tv_sec: 0,
+            tv_usec: 100000,
+        };
+
+        event_del(&raw mut (*ictx).request_timer);
+        event_add(&raw mut (*ictx).request_timer, &raw const tv);
+    }
+}
+
+/// Create a request.
+/// C `vendor/tmux/input.c:3402`: `static struct input_request *input_make_request(struct input_ctx *ictx, enum input_request_type type)`
+unsafe fn input_make_request(
+    ictx: *mut input_ctx,
+    type_: input_request_type,
+) -> *mut input_request {
+    unsafe {
+        let ir: *mut input_request = xcalloc1();
+        (*ir).type_ = type_;
+        (*ir).ictx = ictx;
+        (*ir).t = get_timer();
+
+        (*ictx).request_count += 1;
+        if (*ictx).request_count == 1 {
+            input_start_request_timer(ictx);
+        }
+        tailq_insert_tail::<_, ()>(&raw mut (*ictx).requests, ir);
+
+        ir
+    }
+}
+
+/// Free a request.
+/// C `vendor/tmux/input.c:3420`: `static void input_free_request(struct input_request *ir)`
+unsafe fn input_free_request(ir: *mut input_request) {
+    unsafe {
+        let ictx = (*ir).ictx;
+
+        if !(*ir).c.is_null() {
+            tailq_remove::<_, crate::discr_centry>(&raw mut (*(*ir).c).input_requests, ir);
+        }
+
+        (*ictx).request_count -= 1;
+        tailq_remove::<_, ()>(&raw mut (*ictx).requests, ir);
+
+        free_((*ir).data);
+        free_(ir);
+    }
+}
+
+/// Add a request: pick the client that will be asked, record what for, and put
+/// the question on the wire.
+///
+/// The client chosen is the most recently active one attached to a session
+/// showing this pane's window whose tty has started -- only such a client has a
+/// terminal to ask.
+/// C `vendor/tmux/input.c:3436`: `static int input_add_request(struct input_ctx *ictx, enum input_request_type type, int idx)`
+unsafe fn input_add_request(ictx: *mut input_ctx, type_: input_request_type, idx: i32) -> i32 {
     unsafe {
         let wp = (*ictx).wp;
-        let mut buf: *const u8 = null_mut();
-        let mut len: usize = 0;
-
-        let mut ctx: screen_write_ctx = zeroed();
-        let allow: *const u8 = c!("cpqs01234567");
-        let mut flags: [u8; 13] = [0; 13];
-        let mut j = 0;
+        let mut c: *mut client = null_mut();
 
         if wp.is_null() {
+            return -1;
+        }
+        let w = (*wp).window;
+
+        for loop_ in tailq_foreach::<_, ()>(&raw mut CLIENTS).map(NonNull::as_ptr) {
+            if (*loop_).flags.intersects(CLIENT_UNATTACHEDFLAGS) {
+                continue;
+            }
+            if (*loop_).session.is_null() || !session_has((*loop_).session, w) {
+                continue;
+            }
+            if !(*loop_).tty.flags.intersects(tty_flags::TTY_STARTED) {
+                continue;
+            }
+            if c.is_null() {
+                c = loop_;
+            } else {
+                // C `input.c:3466`: timercmp(&loop->activity_time,
+                // &c->activity_time, >).
+                let a = &raw const (*loop_).activity_time;
+                let b = &raw const (*c).activity_time;
+                if (*a).tv_sec > (*b).tv_sec
+                    || ((*a).tv_sec == (*b).tv_sec && (*a).tv_usec > (*b).tv_usec)
+                {
+                    c = loop_;
+                }
+            }
+        }
+        if c.is_null() {
+            return -1;
+        }
+
+        let ir = input_make_request(ictx, type_);
+        (*ir).c = c;
+        (*ir).idx = idx;
+        (*ir).end = (*ictx).input_end;
+        tailq_insert_tail::<_, crate::discr_centry>(&raw mut (*c).input_requests, ir);
+
+        match type_ {
+            input_request_type::INPUT_REQUEST_PALETTE => {
+                let s = format_nul!("\x1b]4;{};?\x1b\\", idx);
+                tty_puts(&raw mut (*c).tty, s);
+                free_(s);
+            }
+            input_request_type::INPUT_REQUEST_CLIPBOARD => {
+                tty_putcode_ss(&raw mut (*c).tty, tty_code_code::TTYC_MS, c!(""), c!("?"));
+            }
+            input_request_type::INPUT_REQUEST_QUEUE => (),
+        }
+
+        0
+    }
+}
+
+/// Handle a palette reply.
+/// C `vendor/tmux/input.c:3486`: `static void input_request_palette_reply(struct input_request *ir, void *data)`
+unsafe fn input_request_palette_reply(ir: *mut input_request, data: *mut c_void) {
+    unsafe {
+        let pd: *mut input_request_palette_data = data.cast();
+        input_osc_colour_reply((*ir).ictx, 0, 4, (*pd).idx, (*pd).c, (*ir).end);
+    }
+}
+
+/// Handle a clipboard reply.
+/// C `vendor/tmux/input.c:3495`: `static void input_request_clipboard_reply(struct input_request *ir, void *data)`
+unsafe fn input_request_clipboard_reply(ir: *mut input_request, data: *mut c_void) {
+    unsafe {
+        let ictx = (*ir).ictx;
+        let ev = (*ictx).event;
+        let cd: *mut input_request_clipboard_data = data.cast();
+
+        let state = options_get_number_(GLOBAL_OPTIONS, "get-clipboard");
+        if state == 0 || state == 1 {
             return;
         }
-        let state: i32 = options_get_number_(GLOBAL_OPTIONS, "set-clipboard") as i32;
-        if state != 2 {
+        if state == 3 {
+            let copy: *mut u8 = xmalloc((*cd).len).as_ptr().cast();
+            memcpy_(copy, (*cd).buf, (*cd).len);
+            paste_add(null_mut(), copy, (*cd).len);
+        }
+
+        if (*ir).idx == input_end_type::INPUT_END_BEL as i32 {
+            input_reply_clipboard(ev, (*cd).buf, (*cd).len, c!("\x07"), (*cd).clip);
+        } else {
+            input_reply_clipboard(ev, (*cd).buf, (*cd).len, c!("\x1b\\"), (*cd).clip);
+        }
+    }
+}
+
+/// Handle a reply to a request.
+///
+/// Replies are delivered in the order the pane asked, so anything queued behind
+/// the request being answered is flushed with it; requests of another type that
+/// this reply overtakes are dropped, because their answer is never coming.
+/// C `vendor/tmux/input.c:3520`: `void input_request_reply(struct client *c, enum input_request_type type, void *data)`
+pub unsafe fn input_request_reply(c: *mut client, type_: input_request_type, data: *mut c_void) {
+    unsafe {
+        let mut found: *mut input_request = null_mut();
+        let pd: *mut input_request_palette_data = data.cast();
+        let mut complete = false;
+
+        for ir in tailq_foreach::<_, crate::discr_centry>(&raw mut (*c).input_requests)
+            .map(NonNull::as_ptr)
+        {
+            if (*ir).type_ != type_ {
+                input_free_request(ir);
+                continue;
+            }
+            if type_ == input_request_type::INPUT_REQUEST_PALETTE {
+                if (*pd).idx != (*ir).idx {
+                    input_free_request(ir);
+                    continue;
+                }
+                found = ir;
+                break;
+            }
+            if type_ == input_request_type::INPUT_REQUEST_CLIPBOARD {
+                found = ir;
+                break;
+            }
+        }
+        if found.is_null() {
             return;
+        }
+
+        for ir in tailq_foreach::<_, ()>(&raw mut (*(*found).ictx).requests).map(NonNull::as_ptr) {
+            if complete && (*ir).type_ != input_request_type::INPUT_REQUEST_QUEUE {
+                break;
+            }
+            if (*ir).type_ == input_request_type::INPUT_REQUEST_QUEUE {
+                input_send_reply((*ir).ictx, (*ir).data.cast());
+            } else if ir == found {
+                if (*ir).type_ == input_request_type::INPUT_REQUEST_PALETTE {
+                    input_request_palette_reply(ir, data);
+                } else if (*ir).type_ == input_request_type::INPUT_REQUEST_CLIPBOARD {
+                    input_request_clipboard_reply(ir, data);
+                }
+                complete = true;
+            }
+            input_free_request(ir);
+        }
+    }
+}
+
+/// Cancel pending requests for client.
+/// C `vendor/tmux/input.c:3565`: `void input_cancel_requests(struct client *c)`
+pub unsafe fn input_cancel_requests(c: *mut client) {
+    unsafe {
+        for ir in tailq_foreach::<_, crate::discr_centry>(&raw mut (*c).input_requests)
+            .map(NonNull::as_ptr)
+        {
+            input_free_request(ir);
+        }
+    }
+}
+
+/// Reply to an OSC 52 clipboard QUERY.
+///
+/// `get-clipboard` decides where the answer comes from: off (0) ignores the
+/// query, buffer (1) answers from the newest paste buffer without involving the
+/// terminal, and request (2) / both (3) ask the client's terminal and reply when
+/// it answers.
+/// C `vendor/tmux/input.c:3193`: `static void input_osc_52_reply(struct input_ctx *ictx, char clip)`
+unsafe fn input_osc_52_reply(ictx: *mut input_ctx, clip: u8) {
+    unsafe {
+        let ev = (*ictx).event;
+
+        let state = options_get_number_(GLOBAL_OPTIONS, "get-clipboard");
+        if state == 0 {
+            return;
+        }
+        if state == 1 {
+            let pb = paste_get_top(null_mut());
+            if pb.is_null() {
+                return;
+            }
+            let mut len: usize = 0;
+            let buf = paste_buffer_data(pb, &raw mut len);
+            if (*ictx).input_end == input_end_type::INPUT_END_BEL {
+                input_reply_clipboard(ev, buf, len, c!("\x07"), clip);
+            } else {
+                input_reply_clipboard(ev, buf, len, c!("\x1b\\"), clip);
+            }
+            return;
+        }
+        input_add_request(
+            ictx,
+            input_request_type::INPUT_REQUEST_CLIPBOARD,
+            (*ictx).input_end as i32,
+        );
+    }
+}
+
+/// Parse and decode OSC 52 clipboard data. Returns 0 on failure or if handled
+/// as a query. On success, returns 1 and sets `out`, `outlen` and `clip` (the
+/// caller frees `out`).
+/// C `vendor/tmux/input.c:3223`: `static int input_osc_52_parse(struct input_ctx *ictx, const char *p, u_char **out, int *outlen, char *clip)`
+unsafe fn input_osc_52_parse(
+    ictx: *mut input_ctx,
+    p: *const u8,
+    out: *mut *mut u8,
+    outlen: *mut i32,
+    clip: *mut u8,
+) -> i32 {
+    let __func__ = "input_osc_52_parse";
+
+    unsafe {
+        let allow: *const u8 = c!("cpqs01234567");
+        let mut j = 0usize;
+
+        if options_get_number_(GLOBAL_OPTIONS, "set-clipboard") != 2 {
+            return 0;
         }
 
         let mut end = strchr(p, b';' as i32);
         if end.is_null() {
-            return;
+            return 0;
         }
         end = end.add(1);
         if *end == b'\0' {
-            return;
+            return 0;
         }
         log_debug!("{}: {}", __func__, _s(end));
 
-        let mut i = 0;
+        let mut i = 0usize;
         while p.add(i) != end {
             if !strchr(allow, *p.add(i) as i32).is_null()
-                && strchr((&raw mut flags) as *const u8, *p.add(i) as i32).is_null()
+                && strchr(clip.cast_const(), *p.add(i) as i32).is_null()
             {
-                flags[j] = *p.add(i);
+                *clip.add(j) = *p.add(i);
                 j += 1;
             }
             i += 1;
         }
-        // log_debug("%s: %.*s %s", __func__, (int)(end - p - 1), p, flags);
+        log_debug!("{}: {}", __func__, _s(clip.cast_const()));
 
         if streq_(end, "?") {
-            // next-3.7 get-clipboard: off (0) ignores the query; buffer (1)
-            // replies with the newest paste buffer. request (2) / both (3)
-            // request the clipboard from the terminal via the input request
-            // queue, which is not yet ported — they fall back to the buffer
-            // reply here.
-            let get_state: i32 = options_get_number_(GLOBAL_OPTIONS, "get-clipboard") as i32;
-            if get_state == 0 {
+            input_osc_52_reply(ictx, *clip);
+            return 0;
+        }
+
+        let len = strlen(end).div_ceil(4) * 3;
+        if len == 0 {
+            return 0;
+        }
+
+        *out = xmalloc(len).as_ptr().cast();
+        *outlen = b64_pton(end, *out, len);
+        if *outlen == -1 {
+            free_(*out);
+            *out = null_mut();
+            return 0;
+        }
+
+        1
+    }
+}
+
+/// Handle the OSC 52 sequence for setting the clipboard.
+/// C `vendor/tmux/input.c:3266`: `static void input_osc_52(struct input_ctx *ictx, const char *p)`
+unsafe fn input_osc_52(ictx: *mut input_ctx, p: *const u8) {
+    unsafe {
+        let wp = (*ictx).wp;
+        let mut ctx: screen_write_ctx = zeroed();
+        let mut out: *mut u8 = null_mut();
+        let mut outlen: i32 = 0;
+        let mut clip: [u8; 13] = [0; 13];
+
+        if input_osc_52_parse(
+            ictx,
+            p,
+            &raw mut out,
+            &raw mut outlen,
+            (&raw mut clip).cast(),
+        ) == 0
+        {
+            return;
+        }
+
+        if wp.is_null() {
+            // Popup window: there is no pane grid to own the selection, so the
+            // client's terminal is set directly (input.c:3279-3287).
+            if (*ictx).c.is_null() {
+                free_(out);
                 return;
             }
-            let pb = paste_get_top(null_mut());
-            if !pb.is_null() {
-                buf = paste_buffer_data(pb, &raw mut len);
-            }
-            if (*ictx).input_end == input_end_type::INPUT_END_BEL {
-                input_reply_clipboard((*ictx).event, buf, len, c!("\x07"));
-            } else {
-                input_reply_clipboard((*ictx).event, buf, len, c!("\x1b\\"));
-            }
-            return;
+            tty_set_selection(
+                &raw mut (*(*ictx).c).tty,
+                (&raw const clip).cast(),
+                out,
+                outlen as usize,
+            );
+            paste_add(null_mut(), out, outlen as usize);
+        } else {
+            // Normal window.
+            screen_write_start_pane(&raw mut ctx, wp, null_mut());
+            screen_write_setselection(
+                &raw mut ctx,
+                (&raw const clip).cast(),
+                out,
+                outlen as u32,
+            );
+            screen_write_stop(&raw mut ctx);
+            notify_pane(c"pane-set-clipboard", wp);
+
+            paste_add(null_mut(), out, outlen as usize);
         }
-
-        len = (strlen(end) / 4) * 3;
-        if len == 0 {
-            return;
-        }
-
-        let out: *mut u8 = xmalloc(len).as_ptr().cast();
-        let outlen = b64_pton(end, out, len);
-        if outlen == -1 {
-            free_(out);
-            return;
-        }
-
-        screen_write_start_pane(&raw mut ctx, wp, null_mut());
-        screen_write_setselection(
-            &raw mut ctx,
-            (&raw const flags) as *const u8,
-            out,
-            outlen as u32,
-        );
-        screen_write_stop(&raw mut ctx);
-        notify_pane(c"pane-set-clipboard", wp);
-
-        paste_add(null(), out.cast(), outlen as usize);
     }
 }
 
@@ -3406,6 +3963,7 @@ pub unsafe fn input_reply_clipboard(
     buf: *const u8,
     len: usize,
     end: *const u8,
+    clip: u8,
 ) {
     unsafe {
         let mut out: *mut u8 = null_mut();
@@ -3425,7 +3983,11 @@ pub unsafe fn input_reply_clipboard(
             }
         }
 
-        bufferevent_write(bev, c!("\x1b]52;;").cast(), 6);
+        bufferevent_write(bev, c!("\x1b]52;").cast(), 5);
+        if clip != 0 {
+            bufferevent_write(bev, (&raw const clip).cast(), 1);
+        }
+        bufferevent_write(bev, c!(";").cast(), 1);
         if outlen != 0 {
             bufferevent_write(bev, out.cast(), outlen as usize);
         }

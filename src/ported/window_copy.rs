@@ -618,7 +618,7 @@ pub unsafe fn window_copy_view_init(
         screen_init((*data).backing, sx, screen_size_y(base), u32::MAX);
         (*data).writing = Box::leak(Box::new(zeroed())) as *mut screen;
         screen_init((*data).writing, sx, screen_size_y(base), 0);
-        (*data).ictx = input_init(null_mut(), null_mut(), null_mut());
+        (*data).ictx = input_init(null_mut(), null_mut(), null_mut(), null_mut());
         (*data).mx = (*data).cx;
         (*data).my = screen_hsize((*data).backing) + (*data).cy - (*data).oy;
         (*data).showmark = 0;

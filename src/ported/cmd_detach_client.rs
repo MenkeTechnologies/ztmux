@@ -58,6 +58,19 @@ pub unsafe fn cmd_detach_client_exec(self_: *mut cmd, item: *mut cmdq_item) -> c
             return cmd_retval::CMD_RETURN_NORMAL;
         }
 
+        // detach-client carries CMD_READONLY so a read-only client can detach
+        // ITSELF, but detaching OTHER clients -- `-s` (a whole session), `-a`
+        // (every other client), or naming a different target -- is a write, and
+        // is refused (C `cmd-detach-client.c:73-78`).
+        let c = cmdq_get_client(item);
+        if !c.is_null()
+            && (*c).flags.intersects(client_flag::READONLY)
+            && (args_has(args, 's') || args_has(args, 'a') || c != tc)
+        {
+            cmdq_error!(item, "client is read-only");
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
+
         let msgtype = if args_has(args, 'P') {
             msgtype::MSG_DETACHKILL
         } else {

@@ -4,9 +4,14 @@ Fixes to the ztmux port, most recent first.
 
 ## Open
 
-Re-measured 2026-08-21: the structured-output entry is gone from this list
-because it is fixed (below), not because it was tidied away. The four that
-remain were last re-measured 2026-08-18 against the build of that day.
+Re-measured 2026-08-21. Four entries that stood here this morning are gone
+because the defects are fixed, not because they were tidied away: structured
+output under a non-UTF-8 client, the `refresh-client -l` arity, the queued
+request/reply mechanism (DECRQSS with it), and `TTY_WAITBG`/`TTY_WAITFG` with
+`tty_repeat_requests`' `force`. The read-only client gates went with them. All
+five are written up below with what pins them.
+
+What stands here now was found while doing that work.
 
 Three entries that stood here earlier on 2026-08-18 are gone for the same
 reason — the defects are fixed: the `choose-tree` `i` info view (ported, pinned by case
@@ -18,138 +23,119 @@ claim after live probing.
 Every style directive now agrees with the reference: 53 of them, swept through
 both binaries, zero divergences.
 
-### One upstream command flag has an arity the port gets wrong
+### Two tty flags the C sets are still absent
 
-- **Symptom:** `refresh-client -lZ` gives `no current client` under ztmux and
-  `command refresh-client: unknown flag -Z` upstream (both observed today).
-- **Root cause:** the port declares `l::` where the C declares `l`
-  (`cmd-refresh-client.c:39`), so `-l` swallows the next character as its value.
-  Underneath, `cmd_refresh_client.rs:203` still implements the pre-next-3.7
-  `-l [target-pane]` semantics with `clipboard_panes` and a `CLIPBOARDBUFFER`
-  client flag; next-3.7 (`cmd-refresh-client.c:263`) is just
-  `tty_clipboard_query(&tc->tty)`, and `CLIENT_CLIPBOARDBUFFER` exists nowhere in
-  `vendor/tmux`.
-- **Why it is not a one-line fix:** dropping the argument makes the port's own
-  OSC 52 delivery path (`tty_keys.rs:1814-1828`) unreachable, because nothing
-  else registers a pane. Upstream delivers that reply through
-  `input_request_clipboard_reply`, which is part of the unported request/reply
-  mechanism below. The two have to land together or `refresh-client -l` becomes a
-  query whose answer goes nowhere.
-- **`copy-mode -S` is no longer absent.** It was the one genuinely missing flag;
-  it landed with the scrollbar mouse locations and is accepted now (rc 0 on both).
+- **Found 2026-08-21** while porting the request queue, which needed the flag
+  word next to them.
+- `TTY_WINSIZEQUERY` (`tmux.h:1754`) guards the winsize query
+  (`tty.c:146-149`) and is cleared when the reply lands
+  (`tty-keys.c:689`, `:735`). Neither the flag nor the query exists here.
+- `TTY_BRACKETPASTE` (`tmux.h:1757`) is set and cleared as a pane turns
+  bracketed paste on and off (`tty-keys.c:645-647`) and makes a partial paste
+  end extend the key delay (`tty-keys.c:973`). The port has the pane-side
+  `MODE_BRACKETPASTE` but not the tty-side flag, so that delay never applies.
+- **Not known to be observable.** Both are recorded as unported surface rather
+  than as reproduced defects; the bit positions are left free in `tty_flags`
+  with a comment naming what belongs there.
 
-### Four read-only client gates remain (of seven sites)
+## 2026-08-21 (the queued request/reply mechanism)
 
-- **Re-measured 2026-08-18.** `CLIENT_READONLY` has 24 sites across 9 files in
-  the C; `client_flag::READONLY` has 19 across 8 in `src/ported`
-  (`cmd_detach_client.rs` is the file with none).
-- **Landed 2026-08-18:** `copy-mode` gained `CMD_READONLY`
-  (`cmd-copy-mode.c:39`) so a read-only client can enter copy mode at all, and
-  `send-keys` gained both the flag and the exec gate together
-  (`cmd-send-keys.c:42-43`, `:178-181`). Those had to be one change: the flag
-  without the gate would have turned `send-keys` into an unauthenticated
-  key-injection channel rather than closing one. Verified: a read-only client is
-  refused, nothing reaches the pane, and copy mode still opens.
-- **Still missing:** the `proc_get_peer_uid` gates on `attach-session:112` and
-  `switch-client`, plus the `cmd_detach_client.rs` sites. These are
-  unobservable on a single-uid machine and need a second real account to
-  exercise, which is why they are recorded rather than claimed either way.
+### Panes could not ask the terminal anything, and four entries hung off that
 
-### DECRQSS and the queued request/reply mechanism are not ported
+The C lets a pane ask the terminal a question it cannot answer itself -- what a
+palette entry is (OSC 4), what the clipboard holds (OSC 52) -- by forwarding the
+question to a client and routing the answer back when it arrives. None of that
+existed here: fifteen `input_*` functions, the per-pane and per-client queues
+they walk, and the ordering rule that makes an asynchronous answer safe.
 
-- **Narrowed 2026-08-18.** This entry used to claim three missing
-  `input_csi_table[]` rows and a dead `CSI ? Ps n`. Both are wrong now: the table
-  has **43 rows on both sides**, `INPUT_CSI_DSR_PRIVATE`, `INPUT_CSI_QUERY` and
-  `INPUT_CSI_QUERY_PRIVATE` all exist, and `CSI ? 1004 $ p` answers
-  `ESC [ ? 1004 ; 2 $ y` on **both** binaries (probed from inside a pane, reply
-  read back off the pty).
-- **What is still missing, probed the same way:** `DCS $ q m ST` returns
-  `ESC P 0 $ r ESC \` on the reference and **nothing** on the port —
-  `input_handle_decrqss` has no counterpart.
-- **And the machinery behind it:** fifteen `input_*` functions have no
-  counterpart under `src/`, all one cluster — `input_make_request`,
-  `input_add_request`, `input_free_request`, `input_cancel_requests`,
-  `input_request_reply`, `input_request_clipboard_reply`,
-  `input_request_palette_reply`, `input_request_timer_callback`,
-  `input_start_request_timer`, `input_send_reply`, `input_handle_decrqss`,
-  `input_osc_52_parse`, `input_osc_52_reply`, `input_start_ground_timer` and
-  `input_ground_timer_callback`.
-- **Semantics, not just rows:** the C's `input_reply(ictx, add, fmt, ...)`
-  (`input.c:1153`) queues a reply behind any outstanding request when `add` is
-  set, so replies stay ordered against clipboard and palette round-trips. The
-  port's `input_reply_` (`src/ported/input.rs:1274`) writes straight to the
-  bufferevent. This is the same cluster the `refresh-client -l` entry above is
-  blocked on.
+- **What a pane saw before:** an OSC 4 query for an entry the pane had no local
+  value for got silence; an OSC 52 query got the newest paste buffer regardless
+  of what `get-clipboard` said; and `DCS $ q ... ST` (DECRQSS) got nothing at
+  all, because `input_handle_decrqss` had no counterpart. Silence is the worst
+  of these: the program inside the pane waits for a reply that never comes.
+- **Ported, where the C has them:** `input_make_request`, `input_add_request`,
+  `input_free_request`, `input_cancel_requests`, `input_request_reply`,
+  `input_request_palette_reply`, `input_request_clipboard_reply`,
+  `input_request_timer_callback`, `input_start_request_timer`,
+  `input_send_reply`, `input_handle_decrqss`, `input_osc_52_parse`,
+  `input_osc_52_reply`, `input_start_ground_timer` and
+  `input_ground_timer_callback` (the last two existed but were inlined and
+  named `timer`, which is why the C's `ground_timer` name is back).
+- **Ordering is the point, not a detail.** `input_reply` gains the C's `add`
+  argument (`input.c:1153`): with it set, a reply that would overtake an
+  outstanding request is queued behind it instead of being written now, so a
+  pane sees its answers in the order it asked. Seventeen of the port's
+  twenty-one reply sites pass `add=1`, exactly as the C does. A request that is
+  never answered is dropped after 500ms by the request timer, which flushes
+  whatever queued behind it -- otherwise one silent terminal would stall a pane
+  permanently.
+- **Two signatures were still in their pre-next-3.7 form** and are corrected
+  with it: `input_osc_colour_reply` gains `add`, `idx` and the terminator
+  (`input.c:2873`) -- and with `idx` the OSC 4 reply finally names the entry it
+  is answering about -- and `input_reply_clipboard` gains `clip`
+  (`input.c:3336`), so a reply names the selection it came from.
+- **A palette lookup was using the wrong key.** `input_osc_4` looked the entry
+  up as a bare index where the C uses `idx|COLOUR_FLAG_256` (`input.c:2924`), so
+  a query could miss an entry that was set.
+- **`refresh-client -l` is fixed by the same change**, which is why it was
+  blocked on it. The port declared `l::` where the C declares `l`
+  (`cmd-refresh-client.c:39`), so `-l` swallowed the next character as its
+  value and `refresh-client -lZ` was accepted as "-l with value Z" where the C
+  rejects an unknown flag. Underneath it still implemented the pre-next-3.7
+  `-l [target-pane]` semantics with `clipboard_panes` and a
+  `CLIENT_CLIPBOARDBUFFER` flag that exists nowhere in `vendor/tmux`; next-3.7
+  is just `tty_clipboard_query`, and the queue routes the answer to whichever
+  pane asked. The two `clipboard_panes` FIELDS stay, because the C still
+  declares (`tmux.h:2311`) and frees (`server-client.c:475`) them while reading
+  them nowhere; the flag is gone, because the C does not have it.
+- **`TTY_WAITBG`/`TTY_WAITFG` are fixed by it too**, for the same reason: their
+  only consumer is the key-delay condition at `tty-keys.c:979-985`, which also
+  reads the request queue. Both flags are now set with the OSC 10/11 queries
+  (`tty.c:409`), cleared when the start timer gives up (`tty.c:322`), and read
+  where the C reads them -- a key read waits 500ms while a query is outstanding
+  so a terminal's reply is never chopped up as keystrokes.
+  `tty_repeat_requests` regains its `force` argument (`tty.c:414`), and with it
+  the forced repeat after a theme change (`server-client.c:3110`) that the port
+  was not doing at all; `tty_start_start_timer` comes back out of
+  `tty_start_tty`, because `tty_repeat_requests` is its other caller.
+- **The DCS dispatch is now the C's.** It no longer returns early when there is
+  no pane (a popup has none and still parses DCS), it reads
+  `allow-passthrough` from global window options in that case
+  (`input.c:2611-2614`), and `$`-intermediate sequences route to DECRQSS.
+- **Verified live, byte-for-byte against the reference**, by running a pane that
+  echoes whatever the server writes to it: `DCS $ q SP q ST` returns
+  `DCS 1 $ r SP q 0 SP q ST` and `DCS $ q m ST` returns `DCS 0 $ r ST` on both
+  binaries. Primary DA is deliberately not compared: its reply depends on
+  whether the binary was built with sixel support (`input.c:1562-1566`).
+- **Pinned by:** `parity/cases/1563_decrqss_reply.sh` (both DECRQSS answers) and
+  `parity/cases/1564_refresh_client_l_arity.sh` (the flag arity, including that
+  `-l` no longer eats a following argument).
 
-### `TTY_WAITBG`/`TTY_WAITFG` and `tty_repeat_requests`' `force` are unported
+### Read-only clients could detach everybody else
 
-- **Found 2026-08-18** while un-inverting the start-timer condition
-  (`tty.c:318`), recorded rather than absorbed into that change.
-- `tty_send_requests` sets `tty->flags |= (TTY_WAITBG|TTY_WAITFG)` after the OSC
-  10/11 queries (`tty.c:409`) and the start-timer callback clears them
-  (`tty.c:322`). Neither flag exists in this tree — the only mention is a comment
-  at `src/ported/tty.rs:445` recording the gap — so both sites are absent along
-  with every consumer.
-- `tty_repeat_requests` takes an `int force` parameter (`tty.c:414`); the port's
-  takes none.
-- **Not known to be observable.** No probe has been constructed that
-  distinguishes the two binaries on this, so it is filed as unported surface
-  rather than as a reproduced defect.
-
-## 2026-08-21 (extension arguments, and two u_int subtractions that killed the server)
-
-### `ESC [ 1 J` at row 0 took the whole server down
-
-- **Symptom:** any pane that homed the cursor and cleared backwards —
-  `printf '\033[H\033[1J'` reproduces it in one command — killed the server for
-  every session on the socket. `~/.ztmux/server-panic-*.txt` recorded
-  `attempt to subtract with overflow` in `screen_write_clearstartofscreen`.
-- **Root cause:** `screen-write.c:1992` passes `s->cy - 1` to
-  `image_check_line`. In C that is `u_int`, so at row 0 it wraps to `UINT_MAX`
-  and the range test that follows is simply always true; the port wrote the
-  subtraction straight across, and Rust traps on it. `image_check_line` and
-  `image_check_area` then had the same problem one level down (`py + ny`,
-  `im->py + im->sy`), reachable as soon as a pane holds an image.
-- **A second one on the tty side:** `tty_region_pane` computes
-  `ctx->yoff + rupper - ctx->woy` (`tty.c:2318`, u_int again). With a window
-  bigger than the client — an 80x24 terminal attached to a 200x60 window, or any
-  `window-size manual` window — `woy` is the scroll offset and every pane above
-  it makes that difference negative. `tty_cmd_clearendofscreen` calls it
-  unguarded, so scrolling such a window and clearing killed the server too.
-  `tty_cursor_pane`, `tty_cmd_cell` and `tty_cmd_cells` share the idiom.
-- **And one real divergence found next to it:** `tty_margin_pane` is *not* a
-  u_int expression in C — `tty.c:2363` keeps `l`/`r` in a signed `int` and
-  clamps both to `[0, ctx->wsx]`. The port had dropped the clamp, so besides
-  trapping in a dev build it emitted a wrapped margin in a release one.
-- **Fix:** the u_int sites wrap explicitly (`wrapping_add`/`wrapping_sub`),
-  which is what the C does and what a release build was already doing;
-  `tty_margin_pane` gets the signed clamp it was missing.
-- **Pinned by:** `clearing_to_start_of_screen_from_the_top_row_survives` in
-  `tests/server_survives_bad_targets.rs`, which fails against a rebuild without
-  the `screen_write` half.
-
-### Three extension verbs never saw their own arguments
-
-- **Symptom:** `ztmux finder <query>` always printed `usage:` and exited 2, so
-  the verb could not be used at all. `ztmux clearall -f` and `ztmux revive -f`
-  printed their dry-run listing and did nothing, and `-s <session>` was ignored
-  by both — they listed panes from every session.
-- **Root cause:** each extension found its own arguments by scanning
-  `std::env::args()` for its own name and taking what followed
-  (`position(|a| a == "clear")`). That works only while the verb equals the
-  module name, and for these three it does not: `clearall` lives in `clear.rs`,
-  `revive` in `respawn.rs`, `finder` in `find.rs`. The scan never matched, the
-  argument slice came back empty, and every flag and positional was dropped.
-  `completions/_ztmux` documented the flags the whole time.
-- **Fix:** the CLI dispatch in `tmux.rs` records the verb's own argv
-  (`extensions::set_verb_args`) and every extension reads it through
-  `extensions::verb_args()`, so no extension has to find itself in argv and a
-  future rename cannot break argument parsing again. The 17 modules that used
-  the old scan — including the ones whose name happened to match — now take
-  their arguments as a parameter, which also makes them unit-testable. The three
-  verbs' own messages name the verb the user typed rather than the module.
-- **Pinned by:** `tests/extension_flags_reach_the_verb.rs` — one test per verb,
-  driving the real binary.
+- **Root cause:** three `CLIENT_READONLY` gates were missing. `attach-session
+  -r` and `switch-client -r` let an already-read-only client re-assert or clear
+  the flag with no check, where the C requires the caller to be the server's own
+  user (`proc_get_peer_uid` vs `getuid`, `cmd-attach-session.c:111-117`,
+  `cmd-switch-client.c:83-89`) -- clearing it is a privilege escalation, and the
+  C tests the flag on the TARGET client but the uid of the CALLING one.
+  `detach-client` carried `CMD_READONLY` (so a read-only client may detach
+  itself) without the gate that stops it detaching anyone else
+  (`cmd-detach-client.c:73-78`).
+- **Coverage now:** the C has 24 `CLIENT_READONLY` sites across 9 files, the
+  port 22 across the same 9. The difference is `server-client.c`, where the C
+  writes the same read-only check twice -- once for `default-client-command`
+  and once for a command message -- and the port reaches both through one
+  shared path.
+- **Pinned by:** `parity/cases/1565_readonly_client_gates.sh`, which makes a
+  REAL read-only client (an inner server attached with `attach -r` from a pane
+  of the outer one) and has that client press the key, because running the
+  command from a fresh client would test nothing. It shows the writable client
+  surviving `detach-client -a` and the read-only client still able to detach
+  itself.
+- **What is still untestable here:** the two uid checks need a second real
+  account to exercise, so they are ported to the C's shape but not covered by a
+  case.
 
 ## 2026-08-21 (structured output under a non-UTF-8 client)
 

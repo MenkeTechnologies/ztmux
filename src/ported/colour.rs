@@ -17,7 +17,7 @@ use std::borrow::Cow;
 use crate::*;
 use crate::options_::{options, options_array_first, options_array_item_index, options_array_item_value, options_array_next, options_get};
 
-const COLOUR_FLAG_256: i32 = 0x01000000;
+pub const COLOUR_FLAG_256: i32 = 0x01000000;
 const COLOUR_FLAG_RGB: i32 = 0x02000000;
 const COLOUR_FLAG_THEME: i32 = 0x04000000;
 const COLOUR_THEME_COUNT: u32 = 10;
