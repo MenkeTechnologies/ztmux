@@ -3,7 +3,7 @@
   "passed": 1251,
   "failed": 0,
   "percent": 100.00,
-  "ztmux_version": "3.7.40",
+  "ztmux_version": "3.7.41",
   "reference": "tmux next-3.7",
-  "generated_at": "2026-08-20T22:47:36Z"
+  "generated_at": "2026-08-21T01:59:44Z"
 }

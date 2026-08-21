@@ -177,7 +177,7 @@ divergences — each pinned to a single case and then ported correctly. It now s
 **1251/1251 cases passing (100%), byte-for-byte vs the vendored tmux, with zero failing
 cases.** That is a statement about what the suite measures, not a claim that nothing
 differs: `parity/known_gaps/` holds behaviour that is deliberately still unported, and
-`docs/BUGS.md` keeps an open list. 38 of the cases compare what an ATTACHED CLIENT
+`docs/BUGS.md` keeps an open list. 40 of the cases compare what an ATTACHED CLIENT
 draws, by nesting a second server inside a pane of the first — the only way this suite can
 see rendering at all. That technique is where most of the recent divergences were hiding:
 copy-mode line numbers going stale on a cursor move, `display-menu -b` being parsed and
