@@ -4,9 +4,12 @@ Fixes to the ztmux port, most recent first.
 
 ## Open
 
-Re-measured 2026-08-18 against the current build. Three entries that stood here
-earlier the same day are gone because the defects are fixed, not because the
-entries were tidied away: the `choose-tree` `i` info view (ported, pinned by case
+Re-measured 2026-08-21: the structured-output entry is gone from this list
+because it is fixed (below), not because it was tidied away. The four that
+remain were last re-measured 2026-08-18 against the build of that day.
+
+Three entries that stood here earlier on 2026-08-18 are gone for the same
+reason — the defects are fixed: the `choose-tree` `i` info view (ported, pinned by case
 1510), `link=` in a style (ported, pinned by cases 1554/1555), and `dim=` in a
 style, which was added to this list and then closed the same day once
 `tty_style_ctx` came over (case 1556). One entry shrank to a smaller, sharper
@@ -78,33 +81,6 @@ both binaries, zero divergences.
   bufferevent. This is the same cluster the `refresh-client -l` entry above is
   blocked on.
 
-### `-o json` and `-o tsv` are unusable under a non-UTF-8 locale
-
-- **Symptom:** `LC_ALL=C ztmux list-windows -o json` emits `[_{"session":...`
-  — the newline between array elements is an underscore, and the document is
-  not parseable. All four formats collapse to a single line: json 4 lines to 1,
-  jsonl 2 to 1, csv 3 to 1, tsv 3 to 1 with 38 underscores where the tabs were.
-  Still reproduces today.
-- **Root cause:** `Rows::render` (`src/extensions/structured.rs:117`) builds the
-  whole document as one string and hands it to a single `cmdq_print`, whose own
-  comment at line 116 says so. `server_client_print`
-  (`vendor/tmux/server-client.c:3040`, ported faithfully) runs `utf8_sanitize`
-  over a message when the client lacks `CLIENT_UTF8`, and `utf8_sanitize`
-  (`utf8.c:784`, `src/ported/utf8.rs:770`) replaces every byte outside
-  `0x20..0x7e` with `_`. tmux's own multi-line listings survive because they
-  call `cmdq_print` once per line.
-- **Blast radius:** running each of the 113 extension verbs against a fresh
-  two-window server gives 95 producing output under the inherited UTF-8 locale
-  and 31 under `LC_ALL=C` — 64 verbs flip from working to `parse [...]:
-  expected value at line 1 column 2`. `parity/run_parity.sh:55` exports
-  `LC_ALL=C LANG=C`, so the suite runs in exactly that locale, and no parity
-  case can cover `-o` because it has no upstream counterpart.
-- **Fix:** emit one `cmdq_print` per rendered line, as the ported `list-*`
-  commands already do. Five call sites
-  (`cmd_list_buffers/clients/panes/sessions/windows.rs`) share one
-  `cmdq_print!(item, "{}", out.render())`, so the change belongs behind one
-  shared helper rather than five edits.
-
 ### `TTY_WAITBG`/`TTY_WAITFG` and `tty_repeat_requests`' `force` are unported
 
 - **Found 2026-08-18** while un-inverting the start-timer condition
@@ -119,6 +95,53 @@ both binaries, zero divergences.
 - **Not known to be observable.** No probe has been constructed that
   distinguishes the two binaries on this, so it is filed as unported surface
   rather than as a reproduced defect.
+
+## 2026-08-21 (structured output under a non-UTF-8 client)
+
+### `-o json` collapsed to one unparseable line, and the extensions that read it went with it
+
+- **Blast radius:** 102 of the modules under `src/extensions/` resolve the
+  running server by parsing `-o json` (`grep -rl "\-o json" src/extensions`),
+  so for a client in this state they read a document that cannot be parsed at
+  all. The earlier record of this entry counted "64 of 113 verbs" flipping; that
+  number was measured on 2026-08-18 and is left there rather than restated here,
+  since `ztmux verbs` now reports 114 and the count was never re-run.
+- **Symptom:** `LC_ALL=C ztmux list-windows -o json` emitted
+  `[_{"session":...}_]` — every newline in the document replaced by `_`, so
+  nothing downstream could parse it. All six formats collapsed the same way.
+- **Root cause:** `Rows::render` built the whole document as one string and
+  handed it to a single `cmdq_print`. `server_client_print`
+  (`vendor/tmux/server-client.c:3040`, ported faithfully) runs `utf8_sanitize`
+  over a message when the client lacks `CLIENT_UTF8`, and `utf8_sanitize`
+  (`vendor/tmux/utf8.c:784`) replaces every byte outside `0x20..=0x7e` with `_`
+  — newlines included. tmux's own listings never hit this because they call
+  `cmdq_print` once per line.
+- **Two conditions, and the missing one is why this looked unreproducible at
+  first:** the client needs a non-UTF-8 locale AND no `$TMUX` in its
+  environment. `tmux.c:485-492` assumes UTF-8 when `$TMUX` is set, so a probe
+  run from inside a ztmux pane — which is where the repro was first attempted —
+  gets `CLIENT_UTF8` no matter what `LC_ALL` says and prints clean output. From
+  a bare shell it reproduces every time. The earlier record of this entry gave
+  the `LC_ALL=C` half only.
+- **Fix:** `Rows::print` prints one `cmdq_print` per line, and the five call
+  sites (`cmd_list_buffers/clients/panes/sessions/windows.rs`) call it instead
+  of rendering into one message. Byte-for-byte identical for a UTF-8 client:
+  `cmdq_print` appends a newline per message, so splitting on `\n` reproduces
+  exactly the separators the document already had.
+- **What is deliberately NOT fixed:** non-ASCII *content* is still sanitized for
+  such a client — `"name":"h_llo"` for a window named `héllo` — because that is
+  the client declaring it cannot render UTF-8, and every other tmux listing gets
+  the same treatment. A "fix" that smuggled raw UTF-8 past `utf8_sanitize` would
+  be a divergence, so a test pins the sanitizing.
+- **`-o tsv` remains unusable for that client, and this is not a defect:** a tab
+  is `0x09`, outside the printable range, so the separators arrive as
+  underscores. No line-splitting can change that — it is the C's own rule about
+  what may be sent to a client that has not declared UTF-8. The man page now
+  says so under `-o tsv` and points at `-o csv`, whose commas are printable.
+  json, jsonl, csv, yaml and table are all intact.
+- **Pinned by:** `tests/structured_output_under_c_locale.rs` — three tests, of
+  which the two structural ones fail against a rebuild without the fix and the
+  sanitizing one passes both ways by design.
 
 ## 2026-08-20 (n-ary boolean operators)
 

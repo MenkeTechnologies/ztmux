@@ -128,6 +128,34 @@ impl Structured {
         String::from_utf8_lossy(&out).into_owned()
     }
 
+    /// Print the rendered document to a command queue item, one `cmdq_print`
+    /// per line.
+    ///
+    /// The line split is not cosmetic. `server_client_print`
+    /// (`vendor/tmux/server-client.c:3040`) runs `utf8_sanitize` over a message
+    /// when the client lacks `CLIENT_UTF8`, and `utf8_sanitize`
+    /// (`vendor/tmux/utf8.c:784`) replaces every byte outside `0x20..=0x7e`
+    /// with `_` — newlines included. A whole document handed to one
+    /// `cmdq_print` therefore collapses to a single line of underscores for any
+    /// client whose locale is not UTF-8 and that is not itself inside a tmux
+    /// (`tmux.c:485-492` assumes UTF-8 when `$TMUX` is set), which made every
+    /// `-o json` document unparseable there. tmux's own listings never hit this
+    /// because they call `cmdq_print` once per line; so does this now.
+    ///
+    /// Byte-for-byte identical to the previous single call for a UTF-8 client:
+    /// `cmdq_print` appends a newline to each message, and splitting on `\n`
+    /// reproduces exactly the separators that were in the document.
+    /// Non-ASCII *content* is still sanitized for a non-UTF-8 client, as every
+    /// other tmux listing is — the document stays parseable, its strings get the
+    /// same treatment they would from `list-windows -F`.
+    pub(crate) unsafe fn print(&self, item: *mut cmdq_item) {
+        unsafe {
+            for line in self.render().split('\n') {
+                cmdq_print!(item, "{}", line);
+            }
+        }
+    }
+
     fn render_json(&self, out: &mut Vec<u8>, array: bool) {
         if array {
             out.push(b'[');

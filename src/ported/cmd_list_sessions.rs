@@ -110,7 +110,7 @@ unsafe fn cmd_list_sessions_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
         }
 
         if let Some(out) = structured.as_ref() {
-            cmdq_print!(item, "{}", out.render());
+            out.print(item);
         }
 
         cmd_retval::CMD_RETURN_NORMAL

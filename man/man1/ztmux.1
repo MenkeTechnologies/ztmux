@@ -1150,6 +1150,14 @@ RFC 4180 comma-separated values with a header row.
 .TP
 .B tsv
 Tab-separated values with a header row.
+Not usable from a client that has not declared UTF-8 (no UTF-8 locale and no
+.BR $TMUX ):
+the server sanitises every byte outside the printable ASCII range out of a
+message to such a client, and a tab is one, so the separators arrive as
+underscores.
+Use
+.B csv
+there.
 .TP
 .B table
 Human-readable, whitespace-aligned columns with a header and a rule.
