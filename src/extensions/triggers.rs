@@ -385,9 +385,12 @@ fn dispatch(socket: &str, rule: &Rule, target: &str) {
     let line = format!("{prefix} {} &", rule.action);
     let _ = Command::new("/bin/sh").arg("-c").arg(&line).status();
 
+    // Local wall-clock, not epoch milliseconds: this file is meant to be
+    // watched (`split-window -h 'less +F ~/.ztmux/triggers.log'` is the
+    // documented example action), and an epoch is unreadable in a tail.
     let entry = format!(
         "{} {} [{}] fired: {}\n",
-        now_ms(),
+        now_local(),
         rule.name,
         target,
         rule.action
@@ -448,7 +451,29 @@ fn debounce_ok(rule: &Rule) -> bool {
     true
 }
 
+/// `YYYY-MM-DD HH:MM:SS` in the process's own zone, for the fired-trigger log.
+/// `now_ms` stays as it is — the debounce state files are machine-read and want
+/// the raw milliseconds.
+fn now_local() -> String {
+    let t = (now_ms() / 1000) as libc::time_t;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    // SAFETY: `localtime_r` fills the `tm` we own; NULL on failure.
+    if unsafe { libc::localtime_r(&t, &mut tm) }.is_null() {
+        return now_ms().to_string();
+    }
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+        tm.tm_year + 1900,
+        tm.tm_mon + 1,
+        tm.tm_mday,
+        tm.tm_hour,
+        tm.tm_min,
+        tm.tm_sec
+    )
+}
+
 fn now_ms() -> u64 {
+
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u64)
