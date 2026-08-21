@@ -25,14 +25,26 @@ ported surface `parity/cases/` measures — they are unbuilt surface.
 
 ## The cases
 
-`mouse_scrollbar_locations.sh` — the scrollbar and control mouse locations. The C
-names 19 locations per mouse family (`tmux.h:178-197`); ztmux's `keyc` table is
-the older six, with no code for `SCROLLBAR_UP` / `_SLIDER` / `_DOWN` or
-`CONTROL0`-`9`. Five default root bindings have no key to attach to, and
-`copy-mode -S` is unreachable because the slider drag is its only default caller.
+**There are none.** This directory holds only this README: every gap ever
+recorded here has been ported and its case promoted to `parity/cases/`. That is
+the intended end state, not an omission — a gap is added the moment one is
+proven, so an empty directory means nothing is currently proven missing, and
+says nothing about surface no case has probed yet. `docs/BUGS.md` is where
+suspected-but-unproven gaps and open defects live.
 
-Everything else that lived here has graduated into
-`parity/cases/`: `cmd_prompt_in_pane` (the `command-prompt -P` in-pane prompt,
+The last to graduate was `mouse_scrollbar_locations.sh` — the scrollbar and
+control mouse locations. The C names 19 locations per mouse family
+(`tmux.h:177-197`) where this tree carried the older six, so `SCROLLBAR_UP` /
+`_SLIDER` / `_DOWN` and `CONTROL0`-`9` had no key code, five default root
+bindings had nothing to attach to, and `copy-mode -S` was unreachable because
+the slider drag is its only default caller. All 19 landed; the case is now
+`parity/cases/1511_mouse_scrollbar_locations.sh`, rewritten to pin the names,
+the bindings and the flag rather than record their absence, and
+`parity/cases/1512_style_range_control.sh` pins the `#[range=control|N]`
+directive the CONTROL locations are reached through.
+
+Everything else that lived here graduated into
+`parity/cases/` before it: `cmd_prompt_in_pane` (the `command-prompt -P` in-pane prompt,
 promoted once `window_pane` gained its prompt fields and `window.c`'s pane-prompt
 functions were ported — now `parity/cases/1506_command_prompt_in_pane.sh` and
 `1507_pane_prompt_render.sh`), `pane_zoomed_flag`, `session_*_flag`, the terminal-feature
@@ -44,7 +56,7 @@ pane/session status-line options (`pane-status-*` / `session-status-*` /
 repeat modifier), `copy-mode-line-numbers` and its styles, the
 `prompt-cursor-*` / `prompt-command-cursor-*` / `message-format` options, the
 floating-pane format vars, `pane-scrollbars*`, the `tree-mode-*` preview/style
-options, and — last — `cmd_switch_mode`.
+options, and `cmd_switch_mode`.
 
 Add a case here the moment a next-3.7 feature is shown to be missing, so the gap
 is measured rather than remembered.
@@ -58,7 +70,7 @@ to make its output friendlier.
 
 ## Sample proof
 
-`cmd_switch_mode.sh` was the last one, and it read:
+`cmd_switch_mode.sh` was the second-to-last to close, and it read:
 
 ```
 cmd_switch_mode.sh
@@ -83,9 +95,12 @@ covers the five options themselves, `1486` the choose-tree session preview as
 drawn and `1487` the selection style and the per-pane preview, both captured
 through the same nested client.
 
-The one command still unported is `scroll-to-mouse`. `mouse_scrollbar_locations.sh`
-covers the reason — the `KEYC_MOUSE_LOCATION_SCROLLBAR_*` key codes ztmux's
-six-location `keyc` table cannot name — but not the command itself: driving it
-needs a slider drag, and with no mouse event to read the vendored tmux takes its
-own server down, so such a case would measure that crash rather than the gap. The
-command is recorded in `docs/BUGS.md` instead.
+`scroll-to-mouse` was the last unported copy-mode command and the reason this
+directory could not close: naming it needed the `SCROLLBAR_*` key codes, and
+driving it needs a slider drag, which no case can synthesise — with no mouse
+event to read, the vendored tmux takes its own server down, so such a case would
+measure that crash rather than the gap. The command itself came over with the
+copy-mode command table (`window-copy.c:1678` -> `src/ported/window_copy.rs:1819`,
+table entry at `:4295`), and the key codes came over with the 19 locations, so
+neither is a gap any more. It stays uncased for the reason above — that is a
+limit of what this harness can drive, recorded here rather than left implied.

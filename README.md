@@ -11,7 +11,8 @@
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://menketechnologies.github.io/ztmux/)
 [![Port Report](https://img.shields.io/badge/port-report-8a2be2.svg)](https://menketechnologies.github.io/ztmux/port_report.html)
 [![Parity vs tmux](https://img.shields.io/badge/parity%20vs%20tmux-1251%2F1251%20(100%25)-brightgreen.svg)](parity/PARITY_ROADMAP.md)
-[![Status](https://img.shields.io/badge/status-100%25%20functional-brightgreen.svg)](docs/BUGS.md)
+[![Status](https://img.shields.io/badge/status-server%20%2B%20client%20running-brightgreen.svg)](https://menketechnologies.github.io/ztmux/)
+[![Bug log](https://img.shields.io/badge/bug%20log-open%20gaps%20named-orange.svg)](docs/BUGS.md)
 [![Reference](https://img.shields.io/badge/reference-tmux%203.x-00ffcc.svg)](https://github.com/tmux/tmux)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
