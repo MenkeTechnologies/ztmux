@@ -33,8 +33,7 @@ struct Opts {
     json: bool,
 }
 
-fn parse_opts() -> Opts {
-    let args: Vec<String> = std::env::args().collect();
+fn parse_opts(args: &[String]) -> Opts {
     let has = |f: &str| args.iter().any(|a| a == f);
     let idle = args
         .iter()
@@ -59,7 +58,7 @@ pub(crate) fn run(socket: &str) -> i32 {
         eprintln!("ztmux prune: {e}");
         return 1;
     }
-    let opts = parse_opts();
+    let opts = parse_opts(super::verb_args());
     let victims = plan(&snap, &opts, now_unix());
 
     if opts.json {

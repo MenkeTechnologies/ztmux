@@ -648,6 +648,18 @@ pub unsafe fn tmux_main(mut argc: i32, mut argv: *mut *mut u8, _env: *mut *mut u
                 } else {
                     CStr::from_ptr(SOCKET_PATH.cast()).to_string_lossy().into_owned()
                 };
+                // Hand the extension its own arguments (everything after the
+                // verb) so no extension has to find itself in argv; see
+                // `extensions::verb_args`.
+                crate::extensions::set_verb_args(
+                    (1..argc as usize)
+                        .map(|i| {
+                            CStr::from_ptr((*argv.add(i)).cast())
+                                .to_string_lossy()
+                                .into_owned()
+                        })
+                        .collect(),
+                );
                 let code = match cmd {
                     b"switcher" => crate::extensions::switch::run(&sock),
                     b"tree" => crate::extensions::tree::run(&sock),

@@ -129,6 +129,15 @@ fn looks_like_path(t: &str) -> bool {
     {
         return true;
     }
+    // A relative candidate whose every segment is digits is a date or a ratio
+    // (`08/20/26`, `1/2`), not a path — the status line puts one on screen, and
+    // it used to be the first row in the picker.
+    if core
+        .split('/')
+        .all(|seg| !seg.is_empty() && seg.bytes().all(|b| b.is_ascii_digit()))
+    {
+        return false;
+    }
     // Relative like `src/main.rs`: require a dotted last segment or two slashes.
     core.matches('/').count() >= 2 || core.rsplit('/').next().is_some_and(|f| f.contains('.'))
 }
@@ -445,6 +454,16 @@ mod tests {
         assert!(texts.contains(&"src/main.rs:42"));
         assert!(texts.contains(&"/etc/hosts"));
         assert!(texts.contains(&"~/.zshrc"));
+    }
+
+    #[test]
+    fn ignores_dates_and_ratios() {
+        // A date on the status line is not something to open.
+        let got = kinds("08/20/26 and 1/2 and 3/4/5");
+        assert!(got.is_empty(), "got {got:?}");
+        // An absolute path of digits still counts — the leading `/` is explicit.
+        let abs = kinds("/2026/08");
+        assert_eq!(abs.len(), 1, "got {abs:?}");
     }
 
     #[test]

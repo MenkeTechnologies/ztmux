@@ -23,8 +23,8 @@ const PRESETS: &[(&str, &str)] = &[
 ];
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let args: Vec<String> = std::env::args().collect();
-    let name = args.iter().skip_while(|a| a.as_str() != "layout").nth(1);
+    let args = super::verb_args();
+    let name = args.first();
     let name = match name {
         Some(n) if !n.starts_with('-') => n.as_str(),
         _ => {

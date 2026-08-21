@@ -17,7 +17,8 @@ use super::tmux_query::{Pane, Snapshot, capture_pane, poll};
 const TAIL: usize = 10;
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let Some(target) = target_arg() else {
+    let args = super::verb_args();
+    let Some(target) = target_arg(args) else {
         eprintln!("usage: ztmux info <target> [-o json]");
         return 2;
     };
@@ -37,11 +38,7 @@ pub(crate) fn run(socket: &str) -> i32 {
     let tail = capture_pane(socket, &pane.id, false)
         .map(|c| tail_lines(&c, TAIL))
         .unwrap_or_default();
-    let json = std::env::args().any(|a| a == "--json")
-        || std::env::args()
-            .collect::<Vec<_>>()
-            .windows(2)
-            .any(|w| w[0] == "-o" && w[1] == "json");
+    let json = super::wants_json(args);
     if json {
         print!("{}", render_json(pane, &stat, &tail));
     } else {
@@ -53,12 +50,9 @@ pub(crate) fn run(socket: &str) -> i32 {
     0
 }
 
-/// The first positional argument after the `info` subcommand.
-fn target_arg() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
-    let start = args.iter().position(|a| a == "info")? + 1;
-    args[start..]
-        .iter()
+/// The first positional argument of the verb.
+fn target_arg(args: &[String]) -> Option<String> {
+    args.iter()
         .find(|a| !a.starts_with('-') && a.as_str() != "json")
         .cloned()
 }

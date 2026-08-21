@@ -2256,7 +2256,12 @@ pub unsafe fn screen_write_clearstartofscreen(ctx: *mut screen_write_ctx, bg: u3
 
         #[cfg(feature = "sixel")]
         {
-            if crate::image_::image_check_line(s, 0, (*s).cy - 1) && !(*ctx).wp.is_null() {
+            // C computes `s->cy - 1` in u_int, so a cursor on the top row
+            // wraps to UINT_MAX instead of trapping; `ESC [ 1 J` at row 0 is
+            // ordinary output and must not take the server down.
+            if crate::image_::image_check_line(s, 0, (*s).cy.wrapping_sub(1))
+                && !(*ctx).wp.is_null()
+            {
                 (*(*ctx).wp).flags |= window_pane_flags::PANE_REDRAW;
             }
         }

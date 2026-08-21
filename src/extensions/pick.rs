@@ -20,7 +20,7 @@ use super::tmux_query::query_lines;
 const SEL_OPT: &str = "@ztmux_sel";
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let op = op_arg();
+    let op = op_arg(super::verb_args());
     let marked = marked_panes(socket);
     match op.as_deref() {
         Some("sync") => {
@@ -65,11 +65,9 @@ pub(crate) fn run(socket: &str) -> i32 {
     0
 }
 
-/// The operation word following the `pick` subcommand (`ztmux pick sync`).
-fn op_arg() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
-    let i = args.iter().position(|a| a == "pick")?;
-    args.get(i + 1).cloned()
+/// The operation word following the verb (`ztmux pick sync`).
+fn op_arg(args: &[String]) -> Option<String> {
+    args.first().cloned()
 }
 
 /// Every pane id whose `@ztmux_sel` flag is set, across all sessions.

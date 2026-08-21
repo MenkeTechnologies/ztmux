@@ -57,22 +57,21 @@ pub(crate) struct Verb {
 const GROUPS: [Kind; 4] = [Kind::Command, Kind::Alias, Kind::Extension, Kind::Builtin];
 
 pub(crate) fn run(_socket: &str) -> i32 {
-    let args: Vec<String> = std::env::args().collect();
-    let json = args.iter().any(|a| a == "--json")
-        || args.windows(2).any(|w| w[0] == "-o" && w[1] == "json");
+    let args = super::verb_args();
+    let json = super::wants_json(args);
 
     if json {
-        print!("{}", render_json(filter_arg(&args)));
+        print!("{}", render_json(filter_arg(args)));
     } else {
-        print_verbs(filter_arg(&args));
+        print_verbs(filter_arg(args));
     }
     0
 }
 
-/// The filter: the first word after `verbs` that is not a flag or a flag's
-/// value, so `verbs json` filters on "json" while `verbs -o json` does not.
+/// The filter: the first argument that is not a flag or a flag's value, so
+/// `verbs json` filters on "json" while `verbs -o json` does not.
 fn filter_arg(args: &[String]) -> Option<&str> {
-    let mut rest = args.iter().skip_while(|a| *a != "verbs").skip(1);
+    let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         match arg.as_str() {
             // The only value-taking flag; its value is the output format.
@@ -348,23 +347,16 @@ mod tests {
 
     #[test]
     fn the_filter_is_the_first_word_that_is_not_a_flag_or_a_flags_value() {
-        let argv = |args: &[&str]| -> Vec<String> {
-            std::iter::once("ztmux")
-                .chain(args.iter().copied())
-                .map(str::to_string)
-                .collect()
-        };
-        assert_eq!(filter_arg(&argv(&["verbs"])), None);
-        assert_eq!(filter_arg(&argv(&["verbs", "pane"])), Some("pane"));
+        // The verb's own arguments, as `extensions::verb_args` hands them over:
+        // everything after `verbs` itself.
+        let argv =
+            |args: &[&str]| -> Vec<String> { args.iter().copied().map(str::to_string).collect() };
+        assert_eq!(filter_arg(&argv(&[])), None);
+        assert_eq!(filter_arg(&argv(&["pane"])), Some("pane"));
         // `-o json` is the output format, not a filter — but a bare `json` is.
-        assert_eq!(filter_arg(&argv(&["verbs", "-o", "json"])), None);
-        assert_eq!(filter_arg(&argv(&["verbs", "json"])), Some("json"));
-        assert_eq!(
-            filter_arg(&argv(&["verbs", "--json", "pane"])),
-            Some("pane")
-        );
-        // Words before the verb (socket flags) are never the filter.
-        assert_eq!(filter_arg(&argv(&["-S", "/tmp/s", "verbs"])), None);
+        assert_eq!(filter_arg(&argv(&["-o", "json"])), None);
+        assert_eq!(filter_arg(&argv(&["json"])), Some("json"));
+        assert_eq!(filter_arg(&argv(&["--json", "pane"])), Some("pane"));
     }
 
     #[test]

@@ -22,11 +22,12 @@ struct Match {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let Some(query) = query_arg() else {
+    let args = super::verb_args();
+    let Some(query) = query_arg(args) else {
         eprintln!("usage: ztmux grep <pattern> [-a] [-o json]");
         return 2;
     };
-    let history = std::env::args().any(|a| a == "-a" || a == "--history");
+    let history = args.iter().any(|a| a == "-a" || a == "--history");
     let snap = poll(socket);
     if let Some(e) = &snap.error {
         eprintln!("ztmux grep: {e}");
@@ -40,11 +41,7 @@ pub(crate) fn run(socket: &str) -> i32 {
         .filter_map(|p| capture_pane(socket, &p.id, history).map(|c| (p.clone(), c)))
         .collect();
     let matches = search(&captures, &query);
-    let json = std::env::args().any(|a| a == "--json")
-        || std::env::args()
-            .collect::<Vec<_>>()
-            .windows(2)
-            .any(|w| w[0] == "-o" && w[1] == "json");
+    let json = super::wants_json(args);
     if json {
         print!("{}", render_json(&matches));
     } else {
@@ -53,13 +50,10 @@ pub(crate) fn run(socket: &str) -> i32 {
     i32::from(matches.is_empty())
 }
 
-/// The first positional argument after the `grep` subcommand, skipping flags
-/// and the `json` value of `-o json`.
-fn query_arg() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
-    let start = args.iter().position(|a| a == "grep")? + 1;
-    args[start..]
-        .iter()
+/// The first positional argument of the verb, skipping flags and the `json`
+/// value of `-o json`.
+fn query_arg(args: &[String]) -> Option<String> {
+    args.iter()
         .find(|a| !a.starts_with('-') && a.as_str() != "json")
         .cloned()
 }

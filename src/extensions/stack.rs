@@ -37,9 +37,10 @@ use super::tmux_query::query_lines;
 const STACKED_OPT: &str = "@ztmux-stacked";
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let win = target_window();
+    let args = super::verb_args();
+    let win = target_window(args);
     let win = win.as_deref().unwrap_or("");
-    match op_arg().as_deref() {
+    match op_arg(args).as_deref() {
         Some("off") | Some("unstack") => set_stacked(socket, win, false),
         // Re-establish the stack geometry around whichever pane is now flexible
         // (active). zellij does this in expand_pane() on focus.
@@ -54,18 +55,14 @@ pub(crate) fn run(socket: &str) -> i32 {
     0
 }
 
-/// The subcommand word after `stack` (`ztmux stack refocus -t @3`).
-fn op_arg() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
-    let i = args.iter().position(|a| a == "stack")?;
-    args.get(i + 1).filter(|s| !s.starts_with('-')).cloned()
+/// The subcommand word after the verb (`ztmux stack refocus -t @3`).
+fn op_arg(args: &[String]) -> Option<String> {
+    args.first().filter(|s| !s.starts_with('-')).cloned()
 }
 
 /// The `-t <window>` the stack acts on (the binding/hook passes `#{window_id}`).
-fn target_window() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
-    let i = args.iter().position(|a| a == "-t")?;
-    args.get(i + 1).cloned()
+fn target_window(args: &[String]) -> Option<String> {
+    args.windows(2).find(|w| w[0] == "-t").map(|w| w[1].clone())
 }
 
 /// Whether the window is currently stacked.

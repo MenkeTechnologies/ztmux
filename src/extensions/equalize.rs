@@ -36,7 +36,7 @@ struct Target {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let Some(args) = parse_args() else {
+    let Some(args) = parse_args(super::verb_args()) else {
         eprintln!(
             "usage: ztmux equalize [layout] [-s session] [-f]\n  layout: {}",
             LAYOUTS.join(" | ")
@@ -84,11 +84,7 @@ pub(crate) fn run(socket: &str) -> i32 {
 
 /// Parse the optional layout positional and `-s` / `-f` flags. Returns `None` on
 /// an unknown layout name (usage error).
-fn parse_args() -> Option<Args> {
-    let argv: Vec<String> = std::env::args().collect();
-    let start = argv.iter().position(|a| a == "equalize")? + 1;
-    let rest = &argv[start..];
-
+fn parse_args(rest: &[String]) -> Option<Args> {
     let session = rest.windows(2).find(|w| w[0] == "-s").map(|w| w[1].clone());
     let force = rest.iter().any(|a| a == "-f" || a == "--force");
 

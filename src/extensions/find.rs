@@ -23,38 +23,32 @@ struct Hit {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let Some(query) = query_arg() else {
-        eprintln!("usage: ztmux find <query> [-o json]");
+    let args = super::verb_args();
+    let Some(query) = query_arg(args) else {
+        eprintln!("usage: ztmux finder <query> [-o json]");
         return 2;
     };
     let snap = poll(socket);
     if let Some(e) = &snap.error {
-        eprintln!("ztmux find: {e}");
+        eprintln!("ztmux finder: {e}");
         return 1;
     }
     let hits = search(&snap, &query);
-    let json = std::env::args().any(|a| a == "--json")
-        || std::env::args()
-            .collect::<Vec<_>>()
-            .windows(2)
-            .any(|w| w[0] == "-o" && w[1] == "json");
+    let json = super::wants_json(args);
     if json {
         print!("{}", render_json(&hits));
     } else {
         print!("{}", render_text(&hits, std::io::stdout().is_terminal()));
     }
-    // Exit non-zero when nothing matched, so `find` is usable in shell `if`.
+    // Exit non-zero when nothing matched, so `finder` is usable in shell `if`.
     i32::from(hits.is_empty())
 }
 
-/// The first positional argument after the `find` subcommand. Output flags
-/// (`-o json`, `--json`) and the `json` value are skipped so they never get
-/// mistaken for the query.
-fn query_arg() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
-    let start = args.iter().position(|a| a == "find")? + 1;
-    args[start..]
-        .iter()
+/// The first positional argument of the verb. Output flags (`-o json`,
+/// `--json`) and the `json` value are skipped so they never get mistaken for
+/// the query.
+fn query_arg(args: &[String]) -> Option<String> {
+    args.iter()
         .find(|a| !a.starts_with('-') && a.as_str() != "json")
         .cloned()
 }

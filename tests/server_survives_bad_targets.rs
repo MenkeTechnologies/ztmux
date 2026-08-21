@@ -285,3 +285,64 @@ fn wait_for_channel_lifecycle_survives() {
 
     kill(&sock);
 }
+
+/// A pane writing `ESC [ 1 J` (clear to start of screen) with the cursor on the
+/// top row took the whole server down: `screen_write_clearstartofscreen` passes
+/// `s->cy - 1` to `image_check_line`, which C evaluates as `u_int` (wrapping to
+/// `UINT_MAX` at row 0) and Rust trapped on. Any full-screen program that homes
+/// the cursor and clears backwards — every editor, pager and TUI — could do it,
+/// so the whole server died on ordinary pane output.
+#[test]
+fn clearing_to_start_of_screen_from_the_top_row_survives() {
+    let sock = socket("clear1j");
+    boot(&sock);
+
+    assert!(
+        ztmux(
+            &sock,
+            &[
+                "new-window",
+                "-d",
+                "-t",
+                "base",
+                "sh",
+                "-c",
+                // Home the cursor, clear to start of screen, then hold the pane
+                // open long enough for the server to parse the output.
+                "printf '\\033[H\\033[1J'; sleep 5",
+            ],
+        )
+        .status
+        .success(),
+        "could not open the window that writes the escape"
+    );
+
+    // The pane's output is parsed on the server's event loop; give it a moment.
+    for _ in 0..40 {
+        if !server_alive(&sock) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(
+        server_alive(&sock),
+        "server died parsing `ESC [ 1 J` written at row 0"
+    );
+
+    // The same sequence from a window that is bigger than the client exercises
+    // the tty side (`tty_region_pane`), where the pane offset is below the
+    // window offset and the difference wraps in C.
+    assert!(
+        ztmux(
+            &sock,
+            &["resize-window", "-t", "base", "-x", "200", "-y", "60"]
+        )
+        .status
+        .success()
+            || server_alive(&sock),
+        "resize-window failed and the server is gone"
+    );
+    assert!(server_alive(&sock), "server died resizing the window");
+
+    kill(&sock);
+}

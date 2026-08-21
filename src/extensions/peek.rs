@@ -21,7 +21,7 @@ struct Peek {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let filter = target_arg();
+    let filter = target_arg(super::verb_args());
     let snap = poll(socket);
     if let Some(e) = &snap.error {
         eprintln!("ztmux peek: {e}");
@@ -44,8 +44,7 @@ pub(crate) fn run(socket: &str) -> i32 {
 }
 
 /// The value of `-t <substr>`, if present.
-fn target_arg() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
+fn target_arg(args: &[String]) -> Option<String> {
     args.windows(2).find(|w| w[0] == "-t").map(|w| w[1].clone())
 }
 

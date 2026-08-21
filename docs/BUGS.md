@@ -96,6 +96,61 @@ both binaries, zero divergences.
   distinguishes the two binaries on this, so it is filed as unported surface
   rather than as a reproduced defect.
 
+## 2026-08-21 (extension arguments, and two u_int subtractions that killed the server)
+
+### `ESC [ 1 J` at row 0 took the whole server down
+
+- **Symptom:** any pane that homed the cursor and cleared backwards —
+  `printf '\033[H\033[1J'` reproduces it in one command — killed the server for
+  every session on the socket. `~/.ztmux/server-panic-*.txt` recorded
+  `attempt to subtract with overflow` in `screen_write_clearstartofscreen`.
+- **Root cause:** `screen-write.c:1992` passes `s->cy - 1` to
+  `image_check_line`. In C that is `u_int`, so at row 0 it wraps to `UINT_MAX`
+  and the range test that follows is simply always true; the port wrote the
+  subtraction straight across, and Rust traps on it. `image_check_line` and
+  `image_check_area` then had the same problem one level down (`py + ny`,
+  `im->py + im->sy`), reachable as soon as a pane holds an image.
+- **A second one on the tty side:** `tty_region_pane` computes
+  `ctx->yoff + rupper - ctx->woy` (`tty.c:2318`, u_int again). With a window
+  bigger than the client — an 80x24 terminal attached to a 200x60 window, or any
+  `window-size manual` window — `woy` is the scroll offset and every pane above
+  it makes that difference negative. `tty_cmd_clearendofscreen` calls it
+  unguarded, so scrolling such a window and clearing killed the server too.
+  `tty_cursor_pane`, `tty_cmd_cell` and `tty_cmd_cells` share the idiom.
+- **And one real divergence found next to it:** `tty_margin_pane` is *not* a
+  u_int expression in C — `tty.c:2363` keeps `l`/`r` in a signed `int` and
+  clamps both to `[0, ctx->wsx]`. The port had dropped the clamp, so besides
+  trapping in a dev build it emitted a wrapped margin in a release one.
+- **Fix:** the u_int sites wrap explicitly (`wrapping_add`/`wrapping_sub`),
+  which is what the C does and what a release build was already doing;
+  `tty_margin_pane` gets the signed clamp it was missing.
+- **Pinned by:** `clearing_to_start_of_screen_from_the_top_row_survives` in
+  `tests/server_survives_bad_targets.rs`, which fails against a rebuild without
+  the `screen_write` half.
+
+### Three extension verbs never saw their own arguments
+
+- **Symptom:** `ztmux finder <query>` always printed `usage:` and exited 2, so
+  the verb could not be used at all. `ztmux clearall -f` and `ztmux revive -f`
+  printed their dry-run listing and did nothing, and `-s <session>` was ignored
+  by both — they listed panes from every session.
+- **Root cause:** each extension found its own arguments by scanning
+  `std::env::args()` for its own name and taking what followed
+  (`position(|a| a == "clear")`). That works only while the verb equals the
+  module name, and for these three it does not: `clearall` lives in `clear.rs`,
+  `revive` in `respawn.rs`, `finder` in `find.rs`. The scan never matched, the
+  argument slice came back empty, and every flag and positional was dropped.
+  `completions/_ztmux` documented the flags the whole time.
+- **Fix:** the CLI dispatch in `tmux.rs` records the verb's own argv
+  (`extensions::set_verb_args`) and every extension reads it through
+  `extensions::verb_args()`, so no extension has to find itself in argv and a
+  future rename cannot break argument parsing again. The 17 modules that used
+  the old scan — including the ones whose name happened to match — now take
+  their arguments as a parameter, which also makes them unit-testable. The three
+  verbs' own messages name the verb the user typed rather than the module.
+- **Pinned by:** `tests/extension_flags_reach_the_verb.rs` — one test per verb,
+  driving the real binary.
+
 ## 2026-08-21 (structured output under a non-UTF-8 client)
 
 ### `-o json` collapsed to one unparseable line, and the extensions that read it went with it

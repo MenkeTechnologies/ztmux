@@ -26,7 +26,7 @@ struct Target {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let args = parse_args();
+    let args = parse_args(super::verb_args());
     let snap = poll(socket);
     if let Some(e) = &snap.error {
         eprintln!("ztmux retitle: {e}");
@@ -58,12 +58,7 @@ pub(crate) fn run(socket: &str) -> i32 {
     i32::from(done != targets.len())
 }
 
-fn parse_args() -> Args {
-    let argv: Vec<String> = std::env::args().collect();
-    let rest = argv
-        .iter()
-        .position(|a| a == "retitle")
-        .map_or(&[][..], |i| &argv[i + 1..]);
+fn parse_args(rest: &[String]) -> Args {
     Args {
         session: rest.windows(2).find(|w| w[0] == "-s").map(|w| w[1].clone()),
         force: rest.iter().any(|a| a == "-f" || a == "--force"),

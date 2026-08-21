@@ -118,7 +118,11 @@ pub unsafe fn image_check_line(s: *mut screen, py: u32, ny: u32) -> bool {
         let mut redraw = false;
 
         for im in tailq_foreach::<_, discr_entry>(&raw mut (*s).images) {
-            if py + ny > (*im.as_ptr()).py && py < (*im.as_ptr()).py + (*im.as_ptr()).sy {
+            // u_int arithmetic in C: callers pass a wrapped `ny` (see
+            // `screen_write_clearstartofscreen`), so these must wrap too.
+            if py.wrapping_add(ny) > (*im.as_ptr()).py
+                && py < (*im.as_ptr()).py.wrapping_add((*im.as_ptr()).sy)
+            {
                 image_free(im);
                 redraw = true;
             }
@@ -133,10 +137,14 @@ pub unsafe fn image_check_area(s: *mut screen, px: u32, py: u32, nx: u32, ny: u3
         let mut redraw = false;
 
         for im in tailq_foreach::<_, discr_entry>(&raw mut (*s).images) {
-            if py + ny <= (*im.as_ptr()).py || py >= (*im.as_ptr()).py + (*im.as_ptr()).sy {
+            if py.wrapping_add(ny) <= (*im.as_ptr()).py
+                || py >= (*im.as_ptr()).py.wrapping_add((*im.as_ptr()).sy)
+            {
                 continue;
             }
-            if px + nx <= (*im.as_ptr()).px || px >= (*im.as_ptr()).px + (*im.as_ptr()).sx {
+            if px.wrapping_add(nx) <= (*im.as_ptr()).px
+                || px >= (*im.as_ptr()).px.wrapping_add((*im.as_ptr()).sx)
+            {
                 continue;
             }
             image_free(im);

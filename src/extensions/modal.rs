@@ -77,7 +77,7 @@ bind -n -N 'ztmux: lock'         C-g { switch-client -T locked }
 "#;
 
 pub(crate) fn run(socket: &str) -> i32 {
-    match op_arg().as_deref() {
+    match op_arg(super::verb_args()).as_deref() {
         Some("on") => set_modal(socket, true),
         Some("off") => set_modal(socket, false),
         _ => set_modal(socket, !is_on(socket)),
@@ -85,11 +85,9 @@ pub(crate) fn run(socket: &str) -> i32 {
     0
 }
 
-/// The subcommand word after `modal` (`ztmux modal on`).
-fn op_arg() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
-    let i = args.iter().position(|a| a == "modal")?;
-    args.get(i + 1).filter(|s| !s.starts_with('-')).cloned()
+/// The subcommand word after the verb (`ztmux modal on`).
+fn op_arg(args: &[String]) -> Option<String> {
+    args.first().filter(|s| !s.starts_with('-')).cloned()
 }
 
 fn is_on(socket: &str) -> bool {

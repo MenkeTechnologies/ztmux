@@ -326,7 +326,7 @@ fn ui(f: &mut Frame, app: &mut App) {
     let title = if let Some(e) = &app.error {
         format!(" no server: {e} ")
     } else {
-        format!("{box_title}({} )", app.filtered.len())
+        format!("{box_title}({}) ", app.filtered.len())
     };
     let input = Paragraph::new(Line::from(vec![
         Span::styled(label, Style::default().fg(Color::Cyan)),

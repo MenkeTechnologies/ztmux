@@ -128,6 +128,45 @@ pub(crate) const EXTENSION_COMMANDS: &[&str] = &[
     "zoom",
 ];
 
+/// The words that follow the extension verb on the command line, recorded by
+/// the CLI dispatch in `tmux.rs` before it hands off to an extension.
+static VERB_ARGS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+
+/// Record the extension's own arguments — everything after the verb, so
+/// `ztmux -S /tmp/s clearall -f` records `["-f"]`.
+pub(crate) fn set_verb_args(args: Vec<String>) {
+    let _ = VERB_ARGS.set(args);
+}
+
+/// The extension's own arguments, the single source every extension parses its
+/// flags and positionals out of.
+///
+/// Extensions used to scan `std::env::args()` for their own name
+/// (`position(|a| a == "clear")`) and take what followed. That silently broke
+/// the three verbs whose module name is not the verb the CLI dispatches:
+/// `clearall` (`clear.rs`), `revive` (`respawn.rs`) and `finder` (`find.rs`) —
+/// the name was never in argv, so every flag was dropped and `finder` could
+/// not see its query at all. Reading the args the dispatcher actually consumed
+/// removes the name from the equation, so renaming a verb cannot break its
+/// argument parsing again.
+///
+/// The fallback (unit tests and any direct call that never went through the
+/// dispatcher) reproduces the old scan, but against `EXTENSION_COMMANDS` rather
+/// than a hand-written literal.
+pub(crate) fn verb_args() -> &'static [String] {
+    VERB_ARGS.get_or_init(|| {
+        let argv: Vec<String> = std::env::args().collect();
+        argv.iter()
+            .position(|a| EXTENSION_COMMANDS.contains(&a.as_str()))
+            .map_or_else(Vec::new, |i| argv[i + 1..].to_vec())
+    })
+}
+
+/// Whether the caller asked for JSON (`-o json` or `--json`).
+pub(crate) fn wants_json(args: &[String]) -> bool {
+    args.iter().any(|a| a == "--json") || args.windows(2).any(|w| w[0] == "-o" && w[1] == "json")
+}
+
 /// Refuse to start a full-screen subcommand when there is no terminal to draw
 /// on, returning the exit code the caller should hand back.
 ///

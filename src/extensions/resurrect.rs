@@ -39,19 +39,18 @@ struct Win {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
-    match op_arg().as_deref() {
+    let args = super::verb_args();
+    match op_arg(args).as_deref() {
         Some("restore") => restore(socket),
         Some("list") => list(),
-        Some("autosave") => autosave(socket),
+        Some("autosave") => autosave(socket, args),
         _ => save(socket),
     }
 }
 
-/// The subcommand word after `resurrect`.
-fn op_arg() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
-    let i = args.iter().position(|a| a == "resurrect")?;
-    args.get(i + 1).filter(|s| !s.starts_with('-')).cloned()
+/// The subcommand word after the verb.
+fn op_arg(args: &[String]) -> Option<String> {
+    args.first().filter(|s| !s.starts_with('-')).cloned()
 }
 
 /// `~/.ztmux/resurrect`, created if missing.
@@ -119,12 +118,11 @@ fn save(socket: &str) -> i32 {
 /// Runs top-level (the only context where the nested `list-*` queries work),
 /// so it is spawned detached — from `@ztmux-resurrect-auto`'s client-attached
 /// hook, or by hand. A per-socket pidfile keeps a single daemon per server.
-fn autosave(socket: &str) -> i32 {
-    let interval = std::env::args()
-        .collect::<Vec<_>>()
+fn autosave(socket: &str, args: &[String]) -> i32 {
+    let interval = args
         .iter()
         .position(|a| a == "autosave")
-        .and_then(|i| std::env::args().nth(i + 1))
+        .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse::<u64>().ok())
         .filter(|n| *n >= 5)
         .unwrap_or(900);

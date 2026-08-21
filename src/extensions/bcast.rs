@@ -26,7 +26,7 @@ struct Args {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let Some(args) = parse_args() else {
+    let Some(args) = parse_args(super::verb_args()) else {
         eprintln!("usage: ztmux bcast <command> [-c cmd] [-s session] [-N] [-f]");
         return 2;
     };
@@ -64,11 +64,7 @@ pub(crate) fn run(socket: &str) -> i32 {
 }
 
 /// Parse the command (first positional) and flags from the process args.
-fn parse_args() -> Option<Args> {
-    let argv: Vec<String> = std::env::args().collect();
-    let start = argv.iter().position(|a| a == "bcast")? + 1;
-    let rest = &argv[start..];
-
+fn parse_args(rest: &[String]) -> Option<Args> {
     let value_after = |flag: &str| -> Option<String> {
         rest.windows(2).find(|w| w[0] == flag).map(|w| w[1].clone())
     };

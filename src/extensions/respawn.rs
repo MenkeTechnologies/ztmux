@@ -2,7 +2,7 @@
 //!
 //! With `remain-on-exit` set, a pane whose command exits stays open but dead,
 //! showing its last output. Where [`super::prune`] *removes* those dead panes,
-//! `respawn` *restarts* them — running `respawn-pane` on each so the whole server
+//! `revive` *restarts* them — running `respawn-pane` on each so the whole server
 //! is revived in one command instead of hunting them down. Optionally limited to
 //! one session with `-s`. Like `prune` and `bcast`, it is **dry-run by default**
 //! — it prints the dead panes it would revive — and only acts when `-f` /
@@ -17,15 +17,15 @@ struct Args {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let args = parse_args();
+    let args = parse_args(super::verb_args());
     let snap = poll(socket);
     if let Some(e) = &snap.error {
-        eprintln!("ztmux respawn: {e}");
+        eprintln!("ztmux revive: {e}");
         return 1;
     }
     let targets = select(&snap, args.session.as_deref());
     if targets.is_empty() {
-        eprintln!("ztmux respawn: no dead panes");
+        eprintln!("ztmux revive: no dead panes");
         return 1;
     }
     if !args.force {
@@ -49,12 +49,7 @@ pub(crate) fn run(socket: &str) -> i32 {
     i32::from(done != targets.len())
 }
 
-fn parse_args() -> Args {
-    let argv: Vec<String> = std::env::args().collect();
-    let rest = argv
-        .iter()
-        .position(|a| a == "respawn")
-        .map_or(&[][..], |i| &argv[i + 1..]);
+fn parse_args(rest: &[String]) -> Args {
     Args {
         session: rest.windows(2).find(|w| w[0] == "-s").map(|w| w[1].clone()),
         force: rest.iter().any(|a| a == "-f" || a == "--force"),

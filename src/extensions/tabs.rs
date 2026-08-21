@@ -51,7 +51,7 @@ const STYLE: &[(&str, &str)] = &[
 ];
 
 pub(crate) fn run(socket: &str) -> i32 {
-    match op_arg().as_deref() {
+    match op_arg(super::verb_args()).as_deref() {
         Some("on") => set_tabs(socket, true),
         Some("off") => set_tabs(socket, false),
         _ => set_tabs(socket, !is_on(socket)),
@@ -59,11 +59,9 @@ pub(crate) fn run(socket: &str) -> i32 {
     0
 }
 
-/// The subcommand word after `tabs` (`ztmux tabs on`).
-fn op_arg() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
-    let i = args.iter().position(|a| a == "tabs")?;
-    args.get(i + 1).filter(|s| !s.starts_with('-')).cloned()
+/// The subcommand word after the verb (`ztmux tabs on`).
+fn op_arg(args: &[String]) -> Option<String> {
+    args.first().filter(|s| !s.starts_with('-')).cloned()
 }
 
 /// Whether the zellij tab bar is currently on.

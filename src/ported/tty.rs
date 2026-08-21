@@ -2458,8 +2458,10 @@ pub unsafe fn tty_cmd_cell(tty: *mut tty, ctx: *const tty_ctx) {
         let s = (*ctx).s;
         let mut vis: u32 = 0;
 
-        let px = (*ctx).xoff + (*ctx).ocx - (*ctx).wox;
-        let py = (*ctx).yoff + (*ctx).ocy - (*ctx).woy;
+        // Computed before the visibility test, as in C, so these wrap rather
+        // than panic for a pane that is not on screen at all.
+        let px = (*ctx).xoff.wrapping_add((*ctx).ocx).wrapping_sub((*ctx).wox);
+        let py = (*ctx).yoff.wrapping_add((*ctx).ocy).wrapping_sub((*ctx).woy);
         if !tty_is_visible(tty, ctx, (*ctx).ocx, (*ctx).ocy, 1, 1)
             || ((*gcp).data.width == 1 && !tty_check_overlay(tty, px, py))
         {
@@ -2487,7 +2489,7 @@ pub unsafe fn tty_cmd_cell(tty: *mut tty, ctx: *const tty_ctx) {
             }
         }
 
-        if (*ctx).xoff + (*ctx).ocx - (*ctx).wox > (*tty).sx - 1
+        if (*ctx).xoff.wrapping_add((*ctx).ocx).wrapping_sub((*ctx).wox) > (*tty).sx - 1
             && (*ctx).ocy == (*ctx).orlower
             && tty_full_width(tty, ctx)
         {
@@ -2538,8 +2540,8 @@ pub unsafe fn tty_cmd_cells(tty: *mut tty, ctx: *const tty_ctx) {
         tty_attributes(tty, (*ctx).cell, &raw const (*ctx).style_ctx);
 
         // Get tty position from pane position for overlay check.
-        let px = (*ctx).xoff + (*ctx).ocx - (*ctx).wox;
-        let py = (*ctx).yoff + (*ctx).ocy - (*ctx).woy;
+        let px = (*ctx).xoff.wrapping_add((*ctx).ocx).wrapping_sub((*ctx).wox);
+        let py = (*ctx).yoff.wrapping_add((*ctx).ocy).wrapping_sub((*ctx).woy);
 
         let r = tty_check_overlay_range(tty, px, py, (*ctx).num);
         for i in 0..(*r).used as usize {
@@ -2548,7 +2550,7 @@ pub unsafe fn tty_cmd_cells(tty: *mut tty, ctx: *const tty_ctx) {
                 continue;
             }
             // Convert back to pane position for printing.
-            let cx = ri.px - (*ctx).xoff + (*ctx).wox;
+            let cx = ri.px.wrapping_sub((*ctx).xoff).wrapping_add((*ctx).wox);
             tty_cursor_pane_unless_wrap(tty, ctx, cx, (*ctx).ocy);
             tty_putn(
                 tty,
@@ -2856,10 +2858,14 @@ pub unsafe fn tty_region_off(tty: *mut tty) {
 /// C `vendor/tmux/tty.c:2318`: `static void tty_region_pane(struct tty *tty, const struct tty_ctx *ctx, u_int rupper, u_int rlower)`
 pub unsafe fn tty_region_pane(tty: *mut tty, ctx: *const tty_ctx, rupper: u32, rlower: u32) {
     unsafe {
+        // C does this in `u_int`, which wraps: with a window bigger than the
+        // client, `yoff + rupper` is below `woy` for every pane scrolled above
+        // the visible region. Rust must wrap the same way — a plain subtraction
+        // panics there and takes the whole server down with it.
         tty_region(
             tty,
-            (*ctx).yoff + rupper - (*ctx).woy,
-            (*ctx).yoff + rlower - (*ctx).woy,
+            (*ctx).yoff.wrapping_add(rupper).wrapping_sub((*ctx).woy),
+            (*ctx).yoff.wrapping_add(rlower).wrapping_sub((*ctx).woy),
         );
     }
 }
@@ -2913,11 +2919,13 @@ pub unsafe fn tty_margin_off(tty: *mut tty) {
 /// C `vendor/tmux/tty.c:2363`: `static void tty_margin_pane(struct tty *tty, const struct tty_ctx *ctx)`
 pub unsafe fn tty_margin_pane(tty: *mut tty, ctx: *const tty_ctx) {
     unsafe {
-        tty_margin(
-            tty,
-            (*ctx).xoff - (*ctx).wox,
-            (*ctx).xoff + (*ctx).sx - 1 - (*ctx).wox,
-        );
+        // C keeps `l`/`r` in a signed int and clamps both ends to
+        // `[0, ctx->wsx]`; a pane left of the visible window offset makes the
+        // raw difference negative.
+        let clamp = |v: i64| -> u32 { v.clamp(0, i64::from((*ctx).wsx)) as u32 };
+        let l = i64::from((*ctx).xoff) - i64::from((*ctx).wox);
+        let r = i64::from((*ctx).xoff) + i64::from((*ctx).sx) - 1 - i64::from((*ctx).wox);
+        tty_margin(tty, clamp(l), clamp(r));
     }
 }
 
@@ -2979,10 +2987,11 @@ pub unsafe fn tty_cursor_pane_unless_wrap(tty: *mut tty, ctx: *const tty_ctx, cx
 /// C `vendor/tmux/tty.c:2425`: `static void tty_cursor_pane(struct tty *tty, const struct tty_ctx *ctx, u_int cx, u_int cy)`
 pub unsafe fn tty_cursor_pane(tty: *mut tty, ctx: *const tty_ctx, cx: u32, cy: u32) {
     unsafe {
+        // u_int arithmetic in C: wraps for a pane outside the visible offset.
         tty_cursor(
             tty,
-            (*ctx).xoff + cx - (*ctx).wox,
-            (*ctx).yoff + cy - (*ctx).woy,
+            (*ctx).xoff.wrapping_add(cx).wrapping_sub((*ctx).wox),
+            (*ctx).yoff.wrapping_add(cy).wrapping_sub((*ctx).woy),
         );
     }
 }

@@ -87,15 +87,15 @@ fn load_rules() -> Vec<Rule> {
 }
 
 pub(crate) fn run(socket: &str) -> i32 {
-    let args: Vec<String> = std::env::args().collect();
-    match sub_after(&args, "triggers").as_deref() {
+    let args = super::verb_args();
+    match args.first().map(String::as_str) {
         None | Some("list") | Some("ls") => list(),
         Some("arm") => arm(socket),
         Some("disarm") | Some("off") => disarm(socket),
-        Some("add") | Some("new") => add(&args, socket),
+        Some("add") | Some("new") => add(args, socket),
         Some("wizard") => wizard(socket),
-        Some("test") => test_cmd(&args),
-        Some("__match") => match_stream(socket, &args),
+        Some("test") => test_cmd(args),
+        Some("__match") => match_stream(socket, args),
         Some(other) => {
             eprintln!("ztmux triggers: unknown subcommand {other:?}");
             eprintln!(
