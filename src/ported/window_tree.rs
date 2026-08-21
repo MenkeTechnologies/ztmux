@@ -690,13 +690,11 @@ unsafe fn window_tree_draw_session(
         let cy: u32 = (*(*ctx).s).cy;
         let mut loop_: u32;
         let mut visible: u32;
-        let each: u32;
         let mut width: u32;
         let mut offset: u32;
 
         let mut start: u32;
         let mut end: u32;
-        let remaining: u32;
         let mut i: u32;
 
         let mut gc: grid_cell = zeroed();
@@ -748,16 +746,16 @@ unsafe fn window_tree_draw_session(
             left = false;
             right = false;
         }
-        if left && right {
-            each = (sx - 6) / visible;
-            remaining = (sx - 6) - (visible * each);
+        let (each, remaining) = if left && right {
+            let each = (sx - 6) / visible;
+            (each, (sx - 6) - (visible * each))
         } else if left || right {
-            each = (sx - 3) / visible;
-            remaining = (sx - 3) - (visible * each);
+            let each = (sx - 3) / visible;
+            (each, (sx - 3) - (visible * each))
         } else {
-            each = sx / visible;
-            remaining = sx - (visible * each);
-        }
+            let each = sx / visible;
+            (each, sx - (visible * each))
+        };
         if each == 0 {
             return;
         }
@@ -927,18 +925,16 @@ unsafe fn window_tree_draw_window(
             right = false;
         }
 
-        let each;
-        let remaining;
-        if left && right {
-            each = (sx - 6) / visible;
-            remaining = (sx - 6) - (visible * each);
+        let (each, remaining) = if left && right {
+            let each = (sx - 6) / visible;
+            (each, (sx - 6) - (visible * each))
         } else if left || right {
-            each = (sx - 3) / visible;
-            remaining = (sx - 3) - (visible * each);
+            let each = (sx - 3) / visible;
+            (each, (sx - 3) - (visible * each))
         } else {
-            each = sx / visible;
-            remaining = sx - (visible * each);
-        }
+            let each = sx / visible;
+            (each, sx - (visible * each))
+        };
 
         if each == 0 {
             return;

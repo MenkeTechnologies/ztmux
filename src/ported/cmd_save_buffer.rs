@@ -69,9 +69,6 @@ unsafe fn cmd_save_buffer_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
         let args = cmd_get_args(self_);
         let c = cmdq_get_client(item);
         let bufname = cstr_to_str_(args_get_(args, 'b'));
-        let path;
-        let evb;
-
         let pb = if let Some(bufname) = bufname {
             let Some(pb) = NonNull::new(paste_get_name(Some(bufname))) else {
                 cmdq_error!(item, "no buffer {}", bufname);
@@ -88,9 +85,9 @@ unsafe fn cmd_save_buffer_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
         let mut bufsize: usize = 0;
         let bufdata = paste_buffer_data_(pb, &mut bufsize);
 
-        if std::ptr::eq(cmd_get_entry(self_), &CMD_SHOW_BUFFER_ENTRY) {
+        let path = if std::ptr::eq(cmd_get_entry(self_), &CMD_SHOW_BUFFER_ENTRY) {
             if !(*c).session.is_null() || (*c).flags.intersects(client_flag::CONTROL) {
-                evb = evbuffer_new();
+                let evb = evbuffer_new();
                 if evb.is_null() {
                     fatalx("out of memory");
                 }
@@ -99,10 +96,10 @@ unsafe fn cmd_save_buffer_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
                 evbuffer_free(evb);
                 return cmd_retval::CMD_RETURN_NORMAL;
             }
-            path = xstrdup_(c"-").as_ptr();
+            xstrdup_(c"-").as_ptr()
         } else {
-            path = format_single_from_target(item, args_string(args, 0));
-        }
+            format_single_from_target(item, args_string(args, 0))
+        };
         let flags = if args_has(args, 'a') {
             O_APPEND
         } else {

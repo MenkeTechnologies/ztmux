@@ -110,7 +110,6 @@ unsafe fn cmd_show_environment_exec(self_: *mut cmd, item: *mut cmdq_item) -> cm
     unsafe {
         let args = cmd_get_args(self_);
         let target = cmdq_get_target(item);
-        let env: *mut environ;
         let name = args_string(args, 0);
 
         let mut tflag = args_get_(args, 't');
@@ -119,8 +118,8 @@ unsafe fn cmd_show_environment_exec(self_: *mut cmd, item: *mut cmdq_item) -> cm
             return cmd_retval::CMD_RETURN_ERROR;
         }
 
-        if args_has(args, 'g') {
-            env = GLOBAL_ENVIRON;
+        let env: *mut environ = if args_has(args, 'g') {
+            GLOBAL_ENVIRON
         } else {
             if (*target).s.is_null() {
                 tflag = args_get_(args, 't');
@@ -131,8 +130,8 @@ unsafe fn cmd_show_environment_exec(self_: *mut cmd, item: *mut cmdq_item) -> cm
                 }
                 return cmd_retval::CMD_RETURN_ERROR;
             }
-            env = (*(*target).s).environ;
-        }
+            (*(*target).s).environ
+        };
 
         let mut envent;
         if !name.is_null() {

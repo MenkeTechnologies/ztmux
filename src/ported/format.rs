@@ -1600,17 +1600,13 @@ pub unsafe fn format_cb_mouse_status_range(ft: *mut format_tree) -> format_table
             return format_table_type::None;
         }
 
-        let x;
-        let y;
-        if (*ft).m.statusat == 0 && (*ft).m.y < (*ft).m.statuslines {
-            x = (*ft).m.x;
-            y = (*ft).m.y;
+        let (x, y) = if (*ft).m.statusat == 0 && (*ft).m.y < (*ft).m.statuslines {
+            ((*ft).m.x, (*ft).m.y)
         } else if (*ft).m.statusat > 0 && (*ft).m.y >= (*ft).m.statusat as u32 {
-            x = (*ft).m.x;
-            y = (*ft).m.y - (*ft).m.statusat as u32;
+            ((*ft).m.x, (*ft).m.y - (*ft).m.statusat as u32)
         } else {
             return format_table_type::None;
-        }
+        };
 
         let sr = status_get_range((*ft).c, x, y);
         if sr.is_null() {
@@ -5104,30 +5100,28 @@ pub unsafe fn format_replace_expression(
                 LessThanEqual,
             }
 
-            let operator;
-
-            if streq_(*(*mexp).argv, "+") {
-                operator = Operator::Add;
+            let operator = if streq_(*(*mexp).argv, "+") {
+                Operator::Add
             } else if streq_(*(*mexp).argv, "-") {
-                operator = Operator::Subtract;
+                Operator::Subtract
             } else if streq_(*(*mexp).argv, "*") {
-                operator = Operator::Multiply;
+                Operator::Multiply
             } else if streq_(*(*mexp).argv, "/") {
-                operator = Operator::Divide;
+                Operator::Divide
             } else if streq_(*(*mexp).argv, "%") || streq_(*(*mexp).argv, "m") {
-                operator = Operator::Modulus;
+                Operator::Modulus
             } else if streq_(*(*mexp).argv, "==") {
-                operator = Operator::Equal;
+                Operator::Equal
             } else if streq_(*(*mexp).argv, "!=") {
-                operator = Operator::NotEqual;
+                Operator::NotEqual
             } else if streq_(*(*mexp).argv, ">") {
-                operator = Operator::GreaterThan;
+                Operator::GreaterThan
             } else if streq_(*(*mexp).argv, "<") {
-                operator = Operator::LessThan;
+                Operator::LessThan
             } else if streq_(*(*mexp).argv, ">=") {
-                operator = Operator::GreaterThanEqual;
+                Operator::GreaterThanEqual
             } else if streq_(*(*mexp).argv, "<=") {
-                operator = Operator::LessThanEqual;
+                Operator::LessThanEqual
             } else {
                 format_log1!(
                     es,
@@ -5136,7 +5130,7 @@ pub unsafe fn format_replace_expression(
                     _s(*(*mexp).argv),
                 );
                 break 'fail;
-            }
+            };
 
             // The second argument may be flags.
             if argc >= 2 && !strchr(*(*mexp).argv.add(1), b'f' as i32).is_null() {

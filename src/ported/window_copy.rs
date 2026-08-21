@@ -302,8 +302,6 @@ pub unsafe fn window_copy_clone_screen(
         let mut wx: u32 = 0;
         let mut wy: u32 = 0;
 
-        let reflow;
-
         let dst: *mut screen = xcalloc1();
 
         let mut sy = screen_hsize(src) + screen_size_y(src);
@@ -335,13 +333,13 @@ pub unsafe fn window_copy_clone_screen(
             (*dst).cy = (*src).cy;
         }
 
-        if !cx.is_null() && !cy.is_null() {
+        let reflow = if !cx.is_null() && !cy.is_null() {
             *cx = (*dst).cx;
             *cy = screen_hsize(dst) + (*dst).cy;
-            reflow = screen_size_x(hint) != screen_size_x(dst);
+            screen_size_x(hint) != screen_size_x(dst)
         } else {
-            reflow = false;
-        }
+            false
+        };
         if reflow {
             grid_wrap_position((*dst).grid, *cx, *cy, &raw mut wx, &raw mut wy);
         }

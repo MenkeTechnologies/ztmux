@@ -2630,7 +2630,6 @@ unsafe fn input_handle_decrqss(ictx: *mut input_ctx) -> i32 {
         let buf = (*ictx).input_buf;
         let len = (*ictx).input_len;
         let s = (*sctx).s;
-        let ps;
 
         if len < 3 || *buf.add(1) != b' ' || *buf.add(2) != b'q' {
             // Unrecognized DECRQSS: send DCS 0 $ r Pt ST.
@@ -2639,12 +2638,12 @@ unsafe fn input_handle_decrqss(ictx: *mut input_ctx) -> i32 {
         }
 
         // Cursor style query: DCS $ q SP q -- reply DCS 1 $ r SP q <Ps> SP q ST.
-        if (*s).cstyle == screen_cursor_style::SCREEN_CURSOR_BLOCK
+        let ps = if (*s).cstyle == screen_cursor_style::SCREEN_CURSOR_BLOCK
             || (*s).cstyle == screen_cursor_style::SCREEN_CURSOR_UNDERLINE
             || (*s).cstyle == screen_cursor_style::SCREEN_CURSOR_BAR
         {
             let blinking = (*s).mode.intersects(mode_flag::MODE_CURSOR_BLINKING);
-            ps = match (*s).cstyle {
+            match (*s).cstyle {
                 screen_cursor_style::SCREEN_CURSOR_BLOCK => {
                     if blinking {
                         1
@@ -2667,7 +2666,7 @@ unsafe fn input_handle_decrqss(ictx: *mut input_ctx) -> i32 {
                     }
                 }
                 _ => 0,
-            };
+            }
         } else {
             // No explicit runtime style: fall back to the configured
             // cursor-style option (integer Ps 0..6). Pane options inherit.
@@ -2679,8 +2678,8 @@ unsafe fn input_handle_decrqss(ictx: *mut input_ctx) -> i32 {
             let opt_ps = options_get_number_(oo, "cursor-style");
 
             // Sanity clamp: valid Ps are 0..6 per DECSCUSR.
-            ps = if !(0..=6).contains(&opt_ps) { 0 } else { opt_ps };
-        }
+            if !(0..=6).contains(&opt_ps) { 0 } else { opt_ps }
+        };
 
         log_debug!(
             "{}: DECRQSS cursor -> Ps={} (cstyle={} mode={:#x})",
