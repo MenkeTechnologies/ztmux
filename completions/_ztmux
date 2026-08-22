@@ -2663,8 +2663,9 @@ _ztmux-modal() {
 _ztmux-resurrect() {
   [[ -n ${tmux_describe} ]] && print "save/restore all sessions across restarts (ztmux extension)" && return
   _arguments -s \
-    ':subcommand:(save restore list)' \
-    '--run[re-run the saved command of each pane]'
+    ':subcommand:(save restore autosave list)' \
+    '(-r --run)'{-r,--run}'[re-run every saved command line, not just the listed programs]' \
+    '*:snapshot:_files -W ~/.ztmux/resurrect -g "*.txt"'
 }
 
 _ztmux-stack() {

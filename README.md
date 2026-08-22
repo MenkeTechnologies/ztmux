@@ -330,10 +330,16 @@ They fall into a few families:
   mode's keys. `modal off` removes the entry keys and restores the prefix. Since the `Ctrl-*` keys
   are intercepted globally (the zellij trade-off), it is off by default.
   `ztmux resurrect save` / `ztmux resurrect restore` persist the whole server across restarts
-  (zellij-style resurrectable sessions): `save` writes every session/window/pane — layout, cwd and
-  command — to `~/.ztmux/resurrect/`, and `restore` recreates them (windows, panes and exact tiled
-  geometry; shell panes come back in their cwd, `--run` also re-runs saved commands). Existing
-  sessions are never clobbered; `resurrect list` shows saved snapshots. For continuum-style
+  (zellij-style resurrectable sessions): `save` writes every session/window/pane — layout, cwd,
+  running command and its full command line — to `~/.ztmux/resurrect/`, and `restore` recreates
+  them (windows at their saved indexes, panes in their saved directories, exact tiled geometry,
+  and floating panes back at their exact size and position). Restore works pane by pane: a live
+  pane is left alone, a missing pane is split into its window, a missing window is added to its
+  session, and only a missing session is created — so it fills gaps in a running server and is
+  safe to repeat. Programs on `@ztmux-resurrect-processes` (default: the editors and pagers
+  tmux-resurrect ships, `vim nvim emacs man less more tail top htop …`) are re-launched from
+  their saved command line; `--run` re-launches everything saved, `false` nothing. `resurrect
+  list` shows saved snapshots. For continuum-style
   automatic persistence, `set -g @ztmux-resurrect-auto on`: the first client to attach spawns a
   detached daemon that re-saves every 15 minutes (pidfile-guarded, one per server); add
   `set -g @ztmux-resurrect-restore on` and it also restores the last snapshot once on a fresh

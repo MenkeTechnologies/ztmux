@@ -3214,21 +3214,37 @@ persists the whole server across restarts, which tmux itself does not do.
 .B ztmux resurrect
 .RB ( save ,
 the default) walks every session, window and pane and writes its shape \(en
-window names and layout strings, and each pane's working directory and running
-command \(en to a timestamped file under
+window names and layout strings, and each pane's working directory, running
+command and full command line \(en to a timestamped file under
 .IR ~/.ztmux/resurrect/ .
 .B ztmux resurrect restore
 .RI [ file ]
 .RB [ \-\-run ]
 reads the newest save (or
-.IR file )
-back and recreates the sessions: windows in order, the right number of panes
-each in its saved directory, and the exact tiled geometry from the saved layout.
+.IR file ,
+with
+.I .txt
+filled in) back and recreates the sessions: windows at their saved indexes, the
+right number of panes each in its saved directory, the exact tiled geometry from
+the saved layout, and floating panes at their exact size and position.
+Restoring proceeds pane by pane: a pane that is already live is left alone, a
+missing pane is split into its existing window, a missing window is added to its
+existing session, and only a missing session is created from scratch \(en so
+restoring into a running server fills in what is gone, and running it twice
+changes nothing.
 A shell pane comes back exactly; an arbitrary running program cannot be resumed,
-so panes return as a shell in the right directory unless
-.B \-\-run
-is given, which re-sends each pane's saved command. Sessions whose name already
-exists are skipped, never clobbered.
+so panes return as a shell in the right directory and the saved command line is
+then re-sent for the programs listed in
+.BR @ztmux\-resurrect\-processes ,
+which defaults to
+.IR "vi vim view nvim emacs man less more tail top htop irssi weechat mutt" .
+Set it to
+.B :all:
+(or pass
+.BR \-\-run )
+to re-run every saved command line, or to
+.B false
+to re-run none.
 .B ztmux resurrect list
 shows the saved snapshots. For continuum-style automatic persistence set
 .BR "@ztmux\-resurrect\-auto on" :
@@ -3389,6 +3405,18 @@ pidfile-guarded process per server, re-saving every 15 minutes.
 .TP
 .B @ztmux\-resurrect\-restore
 Also restore the last snapshot once, on a fresh server start.
+.TP
+.B @ztmux\-resurrect\-processes
+Which programs
+.B resurrect restore
+re-launches from their saved command line, added to the built-in list
+.RI ( "vi vim view nvim emacs man less more tail top htop irssi weechat mutt" ).
+.B :all:
+restores every saved command line,
+.B false
+none. A name prefixed with
+.B ~
+matches anywhere in the command line rather than only as the program.
 .TP
 .B @ztmux\-repl\-edit\-mode
 Key set for the
