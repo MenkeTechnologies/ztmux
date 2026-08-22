@@ -463,7 +463,12 @@ fn live(socket: &str) -> Live {
         .collect();
     let windows = query_lines(
         socket,
-        &["list-windows", "-a", "-F", "#{session_name}:#{window_index}"],
+        &[
+            "list-windows",
+            "-a",
+            "-F",
+            "#{session_name}:#{window_index}",
+        ],
     )
     .into_iter()
     .collect();
@@ -825,8 +830,9 @@ mod tests {
 
     #[test]
     fn split_layout_keeps_stacking_order_for_several_floats() {
-        let (tiled, floats) =
-            split_layout("b306,80x24,0,0[80x12,0,0,0,40x6,4,2,2,80x11,0,13,1,40x6,8,4,3]<40x6,8,4,3,40x6,4,2,2>");
+        let (tiled, floats) = split_layout(
+            "b306,80x24,0,0[80x12,0,0,0,40x6,4,2,2,80x11,0,13,1,40x6,8,4,3]<40x6,8,4,3,40x6,4,2,2>",
+        );
         // Both cells leave the tiled tree, wherever they sat in the child list.
         assert!(!tiled.contains("40x6"), "float still inline: {tiled}");
         assert_eq!(
