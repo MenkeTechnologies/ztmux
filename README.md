@@ -18,7 +18,7 @@
 
 ### `[TMUX, REWRITTEN IN RUST — DONE RIGHT]`
 
-> *"The world's first 100%-functional tmux in Rust — the whole multiplexer,
+> *"A 100%-functional tmux in Rust — the whole multiplexer,
 > server and client, running."*
 >
 > *"Not a wrapper. Not control mode. The multiplexer itself."*
