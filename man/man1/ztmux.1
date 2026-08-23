@@ -3234,17 +3234,18 @@ restoring into a running server fills in what is gone, and running it twice
 changes nothing.
 A shell pane comes back exactly; an arbitrary running program cannot be resumed,
 so panes return as a shell in the right directory and the saved command line is
-then re-sent for the programs listed in
-.BR @ztmux\-resurrect\-processes ,
-which defaults to
-.IR "vi vim view nvim emacs man less more tail top htop irssi weechat mutt" .
-Set it to
-.B :all:
-(or pass
-.BR \-\-run )
-to re-run every saved command line, or to
+then typed into it and run. Every saved command line runs by default: a pane
+that was idling at a prompt saved none, and the shell itself is never re-run, so
+this is exactly the panes that were busy. Each command waits for its pane's
+shell to answer before being typed, and is checked on screen before it is run \(en
+a freshly spawned shell discards type-ahead, which silently ate the first
+character or the whole line.
+.B @ztmux\-resurrect\-processes
+narrows this to a named list, or
 .B false
-to re-run none.
+turns it off;
+.B \-\-run
+runs every saved command line whatever that option says.
 .B ztmux resurrect list
 shows the saved snapshots. For continuum-style automatic persistence set
 .BR "@ztmux\-resurrect\-auto on" :
@@ -3409,12 +3410,11 @@ Also restore the last snapshot once, on a fresh server start.
 .B @ztmux\-resurrect\-processes
 Which programs
 .B resurrect restore
-re-launches from their saved command line, added to the built-in list
-.RI ( "vi vim view nvim emacs man less more tail top htop irssi weechat mutt" ).
-.B :all:
-restores every saved command line,
+re-launches from their saved command line. Unset (and
+.BR :all: )
+re-launches every one of them;
 .B false
-none. A name prefixed with
+none; a list of names narrows it to those programs, and a name prefixed with
 .B ~
 matches anywhere in the command line rather than only as the program.
 .TP

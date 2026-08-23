@@ -17,9 +17,10 @@
 //!
 //! A shell pane restores perfectly (same cwd). An arbitrary running program
 //! cannot be resumed, so panes come back as a shell in the right directory and
-//! the saved command line is then re-sent for the programs on the restore list
-//! (`@ztmux-resurrect-processes`, defaulting to the editors/pagers upstream
-//! uses); `--run` re-sends every saved command line regardless of the list.
+//! the saved command line is then re-sent. Every saved command line runs by
+//! default — a pane idling at a prompt saves none, so this is exactly the panes
+//! that were busy. `@ztmux-resurrect-processes` narrows that to a named list,
+//! or turns it off entirely with `false`.
 //!
 //! Subcommands: `save` (default), `restore [file] [--run]`, `list`.
 
@@ -31,13 +32,6 @@ use super::tmux_query::query_lines;
 /// Field separator in the save file (unit separator: never appears in names,
 /// paths or layout strings).
 const SEP: char = '\u{1f}';
-
-/// Programs whose command line is re-sent on restore without `--run`, matching
-/// tmux-resurrect's `@resurrect-default-processes`.
-const DEFAULT_PROCESSES: &[&str] = &[
-    "vi", "vim", "view", "nvim", "emacs", "man", "less", "more", "tail", "top", "htop", "irssi",
-    "weechat", "mutt",
-];
 
 struct Pane {
     /// Saved `#{pane_index}` — the target suffix, which already accounts for
@@ -609,26 +603,131 @@ fn process_filter(socket: &str, run_all: bool) -> Box<dyn Fn(&str) -> bool> {
     )
     .first()
     .map_or(String::new(), |s| s.trim().to_string());
-    if opt == "false" {
-        return Box::new(|_| false);
+    match opt.as_str() {
+        // Unset: run everything that was saved. tmux-resurrect defaults to a
+        // short editors-and-pagers list instead, which drops exactly the panes
+        // worth getting back — anything under `sudo`, anything the list never
+        // heard of. A pane sitting at a shell prompt saves no command line, so
+        // "everything saved" is already only the panes that were running one.
+        "" | ":all:" => Box::new(|full: &str| !full.is_empty()),
+        "false" => Box::new(|_| false),
+        _ => {
+            // An explicit list narrows it to exactly those programs.
+            let list: Vec<String> = opt.split_whitespace().map(str::to_string).collect();
+            Box::new(move |full: &str| {
+                let Some(word) = full.split_whitespace().next() else {
+                    return false;
+                };
+                // Match the program, not its path, so `/usr/bin/vim file` counts.
+                let base = word.rsplit('/').next().unwrap_or(word);
+                list.iter().any(|p| {
+                    // A `~` prefix means "appears anywhere in the command line".
+                    p.strip_prefix('~')
+                        .map_or(base == p, |needle| full.contains(needle))
+                })
+            })
+        }
     }
-    if opt == ":all:" {
-        return Box::new(|full: &str| !full.is_empty());
+}
+
+/// Note the command line to re-run in `target`, if this pane had one worth
+/// re-running. `#{pane_current_command}` stands in for a pane saved before the
+/// file carried full command lines.
+fn queue_command(
+    pending: &mut Vec<(String, String)>,
+    restorable: &dyn Fn(&str) -> bool,
+    target: &str,
+    p: &Pane,
+) {
+    // A snapshot written before the file carried command lines has only the
+    // program name to go on.
+    let full = if p.full.is_empty() {
+        p.command.as_str()
+    } else {
+        p.full.as_str()
+    };
+    // Never re-run the shell itself: an idle pane in an old snapshot reads as
+    // `zsh`, and running that would nest a second shell inside the pane.
+    let program = full
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .rsplit('/')
+        .next()
+        .unwrap_or("")
+        .trim_start_matches('-');
+    if SHELLS.contains(&program) {
+        return;
     }
-    let mut list: Vec<String> = DEFAULT_PROCESSES.iter().map(|s| (*s).to_string()).collect();
-    list.extend(opt.split_whitespace().map(str::to_string));
-    Box::new(move |full: &str| {
-        let Some(word) = full.split_whitespace().next() else {
-            return false;
-        };
-        // Match the program, not its path, so `/usr/bin/vim file` counts.
-        let base = word.rsplit('/').next().unwrap_or(word);
-        list.iter().any(|p| {
-            // A `~` prefix means "appears anywhere in the command line".
-            p.strip_prefix('~')
-                .map_or(base == p, |needle| full.contains(needle))
-        })
-    })
+    if restorable(full) {
+        pending.push((target.to_string(), full.to_string()));
+    }
+}
+
+/// The pane's visible screen with every space and newline removed, so a command
+/// that wrapped across several rows still compares as one string.
+fn squashed_screen(socket: &str, target: &str) -> String {
+    super::tmux_query::capture_pane(socket, target, false)
+        .unwrap_or_default()
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect()
+}
+
+/// Type `cmd` into `target` and run it, but only once the pane's shell is
+/// provably listening.
+///
+/// A freshly spawned shell is not reading its pty yet, and zsh discards whatever
+/// type-ahead is buffered when ZLE starts, so keys sent into that window vanish
+/// or lose their first character — `sleep 900` arrived as `leep 900`, and a
+/// `C-u` sent to fix it vanished the same way, leaving two half-typed commands
+/// on one line. Waiting for the prompt to be drawn is not enough either: the
+/// prompt is painted before ZLE takes over.
+///
+/// So the shell is asked to prove it is reading: bare Enters go in until the
+/// pane answers with a fresh prompt line. After that keys are honoured, and the
+/// command is typed, checked on screen and only then run. A command that will
+/// not land is left unsent rather than executed half-typed.
+fn send_command(socket: &str, target: &str, cmd: &str) {
+    if !wait_until_listening(socket, target) {
+        return;
+    }
+    // A long command wraps over many rows and can outrun a short pane, so only
+    // its tail is checked: the handshake above is what stops the head being
+    // eaten, this is the confirmation that keys are arriving at all.
+    let typed: String = cmd.chars().filter(|c| !c.is_whitespace()).collect();
+    let want = typed
+        .char_indices()
+        .nth(typed.chars().count().saturating_sub(120))
+        .map_or(typed.as_str(), |(at, _)| &typed[at..])
+        .to_string();
+    for _ in 0..3 {
+        let _ = query_lines(socket, &["send-keys", "-t", target, cmd]);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        if squashed_screen(socket, target).contains(&want) {
+            let _ = query_lines(socket, &["send-keys", "-t", target, "Enter"]);
+            return;
+        }
+        // Something arrived mangled: wipe the line before typing it again.
+        let _ = query_lines(socket, &["send-keys", "-t", target, "C-u"]);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    let _ = query_lines(socket, &["send-keys", "-t", target, "C-u"]);
+}
+
+/// Send Enter until the pane draws another prompt, which only happens once the
+/// shell is reading its pty. False if it never answers.
+fn wait_until_listening(socket: &str, target: &str) -> bool {
+    for _ in 0..40 {
+        let before = squashed_screen(socket, target);
+        let _ = query_lines(socket, &["send-keys", "-t", target, "Enter"]);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let after = squashed_screen(socket, target);
+        if !after.is_empty() && after != before {
+            return true;
+        }
+    }
+    false
 }
 
 fn restore(socket: &str, args: &[String]) -> i32 {
@@ -659,6 +758,11 @@ fn restore(socket: &str, args: &[String]) -> i32 {
     let (mut new_sessions, mut new_windows, mut new_panes, mut kept) = (0usize, 0usize, 0usize, 0);
     // Windows this run actually built, and so may lay out and rename.
     let mut touched: Vec<&Win> = Vec::new();
+    // (target, command line) for every pane this run created, sent only once the
+    // whole server is rebuilt: a shell that has just been spawned is not reading
+    // its pty yet, and keys sent into the gap are simply lost — which is why the
+    // first pane of a new session came back empty while later ones ran.
+    let mut pending: Vec<(String, String)> = Vec::new();
 
     for w in &wins {
         let wtarget = format!("{}:{}", w.session, w.index);
@@ -690,15 +794,7 @@ fn restore(socket: &str, args: &[String]) -> i32 {
             }
             have.panes.insert(ptarget.clone());
             built = true;
-            // Re-send the saved command line into the pane we just made.
-            let full = if p.full.is_empty() {
-                p.command.as_str()
-            } else {
-                p.full.as_str()
-            };
-            if restorable(full) {
-                let _ = query_lines(socket, &["send-keys", "-t", &ptarget, full, "Enter"]);
-            }
+            queue_command(&mut pending, &restorable, &ptarget, p);
         }
         if built {
             touched.push(w);
@@ -728,23 +824,12 @@ fn restore(socket: &str, args: &[String]) -> i32 {
             };
             new_float(socket, &target, f, &p.cwd, border);
             new_panes += 1;
-            let full = if p.full.is_empty() {
-                p.command.as_str()
-            } else {
-                p.full.as_str()
-            };
-            if restorable(full) {
-                let _ = query_lines(
-                    socket,
-                    &[
-                        "send-keys",
-                        "-t",
-                        &format!("{target}.{}", p.index),
-                        full,
-                        "Enter",
-                    ],
-                );
-            }
+            queue_command(
+                &mut pending,
+                &restorable,
+                &format!("{target}.{}", p.index),
+                p,
+            );
         }
         if let Some(active) = w.panes.iter().find(|p| p.active) {
             let _ = query_lines(
@@ -759,6 +844,12 @@ fn restore(socket: &str, args: &[String]) -> i32 {
             socket,
             &["select-window", "-t", &format!("{}:{}", w.session, w.index)],
         );
+    }
+
+    // Now the shells have had the whole rebuild to come up, re-run what each
+    // pane was running.
+    for (target, cmd) in &pending {
+        send_command(socket, target, cmd);
     }
 
     if new_panes == 0 {

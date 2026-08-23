@@ -336,9 +336,10 @@ They fall into a few families:
   and floating panes back at their exact size and position). Restore works pane by pane: a live
   pane is left alone, a missing pane is split into its window, a missing window is added to its
   session, and only a missing session is created — so it fills gaps in a running server and is
-  safe to repeat. Programs on `@ztmux-resurrect-processes` (default: the editors and pagers
-  tmux-resurrect ships, `vim nvim emacs man less more tail top htop …`) are re-launched from
-  their saved command line; `--run` re-launches everything saved, `false` nothing. `resurrect
+  safe to repeat. Every pane that was running something is re-launched from its
+  saved command line — a pane idling at a prompt saved none, so nothing is typed into it, and
+  the shell itself is never re-run. `@ztmux-resurrect-processes` narrows that to a named list
+  (`~name` matches anywhere in the command line) or turns it off with `false`. `resurrect
   list` shows saved snapshots. For continuum-style
   automatic persistence, `set -g @ztmux-resurrect-auto on`: the first client to attach spawns a
   detached daemon that re-saves every 15 minutes (pidfile-guarded, one per server); add
