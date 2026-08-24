@@ -64,6 +64,13 @@
 //! | [`register_format`](Host::register_format) | provide a `#{…}` variable |
 //! | [`register_hook`](Host::register_hook) | subscribe to a hook (`session-created`, `pane-exited`, …) |
 
+// This file is compiled into the host AND copied into every plugin, so any one
+// consumer uses only part of it: a plugin with no hooks never names `Hook`, the
+// host never constructs `Args`. Unused-item lints on a shared header are noise,
+// so the file states that once here rather than making every consumer repeat an
+// `#[allow]` on the module.
+#![allow(dead_code)]
+
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 
@@ -447,14 +454,17 @@ impl Args {
     /// `argv` must point to `argc` valid, NUL-terminated C strings, as
     /// guaranteed by the host when it invokes a [`CommandFn`].
     pub unsafe fn from_raw(argc: usize, argv: *const *const c_char) -> Self {
+        // Explicit blocks rather than relying on an `unsafe fn` body being
+        // implicitly unsafe: this file is compiled into hosts and plugins on
+        // both the 2021 and 2024 editions, and 2024 requires them.
         let mut items = Vec::with_capacity(argc);
         if !argv.is_null() {
             for i in 0..argc {
-                let p = *argv.add(i);
+                let p = unsafe { *argv.add(i) };
                 if p.is_null() {
                     break;
                 }
-                items.push(CStr::from_ptr(p).to_string_lossy().into_owned());
+                items.push(unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned());
             }
         }
         Args { items }
@@ -507,6 +517,8 @@ impl Hook {
             if p.is_null() {
                 None
             } else {
+                // Safe: the host's contract is that every non-null string in a
+                // `HookEvent` is a valid C string for the duration of the call.
                 Some(unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned())
             }
         }
@@ -520,7 +532,7 @@ impl Hook {
                 pane_id: None,
             };
         }
-        let e = &*e;
+        let e = unsafe { &*e };
         Hook {
             name: s(e.name).unwrap_or_default(),
             client: s(e.client),
@@ -576,8 +588,8 @@ macro_rules! declare_plugin {
         $(formats: { $($fkey:literal => $fprovider:path),+ $(,)? } $(,)?)?
         $(hooks: { $($hname:literal => $hhandler:path),+ $(,)? } $(,)?)?
     ) => {
-        static __ZTNATIVE_PLUGIN_INFO: $crate::PluginInfo = $crate::PluginInfo {
-            abi_version: $crate::ABIVERSION_FOR_MACRO,
+        static __ZTNATIVE_PLUGIN_INFO: $crate::ztnative::PluginInfo = $crate::ztnative::PluginInfo {
+            abi_version: $crate::ztnative::ABIVERSION_FOR_MACRO,
             // `as_bytes().as_ptr()` rather than `str::as_ptr()`: identical
             // pointer, but it does not trip the lint some hosts (ztmux's own
             // tree among them) put on taking a raw pointer out of a `str`.
@@ -586,35 +598,40 @@ macro_rules! declare_plugin {
                 as *const ::std::os::raw::c_char,
         };
 
-        // `unsafe` because the host table is dereferenced below; the host
-        // promises a valid pointer, which is exactly what an `unsafe fn`
-        // signature says.
+        /// Plugin entry point, resolved by the host with `dlsym` after
+        /// `dlopen`. Registers everything `declare_plugin!` was given and
+        /// returns this plugin's `PluginInfo`.
+        ///
+        /// # Safety
+        /// `host` must be the valid `*const HostApi` the host passes in, and
+        /// must stay valid for as long as the plugin is loaded -- the host's
+        /// side of the ABI contract. Called exactly once, by the host.
         #[no_mangle]
         pub unsafe extern "C" fn ztnative_init(
-            host: *const $crate::HostApi,
-        ) -> *const $crate::PluginInfo {
+            host: *const $crate::ztnative::HostApi,
+        ) -> *const $crate::ztnative::PluginInfo {
             if host.is_null() {
                 return ::std::ptr::null();
             }
             // Verify the host speaks our ABI before touching the table.
             let ver = unsafe { (*host).abi_version };
-            if ver != $crate::ABI_VERSION {
+            if ver != $crate::ztnative::ABI_VERSION {
                 return ::std::ptr::null();
             }
-            let h = unsafe { $crate::Host::from_raw(host) };
+            let h = unsafe { $crate::ztnative::Host::from_raw(host) };
             $($(
                 {
                     // One trampoline per command: adapts the C-ABI CommandFn
                     // to the ergonomic fn(&Host,&Ctx,&Args).
                     extern "C" fn __cmd(
-                        host: *const $crate::HostApi,
+                        host: *const $crate::ztnative::HostApi,
                         ctx: *mut ::std::os::raw::c_void,
                         argc: usize,
                         argv: *const *const ::std::os::raw::c_char,
                     ) -> ::std::os::raw::c_int {
-                        let h = unsafe { $crate::Host::from_raw(host) };
-                        let c = unsafe { $crate::Ctx::from_raw(host, ctx) };
-                        let a = unsafe { $crate::Args::from_raw(argc, argv) };
+                        let h = unsafe { $crate::ztnative::Host::from_raw(host) };
+                        let c = unsafe { $crate::ztnative::Ctx::from_raw(host, ctx) };
+                        let a = unsafe { $crate::ztnative::Args::from_raw(argc, argv) };
                         $handler(&h, &c, &a)
                     }
                     #[allow(unused_mut, unused_assignments)]
@@ -629,12 +646,12 @@ macro_rules! declare_plugin {
                     // copied by the host through `emit` — plugin-allocated
                     // memory never crosses the boundary by pointer.
                     extern "C" fn __fmt(
-                        host: *const $crate::HostApi,
+                        host: *const $crate::ztnative::HostApi,
                         key: *const ::std::os::raw::c_char,
                         sink: *mut ::std::os::raw::c_void,
-                        emit: $crate::EmitFn,
+                        emit: $crate::ztnative::EmitFn,
                     ) -> ::std::os::raw::c_int {
-                        let h = unsafe { $crate::Host::from_raw(host) };
+                        let h = unsafe { $crate::ztnative::Host::from_raw(host) };
                         let k = if key.is_null() {
                             ::std::string::String::new()
                         } else {
@@ -659,22 +676,22 @@ macro_rules! declare_plugin {
             $($(
                 {
                     extern "C" fn __hook(
-                        host: *const $crate::HostApi,
-                        event: *const $crate::HookEvent,
+                        host: *const $crate::ztnative::HostApi,
+                        event: *const $crate::ztnative::HookEvent,
                     ) -> ::std::os::raw::c_int {
-                        let h = unsafe { $crate::Host::from_raw(host) };
+                        let h = unsafe { $crate::ztnative::Host::from_raw(host) };
                         // A hook has no command in flight, so it gets the empty
                         // context: `run` queues globally and `print` goes to the
                         // server log, since there is no client to print to.
-                        let c = $crate::Ctx::none(host);
-                        let e = unsafe { $crate::Hook::from_raw(event) };
+                        let c = $crate::ztnative::Ctx::none(host);
+                        let e = unsafe { $crate::ztnative::Hook::from_raw(event) };
                         $hhandler(&h, &c, &e);
                         0
                     }
                     h.register_hook($hname, __hook);
                 }
             )+)?
-            &__ZTNATIVE_PLUGIN_INFO as *const $crate::PluginInfo
+            &__ZTNATIVE_PLUGIN_INFO as *const $crate::ztnative::PluginInfo
         }
     };
 }

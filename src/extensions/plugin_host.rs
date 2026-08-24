@@ -38,7 +38,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::sync::{Mutex, OnceLock};
 
-use ztnative::{
+use crate::ztnative::{
     ABI_VERSION, CommandFn, EmitFn, FormatFn, HookEvent, HookFn, HostApi, INIT_SYMBOL, InitFn,
     PluginInfo,
 };

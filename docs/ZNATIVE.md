@@ -4,7 +4,8 @@
 both **script plugins** (the TPM kind — a repo with a `*.tmux` file that binds
 keys and sets options, which is every tmux plugin published today) and
 **native Rust plugins** (`cdylib`s loaded through the
-[`ztnative`](../ztnative/) ABI — see [the SDK's README](../ztnative/README.md)).
+[`ztnative`](../plugin-abi/) ABI — one copied file, no crate dependency; see
+[its README](../plugin-abi/README.md)).
 
 It is **global only**: one content-addressed store under `$ZTMUX_HOME/pkg/`,
 no per-project manifest or lockfile. The whole workflow is one line per plugin
@@ -98,7 +99,9 @@ so a repo that shipped one without the bit still loads.
 
 ### What a native plugin can do
 
-A native plugin is a `cdylib` compiled against [`ztnative`](../ztnative/). It
+A native plugin is a `cdylib` compiled against [`ztnative`](../plugin-abi/) — a
+single file it copies into its own `src/`, so a plugin builds with no
+dependencies at all. It
 registers, through a versioned C ABI:
 
 - **tmux commands** — a real `cmd_entry`, parsed by tmux's own argument parser
@@ -237,7 +240,7 @@ ztmux znative gc -n
 
 ## Writing a native plugin
 
-See [`ztnative`](../ztnative/README.md) for the ABI and
+See [`ztnative`](../plugin-abi/README.md) for the ABI and
 [`examples/`](../examples/) for five installable plugins:
 
 | Example | Kind | Shows |

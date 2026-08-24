@@ -2308,9 +2308,4 @@ dependencies = [
  "sha2",
  "terminfo-lean",
  "toml",
- "ztnative",
 ]
-
-[[package]]
-name = "ztnative"
-version = "0.1.0"

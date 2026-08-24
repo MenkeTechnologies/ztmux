@@ -56,17 +56,16 @@ and copies the result into the store; the source tree is left alone.
 
 ## Writing your own
 
-Copy `plugin-hello`, change the crate name, and depend on the published SDK
-instead of the local path:
+Copy `plugin-hello`, change the crate name, and copy
+[`plugin-abi/ztnative.rs`](../plugin-abi/ztnative.rs) into your `src/` as
+`mod ztnative;` instead of pointing `#[path]` at the in-tree original. A plugin
+has no dependencies at all:
 
 ```toml
 [lib]
 crate-type = ["cdylib"]
-
-[dependencies]
-ztnative = "0.1"
 ```
 
 `declare_plugin!` writes the `ztnative_init` entry point and the trampolines;
-everything else is ordinary Rust. See [`ztnative`](../ztnative/README.md) for
+everything else is ordinary Rust. See [`ztnative`](../plugin-abi/README.md) for
 the ABI and [`docs/ZNATIVE.md`](../docs/ZNATIVE.md) for the plugin manager.

@@ -1,69 +1,60 @@
-# ztnative
+# ztnative — the ztmux native plugin ABI
 
-**The native plugin ABI for [ztmux](https://github.com/MenkeTechnologies/ztmux) — tmux plugins written in Rust, loaded by the server.**
+**One file. Copy it into your plugin.**
 
-Every tmux plugin ever published is a shell script: a plugin manager clones a
-repo, runs its `*.tmux` file, and that file drives the server by shelling out
-to `tmux bind-key …`. There is no plugin ABI, because tmux has never had one.
+`ztnative.rs` is the whole boundary between the ztmux server and a native
+plugin: `#[repr(C)]` structs, `extern "C"` fn-pointer types, a version constant,
+and the `declare_plugin!` macro that writes the entry point. It is **not a
+crate** and there is nothing to depend on — the same file is compiled into the
+host (`ztmux/src/lib.rs` includes it with `#[path]`) and into your plugin, so
+both sides are guaranteed to agree on every layout without a dependency edge
+between them. `ABI_VERSION` catches a plugin built against an older copy: the
+host refuses to load it rather than reading a struct that has moved.
 
-`ztnative` is that ABI. A plugin is an ordinary `cdylib` the ztmux server
-`dlopen`s, and what it registers are **real tmux commands**, **real `#{…}`
-format variables**, and **real hook subscriptions** — resolved inside the
-server, with no subprocess in the loop and no `tmux` binary involved.
+That is how a C plugin ABI has always worked — you copy the header — and it is
+why a plugin builds with **zero dependencies**.
 
-Both sides of the boundary depend on this crate, so they agree on the exact
-`#[repr(C)]` layout of the host table. Nothing about Rust's unstable
-`repr(Rust)` layout, allocator, or panic ABI crosses it — only C-representable
-data, behind a version gate the host refuses to load a mismatch on.
+## Using it
 
-## A complete plugin
+```sh
+curl -O https://raw.githubusercontent.com/MenkeTechnologies/ztmux/main/plugin-abi/ztnative.rs
+mv ztnative.rs src/
+```
 
 ```toml
-# Cargo.toml
+# Cargo.toml — nothing to add but the crate type
 [lib]
 crate-type = ["cdylib"]
-
-[dependencies]
-ztnative = "0.1"
 ```
 
 ```rust
+// src/lib.rs
+mod ztnative;                       // the file you just copied
+use crate::ztnative::{Args, Ctx, Host};
 use std::os::raw::c_int;
-use ztnative::{declare_plugin, Args, Ctx, Hook, Host};
 
 fn hello(host: &Host, ctx: &Ctx, _args: &Args) -> c_int {
-    let who = ctx.arg("n").unwrap_or_else(|| "world".into());
-    host.print(ctx, &format!("hello {who}"));
+    host.print(ctx, "hello");
     0
 }
 
-fn count(_host: &Host, _key: &str) -> Option<String> {
-    Some("42".into())
-}
-
-fn on_session(host: &Host, ctx: &Ctx, hook: &Hook) {
-    if let Some(s) = &hook.session {
-        host.set_option("@hello-last-session", s);
-        host.run(ctx, "display-message -d0 'a session appeared'");
-    }
-}
-
-declare_plugin! {
+declare_plugin! {                   // #[macro_export], so it is at your crate root
     name: "hello",
     version: "0.1.0",
     commands: {
-        "hello-world" => { alias: "hw", template: "n:", usage: "[-n name]", handler: hello },
+        "hello-world" => { template: "", usage: "", handler: hello },
     },
-    formats: { "plugin_hello_count" => count },
-    hooks:   { "session-created" => on_session },
 }
 ```
 
 ```sh
-ztmux znative add owner/tmux-hello   # clone, cargo build --release, load
-ztmux hello-world -n ztmux           # a tmux command like any other
-ztmux display-message -p '#{plugin_hello_count}'
+ztmux znative add owner/tmux-hello   # clone, cargo build --release, dlopen
+ztmux hello-world
 ```
+
+The module must be named `ztnative` and live at your crate root: the macro
+expands to `$crate::ztnative::…`, which is what lets one file serve a host and a
+plugin that know nothing about each other.
 
 ## What a plugin registers
 
@@ -80,17 +71,17 @@ ztmux display-message -p '#{plugin_hello_count}'
 | `print` / `error` | write to the client that ran the command |
 | `run` | parse and queue tmux command text — the whole command language |
 | `get_option` / `set_option` | read and write options, including the `@user` options plugins configure themselves with |
-| `format_expand` | expand `#{…}` against the running command's target |
+| `format_expand` | expand `#{…}` against the running command's target — `#{S:…}` enumerates sessions, so this doubles as the read path |
 | `register_command` / `register_format` / `register_hook` | dynamic registration (`declare_plugin!` calls these for you) |
 
-Flags parsed out of the command line are read from the [`Ctx`]: `ctx.has('b')`,
-`ctx.arg("t")`. Positional arguments arrive in [`Args`].
+Flags parsed out of the command line are read from the `Ctx`: `ctx.has('b')`,
+`ctx.arg("t")`. Positional arguments arrive in `Args`.
 
 ## Rules the host enforces
 
 - **The port always wins.** ztmux's own command table is scanned first, so a
   plugin can never shadow a tmux command; registering an existing name fails
-  the load with a diagnostic.
+  the load with a diagnostic. Formats work the same way.
 - **Unload can never dangle.** Removing a plugin purges its registrations
   before the `dlclose`, and every dispatch looks the handler up by name at call
   time — a plugin command still sitting in a queued command list fails cleanly
@@ -101,15 +92,16 @@ Flags parsed out of the command line are read from the [`Ctx`]: `ctx.has('b')`,
 - **`ABI_VERSION` is a hard gate.** A mismatched struct layout is undefined
   behaviour, so the host refuses the plugin rather than warning.
 
-## More examples
+## Examples
 
-`ztmux`'s own tree ships five installable plugins under
-[`examples/`](https://github.com/MenkeTechnologies/ztmux/tree/main/examples):
+Five installable plugins live in
+[`examples/`](https://github.com/MenkeTechnologies/ztmux/tree/main/examples) —
 `plugin-hello` (a command, a format and a hook), `plugin-battery` (status-line
 state read in-process and cached), `plugin-sessionizer` (`run` to drive the
 server, `format_expand` to read it back), `plugin-hooklog` (nine hook
 subscriptions feeding a format), and `plugin-tpm-style` (an unmodified TPM
-script plugin, for contrast).
+script plugin, for contrast). They reach this file with `#[path]` instead of
+copying it, so they cannot drift from the original.
 
 ## Installing plugins
 

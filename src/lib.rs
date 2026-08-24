@@ -220,6 +220,18 @@ cfg_pub_mods! {
     mod xmalloc;
 }
 
+// The native-plugin ABI. One file, compiled into the host here and COPIED into
+// a plugin's own crate as a module of the same name (see plugin-abi/README.md):
+// both sides therefore compile the identical `#[repr(C)]` definitions without a
+// crate dependency between them, and `ABI_VERSION` catches a plugin built
+// against an older copy.
+// The plugin-side half of the file -- `Host`, `Ctx`, `Args`, `Hook` and the
+// `declare_plugin!` glue -- is what a PLUGIN compiles; the host only ever
+// touches the `#[repr(C)]` types and the fn-pointer aliases. Keeping one file
+// means the two sides cannot disagree about a layout.
+#[path = "../plugin-abi/ztnative.rs"]
+mod ztnative;
+
 // Original ztmux extensions (dashboard, structured output, …) — not a tmux
 // port; live under src/extensions/ and are exempt from the anti-drift gate.
 mod extensions;

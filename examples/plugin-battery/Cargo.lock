@@ -5,10 +5,3 @@ version = 4
 [[package]]
 name = "plugin-battery"
 version = "0.1.0"
-dependencies = [
- "ztnative",
-]
-
-[[package]]
-name = "ztnative"
-version = "0.1.0"

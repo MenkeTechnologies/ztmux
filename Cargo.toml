@@ -17,7 +17,7 @@ version      = "3.7.44"
 authors = ["MenkeTechnologies <linux.dev25@gmail.com>"]
 categories   = ["command-line-utilities"]
 edition      = "2024"
-include      = ["/src", "/completions", "/man", "COPYING", "README.md", "build.rs"]
+include      = ["/src", "/plugin-abi", "/completions", "/man", "COPYING", "README.md", "build.rs"]
 keywords     = ["tmux"]
 license      = "MIT"
 repository   = "https://github.com/MenkeTechnologies/ztmux"
@@ -71,9 +71,6 @@ serde_json   = { version = "1" }
 libloading   = { version = "0.8" }
 sha2         = { version = "0.10" }
 toml         = { version = "1" }
-# The plugin ABI, shared verbatim with every plugin cdylib (path dep here so
-# host and plugin cannot drift; plugins depend on the published crate).
-ztnative     = { version = "0.1.0", path = "ztnative" }
 
 [build-dependencies]
 lalrpop      = { version = "0.22.2", default-features = false }

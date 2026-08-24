@@ -1,9 +1,10 @@
 # A minimal native ztmux plugin: one command, one `#{…}` format, one hook.
 #
-# A real plugin lives in its own repository and depends on the published
-# `ztnative` crate; this one is inside the ztmux tree, so it points at the
-# local copy of the SDK and declares its own `[workspace]` to stay out of
-# ztmux's.
+# A plugin has NO dependency on ztmux or on any SDK crate: the ABI is one file
+# (plugin-abi/ztnative.rs) that a plugin copies into its own `src/` and declares
+# as `mod ztnative;`. This example reaches the in-tree copy with `#[path]`
+# instead of duplicating it; a plugin outside this repo copies it. The empty
+# `[workspace]` keeps the example out of ztmux's workspace.
 [package]
 name    = "plugin-hello"
 version = "0.1.0"
@@ -17,4 +18,3 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-ztnative = { path = "../../ztnative" }

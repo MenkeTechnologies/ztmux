@@ -34,7 +34,13 @@
 use std::os::raw::c_int;
 use std::sync::Mutex;
 
-use ztnative::{Args, Ctx, Hook, Host, declare_plugin};
+// The ABI, copied in. A plugin outside this repo copies
+// `plugin-abi/ztnative.rs` into its own `src/`; this one points at the
+// in-tree original so the examples cannot drift from it.
+#[path = "../../../plugin-abi/ztnative.rs"]
+mod ztnative;
+
+use crate::ztnative::{Args, Ctx, Hook, Host};
 
 /// How many entries are kept. A status line shows one; the command shows the
 /// tail. Bounded so a long-lived server cannot grow the plugin without limit.

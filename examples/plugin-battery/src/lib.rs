@@ -34,7 +34,13 @@ use std::os::raw::c_int;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use ztnative::{Args, Ctx, Host, declare_plugin};
+// The ABI, copied in. A plugin outside this repo copies
+// `plugin-abi/ztnative.rs` into its own `src/`; this one points at the
+// in-tree original so the examples cannot drift from it.
+#[path = "../../../plugin-abi/ztnative.rs"]
+mod ztnative;
+
+use crate::ztnative::{Args, Ctx, Host};
 
 /// How long a reading is reused before the platform is asked again. The status
 /// line redraws far more often than a battery moves.
