@@ -189,8 +189,8 @@ mod tests {
 
     #[test]
     fn parses_script_manifest() {
-        let m =
-            PluginManifest::parse("[plugin]\nname='y'\n[script]\nrun=['y.tmux','z.tmux']\n").unwrap();
+        let m = PluginManifest::parse("[plugin]\nname='y'\n[script]\nrun=['y.tmux','z.tmux']\n")
+            .unwrap();
         assert_eq!(m.script.unwrap().run, vec!["y.tmux", "z.tmux"]);
     }
 

@@ -203,11 +203,7 @@ pub struct HostApi {
     /// tmux command language — `bind-key`, `set-option`, `display-popup`,
     /// `;`-separated lists, everything. Returns 0 if it parsed and queued,
     /// non-zero on a parse error.
-    pub run: extern "C" fn(
-        host: *const HostApi,
-        ctx: *mut c_void,
-        command: *const c_char,
-    ) -> c_int,
+    pub run: extern "C" fn(host: *const HostApi, ctx: *mut c_void, command: *const c_char) -> c_int,
 
     /// Read an option by name — server, session, or window scope, in the
     /// order tmux resolves them, including the `@user` options a plugin
@@ -223,11 +219,8 @@ pub struct HostApi {
     /// a freshly allocated C string the caller MUST release with
     /// `free_cstring`. With a null `ctx` the expansion has no target and only
     /// server-wide formats resolve.
-    pub format_expand: extern "C" fn(
-        host: *const HostApi,
-        ctx: *mut c_void,
-        text: *const c_char,
-    ) -> *mut c_char,
+    pub format_expand:
+        extern "C" fn(host: *const HostApi, ctx: *mut c_void, text: *const c_char) -> *mut c_char,
 
     /// True (non-zero) when the command was given flag `flag` — one of the
     /// letters in the template it registered.
@@ -235,8 +228,7 @@ pub struct HostApi {
     /// The value given to flag `flag` (a template letter followed by `:`).
     /// Returns a freshly allocated C string the caller MUST release with
     /// `free_cstring`, or null when the flag was not given.
-    pub arg_get:
-        extern "C" fn(host: *const HostApi, ctx: *mut c_void, flag: c_char) -> *mut c_char,
+    pub arg_get: extern "C" fn(host: *const HostApi, ctx: *mut c_void, flag: c_char) -> *mut c_char,
 
     /// Release a string previously returned by `get_option`, `arg_get`, or
     /// `format_expand`.

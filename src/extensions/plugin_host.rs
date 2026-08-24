@@ -207,7 +207,11 @@ extern "C" fn host_register_format(
     if key.is_empty() {
         return 1;
     }
-    staging().lock().unwrap().formats.push((key.to_string(), handler));
+    staging()
+        .lock()
+        .unwrap()
+        .formats
+        .push((key.to_string(), handler));
     0
 }
 
@@ -220,7 +224,11 @@ extern "C" fn host_register_hook(
     if hook.is_empty() {
         return 1;
     }
-    staging().lock().unwrap().hooks.push((hook.to_string(), handler));
+    staging()
+        .lock()
+        .unwrap()
+        .hooks
+        .push((hook.to_string(), handler));
     0
 }
 
@@ -270,13 +278,8 @@ extern "C" fn host_run(_host: *const HostApi, ctx: *mut c_void, command: *const 
             // Outside a command (a hook): append to the global queue.
             _ => {
                 let mut error: *mut u8 = null_mut();
-                let status = cmd_parse_and_append(
-                    command,
-                    None,
-                    null_mut(),
-                    null_mut(),
-                    &raw mut error,
-                );
+                let status =
+                    cmd_parse_and_append(command, None, null_mut(), null_mut(), &raw mut error);
                 if status == cmd_parse_status::CMD_PARSE_ERROR {
                     log_debug!("plugin run: {}", _s(error));
                     free_(error);
@@ -438,7 +441,12 @@ unsafe fn plugin_cmd_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
         let entry = cmd_get_entry(self_);
         let args = cmd_get_args(self_);
 
-        let Some(handler) = commands().lock().unwrap().get(entry.name).map(|c| c.handler) else {
+        let Some(handler) = commands()
+            .lock()
+            .unwrap()
+            .get(entry.name)
+            .map(|c| c.handler)
+        else {
             cmdq_error_(
                 item,
                 format_args!("{}: plugin command is no longer loaded", entry.name),
@@ -480,12 +488,7 @@ unsafe fn plugin_cmd_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
 /// it sits in a command list, key binding, or menu, which can outlive the
 /// plugin — the entry stays valid and [`plugin_cmd_exec`] reports the
 /// unloaded plugin instead.
-fn leak_entry(
-    name: &str,
-    alias: Option<&str>,
-    template: &str,
-    usage: &str,
-) -> &'static cmd_entry {
+fn leak_entry(name: &str, alias: Option<&str>, template: &str, usage: &str) -> &'static cmd_entry {
     Box::leak(Box::new(cmd_entry {
         name: String::leak(name.to_string()),
         alias: alias.map(|a| &*String::leak(a.to_string())),
@@ -530,7 +533,9 @@ pub(crate) fn load(path: &str) -> Result<String, String> {
     let info_ptr: *const PluginInfo = unsafe { init(host_api()) };
     if info_ptr.is_null() {
         *staging().lock().unwrap() = Staging::default();
-        return Err(format!("`{path}`: plugin init failed (ABI mismatch or error)"));
+        return Err(format!(
+            "`{path}`: plugin init failed (ABI mismatch or error)"
+        ));
     }
     // Safe: non-null and, once the version matches, laid out as this host's
     // own `PluginInfo` — both sides compile the same `ztnative` struct.

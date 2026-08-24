@@ -621,7 +621,11 @@ mod tests {
     fn a_shipped_cdylib_is_used_when_there_is_no_source() {
         use super::super::manifest::NativeSpec;
         let dir = super::super::store::tests_support::tmp_dir("shipped-artifact");
-        let name = format!("{}libshipped{}", std::env::consts::DLL_PREFIX, std::env::consts::DLL_SUFFIX);
+        let name = format!(
+            "{}libshipped{}",
+            std::env::consts::DLL_PREFIX,
+            std::env::consts::DLL_SUFFIX
+        );
         std::fs::write(dir.join(name), b"binary").unwrap();
 
         let built = prepare_native(&dir, &NativeSpec::default(), "shipped").unwrap();
