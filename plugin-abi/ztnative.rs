@@ -472,7 +472,7 @@ impl Args {
 
     /// The command name (`argv[0]`), or `""` if somehow empty.
     pub fn name(&self) -> &str {
-        self.items.first().map(String::as_str).unwrap_or("")
+        self.items.first().map_or("", String::as_str)
     }
 
     /// The positional arguments (everything after `argv[0]`).
@@ -532,22 +532,28 @@ impl Hook {
                 pane_id: None,
             };
         }
-        let e = unsafe { &*e };
+        // Safe: non-null, and the host guarantees the event outlives the call.
+        let event = unsafe { &*e };
         Hook {
-            name: s(e.name).unwrap_or_default(),
-            client: s(e.client),
-            session: s(e.session),
-            window: s(e.window),
-            window_id: (e.window_id >= 0).then_some(e.window_id),
-            pane_id: (e.pane_id >= 0).then_some(e.pane_id),
+            name: s(event.name).unwrap_or_default(),
+            client: s(event.client),
+            session: s(event.session),
+            window: s(event.window),
+            window_id: (event.window_id >= 0).then_some(event.window_id),
+            pane_id: (event.pane_id >= 0).then_some(event.pane_id),
         }
     }
 }
 
-/// Declare a plugin: its identity, the tmux commands it adds, the `#{…}`
-/// formats it provides, and the hooks it subscribes to. Expands to the
-/// `#[no_mangle] extern "C" fn ztnative_init` the host looks for, plus the
-/// `'static` [`PluginInfo`].
+/// Declare a plugin.
+///
+/// Takes the plugin's identity, the tmux commands it adds, the `#{…}` formats
+/// it provides and the hooks it subscribes to, and expands to the
+/// `#[no_mangle] extern "C" fn ztnative_init` the host resolves with `dlsym`,
+/// plus the `'static` `PluginInfo` it returns. (Plain code spans, not intra-doc
+/// links: this macro is exported at its crate's root while the types live in
+/// the `ztnative` module, and rustdoc refuses a public doc that links into a
+/// private one.)
 ///
 /// * `commands:` — each `"name" => { alias, template, usage, handler }` adds a
 ///   tmux command. `alias` may be omitted. A handler is
