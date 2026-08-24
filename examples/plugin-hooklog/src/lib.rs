@@ -83,14 +83,14 @@ fn record(_host: &Host, _ctx: &Ctx, hook: &Hook) {
 }
 
 /// `#{plugin_hooklog_last}` — the newest entry, or nothing yet.
-fn last(_host: &Host, _key: &str) -> Option<String> {
+fn last(_host: &Host, _ctx: &Ctx, _key: &str) -> Option<String> {
     LOG.lock().ok()?.last().cloned()
 }
 
 /// `#{plugin_hooklog_count}` — how many notifications this server has seen
 /// since the plugin loaded (capped at [`CAPACITY`] entries kept, so this is
 /// the size of the log, not a lifetime total).
-fn count(_host: &Host, _key: &str) -> Option<String> {
+fn count(_host: &Host, _ctx: &Ctx, _key: &str) -> Option<String> {
     Some(LOG.lock().ok()?.len().to_string())
 }
 

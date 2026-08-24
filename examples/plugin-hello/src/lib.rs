@@ -54,7 +54,7 @@ fn hello(host: &Host, ctx: &Ctx, args: &Args) -> c_int {
 }
 
 /// `#{plugin_hello_count}` — how many greetings this server has served.
-fn hello_count(_host: &Host, _key: &str) -> Option<String> {
+fn hello_count(_host: &Host, _ctx: &Ctx, _key: &str) -> Option<String> {
     Some(GREETED.load(Ordering::Relaxed).to_string())
 }
 

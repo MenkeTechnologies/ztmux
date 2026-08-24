@@ -79,7 +79,12 @@ use std::os::raw::{c_char, c_int, c_void};
 /// layout/semantics. The host refuses to load a plugin whose `abi_version`
 /// does not match its own — a mismatched struct layout is undefined
 /// behaviour, so this is a hard gate, not a warning.
-pub const ABI_VERSION: u32 = 1;
+///
+/// v2: [`FormatFn`] takes the opaque `ctx` a [`CommandFn`] gets, so a format
+/// provider can call [`Host::format_expand`] against the tree being expanded —
+/// without it a provider cannot see the client it is being drawn for, which is
+/// most of what a status-line plugin needs.
+pub const ABI_VERSION: u32 = 2;
 
 /// The one symbol every plugin `cdylib` must export. The host resolves it
 /// with `dlsym` after `dlopen`. Signature is [`InitFn`].
@@ -119,8 +124,15 @@ pub type EmitFn = extern "C" fn(sink: *mut c_void, text: *const c_char);
 /// and the host continues its normal lookup as if the plugin had never
 /// registered. Format expansion runs on every status-line redraw, so this
 /// must be cheap and must not block.
+///
+/// `ctx` is the expansion in progress: [`HostApi::format_expand`] through it
+/// resolves against the *same* tree, which is how a provider sees the client,
+/// session, window and pane it is being drawn for (`#{client_prefix}`,
+/// `#{pane_in_mode}`, …). Expanding a key back into the plugin that is
+/// currently providing it yields nothing rather than recursing.
 pub type FormatFn = extern "C" fn(
     host: *const HostApi,
+    ctx: *mut c_void,
     key: *const c_char,
     sink: *mut c_void,
     emit: EmitFn,
@@ -559,11 +571,17 @@ impl Hook {
 ///   tmux command. `alias` may be omitted. A handler is
 ///   `fn(&Host, &Ctx, &Args) -> c_int`.
 /// * `formats:` — each `"key" => provider` provides `#{key}`. A provider is
-///   `fn(&Host, &str) -> Option<String>`; `None` declines and the host
-///   resolves the key normally.
+///   `fn(&Host, &Ctx, &str) -> Option<String>`; `None` declines and the host
+///   resolves the key normally. The `Ctx` is the expansion in progress, so
+///   `host.format_expand(ctx, "#{client_prefix}")` answers for the client being
+///   drawn.
 /// * `hooks:` — each `"hook-name" => handler` subscribes to a hook. A handler
 ///   is `fn(&Host, &Ctx, &Hook)`; the context is the empty one, so `run` queues
 ///   globally and `print` goes to the server log.
+/// * `on_load:` — a `fn(&Host, &Ctx)` run once, after registration, when the
+///   plugin is loaded. This is where a plugin that configures the server does
+///   its work; `#[macro_export]`-style plugins that only add commands do not
+///   need it.
 ///
 /// All three sections are optional.
 ///
@@ -593,6 +611,7 @@ macro_rules! declare_plugin {
         } $(,)?)?
         $(formats: { $($fkey:literal => $fprovider:path),+ $(,)? } $(,)?)?
         $(hooks: { $($hname:literal => $hhandler:path),+ $(,)? } $(,)?)?
+        $(on_load: $onload:path $(,)?)?
     ) => {
         static __ZTNATIVE_PLUGIN_INFO: $crate::ztnative::PluginInfo = $crate::ztnative::PluginInfo {
             abi_version: $crate::ztnative::ABIVERSION_FOR_MACRO,
@@ -653,11 +672,13 @@ macro_rules! declare_plugin {
                     // memory never crosses the boundary by pointer.
                     extern "C" fn __fmt(
                         host: *const $crate::ztnative::HostApi,
+                        ctx: *mut ::std::os::raw::c_void,
                         key: *const ::std::os::raw::c_char,
                         sink: *mut ::std::os::raw::c_void,
                         emit: $crate::ztnative::EmitFn,
                     ) -> ::std::os::raw::c_int {
                         let h = unsafe { $crate::ztnative::Host::from_raw(host) };
+                        let c = unsafe { $crate::ztnative::Ctx::from_raw(host, ctx) };
                         let k = if key.is_null() {
                             ::std::string::String::new()
                         } else {
@@ -665,7 +686,7 @@ macro_rules! declare_plugin {
                                 .to_string_lossy()
                                 .into_owned()
                         };
-                        match $fprovider(&h, &k) {
+                        match $fprovider(&h, &c, &k) {
                             Some(v) => match ::std::ffi::CString::new(v) {
                                 Ok(c) => {
                                     emit(sink, c.as_ptr());
@@ -697,6 +718,17 @@ macro_rules! declare_plugin {
                     h.register_hook($hname, __hook);
                 }
             )+)?
+            $(
+                {
+                    // Everything above is registered by now, so a plugin that
+                    // has work to do at load -- applying settings, binding
+                    // keys -- does it here. The context is the empty one: the
+                    // plugin is being loaded by a command, not running as one,
+                    // so `run` queues globally and `print` goes to the log.
+                    let c = $crate::ztnative::Ctx::none(host);
+                    $onload(&h, &c);
+                }
+            )?
             &__ZTNATIVE_PLUGIN_INFO as *const $crate::ztnative::PluginInfo
         }
     };

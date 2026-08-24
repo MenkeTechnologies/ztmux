@@ -43,7 +43,9 @@ use crate::ztnative::{
     PluginInfo,
 };
 
-use crate::options_::{options_parse_get, options_set_string, options_to_string};
+use crate::options_::{
+    options_from_string, options_parse_get, options_set_string, options_to_string,
+};
 use crate::*;
 
 /// One loaded plugin. Dropping `_lib` runs `dlclose`, so this is only ever
@@ -72,6 +74,10 @@ struct PluginCall {
     item: *mut cmdq_item,
     args: *mut args,
     after: *mut cmdq_item,
+    /// Set instead of `item` when the plugin is being called from format
+    /// expansion: `format_expand` then resolves against the tree being drawn,
+    /// which is the only way a provider can see whose status line this is.
+    ft: *mut format_tree,
 }
 
 fn plugins() -> &'static Mutex<Vec<LoadedPlugin>> {
@@ -331,10 +337,49 @@ extern "C" fn host_set_option(
         return 1;
     };
     unsafe {
-        // Global session scope — what `set-option -g` writes, and where every
-        // `@user` option a plugin configures itself with is read from.
-        let o = options_set_string!(GLOBAL_S_OPTIONS, name, false, "{}", value);
-        i32::from(o.is_null())
+        // A `@user` option is a string by definition and has no table entry, so
+        // it is the one case that can be assigned directly.
+        if name.starts_with('@') {
+            let o = options_set_string!(GLOBAL_S_OPTIONS, name, false, "{}", value);
+            return i32::from(o.is_null());
+        }
+
+        // Everything else goes through the option's own table entry, the way
+        // `set-option` does (cmd_set_option.c). Assigning a number, flag or
+        // choice as if it were a string is not merely wrong -- the string
+        // setter calls `fatalx` on a non-string option, so a plugin setting
+        // `focus-events` would take the SERVER DOWN. `options_from_string`
+        // parses per type and hands back a cause instead.
+        let Some((entry, oo)) = option_table_entry(name) else {
+            return 1;
+        };
+        let cvalue = cstring_truncating(value.to_string());
+        match options_from_string(oo, entry, name, cvalue.as_ptr().cast(), false) {
+            Ok(()) => 0,
+            Err(cause) => {
+                log_debug!("plugin set_option {}: {}", name, cause.to_string_lossy());
+                1
+            }
+        }
+    }
+}
+
+/// The table entry for `name` and the global options set that owns its scope —
+/// server options live in a different set from session and window ones, and
+/// writing to the wrong one silently does nothing.
+unsafe fn option_table_entry(name: &str) -> Option<(*const options_table_entry, *mut options)> {
+    unsafe {
+        let entry = crate::options_table::OPTIONS_TABLE
+            .iter()
+            .find(|e| e.name == name)?;
+        let oo = if entry.scope & OPTIONS_TABLE_SERVER != 0 {
+            GLOBAL_OPTIONS
+        } else if entry.scope & OPTIONS_TABLE_WINDOW != 0 {
+            GLOBAL_W_OPTIONS
+        } else {
+            GLOBAL_S_OPTIONS
+        };
+        Some((std::ptr::from_ref(entry), oo))
     }
 }
 
@@ -349,6 +394,9 @@ extern "C" fn host_format_expand(
     let fmt = cstring_truncating(text.to_string());
     unsafe {
         let expanded = match call_of(ctx) {
+            // Called from format expansion: resolve against the SAME tree, so
+            // the provider sees the client/session/window/pane being drawn.
+            Some(call) if !call.ft.is_null() => format_expand(call.ft, fmt.as_ptr().cast()),
             Some(call) if !call.item.is_null() => {
                 format_single_from_target(call.item, fmt.as_ptr().cast())
             }
@@ -471,6 +519,7 @@ unsafe fn plugin_cmd_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retval {
             item,
             args,
             after: item,
+            ft: null_mut(),
         };
         let ctx = (&raw mut call).cast::<c_void>();
         let rc = handler(host_api(), ctx, ptrs.len(), ptrs.as_ptr());
@@ -701,11 +750,35 @@ pub(crate) fn command_entry(name: &str) -> Option<&'static cmd_entry> {
 /// provides for `#{key}`, or `None` to let the host resolve the key as usual.
 /// Consulted after the built-in format table, so a plugin cannot shadow a
 /// tmux format.
-pub(crate) fn dispatch_format(key: &str) -> Option<String> {
+pub(crate) fn dispatch_format(key: &str, ft: *mut format_tree) -> Option<String> {
     if !ANY_FORMATS.load(std::sync::atomic::Ordering::Relaxed) {
         return None;
     }
     let handler = formats().lock().unwrap().get(key).map(|(f, _)| *f)?;
+
+    // A provider may expand formats of its own, and one of those can name the
+    // key being provided right now -- directly, or through an option whose
+    // value mentions it. Answer nothing for the re-entrant key rather than
+    // recursing until the stack goes.
+    if IN_FLIGHT.with(|f| f.borrow().iter().any(|k| k == key)) {
+        return None;
+    }
+    IN_FLIGHT.with(|f| f.borrow_mut().push(key.to_string()));
+    let out = dispatch_format_inner(handler, key, ft);
+    IN_FLIGHT.with(|f| {
+        f.borrow_mut().pop();
+    });
+    out
+}
+
+// Keys whose providers are on the stack right now, innermost last. (A line
+// comment, not a doc comment: rustdoc does not document items a macro produces
+// and `-D warnings` rejects the attempt.)
+thread_local! {
+    static IN_FLIGHT: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+fn dispatch_format_inner(handler: FormatFn, key: &str, ft: *mut format_tree) -> Option<String> {
     let ckey = CString::new(key).ok()?;
 
     // The provider hands its value back through this sink, so a string its
@@ -723,9 +796,17 @@ pub(crate) fn dispatch_format(key: &str) -> Option<String> {
         );
     }
 
+    let mut call = PluginCall {
+        item: null_mut(),
+        args: null_mut(),
+        after: null_mut(),
+        ft,
+    };
+    let call_ctx = (&raw mut call).cast::<c_void>();
+
     let mut out: Option<String> = None;
     let sink = (&raw mut out).cast::<c_void>();
-    if handler(host_api(), ckey.as_ptr(), sink, emit as EmitFn) != 0 {
+    if handler(host_api(), call_ctx, ckey.as_ptr(), sink, emit as EmitFn) != 0 {
         return None;
     }
     out

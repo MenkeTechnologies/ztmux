@@ -4178,7 +4178,7 @@ fn format_find(
             // shadow a tmux format.
             if format_table_get(key).is_none()
                 && let Some(key_str) = cstr_to_str_(key)
-                && let Some(value) = crate::extensions::plugin_host::dispatch_format(key_str)
+                && let Some(value) = crate::extensions::plugin_host::dispatch_format(key_str, ft)
             {
                 found = cstring_truncating(value).into_raw().cast();
                 break 'found;

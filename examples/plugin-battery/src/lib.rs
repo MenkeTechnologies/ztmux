@@ -165,20 +165,20 @@ fn prefix(host: &Host, state: State) -> String {
 }
 
 /// `#{plugin_battery}` — prefix plus percentage.
-fn battery(host: &Host, _key: &str) -> Option<String> {
+fn battery(host: &Host, _ctx: &Ctx, _key: &str) -> Option<String> {
     let r = reading()?;
     Some(format!("{}{}%", prefix(host, r.state), r.percent))
 }
 
 /// `#{plugin_battery_pct}` — the number alone, for `#{e|>:…}` arithmetic and
 /// conditional formats.
-fn battery_pct(_host: &Host, _key: &str) -> Option<String> {
+fn battery_pct(_host: &Host, _ctx: &Ctx, _key: &str) -> Option<String> {
     Some(reading()?.percent.to_string())
 }
 
 /// `#{plugin_battery_state}` — `charging` / `discharging` / `charged`, for
 /// `#{==:#{plugin_battery_state},charging}` style conditionals.
-fn battery_state(_host: &Host, _key: &str) -> Option<String> {
+fn battery_state(_host: &Host, _ctx: &Ctx, _key: &str) -> Option<String> {
     Some(reading()?.state.as_str().to_string())
 }
 

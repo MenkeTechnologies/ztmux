@@ -1,0 +1,19 @@
+# A native ztmux plugin: tmux-prefix-highlight as a format provider.
+#
+# A plugin has NO dependency on ztmux or on any SDK crate: the ABI is one file
+# (plugin-abi/ztnative.rs) that a plugin copies into its own `src/` and declares
+# as `mod ztnative;`. This example reaches the in-tree copy with `#[path]`
+# instead of duplicating it; a plugin outside this repo copies it. The empty
+# `[workspace]` keeps the example out of ztmux's workspace.
+[package]
+name    = "plugin-prefix-highlight"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]

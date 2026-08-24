@@ -94,14 +94,16 @@ Flags parsed out of the command line are read from the `Ctx`: `ctx.has('b')`,
 
 ## Examples
 
-Five installable plugins live in
+Eight installable plugins live in
 [`examples/`](https://github.com/MenkeTechnologies/ztmux/tree/main/examples) —
 `plugin-hello` (a command, a format and a hook), `plugin-battery` (status-line
 state read in-process and cached), `plugin-sessionizer` (`run` to drive the
 server, `format_expand` to read it back), `plugin-hooklog` (nine hook
-subscriptions feeding a format), and `plugin-tpm-style` (an unmodified TPM
-script plugin, for contrast). They reach this file with `#[path]` instead of
-copying it, so they cannot drift from the original.
+subscriptions feeding a format), native rewrites of three TPM plugins
+(`plugin-prefix-highlight`, `plugin-sensible`, `plugin-continuum`), and
+`plugin-tpm-style` (an unmodified TPM script plugin, for contrast). They reach
+this file with `#[path]` instead of copying it, so they cannot drift from the
+original.
 
 ## Installing plugins
 

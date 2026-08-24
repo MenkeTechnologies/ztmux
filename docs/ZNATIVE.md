@@ -241,7 +241,7 @@ ztmux znative gc -n
 ## Writing a native plugin
 
 See [`ztnative`](../plugin-abi/README.md) for the ABI and
-[`examples/`](../examples/) for five installable plugins:
+[`examples/`](../examples/) for eight installable plugins:
 
 | Example | Kind | Shows |
 | --- | --- | --- |
@@ -249,6 +249,9 @@ See [`ztnative`](../plugin-abi/README.md) for the ABI and
 | `plugin-battery` | native | formats as the point: status-line state read in-process and cached, not `#(script.sh)` per interval |
 | `plugin-sessionizer` | native | `run` to drive the server, `format_expand` (`#{S:…}`) to read it back |
 | `plugin-hooklog` | native | nine hook subscriptions feeding a `#{…}` variable |
+| `plugin-prefix-highlight` | native | tmux-prefix-highlight as a format provider that reads the live client |
+| `plugin-sensible` | native | tmux-sensible's option set, applied at load without forking a shell |
+| `plugin-continuum` | native | tmux-continuum's auto-save, triggered by hooks instead of a per-redraw script |
 | `plugin-tpm-style` | script | a TPM plugin installed unmodified |
 
 Install any of them straight from the tree:
