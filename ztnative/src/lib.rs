@@ -128,7 +128,10 @@ pub type HookFn = extern "C" fn(host: *const HostApi, event: *const HookEvent) -
 /// is loaded. The plugin registers its commands / formats / hooks through the
 /// host table and returns a pointer to a `'static` [`PluginInfo`] describing
 /// itself (or null on failure).
-pub type InitFn = extern "C" fn(host: *const HostApi) -> *const PluginInfo;
+///
+/// `unsafe` because it dereferences the host table it is handed: the caller
+/// promises `host` is a valid `*const HostApi` that outlives the call.
+pub type InitFn = unsafe extern "C" fn(host: *const HostApi) -> *const PluginInfo;
 
 /// What fired, handed to a [`HookFn`]. Every pointer is borrowed from the
 /// host and is valid only for the duration of the call; copy what you keep.
@@ -549,7 +552,8 @@ impl Hook {
 ///   `fn(&Host, &str) -> Option<String>`; `None` declines and the host
 ///   resolves the key normally.
 /// * `hooks:` — each `"hook-name" => handler` subscribes to a hook. A handler
-///   is `fn(&Host, &Hook)`.
+///   is `fn(&Host, &Ctx, &Hook)`; the context is the empty one, so `run` queues
+///   globally and `print` goes to the server log.
 ///
 /// All three sections are optional.
 ///
@@ -582,12 +586,19 @@ macro_rules! declare_plugin {
     ) => {
         static __ZTNATIVE_PLUGIN_INFO: $crate::PluginInfo = $crate::PluginInfo {
             abi_version: $crate::ABIVERSION_FOR_MACRO,
-            name: concat!($name, "\0").as_ptr() as *const ::std::os::raw::c_char,
-            version: concat!($version, "\0").as_ptr() as *const ::std::os::raw::c_char,
+            // `as_bytes().as_ptr()` rather than `str::as_ptr()`: identical
+            // pointer, but it does not trip the lint some hosts (ztmux's own
+            // tree among them) put on taking a raw pointer out of a `str`.
+            name: concat!($name, "\0").as_bytes().as_ptr() as *const ::std::os::raw::c_char,
+            version: concat!($version, "\0").as_bytes().as_ptr()
+                as *const ::std::os::raw::c_char,
         };
 
+        // `unsafe` because the host table is dereferenced below; the host
+        // promises a valid pointer, which is exactly what an `unsafe fn`
+        // signature says.
         #[no_mangle]
-        pub extern "C" fn ztnative_init(
+        pub unsafe extern "C" fn ztnative_init(
             host: *const $crate::HostApi,
         ) -> *const $crate::PluginInfo {
             if host.is_null() {
@@ -660,8 +671,12 @@ macro_rules! declare_plugin {
                         event: *const $crate::HookEvent,
                     ) -> ::std::os::raw::c_int {
                         let h = unsafe { $crate::Host::from_raw(host) };
+                        // A hook has no command in flight, so it gets the empty
+                        // context: `run` queues globally and `print` goes to the
+                        // server log, since there is no client to print to.
+                        let c = $crate::Ctx::none(host);
                         let e = unsafe { $crate::Hook::from_raw(event) };
-                        $hhandler(&h, &e);
+                        $hhandler(&h, &c, &e);
                         0
                     }
                     h.register_hook($hname, __hook);

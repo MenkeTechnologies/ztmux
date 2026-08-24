@@ -53,8 +53,10 @@ fn hello_count(_host: &Host, _key: &str) -> Option<String> {
 }
 
 /// Fired for every new session: record which one was last created, so the
-/// effect is visible with `show-options -gv @hello-last-session`.
-fn on_session(host: &Host, hook: &Hook) {
+/// effect is visible with `show-options -gv @hello-last-session`. A hook is
+/// handed the empty [`Ctx`] — there is no client to print to — but it can
+/// still `run` tmux commands, which queue globally.
+fn on_session(host: &Host, _ctx: &Ctx, hook: &Hook) {
     if let Some(session) = &hook.session {
         host.set_option("@hello-last-session", session);
     }

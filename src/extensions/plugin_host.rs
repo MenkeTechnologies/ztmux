@@ -525,7 +525,9 @@ pub(crate) fn load(path: &str) -> Result<String, String> {
     };
 
     *staging().lock().unwrap() = Staging::default();
-    let info_ptr: *const PluginInfo = init(host_api());
+    // Safe: `host_api()` is the process-wide table this host owns, valid for
+    // the lifetime of the process — the contract `InitFn` asks for.
+    let info_ptr: *const PluginInfo = unsafe { init(host_api()) };
     if info_ptr.is_null() {
         *staging().lock().unwrap() = Staging::default();
         return Err(format!("`{path}`: plugin init failed (ABI mismatch or error)"));
@@ -623,7 +625,8 @@ pub(crate) fn probe(path: &str) -> Result<(String, String), String> {
     };
 
     *staging().lock().unwrap() = Staging::default();
-    let info_ptr: *const PluginInfo = init(host_api());
+    // Safe: same contract as in `load` — the process-wide host table.
+    let info_ptr: *const PluginInfo = unsafe { init(host_api()) };
     // Nothing was committed; drop what init staged so a later `load` starts
     // from an empty buffer.
     *staging().lock().unwrap() = Staging::default();

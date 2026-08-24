@@ -41,9 +41,10 @@ fn count(_host: &Host, _key: &str) -> Option<String> {
     Some("42".into())
 }
 
-fn on_session(host: &Host, hook: &Hook) {
+fn on_session(host: &Host, ctx: &Ctx, hook: &Hook) {
     if let Some(s) = &hook.session {
         host.set_option("@hello-last-session", s);
+        host.run(ctx, "display-message -d0 'a session appeared'");
     }
 }
 
@@ -99,6 +100,16 @@ Flags parsed out of the command line are read from the [`Ctx`]: `ctx.has('b')`,
   callback rather than passed over as pointers.
 - **`ABI_VERSION` is a hard gate.** A mismatched struct layout is undefined
   behaviour, so the host refuses the plugin rather than warning.
+
+## More examples
+
+`ztmux`'s own tree ships five installable plugins under
+[`examples/`](https://github.com/MenkeTechnologies/ztmux/tree/main/examples):
+`plugin-hello` (a command, a format and a hook), `plugin-battery` (status-line
+state read in-process and cached), `plugin-sessionizer` (`run` to drive the
+server, `format_expand` to read it back), `plugin-hooklog` (nine hook
+subscriptions feeding a format), and `plugin-tpm-style` (an unmodified TPM
+script plugin, for contrast).
 
 ## Installing plugins
 

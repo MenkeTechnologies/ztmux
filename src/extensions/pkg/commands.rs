@@ -34,11 +34,14 @@ pub(crate) fn add(spec: &str) -> PkgResult<Outcome> {
     // `hello`, so `znative info hello` and the name in `znative loaded`
     // agree. An explicit `ztnative.toml` still wins over both.
     let mut probed: Option<(String, String)> = None;
+    let mut built: Option<std::path::PathBuf> = None;
     if let PluginKind::Native(spec) = &kind {
         let staging_name = declared_name.clone().unwrap_or_else(|| staged.name.clone());
-        prepare_native(&staged.dir, spec, &staging_name)?;
-        if let Some(libfile) = find_cdylib(&staged.dir) {
-            let lib = staged.dir.join(libfile);
+        built = prepare_native(&staged.dir, spec, &staging_name)?;
+        let lib = built
+            .clone()
+            .or_else(|| find_cdylib(&staged.dir).map(|f| staged.dir.join(f)));
+        if let Some(lib) = lib {
             probed = crate::extensions::plugin_host::probe(&lib.to_string_lossy()).ok();
         }
     }
@@ -50,8 +53,18 @@ pub(crate) fn add(spec: &str) -> PkgResult<Outcome> {
         .or_else(|| probed.as_ref().map(|(_, v)| v.clone()))
         .unwrap_or_else(|| "0.0.0".into());
 
-    // Copy the loadable subset into the content-addressed store.
+    // Copy the loadable subset into the content-addressed store. A cdylib that
+    // was just built lives under `target/`, which the store copy skips, so it
+    // is placed afterwards — never staged through the plugin's own tree, which
+    // for a `path:` source is the user's working copy.
     let store_path = store.install_dir(&name, &version, &staged.dir)?;
+    if let Some(built) = &built {
+        let file = built
+            .file_name()
+            .ok_or_else(|| PkgError::Resolve(format!("{name}: built cdylib has no name")))?;
+        std::fs::copy(built, store_path.join(file))
+            .map_err(|e| PkgError::Io(format!("install cdylib: {e}")))?;
+    }
     let integrity = super::store_integrity(&store_path)?;
 
     // Build the index record from the store-relative load info.
@@ -458,26 +471,41 @@ fn source_to_spec(source: &str) -> String {
     }
 }
 
-/// Build a native plugin's cdylib into the tree root so the store copy
-/// carries it (the store copy skips `target/`). If a `lib*.{dylib,so}`
-/// already sits at the root, use it as-is. Runs `cargo build --release` when
-/// a `Cargo.toml` exists and building is not disabled.
-fn prepare_native(dir: &Path, spec: &super::manifest::NativeSpec, name: &str) -> PkgResult<()> {
-    if find_cdylib(dir).is_some() {
-        return Ok(()); // prebuilt cdylib already at the root.
-    }
+/// Produce a native plugin's cdylib, returning where it ended up when one was
+/// built: `target/release/lib<name>.{dylib,so}` inside the staged tree. `None`
+/// means the plugin shipped a cdylib in the tree itself, which the store copy
+/// picks up on its own.
+///
+/// **Source wins over a shipped artifact.** A repo with a `Cargo.toml` is
+/// built even when a `lib*.{dylib,so}` is sitting next to it, because for a
+/// `path:` source that tree is the user's working copy and the artifact is
+/// whatever they last compiled — using it would install code that no longer
+/// matches the source they just edited. A prebuilt cdylib is honoured only
+/// where there is nothing to build from, which is the case it exists for: a
+/// plugin distributed as a binary.
+///
+/// Nothing is written into the plugin's tree; `add` copies the artifact
+/// straight into the store.
+fn prepare_native(
+    dir: &Path,
+    spec: &super::manifest::NativeSpec,
+    name: &str,
+) -> PkgResult<Option<std::path::PathBuf>> {
     let has_cargo = dir.join("Cargo.toml").is_file();
     let want_build = spec.build.unwrap_or(has_cargo);
-    if !want_build {
-        return Err(PkgError::Resolve(format!(
-            "{name}: native plugin has no prebuilt cdylib and build is disabled"
-        )));
+
+    if !want_build || !has_cargo {
+        // Not building: the plugin must ship its own cdylib.
+        if find_cdylib(dir).is_some() {
+            return Ok(None);
+        }
+        return Err(PkgError::Resolve(if want_build {
+            format!("{name}: native plugin has neither a cdylib nor a Cargo.toml to build")
+        } else {
+            format!("{name}: native plugin has no prebuilt cdylib and build is disabled")
+        }));
     }
-    if !has_cargo {
-        return Err(PkgError::Resolve(format!(
-            "{name}: native plugin has neither a cdylib nor a Cargo.toml to build"
-        )));
-    }
+
     let out = std::process::Command::new("cargo")
         .current_dir(dir)
         .arg("build")
@@ -490,7 +518,6 @@ fn prepare_native(dir: &Path, spec: &super::manifest::NativeSpec, name: &str) ->
             String::from_utf8_lossy(&out.stderr).trim()
         )));
     }
-    // Copy the built cdylib from target/release to the tree root.
     let rel = dir.join("target").join("release");
     let built = find_cdylib(&rel).ok_or_else(|| {
         PkgError::Resolve(format!(
@@ -498,9 +525,7 @@ fn prepare_native(dir: &Path, spec: &super::manifest::NativeSpec, name: &str) ->
             rel.display()
         ))
     })?;
-    std::fs::copy(rel.join(&built), dir.join(&built))
-        .map_err(|e| PkgError::Io(format!("stage cdylib: {e}")))?;
-    Ok(())
+    Ok(Some(rel.join(built)))
 }
 
 /// Find a `lib*.{dylib,so}` (or `*.dll`) filename directly inside `dir`.
@@ -561,6 +586,66 @@ mod tests {
         assert_eq!(source_to_spec("github:o/r"), "github:o/r");
         assert_eq!(source_to_spec("git+https://x/y.git"), "git+https://x/y.git");
         assert_eq!(source_to_spec("path+file:///tmp/p"), "path:/tmp/p");
+    }
+
+    /// A `path:` source is the user's working copy, so an artifact left in it
+    /// by an earlier build must never be installed in place of the source they
+    /// just edited. With a `Cargo.toml` present, `prepare_native` has to
+    /// attempt a build even though a `lib*.{dylib,so}` is sitting at the root —
+    /// the bug this pins let a stale dylib shadow every later `znative add`.
+    #[cfg(unix)]
+    #[test]
+    fn a_stale_artifact_never_shadows_the_source() {
+        use super::super::manifest::NativeSpec;
+        let dir = super::super::store::tests_support::tmp_dir("stale-artifact");
+        // A manifest cargo will reject, so the build fails fast and the error
+        // tells us a build was attempted at all.
+        std::fs::write(dir.join("Cargo.toml"), b"this is not a manifest\n").unwrap();
+        std::fs::write(dir.join("libstale.dylib"), b"stale").unwrap();
+        std::fs::write(dir.join("libstale.so"), b"stale").unwrap();
+
+        let err = prepare_native(&dir, &NativeSpec::default(), "stale")
+            .expect_err("a broken Cargo.toml must fail the install, not fall back to the artifact");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("cargo build"),
+            "expected a build failure, got: {msg}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The other half of the same rule: with nothing to build from, a shipped
+    /// cdylib is exactly what should be used — that is how a plugin
+    /// distributed as a binary installs.
+    #[test]
+    fn a_shipped_cdylib_is_used_when_there_is_no_source() {
+        use super::super::manifest::NativeSpec;
+        let dir = super::super::store::tests_support::tmp_dir("shipped-artifact");
+        let name = format!("{}libshipped{}", std::env::consts::DLL_PREFIX, std::env::consts::DLL_SUFFIX);
+        std::fs::write(dir.join(name), b"binary").unwrap();
+
+        let built = prepare_native(&dir, &NativeSpec::default(), "shipped").unwrap();
+        assert!(
+            built.is_none(),
+            "a shipped cdylib is carried by the store copy, not rebuilt"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `build = false` with no artifact is a hard error rather than a silent
+    /// half-install that fails later at load.
+    #[test]
+    fn build_disabled_without_an_artifact_is_an_error() {
+        use super::super::manifest::NativeSpec;
+        let dir = super::super::store::tests_support::tmp_dir("no-artifact");
+        std::fs::write(dir.join("Cargo.toml"), b"[package]\n").unwrap();
+        let spec = NativeSpec {
+            build: Some(false),
+            ..Default::default()
+        };
+        let err = prepare_native(&dir, &spec, "nope").expect_err("must not install nothing");
+        assert!(err.to_string().contains("build is disabled"), "{err}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// `gc` reports whole kilobytes; a byte of garbage must not round to

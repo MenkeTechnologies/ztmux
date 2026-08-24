@@ -1,0 +1,19 @@
+# A native ztmux plugin that adds a `sessionizer` command.
+#
+# A real plugin lives in its own repository and depends on the published
+# `ztnative` crate; this one is inside the ztmux tree, so it points at the
+# local copy of the SDK and declares its own `[workspace]` to stay out of
+# ztmux's.
+[package]
+name    = "plugin-sessionizer"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ztnative = { path = "../../ztnative" }
