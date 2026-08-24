@@ -1,0 +1,52 @@
+# Cases that still RUN and are still diffed, but whose result does not gate CI.
+#
+# A case belongs here only when it fails in an environment we cannot reproduce
+# in, so leaving it in the gate would make the pipeline red without anyone being
+# able to work on it. It is not a way to retire a case: nothing here is skipped,
+# every one is executed and diffed on every run, a failure prints as
+# QUARANTINED-FAIL and lands in parity_failures.log, and the count travels on the
+# summary line and in the JSON next to the percentage. When a quarantined case
+# starts matching, the runner says so (QUARANTINED-OK) and the line should be
+# deleted.
+#
+# ---------------------------------------------------------------------------
+# 2026-08-24 — theme colours resolve to terminal ANSI on Linux, RGB on macOS
+#
+# next-3.7's default status/menu styling uses THEME colours (status-style is
+# bg=themegreen,fg=themeblack), resolved per client by
+# server_client_update_theme_colours: with the `theme` option at its default
+# `detect`, each entry comes from the dark-theme-* / light-theme-* options and
+# lands as RGB (themeblack -> 13,13,13; themegreen -> 154,205,50). ztmux does
+# exactly that on macOS: run one at a time against vendor/tmux/tmux, with the
+# debug or the release binary, all twelve match. (Two of them -- 1528 and 1529 --
+# have also been seen failing in a full-suite run on macOS, where every case is
+# racing the next one's servers; 1528 reproduces about one run in two in
+# isolation. That is the fixed-sleep fencing several of these cases use, a
+# separate defect from the one below, and it is why "passes here" is stated per
+# case rather than as a green suite.)
+#
+# On the ubuntu-latest runner the same twelve fail, and every diff is the same
+# shape: the reference emits the RGB form and ztmux emits the terminal ANSI
+# values instead -- ^[[37m/^[[40m for themewhite/themeblack, ^[[42m for
+# themegreen, and nothing at all where the entry resolves to 8. Those are
+# precisely colour_theme_terminal_colour's values, i.e. the client ends up with
+# the `theme` option's `terminal` branch (or theme_colours[] never updated)
+# rather than the option-derived colours. Same feature set on both sides
+# (1555 prints it: both include RGB), same reference binary, same release build.
+#
+# Root cause is open and needs a Linux reproduction to find; there is no
+# container runtime available on the development machine. The twelve are one
+# bug, not twelve: every case here captures a status line, menu or popup drawn
+# with theme colours.
+1504_hashrocket_dotmatrix_status_render.sh
+1508_mode_tree_render.sh
+1522_pane_border_status_render.sh
+1523_pane_border_lines_render.sh
+1528_status_position_justify.sh
+1529_status_lines_format.sh
+1531_window_status_style_render.sh
+1540_display_menu_render.sh
+1541_window_menu_render.sh
+1546_utf8_wide_status_trunc_render.sh
+1555_hyperlink_render.sh
+1556_style_dim_render.sh

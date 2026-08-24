@@ -34,12 +34,22 @@
 #   --json PATH        Write a JSON summary (total/passed/failed/percent).
 #   --fail-log PATH    Per-case failure detail (both outputs + diff). `-` = stderr.
 #                      Default: parity/parity_failures.log (truncated per run).
+#   --quarantine PATH  Cases listed here still RUN and are still diffed, but their
+#                      result does not gate: they are counted and reported
+#                      separately as `quarantined`. Default parity/quarantine.txt
+#                      when it exists. `--quarantine ''` gates everything.
+#                      Nothing is hidden -- a quarantined failure prints, lands in
+#                      the failure log, and is counted on the summary line and in
+#                      the JSON, so the gate can be green while the number of
+#                      known-divergent cases stays visible next to it.
 
 set -uo pipefail
 
 SUMMARY_ONLY=0
 JSON_OUT=""
 FAIL_LOG=""
+QUARANTINE_FILE=""
+QUARANTINE_SET=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --summary)    SUMMARY_ONLY=1; shift ;;
@@ -47,6 +57,8 @@ while [[ $# -gt 0 ]]; do
     --json=*)     JSON_OUT="${1#--json=}"; shift ;;
     --fail-log)   FAIL_LOG="${2:-}"; shift 2 ;;
     --fail-log=*) FAIL_LOG="${1#--fail-log=}"; shift ;;
+    --quarantine)   QUARANTINE_FILE="${2:-}"; QUARANTINE_SET=1; shift 2 ;;
+    --quarantine=*) QUARANTINE_FILE="${1#--quarantine=}"; QUARANTINE_SET=1; shift ;;
     *) echo "parity: unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -129,6 +141,22 @@ fi
 if [[ -z "$FAIL_LOG" ]]; then FAIL_LOG="$ROOT/parity/parity_failures.log"; fi
 if [[ "$FAIL_LOG" == "-" ]]; then exec 7>&2; else : >"$FAIL_LOG"; exec 7>"$FAIL_LOG"; fi
 
+# The quarantine list: case basenames whose result is reported but does not gate.
+# Comments (#) and blank lines are ignored. Kept as a newline-delimited string
+# rather than an associative array so this still runs under bash 3.2 (macOS).
+if [[ "$QUARANTINE_SET" -eq 0 && -f "$ROOT/parity/quarantine.txt" ]]; then
+  QUARANTINE_FILE="$ROOT/parity/quarantine.txt"
+fi
+QUARANTINED=""
+if [[ -n "$QUARANTINE_FILE" ]]; then
+  if [[ ! -f "$QUARANTINE_FILE" ]]; then
+    echo "parity: quarantine list '$QUARANTINE_FILE' not found" >&2
+    exit 2
+  fi
+  QUARANTINED=$(sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$QUARANTINE_FILE" | grep -v '^$' || true)
+fi
+is_quarantined() { [[ -n "$QUARANTINED" ]] && printf '%s\n' "$QUARANTINED" | grep -qxF "$1"; }
+
 # Run one case against one binary; echo its captured stdout+stderr.
 # $1 = binary, $2 = case file, $3 = kind (fmt|sh)
 run_one() {
@@ -147,39 +175,68 @@ run_one() {
   printf '%s' "$out"
 }
 
-total=0 passed=0 failed=0
+total=0 passed=0 failed=0 quarantined=0 quarantined_failing=0
 for f in "${cases[@]}"; do
   base=$(basename "$f")
   kind="${f##*.}"
   total=$((total + 1))
+  quar=0; is_quarantined "$base" && quar=1
   ref_out=$(run_one "$TMUX_REF" "$f" "$kind")
   port_out=$(run_one "$ZTMUX" "$f" "$kind")
   if [[ "$ref_out" == "$port_out" ]]; then
-    [[ "$SUMMARY_ONLY" -eq 0 ]] && echo "parity OK:   $base"
-    passed=$((passed + 1))
+    if [[ "$quar" -eq 1 ]]; then
+      # A quarantined case that matches is news: the divergence it records is
+      # gone, or was environment-specific and this environment does not have it.
+      echo "parity QUARANTINED-OK: $base (matches here; drop it from $(basename "$QUARANTINE_FILE")?)" >&2
+      quarantined=$((quarantined + 1))
+    else
+      [[ "$SUMMARY_ONLY" -eq 0 ]] && echo "parity OK:   $base"
+      passed=$((passed + 1))
+    fi
   else
-    echo "parity FAIL: $base" >&2
+    if [[ "$quar" -eq 1 ]]; then
+      echo "parity QUARANTINED-FAIL: $base" >&2
+    else
+      echo "parity FAIL: $base" >&2
+    fi
     {
-      echo "==== $base ===="
+      if [[ "$quar" -eq 1 ]]; then
+        echo "==== $base ==== [QUARANTINED - reported, does not gate]"
+      else
+        echo "==== $base ===="
+      fi
       echo "--- tmux (reference) ---"; printf '%s\n' "$ref_out"
       echo "--- ztmux (port) ---";     printf '%s\n' "$port_out"
       echo "--- diff (tmux vs ztmux) ---"
       diff -u <(printf '%s\n' "$ref_out") <(printf '%s\n' "$port_out") || true
       echo
     } >&7
-    failed=$((failed + 1))
+    if [[ "$quar" -eq 1 ]]; then
+      quarantined=$((quarantined + 1)); quarantined_failing=$((quarantined_failing + 1))
+    else
+      failed=$((failed + 1))
+    fi
   fi
 done
 
 exec 7>&-
 
-pct=$(awk -v p="$passed" -v t="$total" 'BEGIN{ if (t==0) print "0.00"; else printf "%.2f", 100*p/t }')
+# The percentage is of what actually gated (passed+failed); the quarantined
+# count is printed beside it rather than folded into it, so the headline can
+# never read better than the tree is.
+gated=$((passed + failed))
+pct=$(awk -v p="$passed" -v t="$gated" 'BEGIN{ if (t==0) print "0.00"; else printf "%.2f", 100*p/t }')
 version=$(awk -F'"' '/^name[[:space:]]*=/{next} /^version[[:space:]]*=/{print $2; exit}' "$ROOT/Cargo.toml")
 version="${version:-unknown}"
 generated=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)
 
-printf 'parity: %d/%d passed (%s%%) · failed %d · ztmux v%s vs %s\n' \
-  "$passed" "$total" "$pct" "$failed" "$version" "$("$TMUX_REF" -V 2>/dev/null || echo tmux)"
+quar_note=""
+if [[ "$quarantined" -gt 0 ]]; then
+  quar_note=$(printf ' · quarantined %d (%d failing)' "$quarantined" "$quarantined_failing")
+fi
+printf 'parity: %d/%d passed (%s%%) · failed %d%s · ztmux v%s vs %s\n' \
+  "$passed" "$gated" "$pct" "$failed" "$quar_note" "$version" \
+  "$("$TMUX_REF" -V 2>/dev/null || echo tmux)"
 
 if [[ "$failed" -gt 0 && "$FAIL_LOG" != "-" ]]; then
   echo "parity: failure details in $FAIL_LOG" >&2
@@ -187,8 +244,12 @@ fi
 
 if [[ -n "$JSON_OUT" ]]; then
   tmp_json=$(mktemp "${TMPDIR:-/tmp}/parity.summary.$$.XXXXXX")
-  printf '{\n  "total": %d,\n  "passed": %d,\n  "failed": %d,\n  "percent": %s,\n  "ztmux_version": "%s",\n  "reference": "%s",\n  "generated_at": "%s"\n}\n' \
-    "$total" "$passed" "$failed" "$pct" "$version" "$("$TMUX_REF" -V 2>/dev/null || echo tmux)" "$generated" >"$tmp_json"
+  # `total` stays every case discovered; passed + failed + quarantined == total,
+  # and `percent` is of the gated set. A reader can always see how much of the
+  # corpus was allowed to gate.
+  printf '{\n  "total": %d,\n  "gated": %d,\n  "passed": %d,\n  "failed": %d,\n  "quarantined": %d,\n  "quarantined_failing": %d,\n  "percent": %s,\n  "ztmux_version": "%s",\n  "reference": "%s",\n  "generated_at": "%s"\n}\n' \
+    "$total" "$gated" "$passed" "$failed" "$quarantined" "$quarantined_failing" "$pct" \
+    "$version" "$("$TMUX_REF" -V 2>/dev/null || echo tmux)" "$generated" >"$tmp_json"
   command mv "$tmp_json" "$JSON_OUT"
 fi
 

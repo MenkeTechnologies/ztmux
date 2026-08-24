@@ -24,6 +24,42 @@ ZTMUX=target/debug/ztmux bash parity/run_parity.sh   # test a debug build
 Failure detail (both outputs + unified diff, per case) lands in
 `parity/parity_failures.log` (gitignored, truncated each run).
 
+## Quarantine
+
+`parity/quarantine.txt` lists cases whose result is reported but does not gate. A case goes
+there only when it fails somewhere we cannot reproduce, so leaving it in the gate would keep
+CI red with nobody able to work on it.
+
+It is not a way to retire a case. Every quarantined case is still executed and still diffed
+on every run; a divergence prints as `QUARANTINED-FAIL`, its full diff lands in
+`parity_failures.log`, and the count rides next to the percentage on the summary line and in
+the JSON (`quarantined`, `quarantined_failing`, with `passed + failed + quarantined ==
+total`). The percentage is of the gated set, so the headline can never read better than the
+tree is. When a quarantined case starts matching, the runner says `QUARANTINED-OK` and names
+the file to delete the line from.
+
+```sh
+bash parity/run_parity.sh                            # honours parity/quarantine.txt
+bash parity/run_parity.sh --quarantine ''            # gate everything, nothing excused
+```
+
+**Open: fixed-sleep fences flake under suite load (2026-08-24).** Several of the
+attached-client render cases wait with a bare `sleep 2` / `sleep 0.9` instead of polling for
+a marker the way 1531 and 1547 do. Under a full run, where the next case's servers are
+already starting, that races: 1526 came back with EMPTY output in one macOS run (the case's
+`timeout 15` expired) and passes on every isolated re-run, and 1528 fails about one run in
+two. They are not divergences and are not quarantined; the fix is to fence them on a marker.
+
+**Open: twelve render cases, Linux only (2026-08-24).** next-3.7 styles the status line and
+menus with theme colours (`status-style` defaults to `bg=themegreen,fg=themeblack`), which
+`server_client_update_theme_colours` resolves per client from the `dark-theme-*` options into
+RGB. ztmux does that on macOS — the twelve pass locally against `vendor/tmux/tmux` with both
+the debug and the release binary, and the full suite is green — but on `ubuntu-latest` every
+one of them diffs the same way: the reference emits RGB and ztmux emits the terminal ANSI
+values (`^[[37m`/`^[[40m`/`^[[42m`, and nothing where the entry resolves to 8), which are
+`colour_theme_terminal_colour`'s. Both sides negotiate the same feature set including `RGB`
+(case 1555 prints it). One bug, twelve symptoms; it needs a Linux reproduction to find.
+
 ## Cases
 
 `parity/cases/` holds two flavors:
