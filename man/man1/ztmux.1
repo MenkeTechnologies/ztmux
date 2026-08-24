@@ -1178,6 +1178,110 @@ ztmux list\-panes \-a \-o json
 ztmux list\-sessions \-o table
 .EE
 .RE
+.SS znative
+.B znative
+is a
+.B ztmux
+command \(en not a client subcommand \(en that installs and loads tmux plugins,
+so the same invocation works from
+.IR .tmux.conf ,
+a key binding, the command prompt, and the shell.
+It handles both kinds of plugin:
+.RS
+.TP
+.B script
+An ordinary TPM plugin: a repository with a
+.I *.tmux
+file, run as-is. Nothing about the plugin has to change.
+.TP
+.B native
+A Rust
+.BR cdylib ,
+built against the
+.B ztnative
+ABI and
+.BR dlopen ed
+by the server, registering real
+.B ztmux
+commands,
+.RB #{ ... }
+format variables, and hook subscriptions with no subprocess involved. tmux has
+no counterpart: it has never had a plugin ABI.
+.RE
+.PP
+Subcommands:
+.RS
+.TP
+.BI "load [" source ...]
+Load a plugin, installing it first if the store does not have it; with no
+argument, load everything installed. This is the line a configuration file
+carries. It touches the network only on the first start.
+.TP
+.BI "add " source ...
+Resolve, install, record, and load. Aliases:
+.BR install ", " i .
+.TP
+.BI "remove " name ...
+Unload, delete the store copy, and drop the index entry. Aliases:
+.BR rm ", " uninstall .
+.TP
+.B list
+One line per installed plugin. Alias:
+.BR ls .
+.TP
+.B loaded
+The native plugins mapped into this server, and the file each runs from.
+.TP
+.BI "info " name
+The full record, including the commands, formats, and hooks a loaded plugin
+registered. Alias:
+.BR show .
+.TP
+.BI "update [" name ]
+Re-resolve and reinstall from the recorded source. Aliases:
+.BR upgrade ", " up .
+.TP
+.BR "gc " [ \-n ]
+Remove store directories no longer pinned by the index, and the clone cache.
+.B \-n
+reports without removing.
+.TP
+.B clean
+Clear the scratch directories; the store and index are untouched.
+.RE
+.PP
+A source is
+.IR owner/repo ,
+.BI github: owner/repo\fR,
+.BI git+ URL\fR,
+a URL, or a local path
+.RB ( path: DIR
+or an absolute,
+.IR ./ ,
+.IR ../ ,
+or
+.I ~/
+path); any remote form may carry
+.BI @ ref
+to pin a tag, branch, or commit, and the pin is recorded so
+.B update
+re-fetches that exact ref.
+Everything installs under
+.IR $ZTMUX_HOME/pkg/ " (" $ZTMUX_HOME
+defaults to
+.IR ~/.ztmux ),
+one directory per
+.IR name@version ,
+each SHA-256 pinned in
+.IR installed.toml .
+A native plugin takes its name and version from the compiled artifact when the
+repository declares none.
+.PP
+A plugin can never shadow a
+.B ztmux
+command or format: the port's own tables are consulted first, and registering a
+name that already exists fails the load. Unloading purges a plugin's
+registrations before the library is closed.
 .SS ztmux dashboard
 .B ztmux dashboard
 launches a live full-screen dashboard of the running server: a navigable

@@ -255,6 +255,9 @@ pub(crate) mod open;
 pub(crate) mod peek;
 pub(crate) mod pick;
 pub(crate) mod piped;
+// The native-plugin ABI host and the `znative` plugin package manager.
+pub(crate) mod pkg;
+pub(crate) mod plugin_host;
 pub(crate) mod ports;
 pub(crate) mod procstat;
 pub(crate) mod proctree;

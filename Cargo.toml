@@ -66,6 +66,14 @@ ratatui      = { version = "0.30" }
 reedline     = { version = "0.49" }
 serde        = { version = "1", features = ["derive"] }
 serde_json   = { version = "1" }
+# Native plugin host (`znative`): dlopen for cdylib plugins, TOML for the
+# plugin manifest + install index, SHA-256 for store integrity pinning.
+libloading   = { version = "0.8" }
+sha2         = { version = "0.10" }
+toml         = { version = "1" }
+# The plugin ABI, shared verbatim with every plugin cdylib (path dep here so
+# host and plugin cannot drift; plugins depend on the published crate).
+ztnative     = { version = "0.1.0", path = "ztnative" }
 
 [build-dependencies]
 lalrpop      = { version = "0.22.2", default-features = false }

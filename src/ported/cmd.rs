@@ -232,8 +232,11 @@ use cmd_swap_window::CMD_SWAP_WINDOW_ENTRY;
 use cmd_switch_client::CMD_SWITCH_CLIENT_ENTRY;
 use cmd_unbind_key::CMD_UNBIND_KEY_ENTRY;
 use cmd_wait_for::CMD_WAIT_FOR_ENTRY;
+// ztmux extension: the `znative` plugin manager is a real command so it works
+// from .tmux.conf, a key binding, the command prompt and the CLI alike.
+use crate::extensions::pkg::cmd_znative::CMD_ZNATIVE_ENTRY;
 
-pub static CMD_TABLE: [&cmd_entry; 92] = [
+pub static CMD_TABLE: [&cmd_entry; 93] = [
     &CMD_ATTACH_SESSION_ENTRY,
     &CMD_BIND_KEY_ENTRY,
     &CMD_BREAK_PANE_ENTRY,
@@ -326,6 +329,7 @@ pub static CMD_TABLE: [&cmd_entry; 92] = [
     &CMD_UNBIND_KEY_ENTRY,
     &CMD_UNLINK_WINDOW_ENTRY,
     &CMD_WAIT_FOR_ENTRY,
+    &CMD_ZNATIVE_ENTRY,
 ];
 
 // Instance of a command.
@@ -630,7 +634,18 @@ pub fn cmd_find(name: &str) -> Result<&'static cmd_entry, String> {
                 log_debug!("cmd_find: {name} found");
                 Ok(value)
             }
-            None => Err(format!("unknown command: {name}")),
+            // ztmux: a native plugin may have registered this command through
+            // the ztnative ABI. Consulted only after CMD_TABLE misses, so a
+            // plugin can never shadow a tmux command; and matched on the full
+            // name or alias only, so adding a plugin can never make an
+            // existing prefix ambiguous.
+            None => match crate::extensions::plugin_host::command_entry(name) {
+                Some(entry) => {
+                    log_debug!("cmd_find: {name} found (plugin)");
+                    Ok(entry)
+                }
+                None => Err(format!("unknown command: {name}")),
+            },
         }
     } else {
         let mut msg = format!("ambiguous command: {name}, could be: ");

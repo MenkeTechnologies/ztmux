@@ -221,6 +221,19 @@ pub unsafe fn notify_add(
             return;
         }
 
+        // ztmux: hand the notification to any native plugin subscribed to it
+        // through the ztnative `register_hook` ABI, before the hook command
+        // itself is queued. Plugin hooks observe; they cannot cancel the
+        // notification or the command that caused it.
+        crate::extensions::plugin_host::dispatch_hook(
+            name.to_string_lossy().as_ref(),
+            (!c.is_null()).then(|| cstr_to_str((*c).name)),
+            (!s.is_null()).then(|| (*s).name.as_ref()),
+            (!w.is_null()).then(|| cstr_to_str((*w).name_ptr())),
+            if w.is_null() { -1 } else { (*w).id as i32 },
+            if wp.is_null() { -1 } else { (*wp).id as i32 },
+        );
+
         let ne = xcalloc1::<notify_entry>() as *mut notify_entry;
         (*ne).name = xstrdup(name.as_ptr().cast()).as_ptr();
 

@@ -1,0 +1,22 @@
+# ztnative — the native (Rust) plugin SDK for ztmux.
+#
+# Both sides of the plugin boundary depend on THIS crate so they agree on the
+# exact `#[repr(C)]` layout of the host table: ztmux links it as a path
+# dependency, a plugin links it from crates.io. Nothing but C-representable
+# data crosses the boundary, so no dependency is needed or wanted here.
+[package]
+name          = "ztnative"
+version       = "0.1.0"
+authors       = ["MenkeTechnologies <linux.dev25@gmail.com>"]
+categories    = ["command-line-utilities", "api-bindings"]
+edition       = "2021"
+keywords      = ["tmux", "ztmux", "plugin", "abi"]
+license       = "MIT"
+repository    = "https://github.com/MenkeTechnologies/ztmux"
+homepage      = "https://menketechnologies.github.io/ztmux/"
+documentation = "https://docs.rs/ztnative"
+rust-version  = "1.70"
+description   = "Native plugin SDK for ztmux — the C ABI a tmux plugin written in Rust is compiled against"
+publish       = true
+
+[dependencies]

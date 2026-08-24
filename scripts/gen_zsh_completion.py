@@ -630,6 +630,23 @@ EXTENSIONS = [
         ["-o[output format]:format:(json)", "--json[machine-readable JSON output]"],
         "the UTF-8 state of every attached client (ztmux extension)",
     ),
+    (
+        # A real server command rather than a client extension, but the
+        # vendored base only knows upstream tmux's command list, so it is
+        # injected here like the rest.
+        "znative",
+        [
+            "-n[dry run: list what gc would remove without removing it]",
+            "1:command:((load\\:install\\ if\\ needed\\ then\\ load "
+            "add\\:install\\ and\\ load remove\\:unload\\ and\\ delete "
+            "list\\:installed\\ plugins loaded\\:native\\ plugins\\ live\\ in\\ this\\ server "
+            "info\\:details\\ for\\ one\\ plugin update\\:reinstall\\ from\\ the\\ recorded\\ source "
+            "gc\\:remove\\ orphan\\ store\\ entries clean\\:clear\\ scratch\\ caches "
+            "help\\:usage))",
+            "*:plugin or source:_files",
+        ],
+        "install and load tmux plugins, native (Rust cdylib) or TPM script (ztmux extension)",
+    ),
 ]
 
 

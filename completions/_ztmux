@@ -2700,6 +2700,14 @@ _ztmux-mouse() {
     '--json[machine-readable JSON output]'
 }
 
+_ztmux-znative() {
+  [[ -n ${tmux_describe} ]] && print "install and load tmux plugins, native (Rust cdylib) or TPM script (ztmux extension)" && return
+  _arguments -s \
+    '-n[dry run: list what gc would remove without removing it]' \
+    '1:command:((load\:install\ if\ needed\ then\ load add\:install\ and\ load remove\:unload\ and\ delete list\:installed\ plugins loaded\:native\ plugins\ live\ in\ this\ server info\:details\ for\ one\ plugin update\:reinstall\ from\ the\ recorded\ source gc\:remove\ orphan\ store\ entries clean\:clear\ scratch\ caches help\:usage))' \
+    '*:plugin or source:_files'
+}
+
 _ztmux-utf8() {
   [[ -n ${tmux_describe} ]] && print "the UTF-8 state of every attached client (ztmux extension)" && return
   _arguments -s \

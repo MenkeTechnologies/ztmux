@@ -4171,6 +4171,19 @@ fn format_find(
                 }
             }
 
+            // ztmux: a native plugin may provide this key through the
+            // ztnative `register_format` ABI. Consulted after the option
+            // lookups and before the built-in table so a plugin can extend
+            // `#{…}` — and checked against the table below, so it can never
+            // shadow a tmux format.
+            if format_table_get(key).is_none()
+                && let Some(key_str) = cstr_to_str_(key)
+                && let Some(value) = crate::extensions::plugin_host::dispatch_format(key_str)
+            {
+                found = cstring_truncating(value).into_raw().cast();
+                break 'found;
+            }
+
             if let Some(fte) = format_table_get(key) {
                 match (fte.cb)(ft) {
                     format_table_type::Time(tv) => t = tv.tv_sec,
