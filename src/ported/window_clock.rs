@@ -281,11 +281,13 @@ pub unsafe fn window_clock_draw_screen(wme: NonNull<window_mode_entry>) {
 
         let mut t = libc::time(null_mut());
         let tm = libc::localtime(&raw mut t);
-        if style == 0 {
+        // 0 = "12", 1 = "24", 2 = "12-with-seconds", 3 = "24-with-seconds"
+        // (options-table.c:38-40, window-clock.c:247-261).
+        if style == 0 || style == 2 {
             libc::strftime(
                 &raw mut tim as _,
                 SIZEOF_TIM,
-                c!("%l:%M "),
+                if style == 2 { c!("%l:%M:%S ") } else { c!("%l:%M ") },
                 libc::localtime(&raw mut t),
             );
             if (*tm).tm_hour >= 12 {
@@ -294,7 +296,12 @@ pub unsafe fn window_clock_draw_screen(wme: NonNull<window_mode_entry>) {
                 strlcat(&raw mut tim as _, c!("AM"), SIZEOF_TIM);
             }
         } else {
-            libc::strftime(&raw mut tim as _, SIZEOF_TIM, c!("%H:%M"), tm);
+            libc::strftime(
+                &raw mut tim as _,
+                SIZEOF_TIM,
+                if style == 3 { c!("%H:%M:%S") } else { c!("%H:%M") },
+                tm,
+            );
         }
 
         screen_write_clearscreen(&raw mut ctx, 8);

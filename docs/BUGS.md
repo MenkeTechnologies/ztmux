@@ -38,6 +38,39 @@ both binaries, zero divergences.
   than as reproduced defects; the bit positions are left free in `tty_flags`
   with a comment naming what belongs there.
 
+## 2026-08-30 (the choice lists, swept whole)
+
+### `clock-mode-style` was two names short
+
+- **Found 2026-08-30** by `parity/cases/1954_option_choice_lists.sh`, which sets
+  every name in every CHOICE option's list and reads it back.
+- next-3.7's list is `"12", "24", "12-with-seconds", "24-with-seconds"`
+  (`options-table.c:38-40`); this tree carried the first two, so both
+  with-seconds names were refused with `unknown value`. The reader had drifted
+  with it: `window_clock_draw_screen` had the two-way `%l:%M `/`%H:%M` split
+  where the C picks `%l:%M:%S `/`%H:%M:%S` for styles 2 and 3
+  (`window-clock.c:247-261`). Both halves ported.
+- This is the third defect of exactly this shape after `remain-on-exit` "key"
+  and the mouse locations: a *list* is data, so the anti-drift gate over
+  function names cannot see it, and a short list stays invisible until something
+  writes the missing index. Case 1954 now compares every choice option's whole
+  list, so the next short list shows up as a refused value rather than as a
+  crash later.
+
+### A `destroy-unattached=keep-last` divergence, recorded rather than half-fixed
+
+- **Found 2026-08-30** by the case written for the same option.
+- With three unattached sessions in one group, both binaries keep exactly one,
+  as `keep-last` says, but not the same one. `server_check_unattached` walks the
+  session tree with `RB_FOREACH` and destroys inside the loop
+  (`server-fn.c:487-507`); `RB_FOREACH` computes the next node after the body,
+  so the C reads the links of a node `RB_REMOVE` has already taken out. This
+  port's iterator takes the next pointer first and walks the remaining tree.
+- Matching the C means reading a session's links after it is destroyed, which
+  here is a use-after-free rather than the C's happens-to-work read, so it is in
+  `parity/known_gaps/destroy_unattached_keep_last_survivor.sh` with the minimal
+  reproduction and what closing it would take.
+
 ## 2026-08-30 (floating panes, and a client flag that was never there)
 
 Continuing the flag audit into next-3.7's newest surface: `new-pane`,

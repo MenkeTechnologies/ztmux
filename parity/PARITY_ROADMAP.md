@@ -101,8 +101,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1641/1641 cases pass (100%) vs the vendored tmux — one known divergence, recorded as a gap.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 → 1641 cases.
+**1643/1643 cases pass (100%) vs the vendored tmux — two known divergences, both recorded as gaps.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 → 1641 → 1643 cases.
 
 **Cases 1926–1945 came from a flag audit.** Every `.args` string in
 `vendor/tmux/cmd-*.c` was diffed against the whole corpus, which named 107 flag
@@ -118,6 +118,19 @@ writes 3 into an option this tree only had three names for. Porting
 `layout_get_tiled_cell` (`layout.c:1593`) for the first two also **closed the
 `join_pane_before_placement` gap**, which had recorded exactly the missing
 wrapper; its case is now 1943. `docs/BUGS.md` carries the write-ups.
+
+**Case 1954 sweeps the choice LISTS whole.** Every `OPTIONS_TABLE_CHOICE`
+option, every name in its list, set and read back — 34 options and 137 names,
+generated from `options-table.c` rather than hand-listed. Like case 1498's
+binding diff, this compares *data* the anti-drift gate over function names
+cannot see, and a list that is short by one name stays invisible until something
+writes the missing index. It found `clock-mode-style` carrying only `12` and
+`24` where next-3.7 has `12-with-seconds` and `24-with-seconds`
+(`options-table.c:38-40`), with `window_clock_draw_screen` short of the two
+`:%S` formats those indices select. That is the third defect of this exact shape
+after `remain-on-exit` "key" and the 19 mouse locations. `destroy-unattached` is
+swept separately by case 1955, because with no client attached setting it takes
+the session — and then the server — away mid-loop.
 
 **Cases 1946–1953 went at the floating panes**, next-3.7's newest surface and
 the largest block the flag audit still listed: `new-pane`'s geometry (the

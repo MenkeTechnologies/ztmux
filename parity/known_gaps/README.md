@@ -35,6 +35,21 @@ is ported, so what is missing is what reaches the client, not the digits.
 Entering and leaving the mode, and the options it reads, are compared by
 `parity/cases/1838_clock_mode_state.sh`.
 
+**Two: `destroy_unattached_keep_last_survivor.sh`.** With `destroy-unattached`
+set to `keep-last` and three unattached sessions in one group, both binaries
+destroy two and keep one, as the rule says — but not always the same one. The
+cause is the traversal, not the rule: `server_check_unattached` walks the
+session tree with `RB_FOREACH` and destroys inside the loop
+(`server-fn.c:487-507`), and `RB_FOREACH` computes the next node *after* the
+body, so the C reads the links of a node `RB_REMOVE` has already taken out and
+rebalanced around. Where it lands next depends on the tree's shape, which is why
+only some sets of session names show it at all. This port's `rb_foreach` takes
+the next pointer before the body runs, so it walks the remaining tree. Matching
+the C would mean reading a session's links after it is destroyed — a real
+use-after-free here rather than the C's happens-to-work read — so it is recorded
+rather than half-fixed. Everything else about `destroy-unattached` is compared by
+`parity/cases/1955_destroy_unattached_choices.sh`.
+
 `join_pane_before_placement.sh` used to be the other one: `join-pane -b` put the
 joined pane on the opposite side of the target. It closed with the port of
 `layout_get_tiled_cell` (`layout.c:1593`), which next-3.7's join-pane reaches the
