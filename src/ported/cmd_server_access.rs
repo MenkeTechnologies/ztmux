@@ -19,7 +19,7 @@ pub static CMD_SERVER_ACCESS_ENTRY: cmd_entry = cmd_entry {
     alias: None,
 
     args: args_parse::new("adglrw", 0, 1, None),
-    usage: "[-adglrw] [user|group]",
+    usage: "[-adglrw] [-t target-pane] [user|group]",
 
     flags: cmd_flag::CMD_CLIENT_CANFAIL,
     exec: cmd_server_access_exec,

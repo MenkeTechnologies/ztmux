@@ -294,32 +294,50 @@ unsafe fn cmd_list_keys_commands(self_: *mut cmd, item: *mut cmdq_item) -> cmd_r
         format_defaults(ft, null_mut(), None, None, None);
 
         let command = args_string(args, 0);
-
-        for entry in CMD_TABLE {
-            if !command.is_null()
-                && (!streq_(command, entry.name)
-                    && entry.alias.is_none_or(|alias| !streq_(command, alias)))
-            {
-                continue;
+        if command.is_null() {
+            for entry in CMD_TABLE {
+                cmd_list_single_command(entry, ft, template, item);
             }
-
-            format_add!(ft, "command_list_name", "{}", entry.name);
-            format_add!(
-                ft,
-                "command_list_alias",
-                "{}",
-                entry.alias.unwrap_or_default()
-            );
-            format_add!(ft, "command_list_usage", "{}", entry.usage);
-
-            let line = format_expand(ft, template);
-            if *line != b'\0' {
-                cmdq_print!(item, "{}", _s(line));
+        } else {
+            // The C looks the name up with cmd_find (`cmd-list-commands.c:95`),
+            // so an abbreviation resolves the same way it does on a command
+            // line and an unknown name reports cmd_find's own error.
+            match cmd_find(cstr_to_str(command)) {
+                Ok(entry) => cmd_list_single_command(entry, ft, template, item),
+                Err(cause) => {
+                    cmdq_error!(item, "{}", cause);
+                    format_free(ft);
+                    return cmd_retval::CMD_RETURN_ERROR;
+                }
             }
-            free_(line);
         }
 
         format_free(ft);
         cmd_retval::CMD_RETURN_NORMAL
+    }
+}
+
+/// C `vendor/tmux/cmd-list-commands.c:48`: `static void cmd_list_single_command(const struct cmd_entry *entry, struct format_tree *ft, const char *template, struct cmdq_item *item)`
+unsafe fn cmd_list_single_command(
+    entry: &cmd_entry,
+    ft: *mut format_tree,
+    template: *const u8,
+    item: *mut cmdq_item,
+) {
+    unsafe {
+        format_add!(ft, "command_list_name", "{}", entry.name);
+        format_add!(
+            ft,
+            "command_list_alias",
+            "{}",
+            entry.alias.unwrap_or_default()
+        );
+        format_add!(ft, "command_list_usage", "{}", entry.usage);
+
+        let line = format_expand(ft, template);
+        if *line != b'\0' {
+            cmdq_print!(item, "{}", _s(line));
+        }
+        free_(line);
     }
 }

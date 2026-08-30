@@ -509,7 +509,14 @@ fn KEYC_IS_UNICODE(key: key_code) -> bool {
 
     let masked = key & KEYC_MASK_KEY;
 
-    masked > 0x7f
+    // The C asks whether the key's TYPE field is KEYC_TYPE_UNICODE
+    // (`tmux.h:201-203`). This port still carries the older flat `keyc` encoding
+    // (see parity/known_gaps), where the type field does not exist and the two
+    // sentinels live inside KEYC_MASK_KEY -- so they have to be excluded by
+    // name, or `None`/`Unknown` is mistaken for a Unicode code point.
+    masked != KEYC_NONE
+        && masked != KEYC_UNKNOWN
+        && masked > 0x7f
         && !(KEYC_BASE..KEYC_BASE_END).contains(&masked)
         && !(KEYC_USER..KEYC_USER_END).contains(&masked)
 }

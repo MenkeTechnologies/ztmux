@@ -261,6 +261,39 @@ static TTY_FEATURES: [&tty_feature; 21] = [
 ];
 
 /// C `vendor/tmux/tty-features.c:397`: `void tty_add_features(int *feat, const char *s, const char *separators)`
+/// C `vendor/tmux/tty-features.c:604`: `int tty_feature_present(struct tty_term *term, const char *name)`
+pub unsafe fn tty_feature_present(term: *mut tty_term, name: &str) -> bool {
+    unsafe {
+        let mut found: Option<&'static tty_feature> = None;
+        for (i, tf) in TTY_FEATURES.iter().enumerate() {
+            if tf.name == name {
+                if (*term).features & (1 << i) != 0 {
+                    return true;
+                }
+                found = Some(tf);
+                break;
+            }
+        }
+
+        // The feature flag is not set: fall back to asking whether the client's
+        // terminal actually has every capability the feature is made of.
+        let Some(tf) = found else { return false };
+        if name == "ignorefkeys" {
+            return false;
+        }
+        if !tf.flags.is_empty() && !(*term).flags.contains(tf.flags) {
+            return false;
+        }
+        for capability in tf.capabilities {
+            let capname = capability.split('=').next().unwrap_or(capability);
+            if !tty_term_has_name(term, capname) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 pub unsafe fn tty_add_features(feat: *mut i32, s: &str, separators: *const u8) {
     unsafe {
         log_debug!("adding terminal features {}", s);

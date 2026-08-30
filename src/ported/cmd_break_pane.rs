@@ -19,7 +19,7 @@ pub static CMD_BREAK_PANE_ENTRY: cmd_entry = cmd_entry {
     alias: Some("breakp"),
 
     args: args_parse::new("abdPF:n:s:t:Wx:X:y:Y:", 0, 0, None),
-    usage: "[-abdPW] [-F format] [-n window-name] [-s src-pane] [-t dst-window] [-x position] [-X position] [-y position] [-Y position]",
+    usage: "[-abdPW] [-F format] [-n window-name] [-s src-pane] [-t dst-window] [-x width] [-y height] [-X x-position] [-Y y-position]",
 
     source: cmd_entry_flag::new(b's', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
     target: cmd_entry_flag::new(

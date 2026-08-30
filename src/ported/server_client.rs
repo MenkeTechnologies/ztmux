@@ -3347,6 +3347,20 @@ pub unsafe fn server_client_key_callback(item: *mut cmdq_item, data: *mut c_void
                     break;
                 } // 'table_changed
             } // forward_key:
+            // A pane kept alive by `remain-on-exit` set to "key" (3) is
+            // dismissed by the next key that is not a mouse or paste event
+            // (server-client.c:1557-1566). The C's KEYC_IS_PASTE test has no
+            // counterpart here: this port has no bracketed-paste key encoding,
+            // so no key it can receive is a paste key.
+            if !wp.is_null()
+                && (*wp).flags.intersects(window_pane_flags::PANE_EXITED)
+                && !KEYC_IS_MOUSE(key)
+                && options_get_number_((*wp).options, "remain-on-exit") == 3
+            {
+                options_set_number((*wp).options, "remain-on-exit", 0);
+                server_destroy_pane(wp, 0);
+                break 'out;
+            }
             if (*c).flags.intersects(client_flag::READONLY) {
                 break 'out;
             }

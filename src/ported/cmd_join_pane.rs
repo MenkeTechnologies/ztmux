@@ -434,9 +434,6 @@ unsafe fn cmd_join_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
         let target = cmdq_get_target(item);
         let source = cmdq_get_source(item);
         let mut cause = null_mut();
-        let mut type_: layout_type;
-
-        let mut curval: u32 = 0;
 
         let dst_s = (*target).s;
         let dst_wl = (*target).wl;
@@ -481,60 +478,14 @@ unsafe fn cmd_join_pane_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retva
             return cmd_retval::CMD_RETURN_ERROR;
         }
 
-        type_ = layout_type::LAYOUT_TOPBOTTOM;
-        if args_has(args, 'h') {
-            type_ = layout_type::LAYOUT_LEFTRIGHT;
-        }
-
-        // If the 'p' flag is dropped then this bit can be moved into 'l'.
-        if args_has(args, 'l') || args_has(args, 'p') {
-            if args_has(args, 'f') {
-                match type_ {
-                    layout_type::LAYOUT_TOPBOTTOM => curval = (*dst_w).sy,
-                    _ => curval = (*dst_w).sx,
-                }
-            } else {
-                match type_ {
-                    layout_type::LAYOUT_TOPBOTTOM => curval = (*dst_wp).sy,
-                    _ => curval = (*dst_wp).sx,
-                }
-            }
-        }
-
-        let mut size: i32 = -1;
-        if args_has(args, 'l') {
-            size = args_percentage_and_expand(
-                args,
-                b'l',
-                0,
-                i32::MAX as i64,
-                curval as i64,
-                item,
-                &raw mut cause,
-            ) as _;
-        } else if args_has(args, 'p') {
-            size = args_strtonum_and_expand(args, b'l', 0, 100, item, &raw mut cause) as _;
-            if cause.is_null() {
-                size = curval as i32 * size / 100;
-            }
-        }
+        // The C declares `flags` here and never sets it (cmd-join-pane.c:379):
+        // -b and -f are read inside layout_get_tiled_cell, which takes its own
+        // copy, so the pane-list insert below always goes AFTER the target.
+        let flags = spawn_flags::empty();
+        let lc = layout_get_tiled_cell(item, args, dst_w, dst_wp, flags, &raw mut cause);
         if !cause.is_null() {
-            cmdq_error!(item, "size {}", _s(cause));
+            cmdq_error!(item, "size or position {}", _s(cause));
             free_(cause);
-            return cmd_retval::CMD_RETURN_ERROR;
-        }
-
-        let mut flags: spawn_flags = spawn_flags::empty();
-        if args_has(args, 'b') {
-            flags |= SPAWN_BEFORE;
-        }
-        if args_has(args, 'f') {
-            flags |= SPAWN_FULLSIZE;
-        }
-
-        let lc: *mut layout_cell = layout_split_pane(dst_wp, type_, size, flags);
-        if lc.is_null() {
-            cmdq_error!(item, "create pane failed: pane too small");
             return cmd_retval::CMD_RETURN_ERROR;
         }
 

@@ -490,6 +490,14 @@ pub unsafe fn options_table_entry(o: *mut options_entry) -> *const options_table
     unsafe { (*o).tableentry }
 }
 
+/// C `vendor/tmux/options.c:666`: `const struct options_table_entry *options_search(const char *name)`
+pub fn options_search(name: &str) -> *const options_table_entry {
+    match OPTIONS_TABLE.iter().find(|oe| oe.name == name) {
+        Some(oe) => oe as *const options_table_entry,
+        None => null(),
+    }
+}
+
 /// C `vendor/tmux/options.c:381`: `static struct options_array_item *options_array_item(struct options_entry *o, u_int idx)`
 unsafe fn options_array_item(o: *mut options_entry, idx: c_uint) -> *mut options_array_item {
     unsafe {

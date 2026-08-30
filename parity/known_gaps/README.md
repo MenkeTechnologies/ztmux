@@ -25,9 +25,27 @@ ported surface `parity/cases/` measures — they are unbuilt surface.
 
 ## The cases
 
-**There are none.** This directory holds only this README: every gap ever
-recorded here has been ported and its case promoted to `parity/cases/`. That is
-the intended end state, not an omission — a gap is added the moment one is
+**One: `clock_mode_client_draw.sh`.** `clock-mode` paints nothing on the
+client's screen. The clock is drawn by the CLIENT, through the mode's screen
+rather than into the pane's grid, so a server-side `capture-pane` is empty on
+both binaries; read back through an attached client — this suite's nested-client
+technique — the reference paints the digits and this port paints nothing once
+ztmux's own floating overlay (`@ztmux-ratatui`) is off. `window_clock_draw_screen`
+is ported, so what is missing is what reaches the client, not the digits.
+Entering and leaving the mode, and the options it reads, are compared by
+`parity/cases/1838_clock_mode_state.sh`.
+
+`join_pane_before_placement.sh` used to be the other one: `join-pane -b` put the
+joined pane on the opposite side of the target. It closed with the port of
+`layout_get_tiled_cell` (`layout.c:1593`), which next-3.7's join-pane reaches the
+layout through (`cmd-join-pane.c:419`) and this port did not have — it called
+`layout_split_pane` directly. The C leaves `cmd_join_pane_exec`'s own `flags` at
+zero (`cmd-join-pane.c:379`), so `-b` reaches the layout but never the pane-list
+insert. Its case is now `parity/cases/1943_join_pane_before_placement.sh`.
+
+Historically this directory was empty: every gap recorded here before had been
+ported and its case promoted to `parity/cases/`. That is still the intended end
+state — a gap is added the moment one is
 proven, so an empty directory means nothing is currently proven missing, and
 says nothing about surface no case has probed yet. `docs/BUGS.md` is where
 suspected-but-unproven gaps and open defects live.

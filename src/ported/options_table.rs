@@ -60,7 +60,7 @@ static OPTIONS_TABLE_GET_CLIPBOARD_LIST: [&str; 4] = ["off", "buffer", "request"
 static OPTIONS_TABLE_THEME_LIST: [&str; 4] = ["detect", "terminal", "light", "dark"];
 static OPTIONS_TABLE_SET_CLIPBOARD_LIST: [&str; 3] = ["off", "external", "on"];
 static OPTIONS_TABLE_WINDOW_SIZE_LIST: [&str; 4] = ["largest", "smallest", "manual", "latest"];
-static OPTIONS_TABLE_REMAIN_ON_EXIT_LIST: [&str; 3] = ["off", "on", "failed"];
+static OPTIONS_TABLE_REMAIN_ON_EXIT_LIST: [&str; 4] = ["off", "on", "failed", "key"];
 static OPTIONS_TABLE_DESTROY_UNATTACHED_LIST: [&str; 4] = ["off", "on", "keep-last", "keep-group"];
 static OPTIONS_TABLE_DETACH_ON_DESTROY_LIST: [&str; 5] =
     ["off", "on", "no-detached", "previous", "next"];
@@ -1792,7 +1792,7 @@ pub static OPTIONS_TABLE: [options_table_entry; 248] = [
         choices: &OPTIONS_TABLE_REMAIN_ON_EXIT_LIST,
         default_num: 0,
         text: c!(
-            "Whether panes should remain ('on') or be automatically killed ('off' or 'failed') when the program inside exits."
+            "Whether panes should remain ('on'), remain until a key is pressed ('key') or be automatically killed ('off' or 'failed') when the program inside exits."
         ),
         ..options_table_entry::const_default()
     },

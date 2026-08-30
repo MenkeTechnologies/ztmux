@@ -255,29 +255,6 @@ pub unsafe fn session_destroy(s: *mut session, notify: i32, from: *const u8) {
     }
 }
 
-/// Sanitize session name.
-pub unsafe fn session_check_name(name: *const u8) -> Option<String> {
-    unsafe {
-        if *name == b'\0' {
-            return None;
-        }
-        let copy = xstrdup(name).as_ptr();
-        let mut cp = copy;
-        while *cp != b'\0' {
-            if *cp == b':' || *cp == b'.' {
-                *cp = b'_';
-            }
-            cp = cp.add(1);
-        }
-        let new_name = utf8_stravis_(
-            copy,
-            vis_flags::VIS_OCTAL | vis_flags::VIS_CSTYLE | vis_flags::VIS_TAB | vis_flags::VIS_NL,
-        );
-        free_(copy);
-        Some(String::from_utf8(new_name).unwrap())
-    }
-}
-
 /// Lock session if it has timed out.
 /// C `vendor/tmux/session.c:233`: `static void session_lock_timer(__unused int fd, __unused short events, void *arg)`
 pub unsafe extern "C-unwind" fn session_lock_timer(_fd: i32, _events: i16, s: NonNull<session>) {
@@ -895,28 +872,37 @@ pub unsafe fn session_update_history(s: *mut session) {
 mod tests {
     use super::*;
 
-    // session_check_name rejects an empty name (returns None), leaves ordinary
-    // names untouched, and replaces the ':' / '.' target separators with '_' so
-    // a session name can never be mistaken for a target path.
+    // Session names are validated with check_name and escaped with clean_name
+    // (`tmux.c:285`, `:299`). The pre-3.7 `session_check_name` this replaced
+    // rejected an empty name and rewrote the `.` / `:` target separators to
+    // `_`; next-3.7 deleted that function, and tmux accepts all three, so the
+    // old expectations were wrong rather than merely stale. What is left is
+    // what the C actually does: reject invalid UTF-8, escape the unprintable,
+    // pass everything else through.
     #[test]
-    fn test_session_check_name() {
+    fn test_name_check_and_clean_match_the_c() {
         unsafe {
-            assert_eq!(session_check_name(crate::c!("")), None);
-            assert_eq!(
-                session_check_name(crate::c!("mysession")).as_deref(),
-                Some("mysession")
-            );
-            // Both separators are rewritten.
-            assert_eq!(
-                session_check_name(crate::c!("a.b:c")).as_deref(),
-                Some("a_b_c")
-            );
-            assert_eq!(
-                session_check_name(crate::c!("1.2.3")).as_deref(),
-                Some("1_2_3")
-            );
-            // A single separator alone becomes a single underscore.
-            assert_eq!(session_check_name(crate::c!(":")).as_deref(), Some("_"));
+            assert!(check_name(crate::c!("")));
+            assert!(check_name(crate::c!("a.b:c")));
+
+            let cleaned = |name| {
+                let p = clean_name(name, 0);
+                if p.is_null() {
+                    return None;
+                }
+                let owned = crate::cstr_to_str(p).to_owned();
+                free_(p);
+                Some(owned)
+            };
+            assert_eq!(cleaned(crate::c!("")).as_deref(), Some(""));
+            assert_eq!(cleaned(crate::c!("mysession")).as_deref(), Some("mysession"));
+            // The target separators survive: they are ordinary characters.
+            assert_eq!(cleaned(crate::c!("a.b:c")).as_deref(), Some("a.b:c"));
+            // A control character is not valid UTF-8 for tmux's purposes, so
+            // check_name refuses it before clean_name is reached -- the
+            // reference prints "invalid session name: a<TAB>b" for exactly this.
+            assert!(!check_name(crate::c!("a\tb")));
+            assert_eq!(cleaned(crate::c!("a\tb")), None);
         }
     }
 

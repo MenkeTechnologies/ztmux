@@ -233,6 +233,13 @@ fn alerts_check_activity(w: &window) -> window_flag {
         for wl in tailq_foreach_const::<_, crate::discr_wentry>(&raw const w.winlinks)
             .map(NonNull::as_ptr)
         {
+            // C `alerts.c:151-152`: a winlink that is already flagged does not
+            // notify again. Without this the hook fires on every alert pass for
+            // as long as the flag stands -- the bell check deliberately has no
+            // such guard, which is why only this one needs it.
+            if (*wl).flags.intersects(winlink_flags::WINLINK_ACTIVITY) {
+                continue;
+            }
             let s = (*wl).session;
             if (*s).curw != wl || (*s).attached == 0 {
                 (*wl).flags |= winlink_flags::WINLINK_ACTIVITY;

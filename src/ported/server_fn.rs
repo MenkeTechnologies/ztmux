@@ -355,7 +355,7 @@ pub unsafe fn server_destroy_pane(wp: *mut window_pane, notify: i32) {
         'out: {
             match remain_on_exit {
                 0 => (),
-                1 | 2 => {
+                1 | 2 | 3 => {
                     if remain_on_exit == 2
                         && WIFEXITED((*wp).status)
                         && WEXITSTATUS((*wp).status) == 0

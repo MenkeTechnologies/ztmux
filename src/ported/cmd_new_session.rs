@@ -23,7 +23,7 @@ pub static CMD_NEW_SESSION_ENTRY: cmd_entry = cmd_entry {
     alias: Some("new"),
 
     args: args_parse::new("Ac:dDe:EF:f:n:Ps:t:x:Xy:", 0, -1, None),
-    usage: "[-AdDEPX] [-c start-directory] [-e environment] [-F format] [-f flags] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [shell-command]",
+    usage: "[-AdDEPX] [-c start-directory] [-e environment] [-F format] [-f flags] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [shell-command [argument ...]]",
 
     target: cmd_entry_flag::new(
         b't',
@@ -78,7 +78,7 @@ unsafe fn cmd_new_session_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
         let mut cause = null_mut();
         let mut cwd = null_mut();
         let cp;
-        let name;
+        let mut name;
         let mut prefix = null_mut();
         let mut detached;
         let mut already_attached;
@@ -104,16 +104,46 @@ unsafe fn cmd_new_session_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
                 return cmd_retval::CMD_RETURN_ERROR;
             }
 
+            // The C checks the window name from -n first, then the session name
+            // from -s, validating each with check_name and escaping it with
+            // clean_name (`cmd-new-session.c:102-121`).
+            let mut wname: Option<String> = None;
+            tmp = args_get_(args, 'n');
+            if !tmp.is_null() {
+                name = format_single(item, cstr_to_str(tmp), c, null_mut(), null_mut(), null_mut());
+                if !check_name(name) {
+                    cmdq_error!(item, "invalid window name: {}", _s(name));
+                    free_(name);
+                    return cmd_retval::CMD_RETURN_ERROR;
+                }
+                let cleaned = clean_name(name, 0);
+                if cleaned.is_null() {
+                    cmdq_error!(item, "invalid window name: {}", _s(name));
+                    free_(name);
+                    return cmd_retval::CMD_RETURN_ERROR;
+                }
+                wname = Some(cstr_to_str(cleaned).to_owned());
+                free_(cleaned);
+                free_(name);
+            }
+
             let mut newname = None;
             tmp = args_get_(args, 's');
             if !tmp.is_null() {
                 name = format_single(item, cstr_to_str(tmp), c, null_mut(), null_mut(), null_mut());
-                newname = session_check_name(name);
-                if newname.is_none() {
-                    cmdq_error!(item, "invalid session: {}", _s(name));
+                if !check_name(name) {
+                    cmdq_error!(item, "invalid session name: {}", _s(name));
                     free_(name);
                     return cmd_retval::CMD_RETURN_ERROR;
                 }
+                let cleaned = clean_name(name, 0);
+                if cleaned.is_null() {
+                    cmdq_error!(item, "invalid session name: {}", _s(name));
+                    free_(name);
+                    return cmd_retval::CMD_RETURN_ERROR;
+                }
+                newname = Some(cstr_to_str(cleaned).to_owned());
+                free_(cleaned);
             }
             if args_has(args, 'A') {
                 as_ = if let Some(nn) = newname.as_deref() {
@@ -156,11 +186,15 @@ unsafe fn cmd_new_session_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
                 } else if !groupwith.is_null() {
                     prefix = xstrdup__(&(*groupwith).name);
                 } else {
-                    prefix = session_check_name(group)
-                        .map(|s| CString::new(s).unwrap().into_raw().cast())
-                        .unwrap_or_default();
+                    // C `cmd-new-session.c:155-160`: check_name then clean_name,
+                    // with its own "invalid session group name" wording.
+                    if !check_name(group) {
+                        cmdq_error!(item, "invalid session group name: {}", _s(group));
+                        break 'fail;
+                    }
+                    prefix = clean_name(group, 0);
                     if prefix.is_null() {
-                        cmdq_error!(item, "invalid session group: {}", _s(group));
+                        cmdq_error!(item, "invalid session group name: {}", _s(group));
                         break 'fail;
                     }
                 }
@@ -312,7 +346,13 @@ unsafe fn cmd_new_session_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_ret
                 sc.tc = c;
             }
 
-            sc.name = args_get_(args, 'n');
+            // The cleaned -n name, kept alive for as long as the spawn context
+            // points at it.
+            let wname_c = wname.as_deref().map(|n| CString::new(n).unwrap());
+            sc.name = match &wname_c {
+                Some(n) => n.as_ptr().cast(),
+                None => null(),
+            };
             args_to_vector(args, &raw mut sc.argc, &raw mut sc.argv);
 
             sc.idx = -1;

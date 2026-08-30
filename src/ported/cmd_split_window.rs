@@ -12,6 +12,7 @@
 // IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 // OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 use crate::*;
+use crate::options_::*;
 
 const SPLIT_WINDOW_TEMPLATE: *const u8 = c!("#{session_name}:#{window_index}.#{pane_index}");
 
@@ -55,66 +56,8 @@ unsafe fn cmd_split_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
         let wl = (*target).wl;
         let w = (*wl).window;
         let wp = (*target).wp;
-        let mut cause = null_mut();
+        let mut cause: *mut u8 = null_mut();
         let count = args_count(args);
-        let mut curval = 0;
-
-        let mut type_ = layout_type::LAYOUT_TOPBOTTOM;
-        if args_has(args, 'h') {
-            type_ = layout_type::LAYOUT_LEFTRIGHT;
-        }
-
-        // If the 'p' flag is dropped then this bit can be moved into 'l'.
-        if args_has(args, 'l') || args_has(args, 'p') {
-            if args_has(args, 'f') {
-                match type_ {
-                    layout_type::LAYOUT_TOPBOTTOM => curval = (*w).sy,
-                    _ => curval = (*w).sx,
-                }
-            } else {
-                match type_ {
-                    layout_type::LAYOUT_TOPBOTTOM => curval = (*wp).sy,
-                    _ => curval = (*wp).sx,
-                }
-            }
-        }
-
-        let mut size: i32 = -1;
-        if args_has(args, 'l') {
-            size = args_percentage_and_expand(
-                args,
-                b'l',
-                0,
-                i32::MAX as i64,
-                curval as _,
-                item,
-                &raw mut cause,
-            ) as _;
-        } else if args_has(args, 'p') {
-            size = args_strtonum_and_expand(args, b'p', 0, 100, item, &raw mut cause) as _;
-            if cause.is_null() {
-                size = curval as i32 * size / 100;
-            }
-        }
-        if !cause.is_null() {
-            cmdq_error!(item, "size {}", _s(cause));
-            free_(cause);
-            return cmd_retval::CMD_RETURN_ERROR;
-        }
-
-        window_push_zoom((*wp).window, true, args_has(args, 'Z'));
-        let mut input = args_has(args, 'I') && count == 0;
-
-        let mut flags = spawn_flags::empty();
-        if args_has(args, 'b') {
-            flags |= SPAWN_BEFORE;
-        }
-        if args_has(args, 'f') {
-            flags |= SPAWN_FULLSIZE;
-        }
-        if input || (count == 1 && *args_string(args, 0) == b'\0') {
-            flags |= SPAWN_EMPTY;
-        }
 
         // new-pane creates a floating pane unless -L is given; split-window
         // makes a floating pane only when splitting a floating pane.
@@ -123,23 +66,52 @@ unsafe fn cmd_split_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
         } else {
             window_pane_is_floating(wp) != 0
         };
-        if is_floating {
-            flags |= SPAWN_FLOATING;
+
+        let mut flags = if is_floating {
+            SPAWN_FLOATING
+        } else {
+            spawn_flags::empty()
+        };
+        if args_has(args, 'b') {
+            flags |= SPAWN_BEFORE;
+        }
+        if args_has(args, 'f') {
+            flags |= SPAWN_FULLSIZE;
+        }
+
+        let mut input = args_has(args, 'I');
+        let empty = if input { true } else { args_has(args, 'E') };
+        if empty && count != 0 && (count != 1 || *args_string(args, 0) != b'\0') {
+            cmdq_error!(item, "command cannot be given for empty pane");
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
+        if empty {
+            flags |= SPAWN_EMPTY;
+        }
+
+        let lines;
+        let value = args_get_(args, 'B');
+        if value.is_null() {
+            lines = window_get_pane_lines(w);
+        } else {
+            let oe = options_search("pane-border-lines");
+            match options_find_choice(oe, value) {
+                Ok(choice) => lines = std::mem::transmute::<i32, pane_lines>(choice),
+                Err(err) => {
+                    cmdq_error!(item, "pane-border-lines {}", err.to_string_lossy());
+                    return cmd_retval::CMD_RETURN_ERROR;
+                }
+            }
         }
 
         let lc = if is_floating {
-            let lines = window_get_pane_lines(w);
             layout_get_floating_cell(item, args, lines, w, wp, &raw mut cause)
         } else {
-            layout_split_pane(wp, type_, size, flags)
+            layout_get_tiled_cell(item, args, w, wp, flags, &raw mut cause)
         };
-        if lc.is_null() {
-            if !cause.is_null() {
-                cmdq_error!(item, "{}", _s(cause));
-                free_(cause);
-            } else {
-                cmdq_error!(item, "no space for new pane");
-            }
+        if !cause.is_null() {
+            cmdq_error!(item, "{}", _s(cause));
+            free_(cause);
             return cmd_retval::CMD_RETURN_ERROR;
         }
 
@@ -171,29 +143,106 @@ unsafe fn cmd_split_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
             sc.flags |= SPAWN_ZOOM;
         }
 
+        // The C's `fail:` label: free the argv/environ and destroy the cell the
+        // pane never took over.
+        macro_rules! fail {
+            () => {{
+                if !sc.argv.is_null() {
+                    cmd_free_argv(sc.argc, sc.argv);
+                }
+                environ_free(sc.environ);
+                layout_destroy_cell(w, lc, &raw mut (*w).layout_root);
+                return cmd_retval::CMD_RETURN_ERROR;
+            }};
+        }
+
         let new_wp = spawn_pane(&raw mut sc, &raw mut cause);
         if new_wp.is_null() {
             cmdq_error!(item, "create pane failed: {}", _s(cause));
             free_(cause);
-            if !sc.argv.is_null() {
-                cmd_free_argv(sc.argc, sc.argv);
-            }
-            environ_free(sc.environ);
-            return cmd_retval::CMD_RETURN_ERROR;
+            fail!();
         }
+
+        let mut style = args_get_(args, 's');
+        if !style.is_null() {
+            if options_set_string!((*new_wp).options, "window-style", false, "{}", _s(style))
+                .is_null()
+            {
+                cmdq_error!(item, "bad style: {}", _s(style));
+                fail!();
+            }
+            options_set_string!(
+                (*new_wp).options,
+                "window-active-style",
+                false,
+                "{}",
+                _s(style)
+            );
+            (*new_wp).flags |= window_pane_flags::PANE_REDRAW
+                | window_pane_flags::PANE_STYLECHANGED
+                | window_pane_flags::PANE_THEMECHANGED;
+        }
+        style = args_get_(args, 'S');
+        if !style.is_null()
+            && options_set_string!(
+                (*new_wp).options,
+                "pane-active-border-style",
+                false,
+                "{}",
+                _s(style)
+            )
+            .is_null()
+        {
+            cmdq_error!(item, "bad active border style: {}", _s(style));
+            fail!();
+        }
+        style = args_get_(args, 'R');
+        if !style.is_null()
+            && options_set_string!(
+                (*new_wp).options,
+                "pane-border-style",
+                false,
+                "{}",
+                _s(style)
+            )
+            .is_null()
+        {
+            cmdq_error!(item, "bad inactive border style: {}", _s(style));
+            fail!();
+        }
+        if args_has(args, 'B') {
+            options_set_number((*new_wp).options, "pane-border-lines", lines as i64);
+        }
+        if args_has(args, 'k') || args_has(args, 'm') {
+            options_set_number((*new_wp).options, "remain-on-exit", 3);
+            if args_has(args, 'm') {
+                options_set_string!(
+                    (*new_wp).options,
+                    "remain-on-exit-format",
+                    false,
+                    "{}",
+                    _s(args_get_(args, 'm'))
+                );
+            }
+        }
+        if args_has(args, 'T') {
+            let title = format_single_from_target(item, args_get_(args, 'T'));
+            screen_set_title(&raw mut (*new_wp).base, title);
+            notify_pane(c"pane-title-changed", new_wp);
+            free_(title);
+        }
+
         if input {
             match window_pane_start_input(new_wp, item, &raw mut cause) {
                 -1 => {
                     server_client_remove_pane(new_wp);
-                    layout_close_pane(new_wp);
+                    if !is_floating {
+                        layout_close_pane(new_wp);
+                    }
                     window_remove_pane((*wp).window, new_wp);
                     cmdq_error!(item, "{}", _s(cause));
                     free_(cause);
-                    if !sc.argv.is_null() {
-                        cmd_free_argv(sc.argc, sc.argv);
-                    }
-                    environ_free(sc.environ);
-                    return cmd_retval::CMD_RETURN_ERROR;
+                    fail!();
                 }
                 1 => {
                     input = false;
@@ -204,9 +253,12 @@ unsafe fn cmd_split_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
         if !args_has(args, 'd') {
             cmd_find_from_winlink_pane(current, wl, new_wp, cmd_find_flags::empty());
         }
-        window_pop_zoom((*wp).window);
-        server_redraw_window((*wp).window);
-        server_status_session(s);
+
+        if !is_floating {
+            window_pop_zoom((*wp).window);
+            server_redraw_window((*wp).window);
+        }
+        server_redraw_session(s);
 
         if args_has(args, 'P') {
             let mut template = args_get_(args, 'F');
@@ -218,7 +270,7 @@ unsafe fn cmd_split_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
             free_(cp);
         }
 
-        let mut fs: cmd_find_state = zeroed(); // TODO use uninit
+        let mut fs: cmd_find_state = zeroed();
         cmd_find_from_winlink_pane(&raw mut fs, wl, new_wp, cmd_find_flags::empty());
         cmdq_insert_hook!(s, item, &raw mut fs, "after-split-window");
 
@@ -229,6 +281,9 @@ unsafe fn cmd_split_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_re
         if input {
             return cmd_retval::CMD_RETURN_WAIT;
         }
+
+        // The C also blocks here for -W (window_pane->wait_item), which needs
+        // window_pane_wait_finish; neither is ported yet.
         cmd_retval::CMD_RETURN_NORMAL
     }
 }

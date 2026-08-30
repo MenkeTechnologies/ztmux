@@ -793,7 +793,7 @@ pub unsafe fn file_write_close(files: *mut client_files, imsg: *mut imsg) {
 /// C `vendor/tmux/file.c:678`: `static void file_read_error_callback(__unused struct bufferevent *bev, short what, void *arg)`
 pub unsafe extern "C-unwind" fn file_read_error_callback(
     _bev: *mut bufferevent,
-    _what: i16,
+    what: i16,
     arg: *mut c_void,
 ) {
     unsafe {
@@ -801,9 +801,19 @@ pub unsafe extern "C-unwind" fn file_read_error_callback(
 
         log_debug!("read error file {}", (*cf).stream);
 
+        // C `file.c:687`: `msg.error = (what & EVBUFFER_ERROR) ? EIO : 0;` --
+        // a read that ended in an ERROR has to be reported as one. Reporting 0
+        // unconditionally makes every failed read look like a successful empty
+        // one, which is how `source-file <a directory>` came back quietly.
         let msg: msg_read_done = msg_read_done {
             stream: (*cf).stream,
-            error: 0,
+            // EVBUFFER_ERROR is 0x20 (libevent's BEV_EVENT_ERROR), spelled out
+            // here because the event loop's own constant is private to it.
+            error: if what & 0x20 != 0 {
+                EIO
+            } else {
+                0
+            },
         };
         proc_send(
             (*cf).peer,

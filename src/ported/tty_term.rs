@@ -846,6 +846,20 @@ pub unsafe fn tty_term_has(term: *mut tty_term, code: tty_code_code) -> bool {
     unsafe { (*(*term).codes.add(code as usize)).type_ != tty_code_type::None }
 }
 
+/// C `vendor/tmux/tty-term.c:781`: `int tty_term_has_name(struct tty_term *term, const char *name)`
+pub unsafe fn tty_term_has_name(term: *mut tty_term, name: &str) -> bool {
+    unsafe {
+        for (i, ent) in TTY_TERM_CODES.iter().enumerate() {
+            if crate::cstr_to_str(ent.name.as_ptr()) == name {
+                // tty_term_has indexes `codes` by the enum's discriminant, which
+                // is this entry's position in the table.
+                return (*(*term).codes.add(i)).type_ != tty_code_type::None;
+            }
+        }
+        false
+    }
+}
+
 /// C `vendor/tmux/tty-term.c:792`: `const char *tty_term_string(struct tty_term *term, enum tty_code_code code)`
 pub unsafe fn tty_term_string(term: *mut tty_term, code: tty_code_code) -> &'static [u8] {
     unsafe {

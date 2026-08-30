@@ -19,7 +19,7 @@ pub static CMD_CHOOSE_TREE_ENTRY: cmd_entry = cmd_entry {
     alias: None,
 
     args: args_parse::new("F:f:GhK:kNO:rst:wyZ", 0, 1, Some(cmd_choose_tree_args_parse)),
-    usage: "[-GNrswZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]",
+    usage: "[-GhkNrswZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]",
 
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
     source: cmd_entry_flag::zeroed(),
@@ -33,7 +33,7 @@ pub static CMD_CHOOSE_CLIENT_ENTRY: cmd_entry = cmd_entry {
     alias: None,
 
     args: args_parse::new("F:f:hiK:kNO:rt:yZ", 0, 1, Some(cmd_choose_tree_args_parse)),
-    usage: "[-NrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]",
+    usage: "[-hikNrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]",
 
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
     source: cmd_entry_flag::zeroed(),
@@ -47,7 +47,7 @@ pub static CMD_CHOOSE_BUFFER_ENTRY: cmd_entry = cmd_entry {
     alias: None,
 
     args: args_parse::new("F:f:K:kNO:rt:yZ", 0, 1, Some(cmd_choose_tree_args_parse)),
-    usage: "[-NrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]",
+    usage: "[-kNrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]",
 
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
     source: cmd_entry_flag::zeroed(),
@@ -61,7 +61,7 @@ pub static CMD_CUSTOMIZE_MODE_ENTRY: cmd_entry = cmd_entry {
     alias: None,
 
     args: args_parse::new("F:f:kNt:yZ", 0, 0, None),
-    usage: "[-NZ] [-F format] [-f filter] [-t target-pane]",
+    usage: "[-kNZ] [-F format] [-f filter] [-t target-pane]",
 
     target: cmd_entry_flag::new(b't', cmd_find_type::CMD_FIND_PANE, cmd_find_flags::empty()),
     source: cmd_entry_flag::zeroed(),

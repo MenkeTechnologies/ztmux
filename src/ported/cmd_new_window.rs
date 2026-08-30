@@ -96,7 +96,31 @@ unsafe fn cmd_new_window_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_retv
         sc.s = s;
         sc.tc = tc;
 
-        sc.name = args_get(args, b'n');
+        // The C validates -n with check_name and escapes it with clean_name
+        // before the spawn (`cmd-new-window.c:73-83`); `wname_c` keeps the
+        // cleaned name alive for as long as the spawn context points at it.
+        let mut wname_c: Option<CString> = None;
+        if !name.is_null() {
+            let expanded = format_single(item, cstr_to_str(name), c, s, null_mut(), null_mut());
+            if !check_name(expanded) {
+                cmdq_error!(item, "invalid window name: {}", _s(expanded));
+                free_(expanded);
+                return cmd_retval::CMD_RETURN_ERROR;
+            }
+            let cleaned = clean_name(expanded, 0);
+            if cleaned.is_null() {
+                cmdq_error!(item, "invalid window name: {}", _s(expanded));
+                free_(expanded);
+                return cmd_retval::CMD_RETURN_ERROR;
+            }
+            wname_c = Some(CString::new(cstr_to_str(cleaned)).unwrap());
+            free_(cleaned);
+            free_(expanded);
+        }
+        sc.name = match &wname_c {
+            Some(n) => n.as_ptr().cast(),
+            None => null(),
+        };
         args_to_vector(args, &raw mut sc.argc, &raw mut sc.argv);
         sc.environ = environ_create().as_ptr();
 

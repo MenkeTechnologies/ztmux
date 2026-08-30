@@ -1686,6 +1686,83 @@ pub unsafe fn layout_floating_args_parse(
     }
 }
 
+/// Get a new tiled cell.
+/// C `vendor/tmux/layout.c:1593`: `struct layout_cell *layout_get_tiled_cell(struct cmdq_item *item, struct args *args, struct window *w, struct window_pane *wp, int flags, char **cause)`
+pub unsafe fn layout_get_tiled_cell(
+    item: *mut cmdq_item,
+    args: *mut args,
+    w: *mut window,
+    wp: *mut window_pane,
+    mut flags: spawn_flags,
+    cause: *mut *mut u8,
+) -> *mut layout_cell {
+    unsafe {
+        let mut curval: u32 = 0;
+        let mut size: i32 = -1;
+        let mut error: *mut u8 = null_mut();
+
+        if window_pane_is_floating(wp) != 0 {
+            *cause = xstrdup_(c"can't split a floating pane").as_ptr();
+            return null_mut();
+        }
+
+        let mut type_ = layout_type::LAYOUT_TOPBOTTOM;
+        if args_has(args, 'h') {
+            type_ = layout_type::LAYOUT_LEFTRIGHT;
+        }
+
+        if args_has(args, 'l') || args_has(args, 'p') {
+            if args_has(args, 'f') {
+                match type_ {
+                    layout_type::LAYOUT_TOPBOTTOM => curval = (*w).sy,
+                    _ => curval = (*w).sx,
+                }
+            } else {
+                match type_ {
+                    layout_type::LAYOUT_TOPBOTTOM => curval = (*wp).sy,
+                    _ => curval = (*wp).sx,
+                }
+            }
+        }
+
+        if args_has(args, 'l') {
+            size = args_percentage_and_expand(
+                args,
+                b'l',
+                0,
+                i32::MAX as i64,
+                curval as i64,
+                item,
+                &raw mut error,
+            ) as i32;
+        } else if args_has(args, 'p') {
+            size = args_strtonum_and_expand(args, b'p', 0, 100, item, &raw mut error) as i32;
+            if error.is_null() {
+                size = curval as i32 * size / 100;
+            }
+        }
+        if !error.is_null() {
+            *cause = format_nul!("invalid tiled geometry {}", _s(error));
+            free_(error);
+            return null_mut();
+        }
+
+        if args_has(args, 'b') {
+            flags |= SPAWN_BEFORE;
+        }
+        if args_has(args, 'f') {
+            flags |= SPAWN_FULLSIZE;
+        }
+
+        window_push_zoom((*wp).window, true, args_has(args, 'Z'));
+        let lc = layout_split_pane(wp, type_, size, flags);
+        if lc.is_null() {
+            *cause = xstrdup_(c"no space for a new pane").as_ptr();
+        }
+        lc
+    }
+}
+
 /// C `vendor/tmux/layout.c:1654`: `struct layout_cell *layout_get_floating_cell(struct cmdq_item *item, struct args *args, enum pane_lines lines, struct window *w, struct window_pane *wp, char **cause)`
 // floating-pane API, consumed from the next phase (F2)
 pub unsafe fn layout_get_floating_cell(

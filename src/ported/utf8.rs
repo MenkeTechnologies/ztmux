@@ -172,7 +172,11 @@ fn utf8_get_size(uc: utf8_char) -> u8 {
     (((uc) >> 24) & 0x1f) as u8
 }
 fn utf8_get_width(uc: utf8_char) -> u8 {
-    (((uc) >> 29) - 1) as u8
+    // C `utf8.c:257`: `#define UTF8_GET_WIDTH(uc) (((uc) >> 29) - 1)` on a
+    // u_int, so a `uc` with no width bits set wraps rather than trapping.
+    // `wrapping_sub` keeps that, since a debug build otherwise panics here and
+    // takes the server with it.
+    (uc >> 29).wrapping_sub(1) as u8
 }
 fn utf8_set_size(size: u8) -> utf8_char {
     (size as utf8_char) << 24
@@ -712,6 +716,11 @@ pub unsafe fn utf8_stravis(dst: *mut *mut u8, src: *const u8, flag: vis_flags) -
     }
 }
 
+// A Vec-returning convenience over utf8_strvis_ with no C counterpart. The one
+// production caller was the pre-3.7 `session_check_name`, which next-3.7 deleted
+// in favour of check_name + clean_name, so this is now only used by the tests
+// that exercise the vis round trip.
+#[cfg(test)]
 pub unsafe fn utf8_stravis_(src: *const u8, flag: vis_flags) -> Vec<u8> {
     unsafe {
         let mut buf: Vec<u8> = Vec::with_capacity(4 * (strlen(src) + 1));

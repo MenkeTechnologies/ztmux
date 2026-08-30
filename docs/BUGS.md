@@ -38,9 +38,76 @@ both binaries, zero divergences.
   than as reproduced defects; the bit positions are left free in `tty_flags`
   with a comment naming what belongs there.
 
+## 2026-08-30 (split-window and join-pane: what the flag audit turned up)
+
+The round began by diffing every `.args` string in `vendor/tmux/cmd-*.c` against
+the whole case corpus, which named 107 flag letters no case had ever passed.
+Cases written for the first of them found four defects.
+
+### `split-window`/`new-pane` had drifted from next-3.7 wholesale
+
+- **Found 2026-08-30** by `parity/cases/1941_split_window_empty_and_border_flags.sh`.
+- `cmd_split_window_exec` was a pre-`layout_get_tiled_cell` shape: it computed
+  the split size itself and stopped at `spawn_pane`. Everything the C does on
+  either side of that was missing — `-E`'s empty pane (only `-I` set
+  `SPAWN_EMPTY`), the `command cannot be given for empty pane` refusal
+  (`cmd-split-window.c:110-116`), `-B`'s `pane-border-lines` choice, and the
+  whole post-spawn block that puts `-s`, `-S`, `-R`, `-B`, `-k`, `-m` and `-T` on
+  the new pane's own options (`:173-217`). `split-window -E 'sleep 300'` created
+  a pane instead of failing; `-S fg=red` was accepted and dropped.
+- Fixed by porting the exec against the C, plus the two functions it leans on:
+  `layout_get_tiled_cell` (`layout.c:1593`) and `options_search`
+  (`options.c:666`). The C's `-W` block is still absent — it needs
+  `window_pane->wait_item` and `window_pane_wait_finish`, neither ported — and
+  that is now stated in the code rather than silently missing.
+
+### `join-pane -p` could not take a percentage
+
+- **Found 2026-08-30** by `parity/cases/1931_join_pane_percentage_size.sh`.
+- The `'p'` branch read the value of flag `l`: `args_strtonum_and_expand(args,
+  b'l', ...)`. With no `-l` given that returns `missing`, so every
+  `join-pane -p N` failed with `size missing` instead of sizing the new pane.
+- Fixed by routing join-pane through `layout_get_tiled_cell` the way
+  `cmd-join-pane.c:419` does, which owns the `-l`/`-p`/`-b`/`-f` reading. That
+  also **closed the recorded gap** `join_pane_before_placement.sh`: the C leaves
+  `cmd_join_pane_exec`'s own `flags` at zero (`cmd-join-pane.c:379`), so `-b`
+  reaches the layout cell but never the pane-list insert, which is exactly the
+  side-swap the gap recorded. Promoted to
+  `parity/cases/1943_join_pane_before_placement.sh`.
+
+### `remain-on-exit` was missing next-3.7's fourth choice, and `-k` crashed the server
+
+- **Found 2026-08-30** by `parity/cases/1944_split_window_title_and_remain_flags.sh`,
+  which was written to pin the newly-ported `-k`/`-m`/`-T` block above.
+- next-3.7 added `"key"` to `options_table_remain_on_exit_list`
+  (`options-table.c:93-95`); this tree carried the older three-name list. The C's
+  `-k` writes 3 into that option, so the first `split-window -k` took the server
+  down with `index out of bounds: the len is 3 but the index is 3` in
+  `options_value_to_string` as soon as anything read the option back.
+- Two readers were missing with it: `server_destroy_pane`'s switch had no
+  `case 3` (`server-fn.c:347`), so a pane under `key` would have been destroyed
+  rather than kept; and the block that dismisses such a pane on the next key,
+  setting the option back to `off` (`server-client.c:1557-1566`), did not exist.
+- All three ported. The C's `KEYC_IS_PASTE` half of that condition has no
+  counterpart — this port has no bracketed-paste key encoding at all, so no key
+  it can receive is a paste key; the code says so.
+- Pinned by `parity/cases/1945_remain_on_exit_key_choice.sh`, which sets each of
+  the four choices, and watches a pane exit under `key`.
+
+### `verify_one.sh` reported OK for a case file that does not exist
+
+- **Found 2026-08-30**, and it is a measurement defect rather than a port one, so
+  it is recorded here and fixed on its own.
+- The script takes a PATH (`parity/verify_one.sh parity/cases/NAME.sh`). Given a
+  bare basename it runs `bash NAME.sh` for both binaries, both fail identically
+  with `No such file`, the byte comparison matches, and it prints `OK`. Every
+  bare-name check reads as a pass no matter what the case says.
+- The three divergences above were all "verified" that way before the full suite
+  caught them, which is what exposed it.
+
 ## 2026-08-29 (coverage round: the surface no case had touched)
 
-Three hundred and forty-four parity cases (1566–1910) were written against what the suite did not
+Three hundred and fifty-nine parity cases (1566–1925) were written against what the suite did not
 measure rather than against what it already did: `wait-for`, the config
 conditions (`%if`/`%elif`/`%else`/`%endif`/`%hidden`) and config variable
 expansion, `source-file`'s `-q`/`-n`/`-v`, `show-options -A`/`-v`/`-q` and its
@@ -129,6 +196,25 @@ Ten defects came out of it.
 - **Pinned by:** case 1704, which asks for a full name, an alias, an
   abbreviation, an unknown name and an ambiguous prefix. The full listing is
   deliberately not counted: ztmux's table carries its own extension commands.
+
+### Every failed client-side read was reported as a successful empty one
+
+- **What it did:** `source-file` on a directory printed nothing and returned 0.
+  tmux prints `Input/output error: <path>` and returns 1 — and `-q` does not
+  silence it, because the C only skips a quiet `ENOENT` (`cfg.c`, load_cfg). The
+  same silence covered a file with no read permission and any other read that
+  fails after the open succeeds.
+- **Cause:** `file_read_error_callback` (`src/ported/file.rs`) took the
+  bufferevent's `what` argument, ignored it, and sent `msg_read_done` with
+  `error: 0`. The C sends `msg.error = (what & EVBUFFER_ERROR) ? EIO : 0`
+  (`file.c:687`), so an errored read is reported as an error and an EOF as a
+  clean end. With the flag dropped, the server could not tell the two apart and
+  treated every failure as "read fine, nothing in it".
+- **Fix:** the `what` flag is honoured, with `EVBUFFER_ERROR` (0x20) spelled out
+  where the event loop's own constant is private.
+- **Pinned by:** case 1914, which sources a directory and an unreadable file,
+  each with and without `-q`, and then checks the option that file would have set
+  was not set.
 
 ### Thirteen usage strings had drifted from the C
 

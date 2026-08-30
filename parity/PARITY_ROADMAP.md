@@ -101,8 +101,34 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1254/1254 cases pass (100%) vs the vendored tmux — zero known divergences.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 cases.
+**1633/1633 cases pass (100%) vs the vendored tmux — one known divergence, recorded as a gap.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 cases.
+
+**Cases 1926–1945 came from a flag audit.** Every `.args` string in
+`vendor/tmux/cmd-*.c` was diffed against the whole corpus, which named 107 flag
+letters no case had ever passed. Writing cases for the first of them turned up
+four port defects rather than confirming the surface: `split-window`'s exec had
+drifted from next-3.7 wholesale (`-E` did not make an empty pane, the
+`command cannot be given for empty pane` refusal was absent, and the whole
+post-spawn block that puts `-s`/`-S`/`-R`/`-B`/`-k`/`-m`/`-T` on the new pane was
+missing), `join-pane -p` read the value of flag `l` and so failed with
+`size missing` for every percentage, and `split-window -k` took the server down
+because `remain-on-exit` was missing next-3.7's fourth choice `"key"` — the C
+writes 3 into an option this tree only had three names for. Porting
+`layout_get_tiled_cell` (`layout.c:1593`) for the first two also **closed the
+`join_pane_before_placement` gap**, which had recorded exactly the missing
+wrapper; its case is now 1943. `docs/BUGS.md` carries the write-ups.
+
+**Two harness traps, both of which produced false results before they were
+caught.** `verify_one.sh` takes a *path*: given a bare case name it ran
+`bash NAME.sh` for both binaries, both failed identically with `No such file`,
+the byte comparison matched, and it printed `OK`. Every bare-name check was a
+pass no matter what the case said; it now refuses to run on a case file it
+cannot read. And `run_parity.sh` builds `target/release/ztmux` only when that
+binary is **absent** — it never rebuilds a stale one, so a suite run started
+after a source change measures the previous build. Two runs this round reported
+failures that were only that. Rebuild the release binary yourself before
+trusting a run that follows a code change.
 
 Case **1498** is structural rather than another probe: it diffs the *whole*
 default binding table against next-3.7's, which nothing had done before. The
@@ -199,6 +225,377 @@ emoji and box-drawing rendering untouched — because the failure mode of gettin
 
 Both were authored against the nested-client technique cases 1504 and 1507
 introduced, which is now the only way this suite can see anything a client draws.
+
+Cases **1566–1650** were chosen by measuring what the suite did *not* touch
+rather than by deepening what it already did. Two inventories drove it: the
+command list (`wait-for`, the `%if`/`%elif`/`%else`/`%endif`/`%hidden` config
+conditions, `source-file`'s `-q`/`-n`/`-v`, `show-options -A`/`-v`/`-q` and its
+scope flags, command-name resolution and its errors, `bind`/`unbind`/`list-keys`
+flags and key tables, `command-alias`, `run-shell`, `pipe-pane`) and the format
+table, diffed against every case file: 94 of the 195 format variables had never
+appeared in a case. The block covers 48 of them — the name-exists modifier
+`#{N/w:}`/`#{N/s:}`, window and session ids and stacks, session groups, the
+marked-session flag, linked and active session counts and lists, the dead-pane
+status and signal, cell geometry, the mouse variables outside a mouse key, and
+`#{config_files}`. It found two divergences, both now fixed and both pinned:
+
+- **`#{window_linked_sessions}` counted winlinks, not sessions** (1641) —
+  `format_cb_window_linked_sessions` returned `window->references`, which is the
+  older tmux implementation. The C (`format.c:2919`) counts one per session group
+  holding the window plus each ungrouped session holding it, so a window linked
+  twice into the *same* session counts once. The case pins exactly that shape: a
+  window in two sessions and three winlinks reads `n=2` with a three-entry
+  `#{window_linked_sessions_list}`.
+- **`#{pane_dead_signal}` printed the signal number where tmux prints its name**
+  (1598) — `sig2name` (`tmux.c:309`) had never been ported. It returns
+  `sys_signame[signo]` when configure found that table (`HAVE_SYS_SIGNAME`) and
+  the number otherwise, which is a platform split, not a preference: `sys_signame`
+  is a BSD interface, and glibc and musl do not have it. The port expresses the
+  same split as a target gate on Apple targets, so a pane killed with `SIGTERM`
+  reads `term` on macOS and `15` on Linux — matching the reference on each, which
+  is what the case compares.
+
+Both cases were run against the pre-fix binary and fail there.
+
+Cases **1651–1676** continue the same sweep through the command list: the buffer
+file commands (`save-buffer` incl. `-a` and `-`, `load-buffer`, `paste-buffer`
+with `-s`/`-d`), `send-keys` (`-l`, `-H`, `-N`, and key-name lookup),
+`select-pane -T` and `#{pane_title}`, `new-session` `-A`/`-P`/`-F`/`-e`,
+`set-option -F` and `-p`, `source-file -F`, `kill-session -a`/`-C`,
+`list-panes -s`/`-a`/`-f`, `set-hook -R` and hook arrays, `capture-pane`
+`-J`/`-N`/`-e`/`-C`/`-b`, `if-shell -F`, `select-layout -E`/`-o`,
+`resize-pane -Z`, `move-pane -b`, `respawn-window -k`, and the "no current
+client" path of the client-only commands. One divergence, now fixed:
+
+- **the file-error message had its two halves the wrong way round** (1653) —
+  `cmd_save_buffer_done` and `cmd_load_buffer_done` both formatted
+  `"{path}: {strerror}"` where the C formats `"%s: %s", strerror(error), path`
+  (`cmd-save-buffer.c:68`, `cmd-load-buffer.c:69`). So a failed save read
+  `/tmp/x: No such file or directory` instead of tmux's
+  `No such file or directory: /tmp/x`. Both call sites corrected; the case
+  fails against a pre-fix build.
+
+Cases **1677–1700** take the third pass: the target-token syntax nothing had
+touched (`{start}`/`{end}`/`{last}`/`{next}`/`{previous}` and `+N`/`-N` for
+windows; `{top}`/`{bottom}`/`{left}`/`{right}`, the four corners and the
+`{up-of}` family for panes; `~`/`{marked}`, `=`/`{mouse}`, `$`/`@`/`%` ids, the
+`session:window.pane` string form and the `=name` exact-match prefix), option
+arrays (`set -a` with a subscript, `-o`, `-q`, `terminal-features[]`), the
+window and pane creation flags (`new-window -k`/`-S`/`-a`/`-b`/`-P -F`,
+`split-window -l`/`-p`/`-b`/`-f`/`-Z`, `break-pane`, `swap-pane -D`/`-U`/`-d`,
+`kill-pane -a`), `run-shell -C`, `pipe-pane -I`/`-O`, `list-windows -f`,
+`display-message -a`, `send-prefix`, and the client-only commands' error paths.
+One divergence, and it took the server down:
+
+- **`send-prefix -2` killed the server** (1689) — `prefix2` defaults to
+  `KEYC_NONE`, so the key that reaches `input_key` is the "no key" sentinel. Two
+  things then went wrong. `KEYC_IS_UNICODE` answered *true* for it: the C asks
+  whether the key's TYPE field is `KEYC_TYPE_UNICODE` (`tmux.h:201`), which this
+  port cannot ask because it still carries the flat `keyc` encoding, and the
+  older "is it above 0x7f and not a special key" test it uses instead swallows
+  both sentinels. That sent `KEYC_NONE` into `utf8_to_data`, where
+  `utf8_get_width` computed `(uc >> 29) - 1` on a zero width — an unsigned wrap
+  in C (`utf8.c:257`), a debug-build overflow panic here. Both were fixed:
+  `KEYC_NONE`/`KEYC_UNKNOWN` are excluded from `KEYC_IS_UNICODE`, and the width
+  macro wraps like the C's. tmux sends the key harmlessly; so does the port now.
+
+While writing the target-token cases the reference itself was found to crash:
+`display-message -p -t '{active}'` (and `{current}`) takes the vendored next-3.7
+server down when no client is attached. Those two tokens are therefore absent
+from case 1696, which says so — there is no reference behaviour to compare
+against. Every other token in that family (`~`, `{marked}`, `=`, `{mouse}`)
+expands to nothing on both binaries and is compared.
+
+Cases **1701–1716** are the fourth pass, over the session- and window-level
+commands and the options behind them: `link-window -k`, `swap-window -d`,
+`move-window -r` (with `base-index`), `kill-window -a`, `set-environment`
+`-h`/`-r`/`-u`, `switch-client` and `attach-session` without a client,
+`run-shell -c`, `list-commands <name>`, `destroy-unattached`, `exit-empty` (a
+server with no sessions at all), `fill-character`/`scroll-format`, the numeric
+option bounds, `lock-command`, and the name validation. Two divergences, both
+fixed:
+
+- **`list-commands <name>` never failed and could not abbreviate** (1704) — the
+  port filtered the command table by exact name or alias, which is the older
+  tmux shape. next-3.7 looks the name up with `cmd_find`
+  (`cmd-list-commands.c:95`), so `new-w` resolves like it does on a command line
+  and an unknown name reports `unknown command: <name>` with a non-zero status.
+  The port printed nothing and exited 0. Ported as the C has it, including
+  `cmd_list_single_command` as its own function.
+- **session and window names were sanitised by a function upstream deleted**
+  (1707, 1708) — `rename-session` and `new-session -s` ran the pre-3.7
+  `session_check_name`, which rewrote the `.` and `:` target separators to `_`
+  and refused an empty name; `new-session -n` and `new-window -n` validated
+  nothing at all. next-3.7 checks with `check_name` and escapes with
+  `clean_name` (`tmux.c:285`, `:299`) at all four sites plus the session-group
+  prefix, so `rename-session sess.dot` keeps its dot, an empty name is accepted
+  for a window, and a name holding a control character is refused with
+  `invalid session name:` / `invalid window name:`. All five call sites ported;
+  the dead sanitiser is gone and the unit test that pinned its behaviour now
+  pins the C's.
+
+Cases **1717–1728** are the fifth pass and the first to find nothing: the hooks
+(after-<command> hooks firing and being unset again, `window-linked` /
+`window-unlinked` / `session-created` / `session-closed`, `pane-died` versus
+`pane-exited` either side of `remain-on-exit`, a window-scoped hook against the
+global one, and the `#{hook}` / `hook_*` formats inside a hook body — which the
+notification hooks fill in and the after-<command> hooks leave empty), the
+option scope chain (a user option set at all four scopes, `show-options -A` on a
+window and a pane), `update-environment` as an array, the session-group and
+window-client formats, `#{pane_key_mode}`, and the pane path and history-byte
+formats. All twelve matched the reference first time.
+
+Cases **1729–1737** are the sixth pass, over the flags that change an object's
+shape rather than its identity: `rotate-window -D`/`-U` (followed by pane id, so
+the direction is visible) and `-Z`, `resize-window -x`/`-y`/`-D`/`-R`/`-A` under
+`window-size manual`, the deprecated `select-pane -P`/`-g` styles read back
+through `#{pane_fg}`/`#{pane_bg}`, `paste-buffer -r`, `load-buffer -w`,
+`break-pane -W` with its geometry flags, the `allow-rename` /`allow-set-title` /
+`allow-passthrough` window options (including the rename escape sequence
+actually being gated), and the `t` format modifier in its `/f`, `/p`, `/r` and
+bare forms. All nine matched.
+
+`split-window -W` has no case: on the vendored reference that command prints its
+`-P` line and then never returns (the server keeps serving other clients; that
+one client hangs), so there is no stable behaviour to compare. It is the second
+upstream hang this round found, after `display-message -p -t '{active}'`.
+
+Cases **1738–1744** close the last gap in the copy-mode command table. Of its 95
+entries, 18 had never appeared in a case: the `*-and-cancel` variants
+(`copy-line`, `copy-end-of-line`, `copy-selection`, `append-selection`,
+`cursor-down`, `page-down`, `halfpage-down`, `scroll-down`), the `copy-pipe`
+family (`-line`, `-end-of-line`, `-no-clear` and their cancelling forms),
+`pipe-no-clear`, and the three search commands
+(`search-forward-incremental`, `search-backward-incremental`,
+`search-backward-text`). Each case asserts both halves of what the command does
+— the buffer or cursor moved AND whether the mode was left — because a command
+that cancels when it should not, or copies the wrong extent, otherwise looks the
+same from one side. Two behaviours worth naming, both matched: `cursor-down-and-cancel`
+stays in the mode while there is a line left to move onto, and the two
+incremental searches leave the cursor alone when they are driven from a command
+line, since their state belongs to the interactive prompt.
+
+`scroll-to-mouse` needed a case of its own (1744): with no mouse event behind it
+that command takes the server down, on the reference as well as here. The port
+reproduces the upstream defect exactly, so the case pins the crash rather than
+excusing it — if either side ever stops crashing, or crashes differently, it goes
+red. With that, all 95 entries of the copy-mode command table are exercised by at
+least one case.
+
+Cases **1745–1752** do to the options table what 1738–1744 did to the copy-mode
+one. Of its 180 entries, 42 had never been named by a case: the twenty
+`dark-theme-*` / `light-theme-*` colours, the old `status-bg` / `status-fg` pair
+and the per-side and per-state status styles, `message-line`, `extended-keys`
+and `extended-keys-format` (and `xterm-keys`, which they replaced),
+`assume-paste-time`, `prefix-timeout`, `prompt-history-limit`, `default-size`,
+`default-command`, `key-table`, the four prompt-cursor options, `pane-colours`
+and `user-keys` as arrays, `scroll-on-clear`, `visual-silence`,
+`detach-on-destroy`, `exit-unattached` and `remain-on-exit-format`. Each is
+checked for its default, the values its type accepts, and its refusal of one
+that it does not — the last part being where a hand-written option table drifts
+first. Two of them end the server on purpose and say so: `exit-unattached on`
+with nothing attached, and (in 1712) `destroy-unattached on`.
+
+Cases **1753–1757** finish the format table off the same way. After 1566–1650
+there were 36 variables left with no case; 1753–1756 take the ones a detached
+server can answer (the time-valued formats by shape through the `t` modifier,
+`#{uid}` / `#{host_short}` / the path formats against the values the shell can
+read independently, the remaining mouse formats as empty outside a mouse key,
+and the `*_mode_format` strings), and 1757 takes the eighteen `client_*` formats
+through the nested-client technique — comparing the terminal- and user-derived
+ones directly and reducing the pid, tty, creation time, byte counters and the
+version-carrying `client_termtype` to their shape.
+
+Cases **1758–1763** apply the same measurement to the hooks, which the options
+sweep missed because `OPTIONS_TABLE_HOOK` does not spell its entries the way the
+other options are spelled. 37 of the 57 hooks had no case. 1758 arms all
+twenty-six `after-<command>` hooks at once, runs each command, and prints which
+fired — twenty-five do, and `after-refresh-client` does not, because with no
+client that command errors before its hook. The rest take `after-queue` and
+`after-set-hook` (which fires for the command that arms hooks, its own included),
+`command-error` (with `#{hook}` naming itself, and staying quiet when the command
+succeeds), the client lifecycle through the nested-client technique
+(`client-attached`, `client-resized` on a real resize, `client-detached`, and
+`client-active`/`client-focus-in`/`client-focus-out` staying quiet with nothing
+reporting focus), and the theme hooks.
+
+**Every entry of all four tables is now named by at least one case: 195 format
+variables, 180 options, 95 copy-mode commands, 57 hooks.** That is coverage of
+the *names*, not of every behaviour behind them, and it is measured the way the
+blocks above were built — by diffing each table in the C against the corpus,
+which is a check worth re-running whenever upstream adds to one.
+
+Cases **1764–1791** are the last block of this round and the one that paid best.
+It went after the tables' *contents* rather than their names — usage strings, the
+input parser, the modifiers that need a client, and the options whose behaviour
+nothing asserted — and turned up four divergences:
+
+- **thirteen usage strings had drifted** (1791) — the `choose-tree` family had
+  lost `-k` (and `-h`/`-i`), `break-pane` described `-x`/`-y`/`-X`/`-Y` with the
+  wrong words, `command-prompt` was missing `-F`/`-N`/`-P`, `display-menu` and
+  `display-popup` had lost a space before `[-T title]`, `send-keys` and
+  `send-prefix` showed `-t` as required, `server-access` had dropped its `-t`
+  altogether, and `bind-key`, `new-session`, `respawn-pane`, `respawn-window`,
+  `set-buffer` and `show-hooks` each ended with the wrong optional argument. A
+  usage string is data, so nothing had ever compared them; case 1791 now diffs
+  the whole `list-commands` output, excluding only the six lines that are
+  supposed to differ (ztmux's five `list-*` commands document their
+  structured-output flags, and `znative` exists only here).
+- **`#{L:…}` did not set its loop variables** (1778) — `format_loop_clients`
+  skipped the `loop_index` / `loop_last_flag` pair the C adds
+  (`format.c:5075-5076`), which the session, window and pane loops all have.
+- **`#{I/c:…}` / `#{I/f:…}` / `#{I/e:…}` were unimplemented** (1776, 1777) — the
+  client-information modifier was missing from the tokenizer, the modifier parse
+  and the apply step, along with the two helpers it needs
+  (`tty_term_has_name`, `tty_feature_present`). Asking a client about a
+  capability or a feature expanded to nothing instead of `1`/`0`.
+- **`alert-activity` fired repeatedly for the same window** (1784) —
+  `alerts_check_activity` was missing the C's `if (wl->flags & WINLINK_ACTIVITY)
+  continue;` (`alerts.c:151`), so the hook fired on every alert pass while the
+  flag stood rather than once per transition. The bell check deliberately has no
+  such guard, which is why only the activity one needed it.
+
+The block also covers the input parser (ICH/DCH/ECH/REP, SU/SD, DECSC/DECRC,
+DECALN, OSC 4/104), the mirrored layouts, the last four commands with no case at
+all (`start-server`, `suspend-client`, `customize-mode`, `find-window`), the
+key-name table's function/editing/keypad blocks, the
+terminal-feature names, and the options whose behaviour was never asserted:
+`base-index`/`pane-base-index` on creation, `default-command` spawning a pane,
+`history-limit` capping the scrollback, `synchronize-panes` reaching every pane,
+`word-separators` moving where `next-word` lands, and the session environment
+arriving in a spawned pane.
+
+A fifth upstream defect turned up here too: `respawn-pane` on a **dead** pane
+takes the vendored reference's server down, while this port respawns it and
+carries on. Case 1788 stops at that boundary and says so — there is no reference
+behaviour to compare, and pinning one side of a crash would be pinning nothing.
+
+Cases **1792–1802** are the interaction block: everything here needs a client,
+and the nested-client technique drives it by typing into the OUTER pane, which
+is the inner client's terminal. Where the render cases pin what a client draws,
+these pin what it does. `command-prompt` takes typed input and substitutes `%1`
+and `%%`; `confirm-before` runs its command on `y` and drops it on `n`;
+`display-menu` runs the item whose key is pressed and runs nothing on Escape;
+`choose-tree` switches to the window the selection lands on; the prefix and
+prefix2 keys route the next key through the prefix table (and the same key alone
+does not); `status-keys emacs` makes `C-a` in the prompt move to the start of the
+line. Two of them drive the MOUSE, which nothing had: a real SGR press/release
+selects the pane it lands in (rows taken from the panes' own geometry), and a
+wheel-up event opens copy mode through the default `WheelUpPane` binding. Two
+more pin sizing and searching: `window-size` cycled through largest/smallest/
+latest/manual with two clients of DIFFERENT sizes attached, and `wrap-search` on
+and off at the end of the scrollback.
+
+One case was written and then deleted rather than kept: `allow-passthrough`
+cannot be observed here. The payload leaves the inner pane, reaches the outer
+server as its own passthrough, and — with no real terminal above that — is
+consumed rather than drawn, so both settings of the option compare equal at 0.
+A case that cannot fail is not a case.
+
+Cases **1803–1807** finish the round on the surfaces that need a second process
+rather than only a second client. A **control-mode** client (`-C`) runs in a pane
+so `capture-pane` reads the protocol it speaks: the `%begin`/`%end` block around
+a command's output, the `%session-changed` notification, and the `%error` block
+for an unknown command, with ids and timestamps masked. `wait-for` finally gets
+its blocking half — a pane parked in `wait-for ztchan`, observed still parked,
+then released by `wait-for -S` — which the five earlier wait-for cases could only
+approach from the non-blocking side. The rest take `run-shell -b` and
+`if-shell -b` not holding up the queue, session groups sharing their windows
+(created in one, visible in the other, current window still per-session, killed
+from both), and `switch-client -T` moving a client to another key table so a key
+bound there fires with no prefix.
+
+**On timing.** Every case that attaches a client starts two servers and drives
+input through one into the other, and the runner allows 15 seconds per case per
+binary. Two of the interaction cases were written with 12-second poll loops,
+which left nothing for the setup: under load they did not fail, they TRUNCATED —
+one binary's output stopped mid-case and the diff was against a partial capture.
+The polls are now 5 seconds, and `find-window` with a client was dropped
+altogether: its expected output contained the host name, which is not portable
+between machines. Its flag-parsing sibling (1765) stays.
+
+Cases **1808–1837** close the round on the flags and modifier combinations that
+still had no case anywhere — `refresh-client -f`/`-C`/`-S` with a client,
+`detach-client -t`/`-s` with two of them, `display-panes` selecting by key,
+`copy-mode -s` showing another pane, `display-popup -E` closing on exit,
+`select-window -n`/`-p`/`-l`/`-T`, `set-hook -a`, nested and relative
+`source-file`, `terminal-features` reaching a client's `#{I/f:}`,
+`select-pane -Z`, `join-pane`, `new-window -c` (including `-c` as a format),
+`respawn-window -c`/`-e`, `show-messages -J`/`-T` by shape, `set -U` clearing a
+window option from every pane, `paste-buffer -S`, `run-shell -E`,
+`attach-session -E`, and a dozen cheap format cases combining modifiers that
+each had only single-modifier coverage.
+
+One of them found a divergence that is **not** fixed and is recorded instead:
+`join-pane -b` puts the joined pane on the other side of the target from where
+the reference puts it (`parity/known_gaps/join_pane_before_placement.sh`, with
+the minimal reproduction). `layout_split_pane` and its `SPAWN_BEFORE` handling
+are ported line for line and agree for `split-window -b`; the join-pane path in
+next-3.7 goes through `layout_get_tiled_cell` (`layout.c:1593`), which this port
+does not have, so closing it is a port job rather than a patch. Case 1817 covers
+join-pane's other flags and stops short of `-b`, saying so.
+
+**A harness note worth keeping.** Running `cargo clippy` (or anything else that
+writes to `target/`) while a suite run is in flight removes `target/debug/ztmux`
+from under it: the run then reports every remaining case as a failure with
+"No such file or directory" on the port side. 79 cases "failed" that way in one
+run here. The numbers are worthless from that point on — rebuild and re-run
+rather than trusting them.
+
+Cases **1838–1910** are the last block: the interaction and flag surface the
+earlier sweeps had left, driven mostly through the nested-client technique —
+vi-mode copy keys typed as keys, `send-keys -K` and `-F` and `-M`, a mouse DRAG
+selecting text, `copy-mode -u`/`-e`/`-s`, `load-buffer -`, `if-shell -t`, the
+alert routing (`monitor-silence`, `activity-action`, `visual-activity`), the
+oversized-window path (`window_bigger`, `window_offset_*`, `refresh-client -R`),
+`switch-client -Z`/`-T`, `detach-client -E`, `attach -f`/`-r`, `kill-server`,
+`show-options -H`, option-name prefixes and array forms, `move-window`/`swap-window`
+across sessions, `link-window` inside a group, `move-pane`'s floating-only rule,
+and a further two dozen cheap format cases (integer limits, empty-match
+substitution, `##` escaping, combining-character width, nested conditionals).
+
+Two divergences came out of it, and both are recorded rather than papered over:
+`join-pane -b` (above) and **clock-mode drawing nothing on the client's screen**
+(`parity/known_gaps/clock_mode_client_draw.sh`). The clock is painted by the
+client rather than into the pane grid — a server-side capture is empty on both
+binaries, which is why nothing had caught it — and with ztmux's own overlay
+turned off the reference paints digits where this port paints nothing.
+`window_clock_draw_screen` is ported, so the gap is in what reaches the client.
+Case 1838 keeps the comparable half: entering the mode, `#{pane_mode}`, the empty
+pane grid, cancelling, and the options it reads.
+
+**Case design, learned the hard way.** A case that drives a client must assert
+the client attached and stop if it did not. Several here were written to carry on
+regardless, and under full-suite load they did not fail — they diverged in HOW FAR
+each binary got before the 15s budget, which reads as a divergence and is not one.
+Forty-one cases now end their attach poll with a guard that prints one line and
+exits; the same applies to polls that wait on a pane's output, which should report
+a count by name rather than print a screen that is blank on one side.
+
+Cases **1911–1919** are the coda, and one of them paid: key names with modifiers
+round-tripping through `list-keys`, `unbind -a` on a table that never existed,
+`set -o` on an array index, multi-line format output, object ids not recycling
+after a kill, the window stack and `#{window_stack_index}` after killing the
+current window, `select-pane -l` and `#{pane_last}` when the last pane is killed,
+window index reuse with `renumber-windows` on and off, and `source-file` on a
+directory — which was the one that found something.
+
+- **every failed client-side read was reported as a successful empty one**
+  (1914) — `file_read_error_callback` ignored the `what` it was handed and sent
+  `error: 0` unconditionally, where the C sends
+  `(what & EVBUFFER_ERROR) ? EIO : 0` (`file.c:687`). So `source-file` on a
+  directory, on a file with no read permission, or on anything else that opens
+  and then fails to read came back quiet with status 0, instead of
+  `Input/output error: <path>` and status 1. `-q` does not excuse it either: the
+  C only skips a quiet ENOENT.
+
+Cases **1920–1925** come from a last measurement: every command's `args` string
+in the C, diffed letter by letter against the corpus. That named 58 commands
+carrying at least one flag no case mentioned. The substantive ones are covered
+here — `clear-history -H`, `copy-mode -d`, `link-window -a`/`-b`,
+`unlink-window -k`, `next-window -a`/`previous-window -a` against a real
+activity alert, `last-pane -d`/`-e`/`-Z`, the layout cycling commands with a
+target and their `select-layout -n`/`-p` aliases, and `split-window -k`/`-m`.
 
 The 1211–1390 block (fanned out across format / options / window-pane-layout /
 buffer-session authors) surfaced and fixed two real bugs: `split-window -f`
@@ -621,7 +1018,7 @@ reddens CI merely because the gaps still exist. Should the directory ever empty 
 exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
 left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1254/1254 ported surface; they measure
+proof. These gaps do not count against the 1633/1633 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite

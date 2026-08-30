@@ -306,6 +306,11 @@ pub unsafe fn setblocking(fd: c_int, state: c_int) {
     }
 }
 
+/// C `vendor/tmux/tmux.c:299`: `int check_name(const char *name)`
+pub unsafe fn check_name(name: *const u8) -> bool {
+    unsafe { utf8_isvalid(name) }
+}
+
 /// C `vendor/tmux/tmux.c:285`: `char *clean_name(const char *name, int untrusted)`
 pub unsafe fn clean_name(name: *const u8, untrusted: c_int) -> *mut u8 {
     unsafe {
@@ -342,6 +347,39 @@ pub unsafe fn get_timer() -> u64 {
         }
         (ts.tv_sec as u64 * 1000) + (ts.tv_nsec as u64 / 1000000)
     }
+}
+
+/// C `vendor/tmux/tmux.c:309`: `const char *sig2name(int signo)`
+///
+/// The C returns the lowercase signal name from `sys_signame` when configure
+/// found it (`HAVE_SYS_SIGNAME`) and the number otherwise. `sys_signame` is a
+/// BSD interface: Apple platforms and the BSDs have it, glibc and musl do not,
+/// so the same split is expressed here as a target gate. Callers therefore see
+/// `term` on macOS and `15` on Linux, exactly as tmux does on each.
+#[cfg(target_vendor = "apple")]
+pub fn sig2name(signo: i32) -> Cow<'static, str> {
+    // <sys/signal.h>: `#define NSIG __DARWIN_NSIG` (32), the length of sys_signame.
+    const NSIG: i32 = 32;
+    unsafe extern "C" {
+        static sys_signame: [*const u8; NSIG as usize];
+    }
+
+    if signo > 0 && signo < NSIG {
+        let name = unsafe { sys_signame[signo as usize] };
+        if !name.is_null()
+            && let Ok(name) = unsafe { std::ffi::CStr::from_ptr(name.cast()) }.to_str()
+        {
+            return Cow::Borrowed(name);
+        }
+    }
+    Cow::Owned(format!("{signo}"))
+}
+
+/// C `vendor/tmux/tmux.c:309`: `const char *sig2name(int signo)` — the
+/// `HAVE_SYS_SIGNAME`-less half: no name table, so the number is the name.
+#[cfg(not(target_vendor = "apple"))]
+pub fn sig2name(signo: i32) -> Cow<'static, str> {
+    Cow::Owned(format!("{signo}"))
 }
 
 /// C `vendor/tmux/tmux.c:323`: `const char *find_cwd(void)`

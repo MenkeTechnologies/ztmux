@@ -109,6 +109,11 @@ bitflags::bitflags! {
         const FORMAT_REPEAT = 0x200000;
         const FORMAT_COLOUR_ESC_FG = 0x8000000;
         const FORMAT_COLOUR_ESC_BG = 0x10000000;
+        /// C `vendor/tmux/format.c`: the `#{I/c:...}` / `#{I/f:...}` /
+        /// `#{I/e:...}` client-information modifiers.
+        const FORMAT_CLIENT_TERMCAP = 0x1000000;
+        const FORMAT_CLIENT_TERMFEAT = 0x2000000;
+        const FORMAT_CLIENT_ENVIRON = 0x4000000;
     }
 }
 
@@ -2452,7 +2457,7 @@ pub unsafe fn format_cb_pane_dead_signal(ft: *mut format_tree) -> format_table_t
             if (*wp).flags.intersects(window_pane_flags::PANE_STATUSREADY)
                 && WIFSIGNALED((*wp).status)
             {
-                return format!("{}", WTERMSIG((*wp).status)).into();
+                return format!("{}", sig2name(WTERMSIG((*wp).status))).into();
             }
             return format_table_type::None;
         }
@@ -3234,10 +3239,31 @@ pub unsafe fn format_cb_window_linked(ft: *mut format_tree) -> format_table_type
 /// C `vendor/tmux/format.c:2919`: `static void *format_cb_window_linked_sessions(struct format_tree *ft)`
 pub unsafe fn format_cb_window_linked_sessions(ft: *mut format_tree) -> format_table_type {
     unsafe {
-        if !(*ft).wl.is_null() {
-            return format!("{}", (*(*(*ft).wl).window).references).into();
+        if (*ft).wl.is_null() {
+            return format_table_type::None;
         }
-        format_table_type::None
+        let w = (*(*ft).wl).window;
+
+        // Count sessions holding the window: one per session group that holds it
+        // (the group's first session stands for the whole group), plus each
+        // ungrouped session that holds it. NOT the winlink count -- a window
+        // linked twice into the same session counts once.
+        let mut n: u32 = 0;
+        for sg in rb_foreach(&raw mut SESSION_GROUPS).map(NonNull::as_ptr) {
+            let s = tailq_first(&raw mut (*sg).sessions);
+            if winlink_find_by_window(&raw mut (*s).windows, w).is_some() {
+                n += 1;
+            }
+        }
+        for s in rb_foreach(&raw mut SESSIONS).map(NonNull::as_ptr) {
+            if !session_group_contains(s).is_null() {
+                continue;
+            }
+            if winlink_find_by_window(&raw mut (*s).windows, w).is_some() {
+                n += 1;
+            }
+        }
+        format!("{n}").into()
     }
 }
 
@@ -4592,7 +4618,7 @@ pub unsafe fn format_build_modifiers(
             // `c` takes an f/b argument for the colour-to-escape form
             // (`#{c/f:red}`), so it is here in addition to the no-arg set. `R`
             // (repeat) takes a `left,count` argument (`#{R:x,3}`).
-            if strchr(c!("mCNSWPLst=peqcR"), *cp as i32).is_null() {
+            if strchr(c!("ImCNSWPLst=peqcR"), *cp as i32).is_null() {
                 break;
             }
             let mut c = *cp;
@@ -5046,7 +5072,8 @@ pub unsafe fn format_loop_clients(
         // C: sort_get_clients() collects only attached clients, then sorts
         // (default SORT_ORDER for `#{L:}` — the natural registration order).
         let clients = sort_get_clients(sc);
-        for &c in &clients {
+        let n = clients.len();
+        for (i, &c) in clients.iter().enumerate() {
             format_log1!(
                 es,
                 c!("format_loop_clients"),
@@ -5054,6 +5081,11 @@ pub unsafe fn format_loop_clients(
                 _s((*c).name),
             );
             let nft = format_create(c, item, 0, (*ft).flags);
+            // C `format.c:5075-5076`: the loop variables are injected into the
+            // per-client tree before the defaults, exactly as the session,
+            // window and pane loops do.
+            format_add!(nft, "loop_index", "{}", i);
+            format_add!(nft, "loop_last_flag", "{}", (i == n - 1) as i32);
             format_defaults(
                 nft,
                 c,
@@ -5382,6 +5414,23 @@ pub unsafe fn format_replace(
                                         .unwrap_or_default();
                                 }
                             }
+                            // C `format.c:5290`: `I` asks about the client --
+                            // /c a terminfo capability, /f a terminal feature,
+                            // /e an environment variable.
+                            b'I' => {
+                                if (*fm).argc >= 1 {
+                                    let arg = *(*fm).argv;
+                                    if !strchr(arg, b'f' as i32).is_null() {
+                                        modifiers |= format_modifiers::FORMAT_CLIENT_TERMFEAT;
+                                    }
+                                    if !strchr(arg, b'c' as i32).is_null() {
+                                        modifiers |= format_modifiers::FORMAT_CLIENT_TERMCAP;
+                                    }
+                                    if !strchr(arg, b'e' as i32).is_null() {
+                                        modifiers |= format_modifiers::FORMAT_CLIENT_ENVIRON;
+                                    }
+                                }
+                            }
                             b'w' => modifiers |= format_modifiers::FORMAT_WIDTH,
                             b'e' => {
                                 if (*fm).argc < 1 || (*fm).argc > 3 {
@@ -5513,6 +5562,46 @@ pub unsafe fn format_replace(
                     {
                         cmp = fm;
                     }
+                }
+
+                // Is this asking about the client? C `format.c:5428-5457`.
+                if modifiers.intersects(
+                    format_modifiers::FORMAT_CLIENT_TERMCAP
+                        | format_modifiers::FORMAT_CLIENT_TERMFEAT
+                        | format_modifiers::FORMAT_CLIENT_ENVIRON,
+                ) {
+                    let c = (*ft).c;
+                    if c.is_null()
+                        || (*c).tty.term.is_null()
+                        || (*c).flags.intersects(CLIENT_UNATTACHEDFLAGS)
+                    {
+                        value = xstrdup__("");
+                        break 'done;
+                    }
+                    let name = cstr_to_str(copy);
+                    if modifiers.intersects(format_modifiers::FORMAT_CLIENT_TERMCAP) {
+                        value = xstrdup__(if tty_term_has_name((*c).tty.term, name) {
+                            "1"
+                        } else {
+                            "0"
+                        });
+                    }
+                    if modifiers.intersects(format_modifiers::FORMAT_CLIENT_TERMFEAT) {
+                        value = xstrdup__(if tty_feature_present((*c).tty.term, name) {
+                            "1"
+                        } else {
+                            "0"
+                        });
+                    }
+                    if modifiers.intersects(format_modifiers::FORMAT_CLIENT_ENVIRON) {
+                        let envent = environ_find((*c).environ, copy);
+                        value = if !envent.is_null() && !(*envent).value_ptr().is_null() {
+                            xstrdup((*envent).value_ptr()).as_ptr()
+                        } else {
+                            xstrdup__("")
+                        };
+                    }
+                    break 'done;
                 }
 
                 // Is this a literal string?

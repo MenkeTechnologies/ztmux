@@ -41,11 +41,23 @@ unsafe fn cmd_rename_session_exec(self_: *mut cmd, item: *mut cmdq_item) -> cmd_
         let s = (*target).s;
 
         let tmp = format_single_from_target(item, args_string(args, 0));
-        let Some(newname) = session_check_name(tmp) else {
-            cmdq_error!(item, "invalid session: {}", _s(tmp));
+        // next-3.7 validates with check_name and then escapes with clean_name
+        // (`cmd-rename-session.c:54-61`); the pre-3.7 `session_check_name`, which
+        // also rewrote `.` and `:` to `_` and refused an empty name, is gone
+        // upstream and no longer matches what tmux accepts.
+        if !check_name(tmp) {
+            cmdq_error!(item, "invalid session name: {}", _s(tmp));
             free_(tmp);
             return cmd_retval::CMD_RETURN_ERROR;
-        };
+        }
+        let cleaned = clean_name(tmp, 0);
+        if cleaned.is_null() {
+            cmdq_error!(item, "invalid session name: {}", _s(tmp));
+            free_(tmp);
+            return cmd_retval::CMD_RETURN_ERROR;
+        }
+        let newname = cstr_to_str(cleaned).to_owned();
+        free_(cleaned);
         free_(tmp);
         if newname == (*s).name {
             return cmd_retval::CMD_RETURN_NORMAL;
