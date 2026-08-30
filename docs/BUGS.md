@@ -38,6 +38,193 @@ both binaries, zero divergences.
   than as reproduced defects; the bit positions are left free in `tty_flags`
   with a comment naming what belongs there.
 
+## 2026-08-29 (coverage round: the surface no case had touched)
+
+Three hundred and forty-four parity cases (1566–1910) were written against what the suite did not
+measure rather than against what it already did: `wait-for`, the config
+conditions (`%if`/`%elif`/`%else`/`%endif`/`%hidden`) and config variable
+expansion, `source-file`'s `-q`/`-n`/`-v`, `show-options -A`/`-v`/`-q` and its
+scope flags, command-name resolution (unknown, ambiguous, abbreviated),
+`command-alias`, `bind`/`unbind`/`list-keys` flags and key tables, `run-shell`,
+`pipe-pane`, and 48 format variables that had never appeared in a case (94 of the
+195 in `format.c`'s table had not), then the buffer file commands, `send-keys`,
+`new-session`'s creation flags, `capture-pane`'s output flags, the layout and
+zoom commands, the "no current client" path of the client-only commands, the
+target-token syntax, the option arrays, and the session- and window-level
+commands, the hooks, and the option scope chain -- and then, once every table
+was name-covered, the tables' contents: usage strings, the input parser, the
+modifiers that need a client, and the options whose behaviour nothing asserted.
+Ten defects came out of it.
+
+### `#{window_linked_sessions}` counted winlinks, not sessions
+
+- **What it printed:** the number of winlinks the window has. A window linked
+  twice into the same session read `2` where tmux reads `1`; the accompanying
+  `#{window_linked_sessions_list}`, which does walk winlinks, printed two entries
+  either way, so the two formats disagreed about the same window.
+- **Cause:** `format_cb_window_linked_sessions` returned
+  `(*window).references` — the older tmux implementation. next-3.7
+  (`format.c:2919`) counts sessions: one per session group that holds the window
+  (its first session standing for the group) plus each ungrouped session that
+  holds it, via `winlink_find_by_window`.
+- **Fix:** ported as the C has it, including the session-group half, which the
+  reference count needs and a winlink count cannot express.
+- **Pinned by:** case 1641, which builds a window in two sessions with three
+  winlinks — the one shape where the winlink count and the session count differ —
+  plus 1642/1643/1644 for the single-session values. 1641 fails against a
+  pre-fix build.
+
+### `#{pane_dead_signal}` printed the number, not the signal name
+
+- **What it printed:** `15` for a pane killed by `SIGTERM`, where the reference
+  prints `term` on the same host. The default `remain-on-exit-format`
+  (`options-table.c`) interpolates it, so a dead pane's own status line carried
+  the wrong text.
+- **Cause:** `sig2name` (`tmux.c:309`) had never been ported;
+  `format_cb_pane_dead_signal` formatted `WTERMSIG(status)` directly.
+- **Fix:** `sig2name` ported with the platform split the C gets from configure:
+  `sys_signame` is a BSD interface, so the name table is used on Apple targets
+  and the number is printed where the C's `HAVE_SYS_SIGNAME` would be undefined
+  (glibc, musl). The reference behaves the same way on each platform, so parity
+  holds on both while the text differs between them.
+- **Pinned by:** case 1598, which kills one pane with `exit 3` and another with
+  `SIGTERM` under `remain-on-exit on` and reads back
+  `#{pane_dead_status}`/`#{pane_dead_signal}`, polling for the panes to die
+  rather than sleeping. It fails against a pre-fix build.
+
+### Session and window names went through a sanitiser upstream deleted
+
+- **What it did:** `rename-session sess.dot` stored `sess_dot`, and an empty name
+  was refused outright. `new-session -n` and `new-window -n` validated nothing,
+  so a name with a control character in it reached the window as-is.
+- **Cause:** both rename and `new-session -s` called `session_check_name`, the
+  pre-3.7 sanitiser that rewrote the `.` and `:` target separators to `_` and
+  rejected an empty string. next-3.7 deleted that function; it validates with
+  `check_name` and escapes with `clean_name` (`tmux.c:299`, `:285`) instead, at
+  five call sites: `cmd-rename-session.c:54-61`, `cmd-new-session.c:102-121`
+  (window name, session name) and `:155-160` (session-group prefix), and
+  `cmd-new-window.c:73-83`.
+- **Fix:** `check_name` ported, a `clean_name_string` helper added for the
+  callers that want an owned name, and all five sites moved onto them with the
+  C's own error wording (`invalid session name:` / `invalid window name:` /
+  `invalid session group name:`). The dead sanitiser was removed; the unit test
+  that pinned its `.`/`:` rewriting now pins what the C does, including that a
+  control character fails `check_name` before `clean_name` is reached — which is
+  what the reference prints for `rename-session "a<TAB>b"`.
+- **Pinned by:** cases 1708 (rename, dots/colons/empty for both objects) and
+  1707 (the same names given to `new-session -s`/`-n` and `new-window -n`).
+
+### `list-commands <name>` never failed, and could not abbreviate
+
+- **What it did:** `list-commands nosuchcommand` printed nothing and exited 0
+  where tmux prints `unknown command: nosuchcommand` and exits 1; and
+  `list-commands new-w` printed nothing where tmux resolves the abbreviation and
+  prints `new-window`'s usage.
+- **Cause:** the port walked `CMD_TABLE` filtering on an exact name or alias
+  match — the older tmux shape. next-3.7 calls `cmd_find`
+  (`cmd-list-commands.c:95`), which resolves unique prefixes and hands back a
+  cause to report when it cannot.
+- **Fix:** ported as the C has it, `cmd_list_single_command` included, with the
+  no-argument path still walking the whole table.
+- **Pinned by:** case 1704, which asks for a full name, an alias, an
+  abbreviation, an unknown name and an ambiguous prefix. The full listing is
+  deliberately not counted: ztmux's table carries its own extension commands.
+
+### Thirteen usage strings had drifted from the C
+
+- **What they showed:** `choose-tree`, `choose-client`, `choose-buffer` and
+  `customize-mode` omitted flags they accept (`-k`, and `-h`/`-i`);
+  `command-prompt` omitted `-F`/`-N`/`-P`; `break-pane` named its `-x`/`-y`/`-X`/
+  `-Y` arguments wrongly; `display-menu` and `display-popup` had lost a space
+  before `[-T title]`; `send-keys` and `send-prefix` printed `-t target-pane`
+  as required rather than optional; `server-access` had no `-t` at all; and
+  `bind-key`, `new-session`, `respawn-pane`, `respawn-window`, `set-buffer` and
+  `show-hooks` each ended with the wrong optional argument.
+- **Cause:** ~90 usage strings were transcribed by hand and are data, so neither
+  the anti-drift gate (function names) nor any case had compared them.
+- **Fix:** all thirteen corrected against their C entries.
+- **Pinned by:** case 1791, which diffs the entire `list-commands` output and
+  excludes only the six lines that must differ (ztmux's five `list-*` commands
+  carry their structured-output flags; `znative` exists only here). Any future
+  drift in any usage string, name or alias now goes red.
+
+### `#{L:…}` did not set its loop variables
+
+- **What it did:** inside the client loop, `#{loop_index}` and
+  `#{loop_last_flag}` expanded to nothing, where the session, window and pane
+  loops set both.
+- **Cause:** `format_loop_clients` was missing the two `format_add` calls the C
+  makes on the per-client tree (`format.c:5075-5076`).
+- **Fix:** both added, in the C's position (before `format_defaults`).
+- **Pinned by:** case 1778, with a real client attached through the
+  nested-client technique.
+
+### The client-information modifier was unimplemented
+
+- **What it did:** `#{I/f:RGB}`, `#{I/c:Ms}` and `#{I/e:VAR}` expanded to nothing
+  even with a client attached; tmux answers `1`/`0` and the variable's value.
+- **Cause:** `I` was absent from the modifier tokenizer's with-arguments set,
+  from the modifier parse and from the apply step, and neither helper it needs
+  (`tty_term_has_name`, `tty_feature_present`) had been ported.
+- **Fix:** both helpers ported from `tty-term.c:781` and `tty-features.c:604`,
+  the three `FORMAT_CLIENT_*` flags added, and the apply block ported where the C
+  has it (`format.c:5428-5457`) — including its early return of an empty string
+  when there is no client or the client is unattached.
+- **Pinned by:** cases 1777 (no client: empty, no error) and 1776 (a real client:
+  a feature, a capability and an environment variable it sets).
+
+### `alert-activity` fired again on every alert pass
+
+- **What it did:** a window that stayed flagged kept notifying: a run that should
+  fire `alert-activity` twice and `alert-bell` once fired activity three times
+  and then again after the bell. Deterministic, both runs identical.
+- **Cause:** `alerts_check_activity` was missing the C's
+  `if (wl->flags & WINLINK_ACTIVITY) continue;` (`alerts.c:151`), which stops a
+  winlink that is already flagged from notifying again. The bell check has no
+  such guard by design (the C says so in a comment), so only the activity path
+  was wrong.
+- **Fix:** the guard added, with the C line cited and the bell asymmetry noted.
+- **Pinned by:** case 1784, which drives activity and a bell from pane output and
+  compares the sequence of hooks that fired.
+
+### `send-prefix -2` killed the server
+
+- **What happened:** `send-prefix -2` on a session with the default `prefix2`
+  (`None`) took the whole server down — every other client on it died with
+  `server exited unexpectedly`. tmux sends the key and returns 0.
+- **Cause, in two halves.** `prefix2` defaults to `KEYC_NONE`, so the "no key"
+  sentinel is what reaches `input_key`. (a) `KEYC_IS_UNICODE` said yes to it:
+  the C tests the key's TYPE field against `KEYC_TYPE_UNICODE` (`tmux.h:201`),
+  which this port cannot do while it carries the flat `keyc` encoding, and the
+  older "above 0x7f and not a special key" test it uses instead does not exclude
+  `KEYC_NONE`/`KEYC_UNKNOWN`, which live inside `KEYC_MASK_KEY` here. (b) That
+  sent the sentinel into `utf8_to_data` → `utf8_get_width`, which computes
+  `(uc >> 29) - 1`: an unsigned wrap in C (`utf8.c:257`) and a debug-build
+  `attempt to subtract with overflow` panic here.
+- **Fix:** the two sentinels are excluded from `KEYC_IS_UNICODE` with a comment
+  naming the encoding gap that makes the exclusion necessary, and
+  `utf8_get_width` uses `wrapping_sub` to keep the C's arithmetic. Either fix
+  alone stops the crash; both are wrong without the other.
+- **How it was found:** the crash dump `~/.ztmux/server-panic-<pid>.txt` that
+  the server's panic hook writes named `utf8_get_width` → `utf8_to_data` →
+  `input_key` → `window_pane_key` → `cmd_send_keys_inject_key` directly.
+- **Pinned by:** case 1689, which sends the prefix and then `-2` with `prefix2`
+  both unset and set, and asserts the server is still answering afterwards.
+
+### The file-error message had its two halves the wrong way round
+
+- **What it printed:** `/tmp/nowhere/out.txt: No such file or directory` for a
+  failed `save-buffer`, where tmux prints
+  `No such file or directory: /tmp/nowhere/out.txt`. Same for `load-buffer`.
+- **Cause:** both done-callbacks formatted `"{path}: {strerror}"`; the C formats
+  `"%s: %s", strerror(error), path` (`cmd-save-buffer.c:68`,
+  `cmd-load-buffer.c:69`).
+- **Fix:** the two arguments swapped at both call sites, matching the C.
+- **Pinned by:** case 1653, which asks for a save into a directory that does not
+  exist, a load of a file that does not exist, and a save from a buffer name that
+  does not exist (the last one was already right). It fails against a pre-fix
+  build.
+
 ## 2026-08-21 (the queued request/reply mechanism)
 
 ### Panes could not ask the terminal anything, and four entries hung off that
