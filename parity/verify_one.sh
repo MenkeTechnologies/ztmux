@@ -8,6 +8,14 @@
 #   ZTMUX=path/to/ztmux bash parity/verify_one.sh parity/cases/NAME.fmt
 set -uo pipefail
 case_file="$1"
+# A case file that cannot be read would otherwise compare two identical `bash:
+# No such file` failures and report OK -- a pass that says nothing. The argument
+# is a PATH, not a bare case name.
+if [ ! -f "$case_file" ]; then
+  echo "verify_one: no such case file: $case_file" >&2
+  echo "verify_one: pass a path, e.g. parity/cases/$(basename "$case_file")" >&2
+  exit 2
+fi
 Z="${ZTMUX:-target/debug/ztmux}"
 T="${TMUX_REF:-vendor/tmux/tmux}"
 export LC_ALL=C LANG=C
