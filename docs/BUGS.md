@@ -38,6 +38,28 @@ both binaries, zero divergences.
   than as reproduced defects; the bit positions are left free in `tty_flags`
   with a comment naming what belongs there.
 
+## 2026-08-30 (floating panes, and a client flag that was never there)
+
+Continuing the flag audit into next-3.7's newest surface: `new-pane`,
+`move-pane`'s floating operations, and `refresh-client` against a real client
+(cases 1946–1953).
+
+### The `no-detach-on-destroy` client flag did not exist
+
+- **Found 2026-08-30** by `parity/cases/1952_refresh_client_flags_and_panning.sh`,
+  which sets each client flag that applies to a non-control client and reads
+  `#{client_flags}` back.
+- `CLIENT_NO_DETACH_ON_DESTROY` (`tmux.h:2248`) was absent in four places: the
+  bit itself, the `no-detach-on-destroy` name in `server_client_set_flags`
+  (`server-client.c:2875`), its label in `server_client_get_flags` (`:2909`),
+  and the `cs_new` fallback in `server_destroy_session` (`server-fn.c:456-470`)
+  that is the whole point of the flag — with `detach-on-destroy` on, killing a
+  client's session normally detaches it, and a client carrying this flag is
+  moved to another session instead.
+- All four ported. `parity/cases/1953_no_detach_on_destroy_client_flag.sh`
+  watches a flagged client's session get killed and the client come back on the
+  surviving session rather than exiting.
+
 ## 2026-08-30 (split-window and join-pane: what the flag audit turned up)
 
 The round began by diffing every `.args` string in `vendor/tmux/cmd-*.c` against

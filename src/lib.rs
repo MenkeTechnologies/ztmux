@@ -3089,6 +3089,7 @@ bitflags::bitflags! {
         const CONTROL_WAITEXIT   = 0x0200000000u64;
         const WINDOWSIZECHANGED  = 0x0400000000u64;
         const BRACKETPASTING     = 0x1000000000u64;
+        const NO_DETACH_ON_DESTROY = 0x8000000000u64;
     }
 }
 

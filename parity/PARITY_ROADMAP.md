@@ -101,8 +101,8 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1633/1633 cases pass (100%) vs the vendored tmux — one known divergence, recorded as a gap.** The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 cases.
+**1641/1641 cases pass (100%) vs the vendored tmux — one known divergence, recorded as a gap.** The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 → 1641 cases.
 
 **Cases 1926–1945 came from a flag audit.** Every `.args` string in
 `vendor/tmux/cmd-*.c` was diffed against the whole corpus, which named 107 flag
@@ -118,6 +118,23 @@ writes 3 into an option this tree only had three names for. Porting
 `layout_get_tiled_cell` (`layout.c:1593`) for the first two also **closed the
 `join_pane_before_placement` gap**, which had recorded exactly the missing
 wrapper; its case is now 1943. `docs/BUGS.md` carries the write-ups.
+
+**Cases 1946–1953 went at the floating panes**, next-3.7's newest surface and
+the largest block the flag audit still listed: `new-pane`'s geometry (the
+default half-width by quarter-height, the (4,2) cascade, `-x`/`-y` with
+percentages, `-X`/`-Y`, and the `invalid width`/`invalid height` refusals), its
+tiled `-L` path, `move-pane -P`'s 18 placements read back as the pane's own
+left/top, and the offset and z-order flags through `#{pane_z}`. Two details are
+pinned because they are easy to assume wrong: `move-pane` needs a FLOATING
+target and says `pane is not floating` otherwise, and its `-D` is rejected by
+the parser — the C's offset loop reads `D` but move-pane's args string has none
+(`cmd-join-pane.c:55,228`). `refresh-client` against a real client came with
+them and found the last defect of the round: the whole
+`CLIENT_NO_DETACH_ON_DESTROY` flag was absent — the bit, the
+`no-detach-on-destroy` name in `server_client_set_flags`, its label in
+`server_client_get_flags`, and the `cs_new` fallback in `server_destroy_session`
+that moves such a client to another session instead of exiting it. Case 1953
+pins that behaviour end to end.
 
 **Two harness traps, both of which produced false results before they were
 caught.** `verify_one.sh` takes a *path*: given a bare case name it ran
