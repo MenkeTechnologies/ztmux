@@ -119,3 +119,58 @@ pub(crate) unsafe fn install_crash_handlers() {
         }
     }
 }
+
+/// Cap for an append-only audit log (see [`record_event`]); at ~2 KB an entry
+/// that is thousands of events, far more than any real occurrence needs.
+const AUDIT_LOG_MAX: u64 = 8 * 1024 * 1024;
+
+/// Local `%Y-%m-%d %H:%M:%S` stamp for an audit line.
+fn timestamp() -> String {
+    unsafe {
+        let now: crate::libc::time_t = crate::libc::time(null_mut());
+        let mut tm: crate::libc::tm = std::mem::zeroed();
+        if crate::libc::localtime_r(&raw const now, &raw mut tm).is_null() {
+            return now.to_string();
+        }
+        let mut buf = [0u8; 32];
+        let n = crate::libc::strftime(
+            buf.as_mut_ptr(),
+            buf.len(),
+            crate::c!("%Y-%m-%d %H:%M:%S"),
+            &raw mut tm,
+        );
+        String::from_utf8_lossy(&buf[..n]).into_owned()
+    }
+}
+
+/// Append a timestamped event and the caller's backtrace to `~/.ztmux/<file>`.
+///
+/// For state changes that are rare, unreproducible on demand, and invisible
+/// once they have happened — where the only way to learn the cause is to have
+/// recorded the caller at the time. Unlike `log_debug!`, this does not need
+/// `-v` to have been passed to the server that is about to hit the bug, which
+/// is the whole point: the server that loses the state has already been running
+/// for days. Never writes to the terminal; the file grows to at most
+/// [`AUDIT_LOG_MAX`], after which further events are dropped.
+pub(crate) fn record_event(file: &str, what: &str) {
+    // Unit tests drive the same code paths in-process; they must not write into
+    // the developer's real `~/.ztmux`.
+    if cfg!(test) {
+        return;
+    }
+    let backtrace = std::backtrace::Backtrace::force_capture();
+    crate::log::log_debug_rs(format_args!("{what}"));
+
+    let path = dir().join(file);
+    if std::fs::metadata(&path).is_ok_and(|m| m.len() >= AUDIT_LOG_MAX) {
+        return;
+    }
+    let entry = format!(
+        "{} pid {} {what}\n{backtrace:#?}\n\n",
+        timestamp(),
+        std::process::id(),
+    );
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = f.write_all(entry.as_bytes());
+    }
+}

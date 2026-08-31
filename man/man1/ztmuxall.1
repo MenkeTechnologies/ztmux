@@ -118,7 +118,15 @@ Extension state that is not a tmux option \(en trigger rules, resurrect
 snapshots, the
 .B repl
 history \(en lives under
-.IR ~/.ztmux/ .
+.IR ~/.ztmux/ ,
+alongside the server diagnostics: a
+.I server-crash-<pid>.txt
+or
+.I server-panic-<pid>.txt
+for every abnormal server exit, and
+.IR key-tables.log ,
+which records each key-table destruction with the backtrace of the code that
+caused it.
 .SH 6. THE PORT MODEL
 The ztmux repository vendors a read-only reference under
 .IR vendor/ :

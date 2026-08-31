@@ -185,6 +185,31 @@ pub unsafe fn key_bindings_next_table(table: *mut key_table) -> *mut key_table {
     unsafe { rb_next(table) }
 }
 
+/// ztmux: record one key-table destruction, with the caller's backtrace, to
+/// `~/.ztmux/key-tables.log`.
+///
+/// A table leaving [`KEY_TABLES`] is the state change behind "all my key
+/// bindings disappeared": afterwards the server looks like one that was never
+/// configured (`server_client_set_key_table` silently recreates `root`/`prefix`
+/// empty on the next key), so nothing about the running process says which code
+/// path removed them. Destruction is rare — the tree holds a reference for the
+/// table's whole life — so recording every one costs nothing and is the only
+/// way to name the path after the fact.
+unsafe fn record_table_drop(what: &str, table: *mut key_table) {
+    unsafe {
+        let keys = rb_foreach(&raw mut (*table).key_bindings).count();
+        let defaults = rb_foreach(&raw mut (*table).default_key_bindings).count();
+        crate::extensions::diagnostics::record_event(
+            "key-tables.log",
+            &format!(
+                "{what}: table {} ({keys} bindings, {defaults} defaults, {} references)",
+                _s((*table).name_ptr()),
+                (*table).references,
+            ),
+        );
+    }
+}
+
 /// C `vendor/tmux/key-bindings.c:138`: `void key_bindings_unref_table(struct key_table *table)`
 pub unsafe fn key_bindings_unref_table(table: *mut key_table) {
     unsafe {
@@ -192,6 +217,7 @@ pub unsafe fn key_bindings_unref_table(table: *mut key_table) {
         if (*table).references != 0 {
             return;
         }
+        record_table_drop("key_bindings_unref_table freed", table);
 
         for bd in rb_foreach(&raw mut (*table).key_bindings).map(NonNull::as_ptr) {
             rb_remove(&raw mut (*table).key_bindings, bd);
@@ -323,12 +349,25 @@ pub unsafe fn key_bindings_remove(name: *const u8, key: key_code) {
             _s(key_string_lookup_key((*bd).key, 1)),
         );
 
+        // ztmux: a table can also be stripped one key at a time rather than
+        // dropped whole, so record the individual removal too — the caller is
+        // what identifies a mass unbind. See `record_table_drop`.
+        crate::extensions::diagnostics::record_event(
+            "key-tables.log",
+            &format!(
+                "key_bindings_remove: {} from table {}",
+                _s(key_string_lookup_key((*bd).key, 1)),
+                _s(name),
+            ),
+        );
+
         rb_remove(&raw mut (*table.as_ptr()).key_bindings, bd);
         key_bindings_free(bd);
 
         if rb_empty(&raw mut (*table.as_ptr()).key_bindings)
             && rb_empty(&raw mut (*table.as_ptr()).default_key_bindings)
         {
+            record_table_drop("key_bindings_remove emptied the table", table.as_ptr());
             rb_remove(&raw mut KEY_TABLES, table.as_ptr());
             key_bindings_unref_table(table.as_ptr());
         }
@@ -368,6 +407,7 @@ pub unsafe fn key_bindings_remove_table(name: *const u8) {
     unsafe {
         let table = key_bindings_get_table(name, false);
         if !table.is_null() {
+            record_table_drop("key_bindings_remove_table", table);
             rb_remove(&raw mut KEY_TABLES, table);
             key_bindings_unref_table(table);
         }
