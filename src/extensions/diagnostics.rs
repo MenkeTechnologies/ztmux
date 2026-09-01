@@ -170,7 +170,36 @@ pub(crate) fn record_event(file: &str, what: &str) {
         timestamp(),
         std::process::id(),
     );
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
         let _ = f.write_all(entry.as_bytes());
+    }
+}
+
+/// ztmux: record one key-table destruction, with the caller's backtrace, to
+/// `~/.ztmux/key-tables.log`.
+///
+/// A table leaving `KEY_TABLES` is the state change behind "all my key
+/// bindings disappeared": afterwards the server looks like one that was never
+/// configured (`server_client_set_key_table` silently recreates `root`/`prefix`
+/// empty on the next key), so nothing about the running process says which code
+/// path removed them. Destruction is rare — the tree holds a reference for the
+/// table's whole life — so recording every one costs nothing and is the only
+/// way to name the path after the fact.
+pub(crate) unsafe fn record_table_drop(what: &str, table: *mut crate::key_table) {
+    unsafe {
+        let keys = crate::rb_foreach(&raw mut (*table).key_bindings).count();
+        let defaults = crate::rb_foreach(&raw mut (*table).default_key_bindings).count();
+        record_event(
+            "key-tables.log",
+            &format!(
+                "{what}: table {} ({keys} bindings, {defaults} defaults, {} references)",
+                crate::_s((*table).name_ptr()),
+                (*table).references,
+            ),
+        );
     }
 }
