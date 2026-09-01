@@ -4,7 +4,7 @@ Fixes to the ztmux port, most recent first.
 
 ## Open
 
-Re-measured 2026-08-21. Four entries that stood here this morning are gone
+Re-measured 2026-08-21, with one entry added 2026-08-31. Four entries that stood here that morning are gone
 because the defects are fixed, not because they were tidied away: structured
 output under a non-UTF-8 client, the `refresh-client -l` arity, the queued
 request/reply mechanism (DECRQSS with it), and `TTY_WAITBG`/`TTY_WAITFG` with
@@ -22,6 +22,29 @@ claim after live probing.
 
 Every style directive now agrees with the reference: 53 of them, swept through
 both binaries, zero divergences.
+
+### A running server lost every key binding, twice, with no way to name the cause
+
+- **Found 2026-08-31**, on a server that had been up for days. Afterwards the
+  process looks like one that was never configured: `server_client_set_key_table`
+  recreates `root` and `prefix` empty on the next key, and a table no client is
+  parked on is simply gone, so nothing about the state names the code path that
+  removed it.
+- **Not reproduced.** No case can pin it yet, which is why it is here rather than
+  in `parity/known_gaps/`: the suite compares against the reference, and this is
+  a ztmux-only state with no reference behaviour to diff against.
+- **What was added instead of a guess:** every key-table destruction is now
+  recorded to `~/.ztmux/key-tables.log` with the caller's backtrace, from the
+  three places state can leave the tree — `key_bindings_remove_table`, the branch
+  of `key_bindings_remove` that drops an emptied table, and
+  `key_bindings_unref_table` when the last reference goes
+  (`src/ported/key_bindings.rs:195`, `:345`, `:385`). Each line carries the
+  table's name, its binding and default counts, and its reference count, so a
+  mass unbind is distinguishable from a table that merely went unreferenced.
+- The recorder is a diagnostics helper, not a log level: unlike `log_debug!` it
+  does not need `-v` to have been passed to the server that is about to hit the
+  bug, which is the point for a server that has been running for days. It never
+  writes to the terminal, is capped at 8 MiB, and is a no-op under `cfg(test)`.
 
 ### Two tty flags the C sets are still absent
 

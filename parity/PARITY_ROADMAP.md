@@ -101,7 +101,11 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1643/1643 cases pass (100%) vs the vendored tmux — two known divergences, both recorded as gaps.** The
+**1631/1631 gated cases pass (100%) vs the vendored tmux, with 12 quarantined and two known
+divergences recorded as gaps.** Last measured 2026-09-01 against ztmux v3.7.47 and tmux
+next-3.7: `1631/1631 passed (100.00%) · failed 0 · quarantined 12 (0 failing)`, 1643 case files
+in all — the 12 quarantined ones matched on this macOS run too, and are held out of the gate
+only for a divergence that appears on the Linux CI runner. The
 suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 → 1641 → 1643 cases.
 
 **Cases 1926–1945 came from a flag audit.** Every `.args` string in
@@ -1048,7 +1052,7 @@ reddens CI merely because the gaps still exist. Should the directory ever empty 
 exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
 left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1633/1633 ported surface; they measure
+proof. These gaps do not count against the 1643/1643 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite
