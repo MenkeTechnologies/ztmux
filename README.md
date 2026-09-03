@@ -53,6 +53,7 @@ function is added whose name has no counterpart in the tmux C source.
 - [\[0x06\] Layout](#0x06-layout)
 - [\[0x07\] Porting Workflow](#0x07-porting-workflow)
 - [\[0x08\] Extensions](#0x08-extensions)
+- [\[0x09\] Cost vs the C](#0x09-cost-vs-the-c)
 - [\[0xFF\] License](#0xff-license)
 
 ---
@@ -244,7 +245,7 @@ ztmux/
 │   └── known_gaps/    # proven-unported behaviour, expected to diverge
 ├── regress/           # 32 of tmux's own regression scripts, run against ztmux
 ├── fuzz/              # cargo-fuzz target + differential fuzzing vs real tmux
-├── scripts/           # gen_port_report.py, annotate_c_links.py
+├── scripts/           # gen_port_report.py, annotate_c_links.py, bench_vs_tmux.sh
 ├── tests/             # anti-drift gate + allowlist
 ├── docs/              # GH Pages hub: index / report / port_report
 ├── vendor/
@@ -411,6 +412,55 @@ They fall into a few families:
 Run `ztmux --help` for the current list, or `man ztmux` for the full reference — each
 extension has its own entry under the EXTENSIONS section, and the zsh completion
 ([`completions/_ztmux`](completions/_ztmux)) describes every one inline.
+
+---
+
+## [0x09] COST VS THE C
+
+The port has to be measured against the thing it replaces, not described.
+[`scripts/bench_vs_tmux.sh`](scripts/bench_vs_tmux.sh) runs both binaries back to back on
+the same machine, same 80x24 geometry, same commands, and prints the table below. Every
+number here came out of that script; re-run it and it prints your machine's numbers
+instead.
+
+```sh
+./scripts/bench_vs_tmux.sh                   # release ztmux vs the tmux in PATH
+REPS=60 WINDOWS=20 ./scripts/bench_vs_tmux.sh
+```
+
+ztmux 3.7.47 vs tmux 3.7c, Darwin arm64, best of 60 reps:
+
+| measurement                       |    ztmux |     tmux | ratio |
+| --------------------------------- | -------: | -------: | ----: |
+| cold start (`new-session -d`)      | 25.42 ms | 24.73 ms | 1.03x |
+| warm round trip (`list-sessions`)  | 10.55 ms |  9.37 ms | 1.13x |
+| server RSS, 1 window               | 6272 KiB | 4160 KiB | 1.51x |
+| server RSS, 20 windows             | 6464 KiB | 4192 KiB | 1.54x |
+| binary on disk                     |  7.9 MiB |  977 KiB | 8.24x |
+| binary, stripped                   |  5.9 MiB |        — |     — |
+
+How to read it:
+
+- **Cold start** is a dead socket to an answered `new-session`: fork, daemonize, build the
+  session/window/pane, reply to the client. Within a millisecond of the C.
+- **Round trip** is client connect, command dispatch, reply, exit against a live server.
+  ztmux pays about 1.2 ms more per command.
+- **RSS** is the server's resident set, not the client's. ztmux carries roughly 2 MiB more
+  at rest; the slope is what matters and both are nearly flat — 19 extra windows cost
+  ztmux 192 KiB and tmux 32 KiB.
+- **Binary size** is not a like-for-like comparison. Homebrew's `tmux` dynamically links
+  `libutf8proc`, `libncursesw`, `libevent_core` and `libjemalloc` (`otool -L`), so their
+  code is not counted in its 977 KiB; ztmux links only `libSystem`, `libiconv` and
+  `CoreFoundation`, and the release profile keeps `debug = "line-tables-only"` for usable
+  backtraces — stripping recovers 2.0 MiB.
+
+Both binaries are timed with `-f /dev/null` and `/bin/cat` as the pane command, so no user
+config and no login shell lands in the measurement. That exclusion is deliberate and it is
+the largest term in practice: with a real `~/.tmux.conf` sourced, cold start on this
+machine measured 8.4 s for ztmux and 7.0 s for tmux — config, not multiplexer. Latency is
+reported as the best of N rather than the median because process-startup noise on a loaded
+machine is one-sided; the medians move by tens of milliseconds between runs for both
+binaries while the minima are stable to about 1 ms.
 
 ---
 
