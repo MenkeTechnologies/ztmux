@@ -3562,6 +3562,26 @@ search path.
 .TQ
 .B VISUAL
 Used to select the editor for interactive editing.
+.TP
+.B ZTMUX_HOME
+Root for ztmux's own state, holding the
+.B znative
+plugin store under
+.IR pkg/ ;
+defaults to
+.IR ~/.ztmux .
+.TP
+.B ZTMUX_REPL_EDIT_MODE
+Keys the
+.B repl
+line editor
+.RB ( vi
+or
+.BR emacs )
+for a single console, ahead of the
+.B @ztmux-repl-edit-mode
+option and the server's
+.BR status-keys .
 .SH FILES
 .TP
 .IR $TMUX_TMPDIR /ztmux- UID /
@@ -3588,9 +3608,17 @@ the
 .B repl
 history
 .RI ( repl_history ),
-and a
+and the server diagnostics: a
 .RI server-crash- pid .txt
-report for any server crash.
+or
+.RI server-panic- pid .txt
+report for every abnormal server exit, written whether or not the server was
+started with
+.BR \-v ,
+and
+.IR key-tables.log ,
+which records each key-table destruction with the backtrace of the code that
+caused it.
 .TP
 .I ~/.tmux.conf
 Default per-user configuration file. The full default search path is

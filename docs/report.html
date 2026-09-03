@@ -298,7 +298,7 @@
         <tr><td>src/ported/</td><td>the ztmux port</td><td>The living code we own and evolve toward safe, idiomatic Rust</td></tr>
       </tbody>
     </table>
-    <p class="prose">Every ported function carries a back-link to its C origin as a doc comment, e.g. <code>/// C <code>vendor/tmux/grid.c:320</code>: <code>grid_create()</code></code>. The <a href="port_report.html">port report</a> tracks per-function C&rarr;Rust coverage: <strong>2,495</strong> of tmux's <strong>2,696</strong> functions ported so far.</p>
+    <p class="prose">Every ported function carries a back-link to its C origin as a doc comment, e.g. <code>/// C <code>vendor/tmux/grid.c:320</code>: <code>grid_create()</code></code>. The <a href="port_report.html">port report</a> tracks per-function C&rarr;Rust coverage: <strong>2,502</strong> of tmux&rsquo;s <strong>2,696</strong> functions ported so far.</p>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>BUGS THE HARNESS CAUGHT</h2>
     <p class="prose">Verifying against C at every step turns "looks right" into "is right." A sample of faults the harnesses root-caused to a single line &mdash; the parity suite and unit tests, plus a sweep that drives every command against a private socket and, for the paths that only run with a client attached (modes, redraw, status), against a real client on a pty. Aborts are keyed on crash reports rather than on "is the server still up," since a dying client can legitimately take the server with it. Each fault below is now locked by a regression test or a build gate (the full log, including what is still open, is in <a href="BUGS.md">BUGS.md</a>):</p>

@@ -171,8 +171,13 @@ the same shape as the sibling ports ([zshrs](https://github.com/MenkeTechnologie
 `zsh`, [strykelang](https://github.com/MenkeTechnologies/strykelang) vs `perl`).
 
 ```sh
-bash parity/run_parity.sh --summary       # ztmux vs tmux, every case
+bash parity/run_parity.sh --summary                       # ztmux vs tmux, every case
+bash parity/verify_one.sh parity/cases/NAME.sh            # one case, in isolation (takes a PATH)
+bash parity/run_known_gaps.sh                             # the inverted runner: "GAP" is the pass
 ```
+
+The runner uses `target/release/ztmux` and builds it only when that file is **absent**, so
+rebuild after changing the port or the run measures the previous binary.
 
 Cases live in `parity/cases/` as tmux FORMAT strings (`#{e|+|:2,3}`) or shell scenarios.
 It earns its keep: it root-caused a `#{l:…}` server crash to a dropped pointer increment in
