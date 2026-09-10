@@ -80,7 +80,18 @@
       <div class="stat-card"><div class="stat-val">180k</div><div class="stat-label">Lines of Rust</div></div>
       <div class="stat-card"><div class="stat-val">2,502</div><div class="stat-label">C fns ported (of 2,696)</div></div>
       <div class="stat-card"><div class="stat-val">114</div><div class="stat-label">Original extensions</div></div>
+      <div class="stat-card"><div class="stat-val">6.2 MiB</div><div class="stat-label">Server RSS (tmux C: 4.0 MiB)</div></div>
     </div>
+    <p class="prose" style="margin-top:.6rem">
+      Cost against the C is measured, not asserted:
+      <a href="https://github.com/MenkeTechnologies/ztmux/blob/main/scripts/bench_vs_tmux.sh"><code>scripts/bench_vs_tmux.sh</code></a>
+      runs both binaries back to back on one machine &mdash; cold start, warm round trip, server RSS at 1 and N
+      windows, binary size &mdash; and the table it prints is in the
+      <a href="https://github.com/MenkeTechnologies/ztmux#0x09-cost-vs-the-c">README</a>. The memory rows
+      reproduce run to run (ztmux carries about 2&nbsp;MiB more at rest, and both are nearly flat in the number of
+      windows); the latency rows are dominated by process-start noise on a loaded machine and swing in both
+      directions, so they are reported best-of-N and should not be read as a ranking from a single run.
+    </p>
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>BEYOND tmux</h2>
     <p class="prose">
@@ -241,7 +252,7 @@
 
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>SITEMAP</h2>
     <div class="hub-cards">
-      <a class="hub-card" href="report.html"><h3>Engineering Report &rarr;</h3><p>How the port is built, the two vendored references, the repository layout, the extensions, bugs the harnesses caught, and the anti-drift gates.</p></a>
+      <a class="hub-card" href="report.html"><h3>Engineering Report &rarr;</h3><p>How the port is built, the two vendored references, the repository layout, the extensions, bugs the harnesses caught, the anti-drift gates, and what the port costs against the C.</p></a>
       <a class="hub-card" href="port_report.html"><h3>Port Report &rarr;</h3><p>Per-function C&rarr;Rust coverage: every function in vendor/tmux mapped to src/ported/, with line counts and call-site wiring.</p></a>
       <a class="hub-card" href="https://github.com/MenkeTechnologies/ztmux"><h3>Source &rarr;</h3><p>The ztmux repository &mdash; the living port plus the pinned vendor/ references and the parity suite.</p></a>
       <a class="hub-card" href="https://github.com/tmux/tmux"><h3>tmux (reference) &rarr;</h3><p>The C implementation ztmux ports and verifies against, byte-for-byte.</p></a>

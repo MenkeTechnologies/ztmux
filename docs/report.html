@@ -345,6 +345,34 @@
       <code>file:line</code> and the fix.
     </p>
 
+    <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>COST VS THE C</h2>
+    <p class="prose">
+      A port has to be measured against the thing it replaces.
+      <code>scripts/bench_vs_tmux.sh</code> runs ztmux and the system <code>tmux</code> back to back on one
+      machine, same 80&times;24 geometry and same commands, both with <code>-f /dev/null</code> and
+      <code>/bin/cat</code> as the pane command so no user config or login shell lands in the number. It measures
+      cold start (dead socket to an answered <code>new-session</code>), warm round trip against a live server,
+      server RSS at 1 and N windows, and binary size. The table it printed is in the
+      <a href="https://github.com/MenkeTechnologies/ztmux#0x09-cost-vs-the-c">README</a>.
+    </p>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-val">6.2 MiB</div><div class="stat-label">Server RSS, 1 window (tmux C: 4.0)</div></div>
+      <div class="stat-card"><div class="stat-val">+192 KiB</div><div class="stat-label">RSS cost of 19 more windows (tmux C: +32)</div></div>
+      <div class="stat-card"><div class="stat-val">7.9 MiB</div><div class="stat-label">Binary on disk (5.9 stripped)</div></div>
+      <div class="stat-card"><div class="stat-val">best of N</div><div class="stat-label">How latency is reported</div></div>
+    </div>
+    <p class="prose">
+      Read it with two caveats the script cannot remove. <b>Binary size is not like-for-like</b>: Homebrew's
+      <code>tmux</code> dynamically links <code>libutf8proc</code>, <code>libncursesw</code>,
+      <code>libevent_core</code> and <code>libjemalloc</code>, so their code is not counted in its ~977&nbsp;KiB,
+      while ztmux links only <code>libSystem</code>, <code>libiconv</code> and <code>CoreFoundation</code> and
+      keeps line-table debug info for usable backtraces. <b>The latency rows move</b>: two runs of the same
+      script on the same machine six days apart put cold start at 25.4&nbsp;ms vs 24.7&nbsp;ms one day and
+      53.1&nbsp;ms vs 71.7&nbsp;ms the next &mdash; slower than the C, then faster than it. Process-start noise on
+      a loaded machine is one-sided and swamps the difference, which is why the numbers are minima over N reps
+      and why a single run is not a ranking. The memory and size rows reproduce.
+    </p>
+
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>TESTING</h2>
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-val green">1631/1631</div><div class="stat-label">Gated parity cases (100%)</div></div>

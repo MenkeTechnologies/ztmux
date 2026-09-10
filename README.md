@@ -428,7 +428,7 @@ instead.
 REPS=60 WINDOWS=20 ./scripts/bench_vs_tmux.sh
 ```
 
-ztmux 3.7.47 vs tmux 3.7c, Darwin arm64, best of 60 reps:
+ztmux 3.7.47 vs tmux 3.7c, Darwin arm64, best of 60 reps (2026-09-03):
 
 | measurement                       |    ztmux |     tmux | ratio |
 | --------------------------------- | -------: | -------: | ----: |
@@ -453,6 +453,15 @@ How to read it:
   code is not counted in its 977 KiB; ztmux links only `libSystem`, `libiconv` and
   `CoreFoundation`, and the release profile keeps `debug = "line-tables-only"` for usable
   backtraces — stripping recovers 2.0 MiB.
+
+**The two latency rows are the ones that move.** A second run of the same script on the same
+machine six days later (2026-09-09) reproduced the memory and size rows within a few percent
+— ztmux 6192/6432 KiB against tmux 4016/4128 KiB, the same two binaries on disk — but the
+timings came out ztmux 53.06 ms / tmux 71.70 ms cold and 12.73 ms / 9.10 ms warm: cold start
+*faster* than the C that run, having been a hair slower in the one above. Both runs are real;
+what they show is that on a busy laptop the cold-start row is dominated by whatever else is
+scheduling, and a single run of it should not be read as a ranking. The memory and size rows
+are the reproducible ones.
 
 Both binaries are timed with `-f /dev/null` and `/bin/cat` as the pane command, so no user
 config and no login shell lands in the measurement. That exclusion is deliberate and it is
