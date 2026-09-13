@@ -473,7 +473,7 @@ pub unsafe fn window_buffer_do_delete(
         let data: NonNull<window_buffer_modedata> = modedata.cast();
         let item: NonNull<window_buffer_itemdata> = itemdata.cast();
 
-        if item == mode_tree_get_current((*data.as_ptr()).data).cast()
+        if item.as_ptr().cast::<c_void>() == mode_tree_get_current((*data.as_ptr()).data)
             && !mode_tree_down((*data.as_ptr()).data, 0)
         {
             // If we were unable to select the item further down we are at
@@ -614,12 +614,16 @@ pub unsafe fn window_buffer_key(
             let key_byte = if key < 0x80 { key as u8 } else { 0 };
             match key_byte {
                 b'e' => {
-                    let item: NonNull<window_buffer_itemdata> = mode_tree_get_current(mtd).cast();
-                    window_buffer_start_edit(data, item.as_ptr(), c);
+                    let item: *mut window_buffer_itemdata = mode_tree_get_current(mtd).cast();
+                    window_buffer_start_edit(data, item, c);
                 }
                 b'd' => {
-                    let item = mode_tree_get_current(mtd);
-                    window_buffer_do_delete(NonNull::new(data.cast()).unwrap(), item, c, key);
+                    // C passes the possibly-NULL itemdata straight in
+                    // (window-buffer.c:645); a buffer row always has one, and the
+                    // callback signature cannot carry NULL.
+                    if let Some(item) = NonNull::new(mode_tree_get_current(mtd)) {
+                        window_buffer_do_delete(NonNull::new(data.cast()).unwrap(), item, c, key);
+                    }
                     mode_tree_build(mtd);
                 }
                 b'D' => {
@@ -631,8 +635,9 @@ pub unsafe fn window_buffer_key(
                     finished = true;
                 }
                 b'p' | b'\r' => {
-                    let item = mode_tree_get_current(mtd);
-                    window_buffer_do_paste(NonNull::new(data.cast()).unwrap(), item, c, key);
+                    if let Some(item) = NonNull::new(mode_tree_get_current(mtd)) {
+                        window_buffer_do_paste(NonNull::new(data.cast()).unwrap(), item, c, key);
+                    }
                     finished = true;
                 }
                 _ => (),

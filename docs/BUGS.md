@@ -61,6 +61,49 @@ both binaries, zero divergences.
   than as reproduced defects; the bit positions are left free in `tty_flags`
   with a comment naming what belongs there.
 
+## 2026-09-13 (the format-variable audit)
+
+Every name the C installs with `format_add()` was diffed against the whole case
+corpus, the way the flag audit was done against `.args`. 85 names, 39 of which no
+case had ever expanded. Writing cases for the reachable ones found two defects,
+one of them a server crash.
+
+### The `#{W:…}` window loop had no neighbour variables at all
+
+- **Found 2026-09-13** by `parity/cases/1956_window_loop_neighbor_formats.sh`.
+- `format_loop_windows` adds six names per entry that exist in no other scope —
+  `window_after_active`, `window_before_active`, and the neighbouring winlink's
+  index and active flag under a `next_`/`prev_` prefix — plus every `@`-prefixed
+  window option of that neighbour, re-keyed under the same prefix
+  (`format.c:4825-4850`, `:4901-4908`). The port's loop stopped after
+  `format_defaults`, so all six expanded empty and the neighbour's user options
+  were unreachable. `format_add_window_neighbor` is now ported next to the loop
+  (`src/ported/format.rs:4920`), edge guards included: the first entry gets no
+  `prev_*` and the last no `next_*`.
+- Invisible to everything else in the suite: the names only exist inside the
+  loop, so no `display-message` case could reach them, and the loop's own output
+  is identical without them as long as nothing asks.
+- Mutation-tested: widening the guard to `i + 2 < n` turns the case red on the
+  last two entries.
+
+### Any key pressed on a heading row killed the server
+
+- **Found 2026-09-13** by `parity/cases/1960_customize_mode_option_formats.sh`,
+  on the `M-+` that expands the top-level nodes.
+- `mode_tree_get_current` returns `void *` in the C and is NULL in two ways: an
+  empty list, or a row added with no itemdata — which every category heading is
+  (`window-customize.c`'s "Server Options" and "Key Table - …"). The port
+  returned `NonNull` and unwrapped, so with the cursor on a heading — where
+  `customize-mode` opens — the first key panicked the server and took every
+  session on it down. The C's own callers are written for the NULL: each arm of
+  `window_customize_key` guards `item == NULL` (`window-customize.c:1467`,
+  `:1478`), and this port had those guards already; only the getter was wrong.
+- A comment on the function had reasoned the NULL away, correctly for the empty
+  list and not at all for the heading rows. The signature is now `*mut c_void`
+  as in the C, and the four mode-tree users take the pointer as one
+  (`src/ported/mode_tree.rs:346`).
+- Reachable in one step by a user: `customize-mode`, then any key.
+
 ## 2026-08-30 (the choice lists, swept whole)
 
 ### `clock-mode-style` was two names short

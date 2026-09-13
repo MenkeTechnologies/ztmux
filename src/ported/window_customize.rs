@@ -1548,7 +1548,7 @@ pub unsafe fn window_customize_unset_option(
         if o.is_null() {
             return;
         }
-        if (*item).idx != -1 && item.cast() == mode_tree_get_current((*data).data).as_ptr() {
+        if (*item).idx != -1 && item.cast() == mode_tree_get_current((*data).data) {
             mode_tree_up((*data).data, 0);
         }
         _ = options_remove_or_default(o, (*item).idx);
@@ -1748,7 +1748,7 @@ pub unsafe fn window_customize_unset_key(
             return;
         }
 
-        if item == mode_tree_get_current((*data).data).as_ptr().cast() {
+        if item == mode_tree_get_current((*data).data).cast() {
             mode_tree_collapse_current((*data).data);
             mode_tree_up((*data).data, 0);
         }
@@ -1773,7 +1773,7 @@ pub unsafe fn window_customize_reset_key(
         if !dd.is_null() && (*bd).cmdlist == (*dd).cmdlist {
             return;
         }
-        if dd.is_null() && item == mode_tree_get_current((*data).data).as_ptr().cast() {
+        if dd.is_null() && item == mode_tree_get_current((*data).data).cast() {
             mode_tree_collapse_current((*data).data);
             mode_tree_up((*data).data, 0);
         }
@@ -1835,7 +1835,7 @@ pub unsafe fn window_customize_change_current_callback(
         }
 
         let item: *mut window_customize_itemdata =
-            mode_tree_get_current((*data).data).as_ptr().cast();
+            mode_tree_get_current((*data).data).cast();
         match (*data).change {
             window_customize_change::WINDOW_CUSTOMIZE_UNSET => {
                 if (*item).scope == window_customize_scope::WINDOW_CUSTOMIZE_KEY {
@@ -1908,14 +1908,14 @@ pub unsafe fn window_customize_key(
         let wp: *mut window_pane = (*wme.as_ptr()).wp;
         let data: *mut window_customize_modedata = (*wme.as_ptr()).data.cast();
         let mut item: *mut window_customize_itemdata =
-            mode_tree_get_current((*data).data).cast().as_ptr();
+            mode_tree_get_current((*data).data).cast();
         let prompt: *mut u8;
         let finished: i32 = mode_tree_key((*data).data, c, &raw mut key, m, null_mut(), null_mut());
 
-        let new_item: NonNull<window_customize_itemdata> =
+        let new_item: *mut window_customize_itemdata =
             mode_tree_get_current((*data).data).cast();
-        if item != new_item.as_ptr() {
-            item = new_item.as_ptr();
+        if item != new_item {
+            item = new_item;
         }
 
         // C switches on the full key_code. Truncating to u8 lets a KEYC_* code alias an

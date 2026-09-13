@@ -522,7 +522,7 @@ pub unsafe fn window_client_do_detach(
     // TODO I'm not conviced this NonNull (item) is correct here
 
     unsafe {
-        if item == mode_tree_get_current((*data.as_ptr()).data).cast() {
+        if item.as_ptr().cast::<c_void>() == mode_tree_get_current((*data.as_ptr()).data) {
             mode_tree_down((*data.as_ptr()).data, 0);
         }
         if key == 'd' as key_code || key == 'D' as key_code {
@@ -557,8 +557,12 @@ pub unsafe fn window_client_key(
         let key_byte = if key < 0x80 { key as u8 } else { 0 };
         match key_byte {
             b'd' | b'x' | b'z' => {
-                let item: NonNull<window_client_itemdata> = mode_tree_get_current(mtd).cast();
-                window_client_do_detach(NonNull::new(data.cast()).unwrap(), item.cast(), c, key);
+                // C passes the possibly-NULL itemdata straight in
+                // (window-client.c:535); a client row always has one, and the
+                // callback signature cannot carry NULL.
+                if let Some(item) = NonNull::new(mode_tree_get_current(mtd)) {
+                    window_client_do_detach(NonNull::new(data.cast()).unwrap(), item, c, key);
+                }
                 mode_tree_build(mtd);
             }
             b'i' => {
@@ -575,12 +579,12 @@ pub unsafe fn window_client_key(
                 mode_tree_build(mtd);
             }
             b'\r' => {
-                let item: NonNull<window_client_itemdata> = mode_tree_get_current(mtd).cast();
+                let item: *mut window_client_itemdata = mode_tree_get_current(mtd).cast();
                 mode_tree_run_command(
                     c,
                     null_mut(),
                     (*data).command_ptr(),
-                    cstr_to_str_((*(*item.as_ptr()).c).ttyname_ptr()),
+                    cstr_to_str_((*(*item).c).ttyname_ptr()),
                 );
                 finished = true;
             }

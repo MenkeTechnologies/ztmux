@@ -4917,6 +4917,47 @@ pub unsafe fn format_window_name(es: *mut format_expand_state, fmt: *const u8) -
     }
 }
 
+/// C `vendor/tmux/format.c:4824`: `static void format_add_window_neighbor(struct format_tree *nft, struct winlink *wl, struct session *s, const char *prefix)`
+///
+/// Adds one neighbouring window's index and active flag under a `next_`/`prev_`
+/// prefix, then every `@`-prefixed option of that window under the same prefix —
+/// the only place in tmux where a user option is re-keyed rather than read
+/// through unchanged.
+unsafe fn format_add_window_neighbor(
+    nft: *mut format_tree,
+    wl: *mut winlink,
+    s: *mut session,
+    prefix: &str,
+) {
+    unsafe {
+        format_add_(
+            nft,
+            &format!("{prefix}_window_index"),
+            format_args!("{}", (*wl).idx),
+        );
+        format_add_(
+            nft,
+            &format!("{prefix}_window_active"),
+            format_args!("{}", i32::from(wl == (*s).curw)),
+        );
+
+        let mut o = options_first((*(*wl).window).options);
+        while !o.is_null() {
+            let oname = options_name(o);
+            if oname.starts_with('@') {
+                let oval = options_to_string(o, -1, 1);
+                format_add_(
+                    nft,
+                    &format!("{prefix}_{oname}"),
+                    format_args!("{}", CStr::from_ptr(oval.cast()).to_string_lossy()),
+                );
+                free_(oval);
+            }
+            o = options_next(o);
+        }
+    }
+}
+
 /// C `vendor/tmux/format.c:4856`: `static char *format_loop_windows(struct format_expand_state *es, const char *fmt)`
 pub unsafe fn format_loop_windows(
     es: *mut format_expand_state,
@@ -4965,6 +5006,32 @@ pub unsafe fn format_loop_windows(
             format_add!(nft, "loop_index", "{}", i);
             format_add!(nft, "loop_last_flag", "{}", i32::from(i == n - 1));
             format_defaults(nft, (*ft).c, NonNull::new((*ft).s), NonNull::new(wl), None);
+
+            // C: the neighbour block. `window_after_active` is set on the entry
+            // that FOLLOWS the current window, `window_before_active` on the one
+            // that precedes it, and the two neighbours' index/active/@options go
+            // in under `next_`/`prev_` — all of it edge-guarded, so the first
+            // entry gets no `prev_*` and the last gets no `next_*` at all.
+            let curw = (*(*ft).s).curw;
+            format_add!(
+                nft,
+                "window_after_active",
+                "{}",
+                i32::from(i > 0 && winlinks[i - 1] == curw)
+            );
+            format_add!(
+                nft,
+                "window_before_active",
+                "{}",
+                i32::from(i + 1 < n && winlinks[i + 1] == curw)
+            );
+            if i + 1 < n {
+                format_add_window_neighbor(nft, winlinks[i + 1], (*ft).s, "next");
+            }
+            if i > 0 {
+                format_add_window_neighbor(nft, winlinks[i - 1], (*ft).s, "prev");
+            }
+
             let mut next = zeroed();
             format_copy_state(&raw mut next, es, format_expand_flags::empty());
             next.ft = nft;

@@ -50,6 +50,18 @@ already starting, that races: 1526 came back with EMPTY output in one macOS run 
 `timeout 15` expired) and passes on every isolated re-run, and 1528 fails about one run in
 two. They are not divergences and are not quarantined; the fix is to fence them on a marker.
 
+**Open: a server can fail to come up at all under suite load (2026-09-13).** Two full runs
+on a loaded machine each came back `1634/1636` with **different** cases failing, and the
+failure is never a diff of behaviour: one binary prints
+`error connecting to <socket> (No such file or directory)` where the other prints the
+expected output. It went both ways — the first run's two were the *reference* failing to
+reach its own socket (1281, 1721), the second run's were *ztmux* (1137, 1376) — and all four
+passed on isolated re-run. A third run with nothing else on the machine was
+`1636/1636 (100.00%) · failed 0`. So it is a server-start race under contention rather than a
+port defect, but it is not the render cases' fixed-sleep problem either: these cases never
+get as far as a fence. Until it is root-caused, read a lone `error connecting` failure as a
+flake to re-run, not as a divergence — and do not "fix" it by loosening a case.
+
 **Open: twelve render cases, Linux only (2026-08-24).** next-3.7 styles the status line and
 menus with theme colours (`status-style` defaults to `bg=themegreen,fg=themeblack`), which
 `server_client_update_theme_colours` resolves per client from the `dark-theme-*` options into
@@ -101,12 +113,12 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1631/1631 gated cases pass (100%) vs the vendored tmux, with 12 quarantined and two known
-divergences recorded as gaps.** Last measured 2026-09-01 against ztmux v3.7.47 and tmux
-next-3.7: `1631/1631 passed (100.00%) · failed 0 · quarantined 12 (0 failing)`, 1643 case files
+**1636/1636 gated cases pass (100%) vs the vendored tmux, with 12 quarantined and two known
+divergences recorded as gaps.** Last measured 2026-09-13 against ztmux v3.7.47 and tmux
+next-3.7: `1636/1636 passed (100.00%) · failed 0 · quarantined 12 (0 failing)`, 1648 case files
 in all — the 12 quarantined ones matched on this macOS run too, and are held out of the gate
 only for a divergence that appears on the Linux CI runner. The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 → 1641 → 1643 cases.
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 → 1641 → 1643 → 1648 cases.
 
 **Cases 1926–1945 came from a flag audit.** Every `.args` string in
 `vendor/tmux/cmd-*.c` was diffed against the whole corpus, which named 107 flag
@@ -122,6 +134,54 @@ writes 3 into an option this tree only had three names for. Porting
 `layout_get_tiled_cell` (`layout.c:1593`) for the first two also **closed the
 `join_pane_before_placement` gap**, which had recorded exactly the missing
 wrapper; its case is now 1943. `docs/BUGS.md` carries the write-ups.
+
+**Cases 1956–1960 came from a format-variable audit**, run the way the flag audit
+was: every name the C installs with `format_add()` in `vendor/tmux/*.c`, diffed
+against the whole corpus. 85 names, 39 of which no case had ever expanded — the
+`format_table[]` itself was already covered but for the two wall-clock entries.
+The uncovered names were not evenly spread; they are the ones that only exist in
+a scope no `display-message` can reach, which is exactly where drift hides.
+
+- **1956** takes the six `#{W:…}` loop variables and found the whole neighbour
+  block unported: `window_after_active`, `window_before_active`, the neighbour's
+  index and active flag under `next_`/`prev_`, and every `@`-prefixed window
+  option of that neighbour re-keyed under the same prefix
+  (`format.c:4825-4850`). All six expanded empty, and nothing else in the suite
+  could see it, because the names exist only inside the loop.
+- **1957** pins the five variables `list-keys` computes over the LISTING rather
+  than over a binding — `notes_only`, `key_has_repeat`, `key_repeat` and the two
+  column widths (`cmd-list-keys.c:236-240`). The widths are what the default
+  template pads with, and a CJK key is bound on purpose so a port measuring
+  bytes instead of columns shows up.
+- **1958** reads `copy_cursor_hyperlink` off the grid under the copy-mode cursor,
+  which is the one format that proves an OSC 8 id SURVIVED into the grid rather
+  than being parsed and dropped.
+- **1959** goes at the nine `mode_tree_*` variables. They drive exactly one
+  format — `MODE_TREE_PREFIX_FORMAT`, a compile-time constant (`mode-tree.c:43`)
+  — so no `-F` can read them and the only assertion available is the glyph
+  column each row is drawn with. Case 1508 never leaves the tree fully expanded
+  or reaches depth 2; this one collapses and re-expands under the cursor, puts
+  panes at depth 2 for the `#{R:}` indent and the `parent_last` riser, and adds
+  a flat list.
+- **1960** drives customize-mode's eight, through `-F` and through the `-f`
+  filter (which is expanded with the same tree, so it proves the names exist at
+  build time). It found the round's second defect, and the worse one: any key
+  pressed while a heading row is selected killed the server, because
+  `mode_tree_get_current` had been ported as returning `NonNull` when the C
+  returns `void *` that is NULL for every row added without itemdata. Since
+  `customize-mode` opens with the cursor on a heading, `customize-mode` then any
+  key was a one-step server kill. `docs/BUGS.md` carries both write-ups.
+
+Two harness notes came out of writing them. `send-keys -X` against a pane whose
+mode belongs to a client is refused with `not in a mode`, so a case that drives a
+mode has to send real keys to the client. And `grep` is the wrong tool for
+filtering a capture: `capture-pane | cat -v` on a screen full of box-drawing
+leaves bytes that are not valid UTF-8, and BSD grep in a UTF-8 locale then
+matches **nothing** — measured on one such capture, `grep -ac 'R|'` returns 0
+where `LC_ALL=C grep -ac 'R|'` and `perl -ne` both return 5. The runner exports
+`LC_ALL=C`, so a grep-filtered case passes in the suite while printing nothing
+when its author checks it by hand in their own shell. These cases filter with
+`perl -ne`, which is byte-oriented in either locale.
 
 **Case 1954 sweeps the choice LISTS whole.** Every `OPTIONS_TABLE_CHOICE`
 option, every name in its list, set and read back — 34 options and 137 names,
@@ -1052,7 +1112,7 @@ reddens CI merely because the gaps still exist. Should the directory ever empty 
 exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
 left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1643/1643 ported surface; they measure
+proof. These gaps do not count against the 1648/1648 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite

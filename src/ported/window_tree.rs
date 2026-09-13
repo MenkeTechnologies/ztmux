@@ -1603,7 +1603,11 @@ unsafe fn window_tree_kill_current_callback(
             return prompt_result::PROMPT_CLOSE;
         }
 
-        window_tree_kill_each(data.cast(), mode_tree_get_current(mtd), c, KEYC_NONE);
+        // Every window-tree row carries an itemdata (window-tree.c:296/351/410),
+        // so the C's possibly-NULL return is never NULL here.
+        if let Some(cur) = NonNull::new(mode_tree_get_current(mtd)) {
+            window_tree_kill_each(data.cast(), cur, c, KEYC_NONE);
+        }
         server_renumber_all();
 
         (*data.as_ptr()).references += 1;
@@ -1755,13 +1759,21 @@ unsafe fn window_tree_key(
         let mut nwl = None;
         let mut nwp = None;
 
-        let mut item: NonNull<window_tree_itemdata> = mode_tree_get_current((*data).data).cast();
+        // As above: a window-tree row always has itemdata, so this cannot be the
+        // NULL the C can return for a heading row in the other mode-tree users.
+        let Some(mut item) = NonNull::new(mode_tree_get_current((*data).data).cast::<window_tree_itemdata>())
+        else {
+            return;
+        };
 
         let mut finished = mode_tree_key((*data).data, c, &raw mut key, m, &raw mut x, &raw mut y);
 
         'again: loop {
             let new_item: NonNull<window_tree_itemdata> =
-                mode_tree_get_current((*data).data).cast();
+                match NonNull::new(mode_tree_get_current((*data).data).cast()) {
+                    Some(new_item) => new_item,
+                    None => return,
+                };
             if item != new_item {
                 item = new_item;
                 (*data).offset = 0;

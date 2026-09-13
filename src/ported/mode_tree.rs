@@ -343,21 +343,19 @@ pub unsafe fn mode_tree_down(mtd: *mut mode_tree_data, wrap: i32) -> bool {
 }
 
 /// C `vendor/tmux/mode-tree.c:431`: `void *mode_tree_get_current(struct mode_tree_data *mtd)`
-pub unsafe fn mode_tree_get_current(mtd: *mut mode_tree_data) -> NonNull<c_void> {
-    // C `mode-tree.c:433-434` returns NULL when `mtd->line_size == 0`. The Rust
-    // return type is `NonNull`, so a faithful null-return would require changing
-    // the signature to `Option<NonNull>` and updating all callers across
-    // window_customize.rs / window_client.rs / window_tree.rs / window_buffer.rs.
-    // Those callers cannot reach this on an empty list: mode_tree_up/down/key
-    // (mode-tree.c:367/385/1506) all short-circuit on `line_size == 0`, so
-    // `current` is only advanced when the list is non-empty. The debug assert
-    // pins that invariant instead of panicking silently via the index below.
-    debug_assert!(
-        !unsafe { (*mtd).line_list.is_empty() },
-        "mode_tree_get_current on empty line_list (C returns NULL here)"
-    );
-    NonNull::new(unsafe { (*(&mut (*mtd).line_list)[(*mtd).current as usize].item).itemdata })
-        .unwrap()
+pub unsafe fn mode_tree_get_current(mtd: *mut mode_tree_data) -> *mut c_void {
+    // C `mode-tree.c:433-436` returns `void *`, and it is NULL in TWO ways: the
+    // list is empty, or the selected line is a row that was added with no
+    // itemdata at all -- every category heading is (window-customize.c's
+    // "Server Options" and "Key Table - …", window-tree's session rows). Callers
+    // guard on NULL; returning NonNull and unwrapping turned "a key pressed on a
+    // heading row" into a server panic.
+    unsafe {
+        if (*mtd).line_list.is_empty() {
+            return null_mut();
+        }
+        (*(&mut (*mtd).line_list)[(*mtd).current as usize].item).itemdata
+    }
 }
 
 /// C `vendor/tmux/mode-tree.c:439`: `const char *mode_tree_get_current_name(struct mode_tree_data *mtd)`
