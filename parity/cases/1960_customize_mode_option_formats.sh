@@ -39,7 +39,7 @@ wait_mode() {   # $1 = expected mode name, or "" for no mode
   local want="$1" i=0 got
   while [ $i -lt 100 ]; do
     got=$($BIN -L "$ISOCK" display-message -p -t alpha:one '#{pane_mode}' 2>/dev/null)
-    [ "$got" = "$want" ] && { sleep 0.4; return 0; }
+    [ "$got" = "$want" ] && { sleep 0.2; return 0; }
     i=$((i+1)); sleep 0.1
   done
   echo "wait_mode: timed out waiting for [$want], last=[$got]"
@@ -58,8 +58,8 @@ show() { # show <filter> <format> [extra keys to press before reading]
   # M-+ expands the TOP-LEVEL nodes only -- mode-tree.c:1761 walks mtd->children,
   # not the whole tree -- so a row nested deeper needs its own keys.
   $TM send-keys -t client M-+
-  sleep 0.8
-  for k in "$@"; do $TM send-keys -t client "$k"; sleep 0.4; done
+  sleep 0.2
+  for k in "$@"; do $TM send-keys -t client "$k"; sleep 0.2; done
   # Fence on the rows appearing rather than sleeping a fixed amount: every pass
   # here expects at least one row, and under suite load the client's repaint can
   # land after any sleep short enough to be worth waiting.
@@ -71,7 +71,18 @@ show() { # show <filter> <format> [extra keys to press before reading]
 }
 
 $TM new-window -d -n client "$BIN -L $ISOCK attach -t alpha"
-sleep 2
+# Wait for the inner client to be attached instead of sleeping a fixed two
+# seconds: every case here must finish inside the runner's 15s budget
+# (run_parity.sh:172), and a blind sleep spends an eighth of it doing nothing.
+wait_client() {
+  local i=0
+  while [ $i -lt 300 ]; do
+    [ -n "$($BIN -L "$ISOCK" list-clients -F "#{client_tty}" 2>/dev/null)" ] && { sleep 0.2; return 0; }
+    i=$((i+1)); sleep 0.05
+  done
+  echo "wait_client: TIMEOUT"
+}
+wait_client
 
 echo "== a global option with a unit, and the server option that shares its name =="
 show '#{m:*history-limit*,#{option_name}}' \

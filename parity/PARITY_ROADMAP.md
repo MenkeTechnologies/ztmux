@@ -113,12 +113,12 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1636/1636 gated cases pass (100%) vs the vendored tmux, with 12 quarantined and two known
+**1643/1643 gated cases pass (100%) vs the vendored tmux, with 12 quarantined and two known
 divergences recorded as gaps.** Last measured 2026-09-13 against ztmux v3.7.47 and tmux
-next-3.7: `1636/1636 passed (100.00%) · failed 0 · quarantined 12 (0 failing)`, 1648 case files
+next-3.7: `1643/1643 passed (100.00%) · failed 0 · quarantined 12 (0 failing)`, 1655 case files
 in all — the 12 quarantined ones matched on this macOS run too, and are held out of the gate
 only for a divergence that appears on the Linux CI runner. The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 → 1641 → 1643 → 1648 cases.
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 → 1641 → 1643 → 1648 → 1655 cases.
 
 **Cases 1926–1945 came from a flag audit.** Every `.args` string in
 `vendor/tmux/cmd-*.c` was diffed against the whole corpus, which named 107 flag
@@ -134,6 +134,52 @@ writes 3 into an option this tree only had three names for. Porting
 `layout_get_tiled_cell` (`layout.c:1593`) for the first two also **closed the
 `join_pane_before_placement` gap**, which had recorded exactly the missing
 wrapper; its case is now 1943. `docs/BUGS.md` carries the write-ups.
+
+**Cases 1961–1967 finish that audit.** What was left after 1956–1960 were the
+twelve names that need a real client *and* something a command line cannot
+produce — a menu being placed, a prompt being typed into, a mouse button going
+down — plus the three that live in a template with no `-F`. All of them now have
+a case, and the audit's uncovered list is empty.
+
+- **1961 / 1964** place a menu with `popup_width`, `popup_height`,
+  `popup_status_line_y` and the two `popup_window_status_line_*`
+  (`cmd-display-menu.c:139-177`). Nothing else expands these — menu item text
+  goes through a fresh format tree (`menu.c:89-92`) — so the assertion is where
+  the box LANDED, read off the drawn screen. The status ones are walked through
+  both status positions, two status lines, and `status-justify centre`, because
+  the row is computed one way from the top and another from the bottom.
+- **1963 / 1966** do the same for the six `popup_mouse_*`, which need
+  `event->m.valid`. The mouse event is injected as the bytes a terminal sends —
+  an SGR press written into the pane the inner client is reading, with
+  `send-keys -H` — which that client's tty parser turns into a real event. Each
+  variable is a signed subtraction with a clamp on one side, so every pass
+  clicks once where the clamp does not fire and once where it does.
+- **1962 / 1965** take `prompt_input` and `prompt_flags` (`prompt.c:383-386`) by
+  setting `message-format` to print them instead of the message, so the status
+  line reads back the values. `prompt_input` is checked keystroke by keystroke,
+  and each `command-prompt` flag has to land on the right bit of
+  `prompt_flags_to_string`. `COMMANDMODE` is reached the only way it can be:
+  Escape in an open prompt under vi `status-keys`, which is also the only thing
+  `#{command_prompt}` is 1 for.
+- **1967** masks only the DIGITS out of `show-messages`, where case 1821 masked
+  each line down to one token. That keeps `#{t/p:message_time}`'s %H:%M shape,
+  the template's `": "`, and the logged command text comparable, which is as
+  close as the three `message_*` variables can be reached: show-messages takes
+  no `-F` and expands one compile-time template.
+
+**Every case has 15 seconds, and the client cases were over it.** `run_parity.sh`
+and `verify_one.sh` both run a case under `timeout 15`
+(`run_parity.sh:172`, `verify_one.sh:31`), and a case that overruns is not
+reported as slow — its output is simply cut where the timeout hit. Two ways that
+lies: cut at the same point in both binaries, it passes while proving nothing;
+cut at different points, it fails with a diff that has nothing to do with the
+port. The first drafts of these cases ran 8-13s each and 1963 hit exactly the
+second case — a FAIL whose "divergence" was the reference being a second slower.
+Three fixes, and they are the pattern for any future client case: fence on the
+client being attached rather than `sleep 2`; settle on the ONE thing the case
+reads rather than on two full 24-row captures; and when the passes still do not
+fit, SPLIT the case rather than dropping passes (1961/1964, 1962/1965,
+1963/1966 are three such splits). All seven now run in 3-7s.
 
 **Cases 1956–1960 came from a format-variable audit**, run the way the flag audit
 was: every name the C installs with `format_add()` in `vendor/tmux/*.c`, diffed
@@ -1112,7 +1158,7 @@ reddens CI merely because the gaps still exist. Should the directory ever empty 
 exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
 left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1648/1648 ported surface; they measure
+proof. These gaps do not count against the 1655/1655 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite

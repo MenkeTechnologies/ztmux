@@ -44,7 +44,7 @@ wait_mode() {   # $1 = expected mode name, or "" for no mode
   local want="$1" i=0 got
   while [ $i -lt 100 ]; do
     got=$($BIN -L "$ISOCK" display-message -p -t alpha:one '#{pane_mode}' 2>/dev/null)
-    [ "$got" = "$want" ] && { sleep 0.4; return 0; }
+    [ "$got" = "$want" ] && { sleep 0.2; return 0; }
     i=$((i+1)); sleep 0.1
   done
   echo "wait_mode: timed out waiting for [$want], last=[$got]"
@@ -64,7 +64,18 @@ rows()  { $TM capture-pane -p -t client    | cat -v | perl -ne 'print if /^\(/' 
 erows() { $TM capture-pane -p -e -t client | cat -v | perl -ne 'print if /\(/' | scrub | trim | sed -n "1,${1:-3}p"; }
 
 $TM new-window -d -n client "$BIN -L $ISOCK attach -t alpha"
-sleep 2
+# Wait for the inner client to be attached instead of sleeping a fixed two
+# seconds: every case here must finish inside the runner's 15s budget
+# (run_parity.sh:172), and a blind sleep spends an eighth of it doing nothing.
+wait_client() {
+  local i=0
+  while [ $i -lt 300 ]; do
+    [ -n "$($BIN -L "$ISOCK" list-clients -F "#{client_tty}" 2>/dev/null)" ] && { sleep 0.2; return 0; }
+    i=$((i+1)); sleep 0.05
+  done
+  echo "wait_client: TIMEOUT"
+}
+wait_client
 
 echo "== sessions, windows and panes: depth 0, 1 and 2 =="
 $BIN -L "$ISOCK" choose-tree -N -t alpha:one
@@ -76,18 +87,18 @@ erows 2
 
 echo "== collapse the row under the cursor: + replaces -, children go away =="
 $TM send-keys -t client Left
-sleep 0.6
+sleep 0.3
 rows 6
 
 echo "== and expanding it again restores them =="
 $TM send-keys -t client Right
-sleep 0.6
+sleep 0.3
 rows 6
 
 echo "== the selection moves down two rows =="
 $TM send-keys -t client Down
 $TM send-keys -t client Down
-sleep 0.6
+sleep 0.3
 erows 4
 
 $TM send-keys -t client q
