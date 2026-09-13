@@ -8,7 +8,7 @@
 //!   store/  name@version/     # one extracted copy per (name, version)
 //!   cache/                    # download scratch
 //!   git/                      # git clones
-//!   bin/                      # launcher symlinks (future)
+//!   bin/                      # the `tmux` shim script plugins run with
 //!   installed.toml            # the global install index (source of truth)
 //! ```
 //! Human-readable `name@version` paths give reproducibility from the index's
@@ -62,7 +62,8 @@ impl Store {
     pub(crate) fn git_dir(&self) -> PathBuf {
         self.root.join("git")
     }
-    /// `bin/` — launcher links.
+    /// `bin/` — holds the `tmux` shim a script plugin's `PATH` is pointed at,
+    /// written by [`Store::ensure_tmux_shim`].
     pub(crate) fn bin_dir(&self) -> PathBuf {
         self.root.join("bin")
     }
