@@ -273,16 +273,28 @@ Beyond the port, ztmux adds original subcommands with no upstream counterpart, u
 from the anti-drift gate (`[0x05]`) — precisely because they are *not* tmux. Each is either a
 read-only query over the running server (built on the same structured `list-* -o json`
 output) or a small mutating helper, and every one accepts `-o json` / `--json` for scripting.
+There are **114** today — `ztmux verbs` lists every one with its description, and `man ztmux`
+documents each under EXTENSIONS.
 
 They fall into a few families:
 
 - **Inspection** — one-shot, pipeable views of the live server: process tables (`ps`,
-  `pstree`, `mem`, `state`, `elapsed`), geometry (`size`, `density`, `layouts`, `solo`),
-  directories and repositories (`cwd`, `project`, `git`, `remote`, `ahead`, `changes`,
-  `stash`, `commit`, `conflicts`, `vcs`, `worktree`, `submodules`, `gone`), network (`ssh`,
-  `net`, `ports`), clients (`who`, `readonly`, `idle`, `viewers`, `connected`, `constrain`,
-  `keytable`, `control`, `utf8`), and configuration (`hooks`, `keys`, `monitor`, `remain`,
-  `sync`, `limit`, `visual`, `mouse`, …).
+  `pstree`, `mem`, `state`, `elapsed`, `cmd`, `startcmd`, `nested`, `tty`), geometry (`size`,
+  `density`, `layouts`, `solo`, `zoom`, `winsize`), directories and repositories (`cwd`,
+  `project`, `git`, `remote`, `ahead`, `changes`, `stash`, `commit`, `conflicts`, `vcs`,
+  `worktree`, `submodules`, `gone`, `tag`, `dedup`, `writable`), network (`ssh`, `net`,
+  `ports`), clients (`who`, `readonly`, `idle`, `viewers`, `connected`, `constrain`,
+  `keytable`, `control`, `utf8`), sessions and windows (`age`, `fanout`, `groups`, `linked`,
+  `alerts`, `marks`, `env`, `destroy`, `autolock`, `autoname`, `titlebar`), and
+  configuration (`hooks`, `keys`, `monitor`, `remain`, `sync`, `limit`, `visual`, `mouse`).
+- **Pane contents** — reading what the panes actually hold: `peek` (every pane's visible
+  screen under a header), `grep` (the lines matching a pattern), `finder` (panes whose
+  command, path or title match), `info` (everything about one resolved pane), `titles` (what
+  each program advertised), `history` (panes ranked by scrollback held) and `piped` (panes
+  whose output is teed to a command).
+- **Summaries and streams** — `stats` (one-shot server rollup), `graph` (the
+  session→window→pane tree as DOT/Mermaid/HTML) and `events` (server lifecycle changes as
+  newline-delimited JSON, for a watcher).
 - **Live TUIs** — `dashboard` (full-screen server monitor), `switcher` (fuzzy session/window/
   pane picker), `watch` (top-like per-pane process monitor).
 - **Discovery** — `verbs [filter]` lists every verb ztmux answers to (ported commands, aliases,
