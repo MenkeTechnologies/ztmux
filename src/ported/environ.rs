@@ -287,6 +287,18 @@ pub unsafe fn environ_for_session(s: *mut session, no_term: c_int) -> *mut envir
                 "{}",
                 getversion()
             );
+            // environ.c:269. Without this a pane's own client finds no
+            // COLORTERM, tty_term_create's COLORTERM check (tty-term.c:608-617)
+            // never adds the RGB feature, and every theme colour a nested
+            // server resolves lands on the 8-colour arm of the dark-theme-*
+            // defaults -- ^[[32m where the reference emits 38;2;154;205;50.
+            environ_set!(
+                env,
+                c!("COLORTERM"),
+                environ_flags::empty(),
+                "{}",
+                "truecolor"
+            );
         }
 
         #[cfg(feature = "systemd")]
