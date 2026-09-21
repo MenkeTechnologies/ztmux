@@ -36,7 +36,25 @@ on every run; a divergence prints as `QUARANTINED-FAIL`, its full diff lands in
 the JSON (`quarantined`, `quarantined_failing`, with `passed + failed + quarantined ==
 total`). The percentage is of the gated set, so the headline can never read better than the
 tree is. When a quarantined case starts matching, the runner says `QUARANTINED-OK` and names
-the file to delete the line from.
+the file to delete the line from. It is empty right now.
+
+**Closed: theme colours resolved to terminal ANSI on Linux (2026-09-21).** Twelve render
+cases were quarantined from 2026-08-24 because they matched on macOS and failed on the
+ubuntu-latest runner, every diff the same shape — the reference emitting the RGB form of a
+theme colour (`\033[38;2;154;205;50m`) where ztmux emitted the terminal ANSI one (`\033[42m`).
+A thirteenth, 1959, later landed in the gate with the same diff and turned CI red.
+
+The cause was one missing line in `environ_for_session`
+(`src/ported/environ.rs`): the C sets `COLORTERM=truecolor` in a pane's environment
+(`vendor/tmux/environ.c:269`), alongside the `TERM`, `TERM_PROGRAM` and
+`TERM_PROGRAM_VERSION` the port already set. On Linux the `tmux-256color` terminfo carries
+`colors#0x100` and neither `Tc` nor `RGB`, so the `COLORTERM` check at
+`vendor/tmux/tty-term.c:608-617` is the only route to the RGB feature. Without it a nested
+server's client came up with `term->flags == 0x20` (VT100LIKE alone, no `TERM_256COLOURS`,
+no `TERM_RGBCOLOURS`), so `#{client_colours}` answered below 256 and every `dark-theme-*`
+default took its 8-colour arm. `server_client_update_theme_colours` runs once, at
+`server-client.c:369`, so the wrong value stuck for the life of the client. macOS never saw
+it because the desktop terminal exports `COLORTERM` itself and the pane inherited it.
 
 ```sh
 bash parity/run_parity.sh                            # honours parity/quarantine.txt
@@ -113,12 +131,12 @@ releases and the tmux version ztmux was ported from).
 
 ## Status
 
-**1643/1643 gated cases pass (100%) vs the vendored tmux, with 12 quarantined and two known
-divergences recorded as gaps.** Last measured 2026-09-13 against ztmux v3.7.47 and tmux
-next-3.7: `1643/1643 passed (100.00%) · failed 0 · quarantined 12 (0 failing)`, 1655 case files
-in all — the 12 quarantined ones matched on this macOS run too, and are held out of the gate
-only for a divergence that appears on the Linux CI runner. The
-suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 → 1641 → 1643 → 1648 → 1655 cases.
+**1656/1656 gated cases pass (100%) vs the vendored tmux, with nothing quarantined and two
+known divergences recorded as gaps.** Last measured 2026-09-21 against ztmux v3.7.47 and
+tmux next-3.7: `1656/1656 passed (100.00%) · failed 0`, 1656 case files in all — the twelve
+that had been held out of the gate for a Linux-only divergence were root-caused and now gate
+with the rest (see the quarantine section). The
+suite grew from 122 → 380 → 646 → 661 → 665 → 675 → 680 → 684 → 686 → 689 → 774 → 840 → 900 → 1080 → 1107 → 1115 → 1121 → 1123 → 1130 → 1134 → 1166 → 1173 → 1178 → 1180 → 1183 → 1188 → 1193 → 1194 → 1201 → 1203 → 1205 → 1207 → 1240 → 1244 → 1245 → 1251 → 1254 → 1339 → 1365 → 1389 → 1405 → 1417 → 1426 → 1433 → 1446 → 1452 → 1480 → 1495 → 1525 → 1598 → 1613 → 1618 → 1630 → 1633 → 1641 → 1643 → 1648 → 1655 → 1656 cases.
 
 **Cases 1926–1945 came from a flag audit.** Every `.args` string in
 `vendor/tmux/cmd-*.c` was diffed against the whole corpus, which named 107 flag
@@ -1158,7 +1176,7 @@ reddens CI merely because the gaps still exist. Should the directory ever empty 
 exits 2 with `no cases in parity/known_gaps/*.sh`; the script is deliberately
 left as-is rather than taught to treat "nothing to measure" as success. See
 [`parity/known_gaps/README.md`](known_gaps/README.md) for the full inventory and
-proof. These gaps do not count against the 1655/1655 ported surface; they measure
+proof. These gaps do not count against the 1656/1656 ported surface; they measure
 the unbuilt surface beyond it.
 
 ## Growing the suite
