@@ -22,7 +22,7 @@ to Rust; where behavior is unspecified here it follows upstream
 .BR tmux (1).
 .SH 1. INVOCATION
 .B ztmux
-.RB [ \-2CDlNuVv ]
+.RB [ \-2CDhlNquVv ]
 .RB [ \-c
 .IR shell-command ]
 .RB [ \-f
@@ -89,10 +89,14 @@ servers on the same host. Override the socket with
 .B \-L
 (name) or
 .B \-S
-(full path). Without either flag ztmux always resolves its own socket and never
-adopts one from
-.BR $TMUX ,
-so running it inside a real tmux pane cannot connect it to that tmux server. It
+(full path). Without either flag ztmux adopts the socket named by
+.B $TMUX
+only when that socket lives in a
+.RI ztmux- UID
+directory, so running it inside a real tmux pane cannot connect it to that tmux
+server (a
+.RI tmux- UID
+socket is ignored); otherwise it uses its own default socket. It
 still exports
 .B $TMUX
 to its own panes, pointed at its own socket, because the surrounding ecosystem

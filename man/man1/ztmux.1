@@ -3,7 +3,7 @@
 ztmux \- terminal multiplexer, a from-source Rust port of tmux
 .SH SYNOPSIS
 .B ztmux
-.RB [ \-2CDlNquvV ]
+.RB [ \-2CDhlNquvV ]
 .RB [ \-c
 .IR shell-command ]
 .RB [ \-f
@@ -1031,8 +1031,8 @@ runtime conventions so existing configuration and tooling keep working:
 .RS
 .IP \(bu 2
 the client and server speak tmux's wire protocol over a socket kept under
-.IR $TMUX_TMPDIR / tmux- UID / (default
-.IR /tmp/tmux- UID /);
+.IR $TMUX_TMPDIR /ztmux- UID / (default
+.IR /tmp/ztmux- UID /);
 .IP \(bu 2
 configuration is read from the tmux search path (see
 .B FILES
@@ -1076,6 +1076,9 @@ using the default shell and exit.
 Specify an alternative configuration
 .IR file .
 .TP
+.BR \-h " or " \-\-help
+Print the ztmux help screen and exit.
+.TP
 .B \-l
 Behave as a login shell.
 .TP
@@ -1091,8 +1094,7 @@ socket directory rather than the default
 Do not start the server even if the command would normally do so.
 .TP
 .B \-q
-Suppress the printing of "no server running" style informational messages
-where applicable.
+Accepted for compatibility with tmux and ignored.
 .TP
 .BR \-S " " \fIsocket-path\fP
 Specify a full alternative path to the server socket.
@@ -1119,7 +1121,10 @@ select a tmux command (for example
 .BR new-session ", " list-sessions ", or " split-window )
 and its options. With no command,
 .B ztmux
-attaches to the most recently used session, creating one if none exists.
+runs the
+.B default\-client\-command
+server option, which defaults to
+.BR new\-session .
 .SH EXTENSIONS
 The following capabilities are original to
 .B ztmux
@@ -3554,10 +3559,6 @@ Directory under which the per-user socket directory
 is created; defaults to
 .IR /tmp .
 .TP
-.B TMUX_CONF
-Colon-separated list of configuration file paths overriding the default
-search path.
-.TP
 .B EDITOR
 .TQ
 .B VISUAL
@@ -3627,6 +3628,9 @@ Default per-user configuration file. The full default search path is
 .IR $XDG_CONFIG_HOME/tmux/tmux.conf ,
 and
 .IR ~/.config/tmux/tmux.conf .
+The search path is fixed at build time (the
+.B TMUX_CONF
+build environment variable); it is not read from the environment at run time.
 .SH SEE ALSO
 .BR tmux (1)
 .PP
