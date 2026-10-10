@@ -1,12 +1,3 @@
-```text
-███████╗████████╗███╗   ███╗██╗   ██╗██╗  ██╗
-╚══███╔╝╚══██╔══╝████╗ ████║██║   ██║╚██╗██╔╝
-  ███╔╝    ██║   ██╔████╔██║██║   ██║ ╚███╔╝
- ███╔╝     ██║   ██║╚██╔╝██║██║   ██║ ██╔██╗
-███████╗   ██║   ██║ ╚═╝ ██║╚██████╔╝██╔╝ ██╗
-╚══════╝   ╚═╝   ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝
-```
-
 <p align="center"><img src="docs/logo.png" alt="ztmux" width="640"></p>
 
 [![CI](https://github.com/MenkeTechnologies/ztmux/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/ztmux/actions/workflows/ci.yml)
