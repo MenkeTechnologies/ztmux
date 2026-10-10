@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-label="ztmux">
+  <defs>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="-400" y="-400" width="2400" height="1600">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="scan" width="8" height="8" patternUnits="userSpaceOnUse">
+      <rect width="8" height="3" fill="#000" opacity="0.28"/>
+    </pattern>
+  </defs>
+  <defs>
+    <g id="wm" fill="none" stroke-width="9" stroke-linejoin="miter" stroke-linecap="butt">
+      <path d="M4 22 H38 L4 54 H38"/>
+      <path transform="translate(52 0)" d="M22 4 V48 L28 54 H38 M6 22 H38"/>
+      <path transform="translate(104 0)" d="M5 54 V22 M5 28 L11 22 H17 L21 28 V54 M21 28 L27 22 H33 L37 28 V54"/>
+      <path transform="translate(156 0)" d="M5 22 V48 L11 54 H31 L37 48 V22"/>
+      <path transform="translate(208 0)" d="M6 22 L36 54 M36 22 L6 54"/>
+    </g>
+  </defs>
+  <rect width="1200" height="360" fill="#05050a"/>
+  <polygon points="0,355 1200,355 1200,360 0,360" fill="#d300c5"/>
+  <g transform="translate(30 30) scale(0.5859)">
+    <polygon points="16,72 72,16 496,16 496,440 440,496 16,496" fill="#0a0a14" stroke="#05d9e8" stroke-width="6"/>
+    <polygon points="34,78 78,34 478,34 478,434 434,478 34,478" fill="none" stroke="#d300c5" stroke-width="2" opacity="0.7"/>
+    <polygon points="112,150 384,150 384,196 272,196 272,386 224,386 224,196 112,196" fill="#d300c5" opacity="0.85"/>
+    <g filter="url(#glow)">
+      <polygon points="120,130 392,130 392,176 280,176 280,366 232,366 232,176 120,176" fill="#05d9e8"/>
+    </g>
+    <polygon points="320,318 396,318 396,366 320,366" fill="#ff2a6d" filter="url(#glow)"/>
+    <rect x="34" y="34" width="444" height="444" fill="url(#scan)"/>
+    <polygon points="34,414 478,414 478,434 434,478 34,478" fill="#ff2a6d" opacity="0.92"/>
+    <rect x="52" y="428" width="44" height="34" fill="#05050a"/>
+    <rect x="108" y="428" width="44" height="34" fill="#0a0a14"/>
+    <rect x="164" y="428" width="44" height="34" fill="#0a0a14"/>
+  </g>
+  <g transform="translate(400 86) scale(2.7)">
+    <use href="#wm" transform="translate(-3 2)" stroke="#d300c5"/>
+    <g filter="url(#glow)"><use href="#wm" stroke="#05d9e8" opacity="0.55"/></g>
+    <use href="#wm" stroke="#e0f0ff"/>
+    <rect x="262" y="40" width="26" height="14" fill="#ff2a6d" filter="url(#glow)"/>
+  </g>
+</svg>
