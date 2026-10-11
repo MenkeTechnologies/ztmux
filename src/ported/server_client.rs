@@ -4342,7 +4342,11 @@ pub unsafe fn server_client_dispatch(imsg: *mut imsg, arg: *mut c_void) {
 
         let datalen = ((*imsg).hdr.len - IMSG_HEADER_SIZE as u32) as u16;
 
-        match msgtype::try_from((*imsg).hdr.type_).expect("unexpected msgtype") {
+        // C switch has no default: a message type this build does not know is ignored.
+        let Ok(type_) = msgtype::try_from((*imsg).hdr.type_) else {
+            return;
+        };
+        match type_ {
             msgtype::MSG_IDENTIFY_CLIENTPID
             | msgtype::MSG_IDENTIFY_CWD
             | msgtype::MSG_IDENTIFY_ENVIRON
@@ -4571,7 +4575,7 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
                     fatalx("bad MSG_IDENTIFY_FLAGS size");
                 }
                 memcpy__(&raw mut flags, data.cast());
-                (*c).flags |= client_flag::from_bits(flags as u64).expect("invalid identify flags");
+                (*c).flags |= client_flag::from_bits_retain(flags as u64);
                 // log_debug("client %p IDENTIFY_FLAGS %#x", c, flags);
             }
             msgtype::MSG_IDENTIFY_LONGFLAGS => {
@@ -4579,8 +4583,7 @@ pub unsafe fn server_client_dispatch_identify(c: *mut client, imsg: *mut imsg) {
                     fatalx("bad MSG_IDENTIFY_LONGFLAGS size");
                 }
                 memcpy__(&raw mut longflags, data.cast());
-                (*c).flags |=
-                    client_flag::from_bits(longflags).expect("invalid identify longflags");
+                (*c).flags |= client_flag::from_bits_retain(longflags);
                 // log_debug("client %p IDENTIFY_LONGFLAGS %#llx", c, (unsigned long long)longflags);
             }
             msgtype::MSG_IDENTIFY_TERM => {
