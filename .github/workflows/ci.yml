@@ -93,9 +93,10 @@ jobs:
   # pipeline goes red (see parity/PARITY_ROADMAP.md).
   #
   # parity/quarantine.txt lists cases that still RUN and are still diffed here
-  # but do not gate — today, twelve render cases that pass on macOS and fail on
+  # but do not gate. It has held render cases that pass on macOS and fail on
   # this runner because the default theme colours resolve to terminal ANSI
-  # instead of RGB. They are not skipped: a divergence prints as
+  # instead of RGB, and is empty when nothing is quarantined. Quarantined cases
+  # are not skipped: a divergence prints as
   # QUARANTINED-FAIL, lands in the uploaded log, and is counted on the summary
   # line, so the count cannot quietly grow. The file says which and why.
   parity:
