@@ -49,8 +49,6 @@
 //!
 //! ztmux divergences from the C, all structural rather than behavioural:
 //!
-//! * ztmux has no per-pane prompt line, so `redraw_draw_pane_prompt` has no
-//!   counterpart here.
 //! * The build grid is a `Vec` owned by the build context rather than the C's
 //!   reused file-static buffer. Scenes are cached, so a build is rare.
 
