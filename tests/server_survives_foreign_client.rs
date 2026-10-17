@@ -41,9 +41,12 @@ fn server_alive(sock: &str) -> bool {
 /// Boot a server and return its socket path as the server itself reports it.
 fn boot(sock: &str) -> String {
     assert!(
-        ztmux(sock, &["-f", "/dev/null", "new-session", "-d", "-s", "base"])
-            .status
-            .success(),
+        ztmux(
+            sock,
+            &["-f", "/dev/null", "new-session", "-d", "-s", "base"]
+        )
+        .status
+        .success(),
         "could not start a server on socket {sock}"
     );
     let out = ztmux(sock, &["display-message", "-p", "#{socket_path}"]);
@@ -68,12 +71,19 @@ fn assert_survives(tag: &str, msgtype: u32, data: &[u8]) {
     send_imsg(&path, msgtype, data);
     let alive = server_alive(&sock);
     let _ = ztmux(&sock, &["kill-server"]);
-    assert!(alive, "server died after msgtype {msgtype} payload {data:?}");
+    assert!(
+        alive,
+        "server died after msgtype {msgtype} payload {data:?}"
+    );
 }
 
 #[test]
 fn identify_longflags_with_an_unknown_bit_is_kept_not_fatal() {
-    assert_survives("longflags", MSG_IDENTIFY_LONGFLAGS, &(1u64 << 63).to_ne_bytes());
+    assert_survives(
+        "longflags",
+        MSG_IDENTIFY_LONGFLAGS,
+        &(1u64 << 63).to_ne_bytes(),
+    );
 }
 
 #[test]
