@@ -61,6 +61,34 @@ both binaries, zero divergences.
   than as reproduced defects; the bit positions are left free in `tty_flags`
   with a comment naming what belongs there.
 
+## 2026-10-22
+
+### Scrolling in nvim froze the middle of the window
+
+- **Symptom:** a mouse-wheel scroll in nvim moved only the top row and the rows
+  nvim repainted; everything between stayed as it was. The grid was right
+  (`capture-pane` on the server showed the scrolled text) — only what the client
+  painted was stale.
+- **Cause:** nvim scrolls inside a synchronized-output block (`ESC[?2026h` …
+  `ESC[?2026l`): set the region above the statusline, `DL`/`IL` inside it,
+  repaint the rows that scrolled in. During the block nothing is drawn; each
+  operation records the rows it touched in the pane's `sync_dirty` bitmap and
+  `screen_write_stop_sync` redraws those rows when it ends. The C marks the whole
+  affected range for every multi-row operation (`screen_write_should_draw_lines`
+  at `screen-write.c:1330`, `:1494`, `:1521`, `:1563`, `:1591`, `:1745`, `:1881`).
+  The port called the single-row form with the cursor row at all seven sites
+  (alignment test, both `insertline` paths, both `deleteline` paths,
+  `reverseindex`, `scrolldown`), so the rows a scroll shifted were never redrawn.
+- **Also:** the three clear-screen functions had no draw gate at all and wrote
+  to the tty mid-block. They now gate like the C (`screen-write.c:1934`, `:2009`,
+  `:2082`). `screen_write_clearscreen` deliberately marks `0..sy` where the C
+  marks `s->cy..sy`: the whole screen was cleared, and the C range leaves the rows
+  above the cursor stale when a block clears with the cursor off the top row.
+- **Pinned by** `parity/cases/1969_sync_output_scroll_region_render.sh`: DL, SU,
+  LF at the region bottom, IL and RI, each in its own sync block, read back as
+  the attached client painted them. It fails on the previous build with the
+  frozen-middle picture and matches the reference on this one.
+
 ## 2026-09-13 (the format-variable audit)
 
 Every name the C installs with `format_add()` was diffed against the whole case

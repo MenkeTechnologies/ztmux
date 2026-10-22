@@ -1527,7 +1527,7 @@ pub unsafe fn screen_write_alignmenttest(ctx: *mut screen_write_ctx) {
         screen_write_initctx(ctx, &raw mut ttyctx, 1);
 
         screen_write_collect_clear(ctx, 0, screen_size_y(s) - 1);
-        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        if !screen_write_should_draw_lines(ctx, 0, screen_size_y(s)) {
         } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
@@ -1706,7 +1706,7 @@ pub unsafe fn screen_write_insertline(ctx: *mut screen_write_ctx, mut ny: u32, b
 
             screen_write_collect_flush(ctx, 0, "screen_write_insertline");
             ttyctx.num = ny;
-            if !screen_write_should_draw_line(ctx, (*s).cy) {
+            if !screen_write_should_draw_lines(ctx, (*s).cy, screen_size_y(s) - (*s).cy) {
             } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
                 screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
@@ -1734,7 +1734,7 @@ pub unsafe fn screen_write_insertline(ctx: *mut screen_write_ctx, mut ny: u32, b
         screen_write_collect_flush(ctx, 0, "screen_write_insertline");
 
         ttyctx.num = ny;
-        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        if !screen_write_should_draw_lines(ctx, (*s).cy, (*s).rlower + 1 - (*s).cy) {
         } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
@@ -1778,7 +1778,7 @@ pub unsafe fn screen_write_deleteline(ctx: *mut screen_write_ctx, mut ny: u32, b
 
             screen_write_collect_flush(ctx, 0, "screen_write_deleteline");
             ttyctx.num = ny;
-            if !screen_write_should_draw_line(ctx, (*s).cy) {
+            if !screen_write_should_draw_lines(ctx, (*s).rupper, (*s).rlower + 1 - (*s).rupper) {
             } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
                 screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
@@ -1805,7 +1805,7 @@ pub unsafe fn screen_write_deleteline(ctx: *mut screen_write_ctx, mut ny: u32, b
 
         screen_write_collect_flush(ctx, 0, "screen_write_deleteline");
         ttyctx.num = ny;
-        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        if !screen_write_should_draw_lines(ctx, (*s).cy, (*s).rlower + 1 - (*s).cy) {
         } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
@@ -1988,7 +1988,7 @@ pub unsafe fn screen_write_reverseindex(ctx: *mut screen_write_ctx, bg: u32) {
             screen_write_initctx(ctx, &raw mut ttyctx, 1);
             ttyctx.bg = bg;
 
-            if !screen_write_should_draw_line(ctx, (*s).cy) {
+            if !screen_write_should_draw_lines(ctx, (*s).rupper, (*s).rlower + 1 - (*s).rupper) {
             } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
                 screen_write_redraw_pane(ctx, &raw mut ttyctx);
             } else {
@@ -2142,7 +2142,7 @@ pub unsafe fn screen_write_scrolldown(ctx: *mut screen_write_ctx, mut lines: u32
 
         screen_write_collect_flush(ctx, 0, "screen_write_scrolldown");
         ttyctx.num = lines;
-        if !screen_write_should_draw_line(ctx, (*s).cy) {
+        if !screen_write_should_draw_lines(ctx, (*s).rupper, (*s).rlower + 1 - (*s).rupper) {
         } else if screen_write_pane_is_obscured(ctx) && !(*ctx).wp.is_null() {
             screen_write_redraw_pane(ctx, &raw mut ttyctx);
         } else {
@@ -2197,6 +2197,9 @@ pub unsafe fn screen_write_clearendofscreen(ctx: *mut screen_write_ctx, bg: u32)
         screen_write_collect_clear(ctx, (*s).cy + 1, sy - ((*s).cy + 1));
         screen_write_collect_flush(ctx, 0, "screen_write_clearendofscreen");
 
+        if !screen_write_should_draw_lines(ctx, (*s).cy, sy - (*s).cy) {
+            return;
+        }
         if !screen_write_pane_is_obscured(ctx) {
             tty_write(tty_cmd_clearendofscreen, &raw mut ttyctx);
             return;
@@ -2281,6 +2284,9 @@ pub unsafe fn screen_write_clearstartofscreen(ctx: *mut screen_write_ctx, bg: u3
         screen_write_collect_clear(ctx, 0, (*s).cy);
         screen_write_collect_flush(ctx, 0, "screen_write_clearstartofscreen");
 
+        if !screen_write_should_draw_lines(ctx, 0, (*s).cy + 1) {
+            return;
+        }
         if !screen_write_pane_is_obscured(ctx) {
             tty_write(tty_cmd_clearstartofscreen, &raw mut ttyctx);
             return;
@@ -2357,6 +2363,12 @@ pub unsafe fn screen_write_clearscreen(ctx: *mut screen_write_ctx, bg: u32) {
 
         screen_write_collect_clear(ctx, 0, sy);
 
+        // C marks only s->cy..sy here (screen-write.c:2082), but the whole
+        // screen was cleared: a sync block that clears with the cursor below
+        // the top row would leave the rows above it stale on the client.
+        if !screen_write_should_draw_lines(ctx, 0, sy) {
+            return;
+        }
         if !screen_write_pane_is_obscured(ctx) {
             tty_write(tty_cmd_clearscreen, &raw mut ttyctx);
             return;
