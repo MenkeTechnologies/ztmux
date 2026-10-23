@@ -1,12 +1,12 @@
 {
-  "total": 1656,
-  "gated": 1656,
-  "passed": 1656,
+  "total": 1661,
+  "gated": 1661,
+  "passed": 1661,
   "failed": 0,
   "quarantined": 0,
   "quarantined_failing": 0,
   "percent": 100.00,
-  "ztmux_version": "3.7.47",
+  "ztmux_version": "3.7.48",
   "reference": "tmux next-3.7",
-  "generated_at": "2026-09-21T08:34:45Z"
+  "generated_at": "2026-10-23T01:43:50Z"
 }

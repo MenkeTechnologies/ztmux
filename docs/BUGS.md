@@ -84,10 +84,21 @@ both binaries, zero divergences.
   `:2082`). `screen_write_clearscreen` deliberately marks `0..sy` where the C
   marks `s->cy..sy`: the whole screen was cleared, and the C range leaves the rows
   above the cursor stale when a block clears with the cursor off the top row.
-- **Pinned by** `parity/cases/1969_sync_output_scroll_region_render.sh`: DL, SU,
-  LF at the region bottom, IL and RI, each in its own sync block, read back as
-  the attached client painted them. It fails on the previous build with the
-  frozen-middle picture and matches the reference on this one.
+- **Pinned by** five render cases, each reading back what the attached client
+  painted. Every one fails on the previous build and matches the reference on
+  this one:
+  - `1969_sync_output_scroll_region_render.sh` — DL, SU, LF at the region
+    bottom, IL and RI, each in its own sync block.
+  - `1970_sync_output_clear_render.sh` — ED 0/1/2 in sync blocks, with a
+    mid-block capture that must still show the pre-clear frame.
+  - `1971_sync_output_scroll_edges_render.sh` — SD, RI and IL in a region in
+    the middle of the screen, and IL with the cursor below the region.
+  - `1972_sync_output_split_pane_scroll_render.sh` — DL/IL in the right half of
+    a horizontal split and in the bottom of a vertical one (the redraw-region
+    fallback, with a non-zero pane offset).
+  - `1973_mouse_wheel_sync_scroll_render.sh` — the nvim path end to end: SGR
+    wheel reports typed at the client tty, forwarded to an app that scrolls in
+    sync blocks.
 
 ## 2026-09-13 (the format-variable audit)
 

@@ -3,7 +3,7 @@
 [![CI](https://github.com/MenkeTechnologies/ztmux/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/ztmux/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://menketechnologies.github.io/ztmux/)
 [![Port Report](https://img.shields.io/badge/port-report-8a2be2.svg)](https://menketechnologies.github.io/ztmux/port_report.html)
-[![Parity vs tmux](https://img.shields.io/badge/parity%20vs%20tmux-1656%2F1656%20gated-brightgreen.svg)](parity/PARITY_ROADMAP.md)
+[![Parity vs tmux](https://img.shields.io/badge/parity%20vs%20tmux-1661%2F1661%20gated-brightgreen.svg)](parity/PARITY_ROADMAP.md)
 [![Status](https://img.shields.io/badge/status-server%20%2B%20client%20running-brightgreen.svg)](https://menketechnologies.github.io/ztmux/)
 [![Bug log](https://img.shields.io/badge/bug%20log-open%20gaps%20named-orange.svg)](docs/BUGS.md)
 [![Reference](https://img.shields.io/badge/reference-tmux%203.x-00ffcc.svg)](https://github.com/tmux/tmux)
@@ -16,7 +16,7 @@
 >
 > *"Not a wrapper. Not control mode. The multiplexer itself."*
 >
-> *"Ported against the C, verified against the C — byte for byte, 1656/1656 gated parity cases passing."*
+> *"Ported against the C, verified against the C — byte for byte, 1661/1661 gated parity cases passing."*
 
 ## `[FROM SOURCE, NOT FROM SCRATCH]`
 
@@ -60,7 +60,7 @@ opens its own socket namespace (`ztmux-<uid>`) so it never collides with a runni
 
 **Status: 100% functional.** The port builds, runs, and self-hosts — `ztmux new-session`,
 splits, detach/reattach, the command language, formats, and layouts all work — and the
-parity suite is green at **1656/1656 gated (100%)** against the vendored tmux, with
+parity suite is green at **1661/1661 gated (100%)** against the vendored tmux, with
 **nothing quarantined** — the twelve cases that a Linux-only divergence had held out of the
 gate were root-caused and now gate with the rest
 ([`parity/quarantine.txt`](parity/quarantine.txt) is empty). Every
@@ -185,7 +185,7 @@ had kept twelve render cases out of the gate since August: a pane's environment 
 the `COLORTERM=truecolor` the C sets in `environ_for_session`, so on a Linux terminfo where
 `tmux-256color` carries neither `Tc` nor `RGB` a nested server's client never picked up the
 RGB feature and every default theme colour fell back to its 8-colour form. It now stands at
-**1656/1656 gated cases passing (100%), byte-for-byte vs the vendored tmux**, with
+**1661/1661 gated cases passing (100%), byte-for-byte vs the vendored tmux**, with
 **nothing quarantined** ([`parity/quarantine.txt`](parity/quarantine.txt) is empty; the
 mechanism stays, and the count still travels next to the percentage on the summary line and
 in the JSON). That is a
